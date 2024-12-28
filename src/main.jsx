@@ -4,13 +4,16 @@ import { BrowserRouter as Router } from "react-router-dom";
 import { AuctionsProvider } from "./context/AuctionsContext";
 import App from "./App";
 import "./index.css";
+import { UserProvider } from "./context/UserContext";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
     <React.StrictMode>
-        <AuctionsProvider>
-            <Router>
-                <App />
-            </Router>
-        </AuctionsProvider>
+        <Router>
+            <UserProvider>
+                <AuctionsProvider>
+                    <App />
+                </AuctionsProvider>
+            </UserProvider>
+        </Router>
     </React.StrictMode>
 );

@@ -1,23 +1,51 @@
 import React, { useContext } from "react";
 import { Link } from "react-router-dom";
 import { AuctionsContext } from "../context/AuctionsContext";
+import { UserContext } from "../context/UserContext";
 
 const Home = () => {
     const { auctions } = useContext(AuctionsContext);
+    const { currentUser, logoutUser } = useContext(UserContext);
 
     return (
         <div className="min-h-screen w-full bg-gray-50 flex flex-col justify-between py-10">
-            <header className="text-center mb-12">
-                <h1 className="text-6xl font-extrabold text-blue-600">KoL Auction Bay</h1>
-                <p className="text-xl text-gray-700 mt-4">
-                    The best place to find and bid on rare treasures.
-                </p>
+            <header className="mb-12 relative">
+                {/* User Section */}
+                <div className="absolute top-6 right-6 flex flex-col items-end text-right">
+                    {currentUser ? (
+                        <div className="flex flex-col items-end gap-1 text-right">
+                            <span className="text-gray-700 text-sm font-bold">
+                                Welcome, {currentUser.khubUsername}
+                            </span>
+                            <button
+                                onClick={logoutUser}
+                                className="text-blue-500 hover:underline text-sm"
+                            >
+                                Log Out
+                            </button>
+                        </div>
+                    ) : (
+                        <Link to="/login" className="text-blue-500 hover:underline text-sm">
+                            Log In
+                        </Link>
+                    )}
+                </div>
+
+                {/* Title Section */}
+                <div className="text-center">
+                    <h1 className="text-6xl font-extrabold text-blue-600">KoL Auction Bay</h1>
+                    <p className="text-xl text-gray-700 mt-4">
+                        The best place to find and bid on rare treasures.
+                    </p>
+                </div>
 
                 {/* Navigation Links */}
                 <nav className="flex justify-center gap-12 mt-6 text-sm text-gray-500">
-                    <Link to="/register" className="hover:underline">
-                        Register
-                    </Link>
+                    {!currentUser && (
+                        <Link to="/register" className="hover:underline">
+                            Register
+                        </Link>
+                    )}
                     <Link to="/auctions" className="hover:underline">
                         View All Auctions
                     </Link>

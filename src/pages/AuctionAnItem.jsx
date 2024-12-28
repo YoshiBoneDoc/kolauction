@@ -1,9 +1,13 @@
 import React, { useState, useContext } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { AuctionsContext } from "../context/AuctionsContext";
+import { UserContext } from "../context/UserContext";
 import items from "../data/items.json";
 
 const AuctionAnItem = () => {
     const { addAuction } = useContext(AuctionsContext);
+    const { currentUser } = useContext(UserContext);
+    const navigate = useNavigate();
 
     const [selectedItem, setSelectedItem] = useState("");
     const [quantity, setQuantity] = useState(1);
@@ -40,10 +44,62 @@ const AuctionAnItem = () => {
         addAuction(newAuction);
         setShowPreview(false);
         alert("Auction submitted!");
+        navigate("/auctions");
     };
+
+    // Redirect for unauthenticated users
+    if (!currentUser) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex flex-col">
+                {/* Home Button */}
+                <div className="absolute top-4 left-4">
+                    <Link
+                        to="/"
+                        className="text-blue-500 underline hover:text-blue-700 text-sm"
+                    >
+                        Home
+                    </Link>
+                </div>
+
+                {/* Centered Content */}
+                <div className="flex-grow flex flex-col justify-center items-center">
+                    <h1 className="text-2xl font-bold text-center text-red-600 mb-4">
+                        You must be logged in to auction an item.
+                    </h1>
+                    <div className="text-center">
+                        <Link
+                            to="/login"
+                            className="text-blue-500 underline hover:text-blue-700 text-lg"
+                        >
+                            Log In
+                        </Link>
+                        <p className="mt-4 text-sm text-gray-600">
+                            Don’t have an account?{" "}
+                            <Link
+                                to="/register"
+                                className="text-blue-500 underline hover:text-blue-700"
+                            >
+                                Register
+                            </Link>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gray-50 p-6">
+            {/* Home Button */}
+            <div className="mb-4">
+                <Link
+                    to="/"
+                    className="text-blue-500 underline hover:text-blue-700 text-sm"
+                >
+                    Home
+                </Link>
+            </div>
+
             <h1 className="text-4xl font-bold text-center text-blue-600 mb-8">Auction an Item</h1>
             <form onSubmit={handleFormSubmit} className="max-w-lg mx-auto bg-white shadow-md rounded px-8 pt-6 pb-8">
                 <label htmlFor="item" className="block text-gray-700 text-sm font-bold mb-2">
@@ -78,7 +134,7 @@ const AuctionAnItem = () => {
                 />
 
                 <label htmlFor="mrACount" className="block text-gray-700 text-sm font-bold mb-2">
-                    Mr. A's (Optional):
+                    Mr. As (Optional):
                 </label>
                 <input
                     id="mrACount"
