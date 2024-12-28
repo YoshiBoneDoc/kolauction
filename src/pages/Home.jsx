@@ -15,7 +15,13 @@ const Home = () => {
                     {currentUser ? (
                         <div className="flex flex-col items-end gap-1 text-right">
                             <span className="text-gray-700 text-sm font-bold">
-                                Welcome, {currentUser.khubUsername}
+                                Welcome,{" "}
+                                <Link
+                                    to="/profile"
+                                    className="text-blue-500 hover:underline"
+                                >
+                                    {currentUser.khubUsername}
+                                </Link>
                             </span>
                             <button
                                 onClick={logoutUser}
