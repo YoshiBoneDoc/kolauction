@@ -38,13 +38,15 @@ const AuctionAnItem = () => {
             minBidMeat: minBidMeat || 0,
             auctionTime,
             endTime,
+            currentBid: 0, // Default bid
+            owner: currentUser.khubUsername, // Owner field
             image: items.find((item) => item.name === selectedItem)?.image,
+            bids: [], // Initialize bids as an empty array
         };
 
-        addAuction(newAuction);
+        addAuction(newAuction); // Add the auction to AuctionsContext
         setShowPreview(false);
         alert("Auction submitted!");
-        navigate("/auctions");
     };
 
     // Redirect for unauthenticated users

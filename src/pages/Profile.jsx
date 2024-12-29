@@ -18,14 +18,20 @@ const Profile = () => {
         );
     }
 
+    // Filter auctions and bids
+    const currentTime = Date.now();
     const userAuctions = auctions.filter(auction => auction.seller === currentUser.khubUsername);
     const userBids = auctions.filter(auction =>
         auction.bids?.some(bid => bid.bidder === currentUser.khubUsername)
     );
 
-    const completedAuctions = userAuctions.filter(auction => new Date(auction.endTime) < Date.now());
-    const completedBids = userBids.filter(auction => new Date(auction.endTime) < Date.now());
+    const currentAuctions = userAuctions.filter(auction => new Date(auction.endTime) > currentTime);
+    const completedAuctions = userAuctions.filter(auction => new Date(auction.endTime) <= currentTime);
 
+    const currentBids = userBids.filter(auction => new Date(auction.endTime) > currentTime);
+    const completedBids = userBids.filter(auction => new Date(auction.endTime) <= currentTime);
+
+    // Total meat calculations
     const totalMeatGain = completedAuctions.reduce(
         (sum, auction) => sum + (auction.currentBid || 0),
         0
@@ -60,21 +66,20 @@ const Profile = () => {
                     <div className="flex">
                         {/* Current Auctions */}
                         <div className="w-1/2 pr-6 border-r border-gray-300">
-                            <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                                Current Auctions
-                            </h3>
-                            {userAuctions.length > 0 ? (
+                            <h3 className="text-xl font-semibold text-gray-700 mb-2">Current Auctions</h3>
+                            {currentAuctions.length > 0 ? (
                                 <div className="space-y-4">
-                                    {userAuctions.map(auction => (
-                                        <div
+                                    {currentAuctions.map(auction => (
+                                        <Link
                                             key={auction.id}
-                                            className="border rounded-lg shadow-lg p-4 bg-white"
+                                            to={`/auction/${auction.id}`}
+                                            className="block border rounded-lg shadow-lg p-4 bg-white"
                                         >
                                             <h4 className="text-lg font-bold">{auction.item}</h4>
                                             <p>Quantity: {auction.quantity}</p>
                                             <p>Min Bid: {formatNumber(auction.minBidMeat)}</p>
                                             <p>Current Bid: {auction.currentBid ? formatNumber(auction.currentBid) : "No bids yet"}</p>
-                                        </div>
+                                        </Link>
                                     ))}
                                 </div>
                             ) : (
@@ -84,20 +89,19 @@ const Profile = () => {
 
                         {/* Current Bids */}
                         <div className="w-1/2 pl-6">
-                            <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                                Current Bids
-                            </h3>
-                            {userBids.length > 0 ? (
+                            <h3 className="text-xl font-semibold text-gray-700 mb-2">Current Bids</h3>
+                            {currentBids.length > 0 ? (
                                 <div className="space-y-4">
-                                    {userBids.map(auction => (
-                                        <div
+                                    {currentBids.map(auction => (
+                                        <Link
                                             key={auction.id}
-                                            className="border rounded-lg shadow-lg p-4 bg-white"
+                                            to={`/auction/${auction.id}`}
+                                            className="block border rounded-lg shadow-lg p-4 bg-white"
                                         >
                                             <h4 className="text-lg font-bold">{auction.item}</h4>
                                             <p>Your Bid: {formatNumber(auction.bids.find(bid => bid.bidder === currentUser.khubUsername)?.amount || 0)}</p>
                                             <p>Current Bid: {auction.currentBid ? formatNumber(auction.currentBid) : "No bids yet"}</p>
-                                        </div>
+                                        </Link>
                                     ))}
                                 </div>
                             ) : (
@@ -113,19 +117,18 @@ const Profile = () => {
                     <div className="flex">
                         {/* Auction History */}
                         <div className="w-1/2 pr-6 border-r border-gray-300">
-                            <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                                Auction History
-                            </h3>
+                            <h3 className="text-xl font-semibold text-gray-700 mb-2">Auction History</h3>
                             {completedAuctions.length > 0 ? (
                                 <div className="space-y-4">
                                     {completedAuctions.map(auction => (
-                                        <div
+                                        <Link
                                             key={auction.id}
-                                            className="border rounded-lg shadow-lg p-4 bg-gray-100"
+                                            to={`/auction/${auction.id}`}
+                                            className="block border rounded-lg shadow-lg p-4 bg-gray-100"
                                         >
                                             <h4 className="text-lg font-bold">{auction.item}</h4>
                                             <p>Final Price: {formatNumber(auction.currentBid || 0)}</p>
-                                        </div>
+                                        </Link>
                                     ))}
                                 </div>
                             ) : (
@@ -135,20 +138,19 @@ const Profile = () => {
 
                         {/* Bid History */}
                         <div className="w-1/2 pl-6">
-                            <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                                Bid History
-                            </h3>
+                            <h3 className="text-xl font-semibold text-gray-700 mb-2">Bid History</h3>
                             {completedBids.length > 0 ? (
                                 <div className="space-y-4">
                                     {completedBids.map(auction => (
-                                        <div
+                                        <Link
                                             key={auction.id}
-                                            className="border rounded-lg shadow-lg p-4 bg-gray-100"
+                                            to={`/auction/${auction.id}`}
+                                            className="block border rounded-lg shadow-lg p-4 bg-gray-100"
                                         >
                                             <h4 className="text-lg font-bold">{auction.item}</h4>
                                             <p>Your Bid: {formatNumber(auction.bids.find(bid => bid.bidder === currentUser.khubUsername)?.amount || 0)}</p>
                                             <p>Winning Bid: {formatNumber(auction.currentBid || 0)}</p>
-                                        </div>
+                                        </Link>
                                     ))}
                                 </div>
                             ) : (
@@ -156,6 +158,22 @@ const Profile = () => {
                             )}
                         </div>
                     </div>
+                </div>
+            </div>
+
+            {/* Lifetime Totals */}
+            <div className="fixed bottom-0 left-0 w-full bg-white shadow-md border-t p-4 flex justify-evenly">
+                <div className="text-center">
+                    <h2 className="text-sm font-bold text-gray-700">Total Meat Gained</h2>
+                    <p className="text-lg font-extrabold text-green-600">
+                        {formatNumber(totalMeatGain)} Meat
+                    </p>
+                </div>
+                <div className="text-center">
+                    <h2 className="text-sm font-bold text-gray-700">Total Meat Bid</h2>
+                    <p className="text-lg font-extrabold text-red-600">
+                        {formatNumber(totalMeatBid)} Meat
+                    </p>
                 </div>
             </div>
         </div>
