@@ -3,6 +3,9 @@ import { Link, useNavigate } from "react-router-dom";
 import { AuctionsContext } from "../context/AuctionsContext";
 import { UserContext } from "../context/UserContext";
 import items from "../data/items.json";
+import { capMinBid } from "../utils/dataChecks";
+import { parseInput, convertToShorthand } from "../utils/numberUtils";
+
 
 const AuctionAnItem = () => {
     const { addAuction } = useContext(AuctionsContext);
@@ -10,65 +13,90 @@ const AuctionAnItem = () => {
     const navigate = useNavigate();
 
     const [selectedItem, setSelectedItem] = useState("");
-    const [quantity, setQuantity] = useState(1);
-    const [mrACount, setMrACount] = useState(0);
+    const [quantity, setQuantity] = useState("1");
     const [minBidMeat, setMinBidMeat] = useState("");
     const [auctionTime, setAuctionTime] = useState("24");
     const [showPreview, setShowPreview] = useState(false);
+    const [previewImage, setPreviewImage] = useState("");
+    const [errorMessage, setErrorMessage] = useState("");
+
+// **Handle Quantity Input**
+    const handleQuantityChange = (e) => {
+        const sanitizedValue = parseInput(e.target.value);
+        setQuantity(sanitizedValue); // Update the input value dynamically
+        e.target.value = sanitizedValue; // Reflect the formatted value in the input field
+    };
+
+// **Handle Minimum Bid Input**
+    const handleMinBidMeatChange = (e) => {
+        console.log("Input value before sanitization:", e.target.value);
+        const sanitizedValue = parseInput(e.target.value); // Sanitize input
+        console.log("Sanitized minBidMeat:", sanitizedValue); // Debug log
+        setMinBidMeat(sanitizedValue); // Dynamically update the state
+    };
 
     const handleFormSubmit = (e) => {
         e.preventDefault();
 
+        // **Validation Checks**
         if (!selectedItem) {
-            alert("Please select an item to auction.");
+            setErrorMessage("Please select an item to auction.");
             return;
         }
 
+        const parsedQuantity = parseInt(quantity.replace(/,/g, ""), 10); // Ensure quantity is numeric
+        const parsedMinBidMeat = parseInput(minBidMeat); // Parse and sanitize the minBidMeat
+
+
+        if (!quantity || parseInt(quantity) <= 0) {
+            setErrorMessage("Quantity must be a positive number.");
+            return;
+        }
+
+        if (!minBidMeat || parseInt(minBidMeat) <= 0) {
+            setErrorMessage("Minimum bid must be a positive number.");
+            return;
+        }
+
+        const matchedItem = items.find((item) => item.name === selectedItem);
+        const gifName = matchedItem?.image?.split("/").pop();
+        const imageUrl = gifName
+            ? `http://images.kingdomofloathing.com/itemimages/${gifName}`
+            : "https://via.placeholder.com/150";
+
+        setPreviewImage(imageUrl);
         setShowPreview(true);
+        setErrorMessage(""); // Clear errors on valid input
     };
 
     const handleConfirmAuction = () => {
         const endTime = Date.now() + auctionTime * 60 * 60 * 1000;
 
-        // Find the selected item's data
-        const matchedItem = items.find((item) => item.name === selectedItem);
-
-        // Extract the correct .gif value from the matched item's image property
-        const gifName = matchedItem?.image?.split("/").pop(); // Split by "/" and take the last portion (e.g., "saucepan.gif")
-
-        // Construct the image URL
-        const imageUrl = gifName
-            ? `http://images.kingdomofloathing.com/itemimages/${gifName}`
-            : "https://via.placeholder.com/150";
-
-        console.log("Matched Item:", matchedItem);
-        console.log("Extracted gif name:", gifName);
-        console.log("Generated Image URL:", imageUrl);
-
         const newAuction = {
             id: Date.now(),
             item: selectedItem,
-            quantity,
-            mrACount,
-            minBidMeat: minBidMeat || 0,
+            quantity: parseInt(quantity), // Ensure quantity is numeric
+            minBidMeat: parseInt(minBidMeat), // Ensure minBidMeat is numeric
             auctionTime,
             endTime,
-            currentBid: 0, // Default bid
-            owner: currentUser.khubUsername, // Owner field
-            image: imageUrl, // Use the constructed image URL
-            bids: [], // Initialize bids as an empty array
+            currentBid: 0,
+            owner: currentUser.khubUsername,
+            image: previewImage,
+            bids: [],
         };
+        console.log(convertToShorthand(parseInput(minBidMeat)));
 
-        addAuction(newAuction); // Add the auction to AuctionsContext
+
+        addAuction(newAuction);
         setShowPreview(false);
         alert("Auction submitted!");
+        navigate("/auctions");
     };
 
     // Redirect for unauthenticated users
     if (!currentUser) {
         return (
             <div className="min-h-screen bg-gray-50 flex flex-col">
-                {/* Home Button */}
                 <div className="absolute top-4 left-4">
                     <Link
                         to="/"
@@ -77,8 +105,6 @@ const AuctionAnItem = () => {
                         Home
                     </Link>
                 </div>
-
-                {/* Centered Content */}
                 <div className="flex-grow flex flex-col justify-center items-center">
                     <h1 className="text-2xl font-bold text-center text-red-600 mb-4">
                         You must be logged in to auction an item.
@@ -107,7 +133,6 @@ const AuctionAnItem = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 p-6">
-            {/* Home Button */}
             <div className="mb-4">
                 <Link
                     to="/"
@@ -119,6 +144,9 @@ const AuctionAnItem = () => {
 
             <h1 className="text-4xl font-bold text-center text-blue-600 mb-8">Auction an Item</h1>
             <form onSubmit={handleFormSubmit} className="max-w-lg mx-auto bg-white shadow-md rounded px-8 pt-6 pb-8">
+                {errorMessage && (
+                    <p className="text-red-500 text-center mb-4 font-bold">{errorMessage}</p>
+                )}
                 <label htmlFor="item" className="block text-gray-700 text-sm font-bold mb-2">
                     Select an Item:
                 </label>
@@ -143,22 +171,10 @@ const AuctionAnItem = () => {
                 </label>
                 <input
                     id="quantity"
-                    type="number"
+                    type="text" // Changed to text to allow shorthand input
                     value={quantity}
-                    onChange={(e) => setQuantity(Number(e.target.value))}
-                    min="1"
-                    className="block w-full p-2 border border-gray-300 rounded mb-4"
-                />
-
-                <label htmlFor="mrACount" className="block text-gray-700 text-sm font-bold mb-2">
-                    Mr. As (Optional):
-                </label>
-                <input
-                    id="mrACount"
-                    type="number"
-                    value={mrACount}
-                    onChange={(e) => setMrACount(Number(e.target.value))}
-                    min="0"
+                    onChange={handleQuantityChange}
+                    placeholder="Enter quantity (e.g., 1k, 10m)"
                     className="block w-full p-2 border border-gray-300 rounded mb-4"
                 />
 
@@ -167,10 +183,10 @@ const AuctionAnItem = () => {
                 </label>
                 <input
                     id="minBidMeat"
-                    type="number"
+                    type="text" // Changed to text to allow shorthand input
                     value={minBidMeat}
-                    onChange={(e) => setMinBidMeat(Number(e.target.value))}
-                    min="0"
+                    onChange={handleMinBidMeatChange}
+                    placeholder="Enter minimum bid (e.g., 1k, 1.6m, 20b)"
                     className="block w-full p-2 border border-gray-300 rounded mb-4"
                 />
 
@@ -205,14 +221,14 @@ const AuctionAnItem = () => {
                     {selectedItem && (
                         <div className="flex flex-col items-center">
                             <img
-                                src={items.find((item) => item.name === selectedItem)?.image}
+                                src={previewImage}
                                 alt={selectedItem}
                                 className="w-32 h-32 object-contain mb-4"
                             />
                             <p>Item: {selectedItem}</p>
                             <p>Quantity: {quantity}</p>
-                            <p>Mr. A's: {mrACount}</p>
-                            <p>Min Bid (Meat): {minBidMeat || 0}</p>
+                            <p>Min Bid: {convertToShorthand(parseInput(minBidMeat)) || "0"}</p>
+
                             <p>Duration: {auctionTime} hours</p>
                         </div>
                     )}

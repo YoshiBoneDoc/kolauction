@@ -2,6 +2,7 @@ import React, { useContext, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { AuctionsContext } from "../context/AuctionsContext";
 import { UserContext } from "../context/UserContext";
+import { parseInput } from "../utils/numberUtils";
 
 const AllAuctions = () => {
     const { auctions, updateAuction } = useContext(AuctionsContext);
@@ -67,23 +68,6 @@ const AllAuctions = () => {
         const numericBid = parseInt(bidAmount.replace(/,/g, ""), 10);
         const auction = auctions.find((a) => a.id === auctionId);
 
-        if (!auction) return;
-
-        if (!currentUser) {
-            setBids((prevBids) => ({
-                ...prevBids,
-                [auctionId]: { ...prevBids[auctionId], bidError: "Only registered users may bid." },
-            }));
-            return;
-        }
-
-        if (auction.owner === currentUser.khubUsername) {
-            setBids((prevBids) => ({
-                ...prevBids,
-                [auctionId]: { ...prevBids[auctionId], bidError: "You cannot bid on your own auction." },
-            }));
-            return;
-        }
 
         if (numericBid > (auction.currentBid || 0) && numericBid >= auction.minBidMeat) {
             const updatedAuction = {
@@ -109,10 +93,11 @@ const AllAuctions = () => {
     };
 
     const handleInputChange = (auctionId, value) => {
-        const formattedValue = value.replace(/\D/g, ""); // Allow only numbers
+        const parsedValue = parseInput(value);
+
         setBids((prevBids) => ({
             ...prevBids,
-            [auctionId]: { ...prevBids[auctionId], bidAmount: formatNumber(formattedValue) },
+            [auctionId]: { ...prevBids[auctionId], bidAmount: isNaN(parsedValue) ? value : parseInput(parsedValue) },
         }));
     };
 
@@ -189,7 +174,7 @@ const AllAuctions = () => {
                                             type="text"
                                             value={bids[auction.id]?.bidAmount || ""}
                                             onChange={(e) => handleInputChange(auction.id, e.target.value)}
-                                            placeholder="Bid Meat"
+                                            placeholder="Enter bid (e.g., 10k, 1m)"
                                             className="w-full p-2 border border-gray-300 rounded placeholder-gray-500"
                                         />
                                         <div className="flex justify-between mt-2">
