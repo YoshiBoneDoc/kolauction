@@ -21,7 +21,6 @@ const AuctionAnItem = () => {
     const [errorMessage, setErrorMessage] = useState("");
 
 // **Handle Quantity Input**
-// **Handle Quantity Input**
     const handleQuantityChange = (e) => {
         const input = e.target;
         const rawValue = input.value.replace(/,/g, ""); // Remove commas from the raw input

@@ -2,7 +2,7 @@ import React, { useContext, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { AuctionsContext } from "../context/AuctionsContext";
 import { UserContext } from "../context/UserContext";
-import { parseInput } from "../utils/numberUtils";
+import { parseInput, convertToShorthand} from "../utils/numberUtils";
 
 const AllAuctions = () => {
     const { auctions, updateAuction } = useContext(AuctionsContext);
@@ -68,7 +68,34 @@ const AllAuctions = () => {
         const numericBid = parseInt(bidAmount.replace(/,/g, ""), 10);
         const auction = auctions.find((a) => a.id === auctionId);
 
+        // Validate bid amount
+        if (!numericBid || numericBid <= 0) {
+            setBids((prevBids) => ({
+                ...prevBids,
+                [auctionId]: { ...prevBids[auctionId], bidError: "This isn't a charity. Bid at least the minimum" },
+            }));
+            return;
+        }
 
+        if (numericBid > 20000000000) {
+            setBids((prevBids) => ({
+                ...prevBids,
+                [auctionId]: { ...prevBids[auctionId], bidError: "Bid cannot exceed 20 billion." },
+            }));
+            return;
+        }
+
+        // Check if user is already the highest bidder
+        const lastBid = auction.bids?.[auction.bids.length - 1];
+        if (lastBid?.bidder === currentUser.khubUsername) {
+            setBids((prevBids) => ({
+                ...prevBids,
+                [auctionId]: { ...prevBids[auctionId], bidError: "You are already the highest bidder." },
+            }));
+            return;
+        }
+
+        //Check bid against current bid and minimum bid
         if (numericBid > (auction.currentBid || 0) && numericBid >= auction.minBidMeat) {
             const updatedAuction = {
                 ...auction,
@@ -93,11 +120,15 @@ const AllAuctions = () => {
     };
 
     const handleInputChange = (auctionId, value) => {
-        const parsedValue = parseInput(value);
+        const input = value.replace(/,/g, ""); // Remove commas from raw input
+        const sanitizedValue = parseInput(input); // Sanitize the input using parseInput
 
         setBids((prevBids) => ({
             ...prevBids,
-            [auctionId]: { ...prevBids[auctionId], bidAmount: isNaN(parsedValue) ? value : parseInput(parsedValue) },
+            [auctionId]: {
+                ...prevBids[auctionId],
+                bidAmount: sanitizedValue || input, // Use sanitized value or raw input
+            },
         }));
     };
 
@@ -133,7 +164,7 @@ const AllAuctions = () => {
                         </h2>
 
                         <p className="text-xs text-[#3F72AF] mb-4">
-                            Minimum Bid (Meat): {formatNumber(auction.minBidMeat)}
+                            Minimum Bid (Meat): {convertToShorthand(auction.minBidMeat) || "0"}
                         </p>
 
                         <div className="text-center mb-4">
