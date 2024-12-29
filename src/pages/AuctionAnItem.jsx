@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { AuctionsContext } from "../context/AuctionsContext";
 import { UserContext } from "../context/UserContext";
 import items from "../data/items.json";
-import { capMinBid } from "../utils/dataChecks";
+import { getBidErrorMessage} from "../utils/dataChecks";
 import { parseInput, convertToShorthand } from "../utils/numberUtils";
 
 
@@ -21,43 +21,94 @@ const AuctionAnItem = () => {
     const [errorMessage, setErrorMessage] = useState("");
 
 // **Handle Quantity Input**
+// **Handle Quantity Input**
     const handleQuantityChange = (e) => {
-        const sanitizedValue = parseInput(e.target.value);
-        setQuantity(sanitizedValue); // Update the input value dynamically
-        e.target.value = sanitizedValue; // Reflect the formatted value in the input field
+        const input = e.target;
+        const rawValue = input.value.replace(/,/g, ""); // Remove commas from the raw input
+        const cursorPosition = input.selectionStart; // Get the current cursor position
+
+        // Sanitize the input
+        const sanitizedValue = parseInput(rawValue);
+
+        // Calculate the new cursor position based on the input
+        const countCommasBeforeCursor = (value, position) =>
+            value.slice(0, position).match(/,/g)?.length || 0;
+
+        const rawCommasBefore = countCommasBeforeCursor(input.value, cursorPosition);
+        const sanitizedCommasBefore = countCommasBeforeCursor(sanitizedValue, cursorPosition);
+
+        const adjustedCursorPosition =
+            cursorPosition + (sanitizedCommasBefore - rawCommasBefore);
+
+        // Update the state with the sanitized value
+        setQuantity(sanitizedValue);
+
+        // Restore the cursor position after the DOM update
+        setTimeout(() => {
+            input.setSelectionRange(adjustedCursorPosition, adjustedCursorPosition);
+        }, 0);
     };
 
 // **Handle Minimum Bid Input**
     const handleMinBidMeatChange = (e) => {
-        console.log("Input value before sanitization:", e.target.value);
-        const sanitizedValue = parseInput(e.target.value); // Sanitize input
-        console.log("Sanitized minBidMeat:", sanitizedValue); // Debug log
-        setMinBidMeat(sanitizedValue); // Dynamically update the state
+        const input = e.target;
+        const rawValue = input.value.replace(/,/g, ""); // Remove commas from the raw input
+        const cursorPosition = input.selectionStart; // Get the current cursor position
+
+        // Sanitize the input
+        const sanitizedValue = parseInput(rawValue);
+
+        // Calculate the new cursor position based on the input
+        const countCommasBeforeCursor = (value, position) =>
+            value.slice(0, position).match(/,/g)?.length || 0;
+
+        const rawCommasBefore = countCommasBeforeCursor(input.value, cursorPosition);
+        const sanitizedCommasBefore = countCommasBeforeCursor(sanitizedValue, cursorPosition);
+
+        const adjustedCursorPosition =
+            cursorPosition + (sanitizedCommasBefore - rawCommasBefore);
+
+        // Update the state with the sanitized value
+        setMinBidMeat(sanitizedValue);
+
+        // Restore the cursor position after the DOM update
+        setTimeout(() => {
+            input.setSelectionRange(adjustedCursorPosition, adjustedCursorPosition);
+        }, 0);
     };
 
     const handleFormSubmit = (e) => {
         e.preventDefault();
 
-        // **Validation Checks**
+        // Parse and sanitize the minimum bid input
+        const parsedMinBidMeat = parseInt(minBidMeat.replace(/,/g, ""), 10);
+        if (isNaN(parsedMinBidMeat) || parsedMinBidMeat <= 0) {
+            setErrorMessage("Minimum bid must be a positive number.");
+            return;
+        }
+        if (parsedMinBidMeat > 10000000000) {
+            setErrorMessage("Minimum bid cannot exceed 10 billion.");
+            return;
+        }
+
+        // Parse and sanitize the quantity input
+        const parsedQuantity = parseInt(quantity.replace(/,/g, ""), 10);
+        if (isNaN(parsedQuantity) || parsedQuantity <= 0) {
+            setErrorMessage("Quantity must be a positive number.");
+            return;
+        }
+        if (parsedQuantity > 5000000000) {
+            setErrorMessage("Quantity cannot exceed 5 billion.");
+            return;
+        }
+
+        // Validate selected item
         if (!selectedItem) {
             setErrorMessage("Please select an item to auction.");
             return;
         }
 
-        const parsedQuantity = parseInt(quantity.replace(/,/g, ""), 10); // Ensure quantity is numeric
-        const parsedMinBidMeat = parseInput(minBidMeat); // Parse and sanitize the minBidMeat
-
-
-        if (!quantity || parseInt(quantity) <= 0) {
-            setErrorMessage("Quantity must be a positive number.");
-            return;
-        }
-
-        if (!minBidMeat || parseInt(minBidMeat) <= 0) {
-            setErrorMessage("Minimum bid must be a positive number.");
-            return;
-        }
-
+        // All validation passed: Proceed with auction preview
         const matchedItem = items.find((item) => item.name === selectedItem);
         const gifName = matchedItem?.image?.split("/").pop();
         const imageUrl = gifName
@@ -70,13 +121,36 @@ const AuctionAnItem = () => {
     };
 
     const handleConfirmAuction = () => {
+        // Parse and sanitize the minimum bid input
+        const parsedMinBidMeat = parseInt(minBidMeat.replace(/,/g, ""), 10);
+        if (isNaN(parsedMinBidMeat) || parsedMinBidMeat <= 0) {
+            alert("Minimum bid must be a positive number.");
+            return;
+        }
+        if (parsedMinBidMeat > 10000000000) {
+            alert("Minimum bid cannot exceed 10 billion.");
+            return;
+        }
+
+        // Parse and sanitize the quantity input
+        const parsedQuantity = parseInt(quantity.replace(/,/g, ""), 10);
+        if (isNaN(parsedQuantity) || parsedQuantity <= 0) {
+            alert("Quantity must be a positive number.");
+            return;
+        }
+        if (parsedQuantity > 5000000000) {
+            alert("Quantity cannot exceed 5 billion.");
+            return;
+        }
+
+        // Prepare auction object
         const endTime = Date.now() + auctionTime * 60 * 60 * 1000;
 
         const newAuction = {
             id: Date.now(),
             item: selectedItem,
-            quantity: parseInt(quantity), // Ensure quantity is numeric
-            minBidMeat: parseInt(minBidMeat), // Ensure minBidMeat is numeric
+            quantity: parsedQuantity,
+            minBidMeat: parsedMinBidMeat,
             auctionTime,
             endTime,
             currentBid: 0,
@@ -84,9 +158,8 @@ const AuctionAnItem = () => {
             image: previewImage,
             bids: [],
         };
-        console.log(convertToShorthand(parseInput(minBidMeat)));
 
-
+        // Add auction and navigate back
         addAuction(newAuction);
         setShowPreview(false);
         alert("Auction submitted!");
@@ -186,7 +259,7 @@ const AuctionAnItem = () => {
                     type="text" // Changed to text to allow shorthand input
                     value={minBidMeat}
                     onChange={handleMinBidMeatChange}
-                    placeholder="Enter minimum bid (e.g., 1k, 1.6m, 20b)"
+                    placeholder="Enter minimum bid (e.g., 20000, 1k, 10m, 20b)"
                     className="block w-full p-2 border border-gray-300 rounded mb-4"
                 />
 

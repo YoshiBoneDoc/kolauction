@@ -5,8 +5,11 @@ export const parseInput = (value) => {
     // Return an empty string if the input is empty
     if (!value) return "";
 
-    // Remove commas from the input
-    value = value.replace(/,/g, "");
+    // Remove any commas or invalid characters (allow numbers and shorthand 'k', 'm', 'b')
+    value = value.replace(/[^0-9kmbKMB]/g, "");
+
+    // Remove any decimals if present
+    value = value.replace(/\./g, "");
 
     // Remove invalid characters (allow only numbers, '.', 'k', 'm', 'b')
     value = value.replace(/[^0-9.kmbKMB]/g, "");
