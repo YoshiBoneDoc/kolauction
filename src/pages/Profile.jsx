@@ -18,30 +18,34 @@ const Profile = () => {
         );
     }
 
-    // Filter auctions and bids
     const currentTime = Date.now();
-    const userAuctions = auctions.filter(auction => auction.seller === currentUser.khubUsername);
-    const userBids = auctions.filter(auction =>
-        auction.bids?.some(bid => bid.bidder === currentUser.khubUsername)
+    const userAuctions = auctions.filter((auction) => auction.seller === currentUser.khubUsername);
+    const userBids = auctions.filter((auction) =>
+        auction.bids?.some((bid) => bid.bidder === currentUser.khubUsername)
     );
 
-    const currentAuctions = userAuctions.filter(auction => new Date(auction.endTime) > currentTime);
-    const completedAuctions = userAuctions.filter(auction => new Date(auction.endTime) <= currentTime);
+    const currentAuctions = userAuctions.filter((auction) => new Date(auction.endTime) > currentTime);
+    const completedAuctions = userAuctions.filter((auction) => new Date(auction.endTime) <= currentTime);
 
-    const currentBids = userBids.filter(auction => new Date(auction.endTime) > currentTime);
-    const completedBids = userBids.filter(auction => new Date(auction.endTime) <= currentTime);
+    const currentBids = userBids.filter((auction) => new Date(auction.endTime) > currentTime);
+    const completedBids = userBids.filter((auction) => new Date(auction.endTime) <= currentTime);
 
-    // Total meat calculations
     const totalMeatGain = completedAuctions.reduce(
         (sum, auction) => sum + (auction.currentBid || 0),
         0
     );
+
     const totalMeatBid = completedBids.reduce((sum, auction) => {
-        const userBid = auction.bids.find(bid => bid.bidder === currentUser.khubUsername);
+        const userBid = auction.bids.find((bid) => bid.bidder === currentUser.khubUsername);
         return sum + (userBid?.amount || 0);
     }, 0);
 
     const formatNumber = (number) => number.toLocaleString("en-US");
+
+    const getHighestUserBid = (auction) => {
+        const userBids = auction.bids.filter((bid) => bid.bidder === currentUser.khubUsername);
+        return userBids.length > 0 ? Math.max(...userBids.map((bid) => bid.amount)) : null;
+    };
 
     return (
         <div className="min-h-screen bg-gray-50 p-6 pb-20">
@@ -69,7 +73,7 @@ const Profile = () => {
                             <h3 className="text-xl font-semibold text-gray-700 mb-2">Current Auctions</h3>
                             {currentAuctions.length > 0 ? (
                                 <div className="space-y-4">
-                                    {currentAuctions.map(auction => (
+                                    {currentAuctions.map((auction) => (
                                         <Link
                                             key={auction.id}
                                             to={`/auction/${auction.id}`}
@@ -92,17 +96,20 @@ const Profile = () => {
                             <h3 className="text-xl font-semibold text-gray-700 mb-2">Current Bids</h3>
                             {currentBids.length > 0 ? (
                                 <div className="space-y-4">
-                                    {currentBids.map(auction => (
-                                        <Link
-                                            key={auction.id}
-                                            to={`/auction/${auction.id}`}
-                                            className="block border rounded-lg shadow-lg p-4 bg-white"
-                                        >
-                                            <h4 className="text-lg font-bold">{auction.item}</h4>
-                                            <p>Your Bid: {formatNumber(auction.bids.find(bid => bid.bidder === currentUser.khubUsername)?.amount || 0)}</p>
-                                            <p>Current Bid: {auction.currentBid ? formatNumber(auction.currentBid) : "No bids yet"}</p>
-                                        </Link>
-                                    ))}
+                                    {currentBids.map((auction) => {
+                                        const highestUserBid = getHighestUserBid(auction);
+                                        return (
+                                            <Link
+                                                key={auction.id}
+                                                to={`/auction/${auction.id}`}
+                                                className="block border rounded-lg shadow-lg p-4 bg-white"
+                                            >
+                                                <h4 className="text-lg font-bold">{auction.item}</h4>
+                                                <p>Your Bid: {highestUserBid ? formatNumber(highestUserBid) : "No bids yet"}</p>
+                                                <p>Current Bid: {auction.currentBid ? formatNumber(auction.currentBid) : "No bids yet"}</p>
+                                            </Link>
+                                        );
+                                    })}
                                 </div>
                             ) : (
                                 <p className="text-gray-600">No current bids.</p>
@@ -120,7 +127,7 @@ const Profile = () => {
                             <h3 className="text-xl font-semibold text-gray-700 mb-2">Auction History</h3>
                             {completedAuctions.length > 0 ? (
                                 <div className="space-y-4">
-                                    {completedAuctions.map(auction => (
+                                    {completedAuctions.map((auction) => (
                                         <Link
                                             key={auction.id}
                                             to={`/auction/${auction.id}`}
@@ -141,17 +148,20 @@ const Profile = () => {
                             <h3 className="text-xl font-semibold text-gray-700 mb-2">Bid History</h3>
                             {completedBids.length > 0 ? (
                                 <div className="space-y-4">
-                                    {completedBids.map(auction => (
-                                        <Link
-                                            key={auction.id}
-                                            to={`/auction/${auction.id}`}
-                                            className="block border rounded-lg shadow-lg p-4 bg-gray-100"
-                                        >
-                                            <h4 className="text-lg font-bold">{auction.item}</h4>
-                                            <p>Your Bid: {formatNumber(auction.bids.find(bid => bid.bidder === currentUser.khubUsername)?.amount || 0)}</p>
-                                            <p>Winning Bid: {formatNumber(auction.currentBid || 0)}</p>
-                                        </Link>
-                                    ))}
+                                    {completedBids.map((auction) => {
+                                        const highestUserBid = getHighestUserBid(auction);
+                                        return (
+                                            <Link
+                                                key={auction.id}
+                                                to={`/auction/${auction.id}`}
+                                                className="block border rounded-lg shadow-lg p-4 bg-gray-100"
+                                            >
+                                                <h4 className="text-lg font-bold">{auction.item}</h4>
+                                                <p>Your Bid: {highestUserBid ? formatNumber(highestUserBid) : "No bids yet"}</p>
+                                                <p>Winning Bid: {formatNumber(auction.currentBid || 0)}</p>
+                                            </Link>
+                                        );
+                                    })}
                                 </div>
                             ) : (
                                 <p className="text-gray-600">No completed bids.</p>

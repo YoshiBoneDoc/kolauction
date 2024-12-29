@@ -1,26 +1,23 @@
 import React, { useState, useContext } from "react";
 import { UserContext } from "../context/UserContext";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 const Register = () => {
     const { registerUser } = useContext(UserContext);
     const [khubUsername, setKhubUsername] = useState("");
     const [password, setPassword] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
-    const [successMessage, setSuccessMessage] = useState("");
+    const navigate = useNavigate(); // React Router navigation hook
 
     const handleSubmit = (e) => {
         e.preventDefault();
 
         try {
             registerUser({ khubUsername, password });
-            setSuccessMessage("Registration successful!");
-            setErrorMessage("");
-            setKhubUsername("");
-            setPassword("");
+            setErrorMessage(""); // Clear any previous error messages
+            navigate("/login"); // Redirect to login page
         } catch (error) {
             setErrorMessage(error.message);
-            setSuccessMessage("");
         }
     };
 
@@ -41,9 +38,6 @@ const Register = () => {
 
                 {errorMessage && (
                     <p className="text-red-500 text-sm mb-4">{errorMessage}</p>
-                )}
-                {successMessage && (
-                    <p className="text-green-500 text-sm mb-4">{successMessage}</p>
                 )}
 
                 <div className="mb-4">

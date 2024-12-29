@@ -30,6 +30,21 @@ const AuctionAnItem = () => {
     const handleConfirmAuction = () => {
         const endTime = Date.now() + auctionTime * 60 * 60 * 1000;
 
+        // Find the selected item's data
+        const matchedItem = items.find((item) => item.name === selectedItem);
+
+        // Extract the correct .gif value from the matched item's image property
+        const gifName = matchedItem?.image?.split("/").pop(); // Split by "/" and take the last portion (e.g., "saucepan.gif")
+
+        // Construct the image URL
+        const imageUrl = gifName
+            ? `http://images.kingdomofloathing.com/itemimages/${gifName}`
+            : "https://via.placeholder.com/150";
+
+        console.log("Matched Item:", matchedItem);
+        console.log("Extracted gif name:", gifName);
+        console.log("Generated Image URL:", imageUrl);
+
         const newAuction = {
             id: Date.now(),
             item: selectedItem,
@@ -40,7 +55,7 @@ const AuctionAnItem = () => {
             endTime,
             currentBid: 0, // Default bid
             owner: currentUser.khubUsername, // Owner field
-            image: items.find((item) => item.name === selectedItem)?.image,
+            image: imageUrl, // Use the constructed image URL
             bids: [], // Initialize bids as an empty array
         };
 
