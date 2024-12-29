@@ -1,5 +1,5 @@
-import React, { useContext, useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import React, { useContext, useState, useEffect, useMemo } from "react";
+import { Link} from "react-router-dom";
 import { AuctionsContext } from "../context/AuctionsContext";
 import { UserContext } from "../context/UserContext";
 import { parseInput, convertToShorthand} from "../utils/numberUtils";
@@ -7,6 +7,15 @@ import { parseInput, convertToShorthand} from "../utils/numberUtils";
 const AllAuctions = () => {
     const { auctions, updateAuction } = useContext(AuctionsContext);
     const { currentUser } = useContext(UserContext);
+
+    // Memoize processed auctions with shorthand values
+    const processedAuctions = useMemo(() =>
+            auctions.map((auction) => ({
+                ...auction,
+                shorthandMinBid: convertToShorthand(auction.minBidMeat) || "0", // Precompute shorthand
+            })),
+        [auctions] // Only recompute if auctions change
+    );
 
     const calculateRemainingTime = (endTime) => {
         if (!endTime) return { timeString: "Invalid Auction Data", isRed: false };
@@ -39,6 +48,13 @@ const AllAuctions = () => {
         }, {})
     );
 
+    const handlePlaceBid = (auctionId) => {
+        setBids((prevBids) => ({
+            ...prevBids,
+            [auctionId]: { ...prevBids[auctionId], showInput: true, bidError: "" },
+        }));
+    };
+
     useEffect(() => {
         const interval = setInterval(() => {
             setCountdowns(auctions.map((auction) => calculateRemainingTime(auction.endTime)));
@@ -48,13 +64,6 @@ const AllAuctions = () => {
     }, [auctions]);
 
     const formatNumber = (number) => number.toLocaleString("en-US");
-
-    const handlePlaceBid = (auctionId) => {
-        setBids((prevBids) => ({
-            ...prevBids,
-            [auctionId]: { ...prevBids[auctionId], showInput: true, bidError: "" },
-        }));
-    };
 
     const handleCancelBid = (auctionId) => {
         setBids((prevBids) => ({
@@ -120,16 +129,33 @@ const AllAuctions = () => {
     };
 
     const handleInputChange = (auctionId, value) => {
-        const input = value.replace(/,/g, ""); // Remove commas from raw input
-        const sanitizedValue = parseInput(input); // Sanitize the input using parseInput
+        const inputElement = document.activeElement; // Get the input element
+        if (!inputElement) return;
+        const cursorPosition = inputElement.selectionStart; // Get cursor position
+        const rawValue = value.replace(/,/g, ""); // Remove commas from the raw input
+
+        // Determine if the cursor is at the end
+        const isAtEnd = cursorPosition === value.length;
+
+        // Sanitize and add commas only if typing at the end
+        const sanitizedValue = parseInput(rawValue);
 
         setBids((prevBids) => ({
             ...prevBids,
             [auctionId]: {
                 ...prevBids[auctionId],
-                bidAmount: sanitizedValue || input, // Use sanitized value or raw input
+                bidAmount: sanitizedValue, // Always update the sanitized value
             },
         }));
+
+        // Restore cursor position or place it at the end if reformatting
+        setTimeout(() => {
+            if (isAtEnd) {
+                inputElement.setSelectionRange(sanitizedValue.length, sanitizedValue.length); // Move cursor to end
+            } else {
+                inputElement.setSelectionRange(cursorPosition, cursorPosition); // Maintain original cursor position
+            }
+        }, 0);
     };
 
     return (
@@ -145,7 +171,7 @@ const AllAuctions = () => {
 
             <h1 className="text-4xl font-bold text-center text-[#112D4E] mb-8">All Auctions</h1>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {auctions.map((auction, index) => (
+                {processedAuctions.map((auction, index) => (
                     <div
                         key={auction.id}
                         className="border rounded-lg shadow-lg p-4 bg-[#F9F7F7] flex flex-col items-center"
@@ -163,9 +189,11 @@ const AllAuctions = () => {
                             <span className="text-[#3F72AF]"> x{auction.quantity}</span>
                         </h2>
 
+                        {/* Use memoized shorthand value */}
                         <p className="text-xs text-[#3F72AF] mb-4">
-                            Minimum Bid (Meat): {convertToShorthand(auction.minBidMeat) || "0"}
+                            Minimum Bid (Meat): {auction.shorthandMinBid}
                         </p>
+                        {/* Other auction details */}
 
                         <div className="text-center mb-4">
                             <p className="text-sm text-[#3F72AF] underline">Current Bid</p>

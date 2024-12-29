@@ -71,7 +71,6 @@ export const parseInput = (value) => {
 export const convertToShorthand = (value) => {
     // Remove commas from the input to allow parsing
     const sanitizedValue = value.toString().replace(/,/g, "").trim();
-
     // Parse the numeric value, allowing decimals
     const numericValue = parseFloat(sanitizedValue);
 
