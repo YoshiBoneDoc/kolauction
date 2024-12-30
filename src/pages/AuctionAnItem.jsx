@@ -24,6 +24,14 @@ const AuctionAnItem = () => {
         const input = e.target;
         const rawValue = input.value.replace(/,/g, ""); // Remove commas for processing
         const cursorPosition = input.selectionStart; // Get the cursor position
+        const maxCheck = parseInt(rawValue, 10); // Parse the raw value as a number
+
+
+        // If the numeric value exceeds 5 billion, stop processing and retain the old value
+        const maxAmount = 20000000000;
+        if (maxCheck > maxAmount) {
+            return;
+        }
 
         // Count numeric digits up to the cursor position (ignoring commas)
         let digitsBeforeCursor = 0;
@@ -45,11 +53,6 @@ const AuctionAnItem = () => {
         // Process the raw value through parseInput
         let parsedValue = parseInput(rawValue); // Converts to sanitized value
         const numericValue = parseInt(parsedValue.replace(/,/g, ""), 10);
-
-        // Cap at 5 billion (quantity cap)
-        if (numericValue > 5_000_000_000) {
-            parsedValue = "5,000,000,000";
-        }
 
         // Calculate the new cursor position
         let newCursorPosition = 0;
@@ -83,6 +86,13 @@ const AuctionAnItem = () => {
         const input = e.target;
         const rawValue = input.value.replace(/,/g, ""); // Remove commas for processing
         const cursorPosition = input.selectionStart; // Get the cursor position
+        const maxCheck = parseInt(rawValue, 10); // Parse the raw value as a number
+
+        // If the numeric value exceeds 5 billion, stop processing and retain the old value
+        const maxAmount = 10000000000;
+        if (maxCheck > maxAmount) {
+            return;
+        }
 
         // Count numeric digits up to the cursor position (ignoring commas)
         let digitsBeforeCursor = 0;
@@ -105,10 +115,6 @@ const AuctionAnItem = () => {
         let parsedValue = parseInput(rawValue); // Converts to sanitized value
         const numericValue = parseInt(parsedValue.replace(/,/g, ""), 10);
 
-        // Cap at 10 billion (minimum bid cap)
-        if (numericValue > 10_000_000_000) {
-            parsedValue = "10,000,000,000";
-        }
 
         // Calculate the new cursor position
         let newCursorPosition = 0;
