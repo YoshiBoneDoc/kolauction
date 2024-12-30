@@ -1,15 +1,27 @@
-import React, { useContext } from "react";
-import { Link } from "react-router-dom";
+import React, { useContext, useMemo } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { AuctionsContext } from "../context/AuctionsContext";
 import { UserContext } from "../context/UserContext";
+import { convertToShorthand } from "../utils/numberUtils";
 
 const Home = () => {
     const { auctions } = useContext(AuctionsContext);
     const { currentUser, logoutUser } = useContext(UserContext);
+    const navigate = useNavigate();
+
+    // Process popular auctions with shorthand values
+    const popularAuctions = useMemo(() =>
+            auctions.slice(0, 4).map((auction) => ({
+                ...auction,
+                shorthandMinBid: convertToShorthand(auction.minBidMeat) || "0",
+                formattedQuantity: auction.quantity?.toLocaleString("en-US") || "0",
+            }))
+        , [auctions]);
 
     return (
-        <div className="min-h-screen w-full bg-gray-50 flex flex-col justify-between py-10">
-            <header className="mb-12 relative">
+        <div className="min-h-screen w-full bg-gray-50 flex flex-col">
+            {/* Header Section */}
+            <header className="relative mb-10 mt-12">
                 {/* User Section */}
                 <div className="absolute top-6 right-6 flex flex-col items-end text-right">
                     {currentUser ? (
@@ -46,7 +58,7 @@ const Home = () => {
                 </div>
 
                 {/* Navigation Links */}
-                <nav className="flex justify-center gap-12 mt-6 text-sm text-gray-500">
+                <nav className="flex justify-center gap-12 mt-6 -mb-14 text-sm text-gray-500">
                     {!currentUser && (
                         <Link to="/register" className="hover:underline">
                             Register
@@ -64,44 +76,54 @@ const Home = () => {
                 </nav>
             </header>
 
-            {/* Popular Auctions Section */}
-            <section className="w-full max-w-6xl mx-auto px-4">
-                <h2 className="text-4xl font-bold text-center text-gray-800 mb-8">
-                    Popular Auctions
-                </h2>
+            {/* Divider Line */}
+            <div className="flex justify-center mt-6">
+                <div className="border-t border-gray-300 w-2/3"></div>
+            </div>
+
+            {/* Scrollable Cards Section */}
+            <div className="flex-grow overflow-y-auto w-full max-w-6xl mx-auto px-4 mt-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    {auctions.slice(0, 4).map((auction) => (
-                        <Link
+                    {popularAuctions.map((auction) => (
+                        <div
                             key={auction.id}
-                            to={`/auction/${auction.id}`}
-                            className="border rounded-lg shadow-lg p-6 bg-white hover:shadow-2xl hover:scale-105 transition"
+                            onClick={() => navigate(`/auction/${auction.id}`)} // Make card clickable
+                            className="flex items-center border rounded-md shadow p-2 bg-white cursor-pointer hover:shadow-lg transition-transform transform hover:scale-105"
                         >
-                            <h3 className="text-2xl font-semibold mb-4 text-center">
-                                {auction.item}
-                            </h3>
-                            <p className="text-gray-600 text-center">
-                                Quantity: {auction.quantity}
-                            </p>
-                            {auction.image && (
-                                <img
-                                    src={auction.image}
-                                    alt={auction.item}
-                                    className="w-32 h-32 mx-auto mt-2"
-                                />
-                            )}
-                        </Link>
+                            {/* Icon or Item Image */}
+                            <img
+                                src={auction.image || "/placeholder-icon.png"}
+                                alt={auction.item}
+                                className="w-10 h-10 object-contain mr-3"
+                            />
+
+                            {/* Item Details */}
+                            <div className="flex flex-col flex-grow text-center">
+                                <h2 className="text-lg font-bold text-[#112D4E]">
+                                    {auction.item} <span className="text-[#3F72AF]">x{auction.formattedQuantity}</span>
+                                </h2>
+                                <p className="text-sm text-blue-500 underline mt-1">Current Bid</p>
+                                <p className="text-lg font-extrabold text-[#112D4E] mt-1">
+                                    {auction.currentBid
+                                        ? `${auction.currentBid.toLocaleString("en-US")} Meat`
+                                        : <span className="text-gray-700"><span className="font-bold">No Bids</span> - Min <span className="font-normal">{auction.shorthandMinBid}</span></span>}
+                                </p>
+                            </div>
+                        </div>
                     ))}
                 </div>
-            </section>
+            </div>
 
-            {/* Footer Section */}
-            <footer className="text-center mt-10">
-                <Link
-                    to="/donate"
-                    className="text-blue-500 text-sm hover:underline"
-                >
-                    Donate
-                </Link>
+            {/* Static Donate Bar */}
+            <footer className="w-full bg-gray-100 border-t shadow-md py-2 fixed bottom-0">
+                <div className="text-center">
+                    <Link
+                        to="/donate"
+                        className="text-blue-500 text-sm hover:underline"
+                    >
+                        Donate
+                    </Link>
+                </div>
             </footer>
         </div>
     );

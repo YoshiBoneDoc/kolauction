@@ -29,7 +29,7 @@ AuctionsProvider.propTypes = {
             id: 12345,
             item: "Golden pubes",
             quantity: 1,
-            minBidMeat: 1000000, // 1m
+            minBidMeat: 1240000, // 1m
             auctionTime: 72, // 3 days in hours
             endTime: Date.now() + 72 * 60 * 60 * 1000, // Ends 3 days from now
             currentBid: 0,

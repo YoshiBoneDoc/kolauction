@@ -20,15 +20,39 @@ const AuctionAnItem = () => {
     const [previewImage, setPreviewImage] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
 
+    let hasSuffix = false; // Boolean to track if a suffix has been entered
+
     const handleQuantityChange = (e) => {
         const input = e.target;
         const rawValue = input.value.replace(/,/g, ""); // Remove commas for processing
         const cursorPosition = input.selectionStart; // Get the cursor position
         const maxCheck = parseInt(rawValue, 10); // Parse the raw value as a number
 
+        console.log("Raw Input Value:", rawValue);
+        console.log("Cursor Position Before:", cursorPosition);
+
+
+        const suffixes = ['k', 'm', 'b'];
+        const matches = rawValue.match(/[kmb]/gi);
+
+        // Ensure only one suffix is allowed
+        if (matches) {
+            if (matches.length > 1 || hasSuffix) {
+                console.log("Multiple suffixes detected or already present");
+
+                setQuantity(rawValue.slice(0, -1)); // Remove the latest character
+                return;
+            } else {
+                hasSuffix = true; // Mark suffix as used if valid
+                console.log("Setting hasSuffix to true");
+
+            }
+        }
 
         // If the numeric value exceeds 5 billion, stop processing and retain the old value
-        const maxAmount = 20000000000;
+        const maxAmount = 5000000000;
+        console.log("Max limit exceeded");
+
         if (maxCheck > maxAmount) {
             return;
         }
@@ -45,7 +69,11 @@ const AuctionAnItem = () => {
         const isDeleting = rawValue.length < (quantity.replace(/,/g, "").length || 0);
 
         if (isDeleting) {
-            // Update state directly with raw value for deletion
+            // Reset the suffix flag if the suffix is deleted
+            if (!/[kmb]/i.test(rawValue)) {
+                console.log("Resetting hasSuffix to false");
+                hasSuffix = false;
+            }
             setQuantity(input.value); // Use raw value directly
             return; // Exit early for deletion handling
         }
@@ -59,24 +87,32 @@ const AuctionAnItem = () => {
         let digitCount = 0;
         for (let i = 0; i < parsedValue.length; i++) {
             if (/\d/.test(parsedValue[i])) {
+                console.log("Moving cursor to end due to suffix");
+
                 digitCount++;
             }
             if (digitCount === digitsBeforeCursor) {
+                console.log("Setting Cursor Position to Calculated Position");
+
                 newCursorPosition = i + 1; // Place cursor after the matching digit
                 break;
             }
         }
 
+        console.log("Parsed Value:", parsedValue);
+        console.log("Quantity Before Update:", quantity);
         // Update the state with the sanitized value
         setQuantity(parsedValue);
+        console.log("Quantity After Update:", parsedValue);
 
         // Restore the cursor position after formatting
         requestAnimationFrame(() => {
-            if (numericValue > 5_000_000_000) {
-                // If capped, place the cursor at the end
-                input.setSelectionRange(parsedValue.length, parsedValue.length);
+            const containsSuffix = /[kmb]/i.test(parsedValue);
+            if (containsSuffix) {
+                console.log("Moving cursor to end due to suffix");
+
+                input.setSelectionRange(parsedValue.length, parsedValue.length); // Move cursor to end
             } else {
-                // Otherwise, set it based on the calculated position
                 input.setSelectionRange(newCursorPosition, newCursorPosition);
             }
         });

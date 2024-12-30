@@ -50,6 +50,25 @@ const AllAuctions = () => {
     );
 
     const handlePlaceBid = (auctionId) => {
+
+        // Normalize and compare usernames for case insensitivity
+        const auction = auctions.find((a) => a.id === auctionId);
+        const auctionOwner = String(auction.owner).trim().toLowerCase();
+        const currentUsername = String(currentUser.khubUsername).trim().toLowerCase();
+
+        // Check if the user is the owner of the auction
+        if (auctionOwner === currentUsername) {
+            setBids((prevBids) => ({
+                ...prevBids,
+                [auctionId]: {
+                    ...prevBids[auctionId],
+                    bidError: "You cannot bid on your own auction.",
+                },
+            }));
+            return;
+        }
+
+        // Show input field for valid users
         setBids((prevBids) => ({
             ...prevBids,
             [auctionId]: { ...prevBids[auctionId], showInput: true, bidError: "" },
@@ -262,22 +281,31 @@ const AllAuctions = () => {
 
                         {!countdowns[index]?.isExpired ? (
                             <div className="mt-4 w-full">
-                                {!bids[auction.id].showInput ? (
-                                    <>
-                                        <button
-                                            onClick={() => handlePlaceBid(auction.id)}
-                                            className="w-full bg-[#112D4E] text-white font-bold py-2 px-4 rounded hover:bg-[#3F72AF]"
-                                        >
-                                            Place Bid
-                                        </button>
-                                        <Link
-                                            to={`/auction/${auction.id}`}
-                                            className="text-[#112D4E] underline hover:text-[#3F72AF] text-sm mt-2 block text-center"
-                                        >
-                                            More Info
-                                        </Link>
-                                    </>
+                                {auction.owner.trim().toLowerCase() === currentUser.khubUsername.trim().toLowerCase() ? (
+                                    <Link
+                                        to={`/auction/${auction.id}`}
+                                        className="w-full bg-[#3F72AF] text-white font-bold py-2 px-4 rounded hover:bg-[#3F72AF] text-center block"
+                                    >
+                                        More Info
+                                    </Link>
                                 ) : (
+                                    !bids[auction.id].showInput ? (
+                                        <>
+                                            <button
+                                                onClick={() => handlePlaceBid(auction.id)}
+                                                className="w-full bg-[#112D4E] text-white font-bold py-2 px-4 rounded hover:bg-[#3F72AF]"
+                                            >
+                                                Place Bid
+                                            </button>
+                                            <Link
+                                                to={`/auction/${auction.id}`}
+                                                className="text-[#112D4E] underline hover:text-[#3F72AF] text-sm mt-2 block text-center"
+                                            >
+                                                More Info
+                                            </Link>
+                                        </>
+                                    ) :
+                                        // Input logic for bidding
                                     <>
                                         <input
                                             type="text"

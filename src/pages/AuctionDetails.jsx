@@ -2,7 +2,6 @@ import React, { useContext, useEffect, useState, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AuctionsContext } from "../context/AuctionsContext";
 import { UserContext } from "../context/UserContext";
-import { parseInput } from "../utils/numberUtils.jsx";
 
 const AuctionDetails = () => {
     const { id } = useParams();
@@ -13,7 +12,11 @@ const AuctionDetails = () => {
 
     const [bidAmount, setBidAmount] = useState("");
     const [bidError, setBidError] = useState("");
-    const [remainingTime, setRemainingTime] = useState("");
+    const [remainingTime, setRemainingTime] = useState({
+        timeString: "...",
+        isRed: false,
+    });
+    const maxBidAmount = 20000000000; // 20 billion
 
     // Format numbers for display
     const formattedMinBid = useMemo(
@@ -28,17 +31,24 @@ const AuctionDetails = () => {
 
     // Calculate the remaining time for the auction
     const calculateRemainingTime = (endTime) => {
-        if (!endTime) return "Expired";
+        if (!endTime) return { timeString: "Invalid Auction Data", isRed: false };
 
-        const timeDifference = new Date(endTime) - Date.now();
-        if (timeDifference <= 0) return "Expired";
+        const currentTime = Date.now();
+        const remainingTime = new Date(endTime) - currentTime;
 
-        const hours = Math.floor(timeDifference / (1000 * 60 * 60));
-        const minutes = Math.floor((timeDifference % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((timeDifference % (1000 * 60)) / 1000);
+        if (remainingTime <= 0) return { timeString: "Auction Expired", isRed: false };
 
-        return `${hours}h ${minutes}m ${seconds}s`;
+        const days = Math.floor(remainingTime / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((remainingTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((remainingTime % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((remainingTime % (1000 * 60)) / 1000);
+
+        return {
+            timeString: days > 0 ? `${days}d ${hours}h ${minutes}m` : `${hours}h ${minutes}m ${seconds}s`,
+            isRed: remainingTime <= 3 * 60 * 60 * 1000, // Flag for less than 3 hours
+        };
     };
+
 
     useEffect(() => {
         if (!auction?.endTime) return;
@@ -52,52 +62,96 @@ const AuctionDetails = () => {
 
     // Handle bid input with cursor management and 20 billion cap
     const handleBidInputChange = (e) => {
-        const inputElement = document.activeElement;
-        if (!inputElement) return;
-
-        const value = e.target.value;
-        const rawValue = value.replace(/,/g, "");
+        const inputElement = e.target;
+        const rawValue = inputElement.value.toLowerCase().replace(/,/g, "");
         const cursorPosition = inputElement.selectionStart;
+        const maxCheck = parseInt(rawValue, 10); // Parse the raw value as a number
 
-        // Cap the value at 20 billion
+        // If the numeric value exceeds 5 billion, stop processing and retain the old value
         const maxAmount = 20000000000;
-        if (parseInt(rawValue, 10) > maxAmount) {
+        if (maxCheck > maxAmount) {
             return;
         }
 
-        // Count numeric digits up to the cursor position (ignoring commas)
-        let digitsBeforeCursor = 0;
-        for (let i = 0; i < cursorPosition; i++) {
-            if (/\d/.test(value[i])) {
-                digitsBeforeCursor++;
+        // Handle empty input
+        if (rawValue === "") {
+            setBidAmount("");
+            setBidError("");
+            return;
+        }
+
+        // Validate and parse input
+        let numericValue;
+        const match = rawValue.match(/^(\d+)([kmb]?)$/);
+        if (match) {
+            const numberPart = parseInt(match[1], 10);
+            const suffix = match[2];
+
+            // Convert suffix
+            switch (suffix) {
+                case "k":
+                    numericValue = numberPart * 1000;
+                    break;
+                case "m":
+                    numericValue = numberPart * 1000000;
+                    break;
+                case "b":
+                    numericValue = numberPart * 1000000000;
+                    break;
+                default:
+                    numericValue = numberPart;
+            }
+
+            // Cap at max amount
+            if (numericValue > maxBidAmount) {
+                numericValue = maxBidAmount;
+                setBidError("Bid cannot exceed 20 billion.");
+            } else {
+                setBidError("");
+            }
+        } else {
+            setBidError("Invalid input. Use digits optionally followed by k, m, or b.");
+            return;
+        }
+
+        const formattedValue = numericValue.toLocaleString("en-US");
+
+        // Check if a suffix was used
+        const suffixUsed = rawValue.match(/[kmb]$/);
+
+        let newCursorPosition;
+        if (suffixUsed) {
+            // Move cursor to the end if a suffix was used
+            newCursorPosition = formattedValue.length;
+        } else {
+            // Calculate the new cursor position based on digits before the cursor
+            let digitsBeforeCursor = 0;
+            for (let i = 0; i < cursorPosition; i++) {
+                if (/\d/.test(inputElement.value[i])) {
+                    digitsBeforeCursor++;
+                }
+            }
+
+            let digitCount = 0;
+            newCursorPosition = 0;
+            for (let i = 0; i < formattedValue.length; i++) {
+                if (/\d/.test(formattedValue[i])) {
+                    digitCount++;
+                }
+                if (digitCount === digitsBeforeCursor) {
+                    newCursorPosition = i + 1;
+                    break;
+                }
             }
         }
 
-        // Format the value with commas
-        const formattedValue = rawValue.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-
-        // Calculate the new cursor position
-        let newCursorPosition = 0;
-        let digitCount = 0;
-        for (let i = 0; i < formattedValue.length; i++) {
-            if (/\d/.test(formattedValue[i])) {
-                digitCount++;
-            }
-            if (digitCount === digitsBeforeCursor) {
-                newCursorPosition = i + 1;
-                break;
-            }
-        }
-
-        // Update the state with the formatted value
         setBidAmount(formattedValue);
-
-        // Restore the cursor position after formatting
         requestAnimationFrame(() => {
             inputElement.setSelectionRange(newCursorPosition, newCursorPosition);
         });
     };
 
+    // Handle bid submission
     // Handle bid submission
     const handleBidSubmit = () => {
         if (!currentUser) {
@@ -106,31 +160,60 @@ const AuctionDetails = () => {
         }
 
         const numericBid = parseInt(bidAmount.replace(/,/g, ""), 10);
-        if (isNaN(numericBid) || numericBid <= 0) {
+
+        // Refuse empty inputs or invalid numbers
+        if (!numericBid || numericBid <= 0) {
             setBidError("Please enter a valid bid amount.");
             return;
         }
 
-        if (auction.owner === currentUser.khubUsername) {
+        // Normalize and compare usernames for case insensitivity
+        const auctionOwner = String(auction.owner).trim().toLowerCase();
+        const currentUsername = String(currentUser.khubUsername).trim().toLowerCase();
+
+        // Check if the user is the owner of the auction
+        if (auctionOwner === currentUsername) {
             setBidError("You cannot bid on your own auction.");
             return;
         }
 
-        if (numericBid > (auction.currentBid || 0) && numericBid >= auction.minBidMeat) {
-            const updatedAuction = {
-                ...auction,
-                currentBid: numericBid,
-                bids: [
-                    ...(auction.bids || []),
-                    { bidder: currentUser.khubUsername, amount: numericBid, timestamp: Date.now() },
-                ],
-            };
-            updateAuction(updatedAuction);
-            setBidAmount("");
-            setBidError("");
-        } else {
-            setBidError("Bid too low.");
+        // Check if the user is already the highest bidder
+        const lastBid = auction.bids?.[auction.bids.length - 1];
+        if (
+            lastBid &&
+            String(lastBid.bidder).trim().toLowerCase() === currentUsername
+        ) {
+            setBidError("You are already the highest bidder.");
+            return;
         }
+
+        // Validate the bid amount
+        if (numericBid <= (auction.currentBid || 0)) {
+            setBidError("This isn't a charity.");
+            return;
+        }
+
+        if (numericBid < auction.minBidMeat) {
+            setBidError("Your bid must meet or exceed the minimum bid.");
+            return;
+        }
+
+        // Create the updated auction object
+        const updatedAuction = {
+            ...auction,
+            currentBid: numericBid,
+            bids: [
+                ...(auction.bids || []),
+                { bidder: currentUser.khubUsername, amount: numericBid, timestamp: Date.now() },
+            ],
+        };
+
+        // Update the auction
+        updateAuction(updatedAuction);
+
+        // Clear input and errors
+        setBidAmount("");
+        setBidError("");
     };
 
     if (!auction) {
@@ -202,11 +285,17 @@ const AuctionDetails = () => {
                             </p>
                             <p className="text-sm text-gray-500 underline mt-10">Current Bid</p>
                             <p className="text-3xl font-extrabold text-black mt-2">{formattedCurrentBid} Meat</p>
-                            <p className="text-sm text-gray-600 mt-16">Sold by: <span className="font-bold text-black">{auction.owner || "Unknown"}</span>
+                            <p className="text-sm text-gray-600 mt-16">Sold by: <span
+                                className="font-bold text-black">{auction.owner || "Unknown"}</span>
+                            </p>
+                            <p
+                                className={`text-xs mt-5 ${
+                                    remainingTime?.isRed ? "text-red-500" : "text-gray-500"
+                                }`}
+                            >
+                                Ends In: {remainingTime?.timeString || ""}
                             </p>
                         </div>
-
-                        <p className="text-xs text-gray-500 mt-6 text-center">Ends In: {remainingTime}</p>
                     </div>
                 </div>
             </div>
