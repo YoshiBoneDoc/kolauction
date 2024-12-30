@@ -93,3 +93,109 @@ export const convertToShorthand = (value) => {
 
     return numericValue.toString(); // Return the number as-is if no shorthand is needed
 };
+
+/**
+ * Processes input for numeric fields with optional suffixes (k, m, b).
+ *
+ * @param {string} inputValue - The raw user input.
+ * @param {HTMLElement} inputElement - The input DOM element.
+ * @param {number} maxAmount - The maximum allowed value (default: 20 billion).
+ * @returns {object} - Processed result with:
+ *   - formattedValue (string): The formatted value with commas.
+ *   - numericValue (number): The numeric equivalent.
+ *   - newCursorPosition (number): Suggested cursor position.
+ *   - isValid (boolean): Whether the input is valid.
+ *   - error (string): Error message if invalid.
+ */
+export const processBidInput = (inputValue, inputElement, maxAmount = 20000000000) => {
+    if (!inputElement) return { isValid: false, error: "Input element not found." };
+
+    // Normalize input and remove commas
+    let value = inputValue.toLowerCase();
+    console.log("Raw Input Value:", value);
+
+    const rawValue = value.replace(/,/g, "");
+    const cursorPosition = inputElement.selectionStart;
+
+    // Handle empty input
+    if (rawValue === "") {
+        return { formattedValue: "", numericValue: 0, newCursorPosition: 0, isValid: true, error: "" };
+    }
+
+    // Cap the value at the maximum allowed amount
+    if (parseInt(rawValue, 10) > maxAmount) {
+        return { isValid: false, error: `Value cannot exceed ${maxAmount.toLocaleString("en-US")}.` };
+    }
+
+    let numericValue;
+
+    // Match valid input with optional suffix
+    const match = rawValue.match(/^(\d+)([kmb]?)$/);
+    console.log("Match Result:", match);
+
+    if (match) {
+        const numberPart = parseInt(match[1], 10); // Numeric portion
+        const suffix = match[2]; // Suffix portion (if any)
+        console.log("Number Part:", numberPart, "Suffix:", suffix);
+
+        // Convert based on suffix
+        switch (suffix) {
+            case "k":
+                numericValue = numberPart * 1000;
+                break;
+            case "m":
+                numericValue = numberPart * 1000000;
+                break;
+            case "b":
+                numericValue = numberPart * 1000000000;
+                break;
+            default:
+                numericValue = numberPart; // No suffix
+        }
+        console.log("Converted Numeric Value:", numericValue);
+
+        // Cap the value at the maximum allowed amount
+        if (numericValue > maxAmount) {
+            numericValue = maxAmount;
+        }
+    } else {
+        // If invalid input
+        console.error("Invalid Input Detected");
+        return { isValid: false, error: "Invalid input. Use digits optionally followed by k, m, or b." };
+    }
+
+    // Format the numeric value with commas
+    const formattedValue = numericValue.toLocaleString("en-US");
+    console.log("Formatted Value:", formattedValue);
+
+    // Count numeric digits up to the cursor position (ignoring commas)
+    let digitsBeforeCursor = 0;
+    for (let i = 0; i < cursorPosition; i++) {
+        if (/\d/.test(value[i])) {
+            digitsBeforeCursor++;
+        }
+    }
+    console.log("Digits Before Cursor:", digitsBeforeCursor);
+
+    // Calculate the new cursor position
+    let newCursorPosition = 0;
+    let digitCount = 0;
+    for (let i = 0; i < formattedValue.length; i++) {
+        if (/\d/.test(formattedValue[i])) {
+            digitCount++;
+        }
+        if (digitCount === digitsBeforeCursor) {
+            newCursorPosition = i + 1;
+            break;
+        }
+    }
+    console.log("New Cursor Position:", newCursorPosition);
+
+    return {
+        formattedValue,
+        numericValue,
+        newCursorPosition,
+        isValid: true,
+        error: "",
+    };
+};

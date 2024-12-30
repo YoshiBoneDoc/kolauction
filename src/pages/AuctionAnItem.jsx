@@ -3,9 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { AuctionsContext } from "../context/AuctionsContext";
 import { UserContext } from "../context/UserContext";
 import items from "../data/items.json";
-import { getBidErrorMessage} from "../utils/dataChecks";
-import { parseInput, convertToShorthand } from "../utils/numberUtils";
-
+import { parseInput, convertToShorthand, processBidInput } from "../utils/numberUtils";
+import { validateAuctionSubmission } from "../utils/dataChecks";
 
 const AuctionAnItem = () => {
     const { addAuction } = useContext(AuctionsContext);
@@ -21,161 +20,54 @@ const AuctionAnItem = () => {
     const [errorMessage, setErrorMessage] = useState("");
 
     const handleQuantityChange = (e) => {
-        const input = e.target;
-        const rawValue = input.value.replace(/,/g, ""); // Remove commas for processing
-        const cursorPosition = input.selectionStart; // Get the cursor position
-        const maxCheck = parseInt(rawValue, 10); // Parse the raw value as a number
+        const inputElement = e.target;
+        const { formattedValue, numericValue, newCursorPosition } = processBidInput(
+            inputElement.value,
+            inputElement,
+            5000000000 // Cap at 5 billion
+        );
 
+        setQuantity(formattedValue);
 
-        // If the numeric value exceeds 5 billion, stop processing and retain the old value
-        const maxAmount = 20000000000;
-        if (maxCheck > maxAmount) {
-            return;
-        }
-
-        // Count numeric digits up to the cursor position (ignoring commas)
-        let digitsBeforeCursor = 0;
-        for (let i = 0; i < cursorPosition; i++) {
-            if (/\d/.test(input.value[i])) {
-                digitsBeforeCursor++;
-            }
-        }
-
-        // Detect deletion: input length is shorter than the current state
-        const isDeleting = rawValue.length < (quantity.replace(/,/g, "").length || 0);
-
-        if (isDeleting) {
-            // Update state directly with raw value for deletion
-            setQuantity(input.value); // Use raw value directly
-            return; // Exit early for deletion handling
-        }
-
-        // Process the raw value through parseInput
-        let parsedValue = parseInput(rawValue); // Converts to sanitized value
-        const numericValue = parseInt(parsedValue.replace(/,/g, ""), 10);
-
-        // Calculate the new cursor position
-        let newCursorPosition = 0;
-        let digitCount = 0;
-        for (let i = 0; i < parsedValue.length; i++) {
-            if (/\d/.test(parsedValue[i])) {
-                digitCount++;
-            }
-            if (digitCount === digitsBeforeCursor) {
-                newCursorPosition = i + 1; // Place cursor after the matching digit
-                break;
-            }
-        }
-
-        // Update the state with the sanitized value
-        setQuantity(parsedValue);
-
-        // Restore the cursor position after formatting
+        // Restore cursor position
         requestAnimationFrame(() => {
-            if (numericValue > 5_000_000_000) {
-                // If capped, place the cursor at the end
-                input.setSelectionRange(parsedValue.length, parsedValue.length);
-            } else {
-                // Otherwise, set it based on the calculated position
-                input.setSelectionRange(newCursorPosition, newCursorPosition);
-            }
+            inputElement.setSelectionRange(newCursorPosition, newCursorPosition);
         });
     };
 
     const handleMinBidMeatChange = (e) => {
-        const input = e.target;
-        const rawValue = input.value.replace(/,/g, ""); // Remove commas for processing
-        const cursorPosition = input.selectionStart; // Get the cursor position
-        const maxCheck = parseInt(rawValue, 10); // Parse the raw value as a number
+        const inputElement = e.target;
+        const { formattedValue, numericValue, newCursorPosition } = processBidInput(
+            inputElement.value,
+            inputElement,
+            10000000000 // Cap at 10 billion
+        );
 
-        // If the numeric value exceeds 5 billion, stop processing and retain the old value
-        const maxAmount = 10000000000;
-        if (maxCheck > maxAmount) {
-            return;
-        }
+        setMinBidMeat(formattedValue);
 
-        // Count numeric digits up to the cursor position (ignoring commas)
-        let digitsBeforeCursor = 0;
-        for (let i = 0; i < cursorPosition; i++) {
-            if (/\d/.test(input.value[i])) {
-                digitsBeforeCursor++;
-            }
-        }
-
-        // Detect deletion: input length is shorter than the current state
-        const isDeleting = rawValue.length < (minBidMeat.replace(/,/g, "").length || 0);
-
-        if (isDeleting) {
-            // Update state directly with raw value for deletion
-            setMinBidMeat(input.value); // Use raw value directly
-            return; // Exit early for deletion handling
-        }
-
-        // Process the raw value through parseInput
-        let parsedValue = parseInput(rawValue); // Converts to sanitized value
-        const numericValue = parseInt(parsedValue.replace(/,/g, ""), 10);
-
-
-        // Calculate the new cursor position
-        let newCursorPosition = 0;
-        let digitCount = 0;
-        for (let i = 0; i < parsedValue.length; i++) {
-            if (/\d/.test(parsedValue[i])) {
-                digitCount++;
-            }
-            if (digitCount === digitsBeforeCursor) {
-                newCursorPosition = i + 1; // Place cursor after the matching digit
-                break;
-            }
-        }
-
-        // Update the state with the sanitized value
-        setMinBidMeat(parsedValue);
-
-        // Restore the cursor position after formatting
+        // Restore cursor position
         requestAnimationFrame(() => {
-            if (numericValue > 10_000_000_000) {
-                // If capped, place the cursor at the end
-                input.setSelectionRange(parsedValue.length, parsedValue.length);
-            } else {
-                // Otherwise, set it based on the calculated position
-                input.setSelectionRange(newCursorPosition, newCursorPosition);
-            }
+            inputElement.setSelectionRange(newCursorPosition, newCursorPosition);
         });
     };
 
     const handleFormSubmit = (e) => {
         e.preventDefault();
 
-        // Parse and sanitize the minimum bid input
-        const parsedMinBidMeat = parseInt(minBidMeat.replace(/,/g, ""), 10);
-        if (isNaN(parsedMinBidMeat) || parsedMinBidMeat <= 0) {
-            setErrorMessage("Minimum bid must be a positive number.");
-            return;
-        }
-        if (parsedMinBidMeat > 10000000000) {
-            setErrorMessage("Minimum bid cannot exceed 10 billion.");
-            return;
-        }
-
-        // Parse and sanitize the quantity input
         const parsedQuantity = parseInt(quantity.replace(/,/g, ""), 10);
-        if (isNaN(parsedQuantity) || parsedQuantity <= 0) {
-            setErrorMessage("Quantity must be a positive number.");
-            return;
-        }
-        if (parsedQuantity > 5000000000) {
-            setErrorMessage("Quantity cannot exceed 5 billion.");
+        const parsedMinBidMeat = parseInt(minBidMeat.replace(/,/g, ""), 10);
+
+        const { isValid, error } = validateAuctionSubmission({
+            quantity: parsedQuantity,
+            minBidMeat: parsedMinBidMeat,
+            selectedItem,
+        });
+
+        if (!isValid) {
+            setErrorMessage(error);
             return;
         }
 
-        // Validate selected item
-        if (!selectedItem) {
-            setErrorMessage("Please select an item to auction.");
-            return;
-        }
-
-        // All validation passed: Proceed with auction preview
         const matchedItem = items.find((item) => item.name === selectedItem);
         const gifName = matchedItem?.image?.split("/").pop();
         const imageUrl = gifName
@@ -188,29 +80,20 @@ const AuctionAnItem = () => {
     };
 
     const handleConfirmAuction = () => {
-        // Parse and sanitize the minimum bid input
-        const parsedMinBidMeat = parseInt(minBidMeat.replace(/,/g, ""), 10);
-        if (isNaN(parsedMinBidMeat) || parsedMinBidMeat <= 0) {
-            alert("Minimum bid must be a positive number.");
-            return;
-        }
-        if (parsedMinBidMeat > 10000000000) {
-            alert("Minimum bid cannot exceed 10 billion.");
-            return;
-        }
-
-        // Parse and sanitize the quantity input
         const parsedQuantity = parseInt(quantity.replace(/,/g, ""), 10);
-        if (isNaN(parsedQuantity) || parsedQuantity <= 0) {
-            alert("Quantity must be a positive number.");
-            return;
-        }
-        if (parsedQuantity > 5000000000) {
-            alert("Quantity cannot exceed 5 billion.");
+        const parsedMinBidMeat = parseInt(minBidMeat.replace(/,/g, ""), 10);
+
+        const { isValid, error } = validateAuctionSubmission({
+            quantity: parsedQuantity,
+            minBidMeat: parsedMinBidMeat,
+            selectedItem,
+        });
+
+        if (!isValid) {
+            alert(error);
             return;
         }
 
-        // Prepare auction object
         const endTime = Date.now() + auctionTime * 60 * 60 * 1000;
 
         const newAuction = {
@@ -226,7 +109,6 @@ const AuctionAnItem = () => {
             bids: [],
         };
 
-        // Add auction and navigate back
         addAuction(newAuction);
         setShowPreview(false);
         alert("Auction submitted!");

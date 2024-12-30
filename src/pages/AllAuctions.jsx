@@ -2,7 +2,8 @@ import React, { useContext, useState, useEffect, useMemo } from "react";
 import { Link} from "react-router-dom";
 import { AuctionsContext } from "../context/AuctionsContext";
 import { UserContext } from "../context/UserContext";
-import { parseInput, convertToShorthand} from "../utils/numberUtils";
+import { convertToShorthand, processBidInput} from "../utils/numberUtils";
+import {validateBid} from "../utils/dataChecks.jsx";
 
 const AllAuctions = () => {
     const { auctions, updateAuction } = useContext(AuctionsContext);
@@ -73,139 +74,57 @@ const AllAuctions = () => {
         }));
     };
 
-    const handleBidConfirm = (auctionId) => {
-        const { bidAmount } = bids[auctionId];
-        const numericBid = parseInt(bidAmount.replace(/,/g, ""), 10);
-        const auction = auctions.find((a) => a.id === auctionId);
-
-        // Validate bid amount
-        if (!numericBid || numericBid <= 0) {
-            setBids((prevBids) => ({
-                ...prevBids,
-                [auctionId]: { ...prevBids[auctionId], bidError: "This isn't a charity. Bid at least the minimum" },
-            }));
-            return;
-        }
-
-        if (numericBid > 20000000000) {
-            setBids((prevBids) => ({
-                ...prevBids,
-                [auctionId]: { ...prevBids[auctionId], bidError: "Bid cannot exceed 20 billion." },
-            }));
-            return;
-        }
-
-        // Check if user is already the highest bidder
-        const lastBid = auction.bids?.[auction.bids.length - 1];
-        if (lastBid?.bidder === currentUser.khubUsername) {
-            setBids((prevBids) => ({
-                ...prevBids,
-                [auctionId]: { ...prevBids[auctionId], bidError: "You are already the highest bidder." },
-            }));
-            return;
-        }
-
-        //Check bid against current bid and minimum bid
-        if (numericBid > (auction.currentBid || 0) && numericBid >= auction.minBidMeat) {
-            const updatedAuction = {
-                ...auction,
-                currentBid: numericBid,
-                bids: [
-                    ...(auction.bids || []),
-                    { bidder: currentUser.khubUsername, amount: numericBid, timestamp: Date.now() },
-                ],
-            };
-            updateAuction(updatedAuction);
-
-            setBids((prevBids) => ({
-                ...prevBids,
-                [auctionId]: { bidAmount: "", bidError: "", showInput: false },
-            }));
-        } else {
-            setBids((prevBids) => ({
-                ...prevBids,
-                [auctionId]: { ...prevBids[auctionId], bidError: "Bid too low." },
-            }));
-        }
-    };
 
     const handleInputChange = (auctionId, value) => {
         const inputElement = document.activeElement; // Get the input element
-        if (!inputElement) return;
+        const { formattedValue, numericValue, newCursorPosition } = processBidInput(
+            value,
+            inputElement,
+            20000000000 // Cap at 20 billion
+        );
 
-        const rawValue = value.replace(/,/g, ""); // Remove commas for processing
-        const numericValue = parseInt(rawValue, 10); // Parse the raw value as a number
-        const cursorPosition = inputElement.selectionStart; // Get the cursor position in the formatted value
-
-        // If the numeric value exceeds 20 billion, stop processing and retain the old value
-        const maxAmount = 20000000000;
-        if (numericValue > maxAmount) {
-            return;
-        }
-
-        // Count numeric digits up to the cursor position (ignoring commas)
-        let digitsBeforeCursor = 0;
-        for (let i = 0; i < cursorPosition; i++) {
-            if (/\d/.test(value[i])) {
-                digitsBeforeCursor++;
-            }
-        }
-
-        // Detect deletion: input length is shorter than the current state
-        const isDeleting = rawValue.length < (bids[auctionId]?.bidAmount.replace(/,/g, "").length || 0);
-
-        // If deleting, bypass formatting and update state directly
-        if (isDeleting) {
-            setBids((prevBids) => ({
-                ...prevBids,
-                [auctionId]: {
-                    ...prevBids[auctionId],
-                    bidAmount: value, // Use raw value directly
-                },
-            }));
-            return; // Exit early for deletion handling
-        }
-
-        // Process the raw value through parseInput while maintaining digit count
-        const parsedValue = parseInput(rawValue); // Converts to sanitized value
-        const sanitizedValue = parsedValue.replace(/,/g, ""); // Remove commas for further processing
-
-        // Check if the number is capped at 20 billion
-        const isCapped = sanitizedValue.length !== rawValue.length;
-
-        // Calculate the new cursor position based on digits before the cursor
-        let newCursorPosition = 0;
-        let digitCount = 0;
-
-        for (let i = 0; i < parsedValue.length; i++) {
-            if (/\d/.test(parsedValue[i])) {
-                digitCount++;
-            }
-
-            if (digitCount === digitsBeforeCursor) {
-                newCursorPosition = i + 1; // Place cursor after the matching digit
-                break;
-            }
-        }
-
-        // Update the state with the sanitized value
         setBids((prevBids) => ({
             ...prevBids,
             [auctionId]: {
                 ...prevBids[auctionId],
-                bidAmount: parsedValue,
+                bidAmount: formattedValue,
             },
         }));
 
         // Restore the cursor position after formatting
         requestAnimationFrame(() => {
-            // If the input is capped, place the cursor at the end
-            if (isCapped) {
-                inputElement.setSelectionRange(parsedValue.length, parsedValue.length);
-            } else {
-                inputElement.setSelectionRange(newCursorPosition, newCursorPosition);
-            }
+            inputElement.setSelectionRange(newCursorPosition, newCursorPosition);
         });
+    };
+
+    const handleBidConfirm = (auctionId) => {
+        const { bidAmount } = bids[auctionId];
+        const numericBid = parseInt(bidAmount.replace(/,/g, ""), 10);
+        const auction = auctions.find((a) => a.id === auctionId);
+
+        const { isValid, error, updatedAuction } = validateBid({
+            numericBid,
+            auction,
+            currentUser: currentUser.khubUsername,
+            maxAmount: 20000000000, // Cap at 20 billion
+        });
+
+        if (!isValid) {
+            setBids((prevBids) => ({
+                ...prevBids,
+                [auctionId]: { ...prevBids[auctionId], bidError: error },
+            }));
+            return;
+        }
+
+        // Update the auction with the valid bid
+        updateAuction(updatedAuction);
+
+        // Reset bid state
+        setBids((prevBids) => ({
+            ...prevBids,
+            [auctionId]: { bidAmount: "", bidError: "", showInput: false },
+        }));
     };
 
     return (

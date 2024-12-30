@@ -2,7 +2,8 @@ import React, { useContext, useEffect, useState, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AuctionsContext } from "../context/AuctionsContext";
 import { UserContext } from "../context/UserContext";
-import { parseInput } from "../utils/numberUtils.jsx";
+import { processBidInput} from "../utils/numberUtils.jsx";
+import { validateBid } from "../utils/dataChecks";
 
 const AuctionDetails = () => {
     const { id } = useParams();
@@ -52,50 +53,14 @@ const AuctionDetails = () => {
 
     // Handle bid input with cursor management and 20 billion cap
     const handleBidInputChange = (e) => {
-        const inputElement = document.activeElement;
-        if (!inputElement) return;
-
-        const value = e.target.value;
-        const rawValue = value.replace(/,/g, "");
-        const cursorPosition = inputElement.selectionStart;
-
-        // Cap the value at 20 billion
-        const maxAmount = 20000000000;
-        if (parseInt(rawValue, 10) > maxAmount) {
-            return;
+        const inputElement = e.target;
+        const { formattedValue, numericValue, isValid, error } = processBidInput(inputElement.value, 20000000000);
+        if (isValid) {
+            setBidAmount(formattedValue); // Update the state with the formatted value
+            setBidError(""); // Clear errors
+        } else {
+            setBidError(error); // Set the error message
         }
-
-        // Count numeric digits up to the cursor position (ignoring commas)
-        let digitsBeforeCursor = 0;
-        for (let i = 0; i < cursorPosition; i++) {
-            if (/\d/.test(value[i])) {
-                digitsBeforeCursor++;
-            }
-        }
-
-        // Format the value with commas
-        const formattedValue = rawValue.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-
-        // Calculate the new cursor position
-        let newCursorPosition = 0;
-        let digitCount = 0;
-        for (let i = 0; i < formattedValue.length; i++) {
-            if (/\d/.test(formattedValue[i])) {
-                digitCount++;
-            }
-            if (digitCount === digitsBeforeCursor) {
-                newCursorPosition = i + 1;
-                break;
-            }
-        }
-
-        // Update the state with the formatted value
-        setBidAmount(formattedValue);
-
-        // Restore the cursor position after formatting
-        requestAnimationFrame(() => {
-            inputElement.setSelectionRange(newCursorPosition, newCursorPosition);
-        });
     };
 
     // Handle bid submission
@@ -106,31 +71,21 @@ const AuctionDetails = () => {
         }
 
         const numericBid = parseInt(bidAmount.replace(/,/g, ""), 10);
-        if (isNaN(numericBid) || numericBid <= 0) {
-            setBidError("Please enter a valid bid amount.");
+        const validation = validateBid({
+            numericBid,
+            auction,
+            currentUser: currentUser.khubUsername,
+            maxAmount: 20000000000, // Optional if default is already set
+        });
+        if (!validation.isValid) {
+            setBidError(validation.error);
             return;
         }
 
-        if (auction.owner === currentUser.khubUsername) {
-            setBidError("You cannot bid on your own auction.");
-            return;
-        }
-
-        if (numericBid > (auction.currentBid || 0) && numericBid >= auction.minBidMeat) {
-            const updatedAuction = {
-                ...auction,
-                currentBid: numericBid,
-                bids: [
-                    ...(auction.bids || []),
-                    { bidder: currentUser.khubUsername, amount: numericBid, timestamp: Date.now() },
-                ],
-            };
-            updateAuction(updatedAuction);
-            setBidAmount("");
-            setBidError("");
-        } else {
-            setBidError("Bid too low.");
-        }
+        // Update the auction if valid
+        updateAuction(validation.updatedAuction);
+        setBidAmount("");
+        setBidError("");
     };
 
     if (!auction) {
