@@ -20,60 +20,122 @@ const AuctionAnItem = () => {
     const [previewImage, setPreviewImage] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
 
-// **Handle Quantity Input**
     const handleQuantityChange = (e) => {
         const input = e.target;
-        const rawValue = input.value.replace(/,/g, ""); // Remove commas from the raw input
-        const cursorPosition = input.selectionStart; // Get the current cursor position
+        const rawValue = input.value.replace(/,/g, ""); // Remove commas for processing
+        const cursorPosition = input.selectionStart; // Get the cursor position
 
-        // Sanitize the input
-        const sanitizedValue = parseInput(rawValue);
+        // Count numeric digits up to the cursor position (ignoring commas)
+        let digitsBeforeCursor = 0;
+        for (let i = 0; i < cursorPosition; i++) {
+            if (/\d/.test(input.value[i])) {
+                digitsBeforeCursor++;
+            }
+        }
 
-        // Calculate the new cursor position based on the input
-        const countCommasBeforeCursor = (value, position) =>
-            value.slice(0, position).match(/,/g)?.length || 0;
+        // Detect deletion: input length is shorter than the current state
+        const isDeleting = rawValue.length < (quantity.replace(/,/g, "").length || 0);
 
-        const rawCommasBefore = countCommasBeforeCursor(input.value, cursorPosition);
-        const sanitizedCommasBefore = countCommasBeforeCursor(sanitizedValue, cursorPosition);
+        if (isDeleting) {
+            // Update state directly with raw value for deletion
+            setQuantity(input.value); // Use raw value directly
+            return; // Exit early for deletion handling
+        }
 
-        const adjustedCursorPosition =
-            cursorPosition + (sanitizedCommasBefore - rawCommasBefore);
+        // Process the raw value through parseInput
+        let parsedValue = parseInput(rawValue); // Converts to sanitized value
+        const numericValue = parseInt(parsedValue.replace(/,/g, ""), 10);
+
+        // Cap at 5 billion (quantity cap)
+        if (numericValue > 5_000_000_000) {
+            parsedValue = "5,000,000,000";
+        }
+
+        // Calculate the new cursor position
+        let newCursorPosition = 0;
+        let digitCount = 0;
+        for (let i = 0; i < parsedValue.length; i++) {
+            if (/\d/.test(parsedValue[i])) {
+                digitCount++;
+            }
+            if (digitCount === digitsBeforeCursor) {
+                newCursorPosition = i + 1; // Place cursor after the matching digit
+                break;
+            }
+        }
 
         // Update the state with the sanitized value
-        setQuantity(sanitizedValue);
+        setQuantity(parsedValue);
 
-        // Restore the cursor position after the DOM update
-        setTimeout(() => {
-            input.setSelectionRange(adjustedCursorPosition, adjustedCursorPosition);
-        }, 0);
+        // Restore the cursor position after formatting
+        requestAnimationFrame(() => {
+            if (numericValue > 5_000_000_000) {
+                // If capped, place the cursor at the end
+                input.setSelectionRange(parsedValue.length, parsedValue.length);
+            } else {
+                // Otherwise, set it based on the calculated position
+                input.setSelectionRange(newCursorPosition, newCursorPosition);
+            }
+        });
     };
 
-// **Handle Minimum Bid Input**
     const handleMinBidMeatChange = (e) => {
         const input = e.target;
-        const rawValue = input.value.replace(/,/g, ""); // Remove commas from the raw input
-        const cursorPosition = input.selectionStart; // Get the current cursor position
+        const rawValue = input.value.replace(/,/g, ""); // Remove commas for processing
+        const cursorPosition = input.selectionStart; // Get the cursor position
 
-        // Sanitize the input
-        const sanitizedValue = parseInput(rawValue);
+        // Count numeric digits up to the cursor position (ignoring commas)
+        let digitsBeforeCursor = 0;
+        for (let i = 0; i < cursorPosition; i++) {
+            if (/\d/.test(input.value[i])) {
+                digitsBeforeCursor++;
+            }
+        }
 
-        // Calculate the new cursor position based on the input
-        const countCommasBeforeCursor = (value, position) =>
-            value.slice(0, position).match(/,/g)?.length || 0;
+        // Detect deletion: input length is shorter than the current state
+        const isDeleting = rawValue.length < (minBidMeat.replace(/,/g, "").length || 0);
 
-        const rawCommasBefore = countCommasBeforeCursor(input.value, cursorPosition);
-        const sanitizedCommasBefore = countCommasBeforeCursor(sanitizedValue, cursorPosition);
+        if (isDeleting) {
+            // Update state directly with raw value for deletion
+            setMinBidMeat(input.value); // Use raw value directly
+            return; // Exit early for deletion handling
+        }
 
-        const adjustedCursorPosition =
-            cursorPosition + (sanitizedCommasBefore - rawCommasBefore);
+        // Process the raw value through parseInput
+        let parsedValue = parseInput(rawValue); // Converts to sanitized value
+        const numericValue = parseInt(parsedValue.replace(/,/g, ""), 10);
+
+        // Cap at 10 billion (minimum bid cap)
+        if (numericValue > 10_000_000_000) {
+            parsedValue = "10,000,000,000";
+        }
+
+        // Calculate the new cursor position
+        let newCursorPosition = 0;
+        let digitCount = 0;
+        for (let i = 0; i < parsedValue.length; i++) {
+            if (/\d/.test(parsedValue[i])) {
+                digitCount++;
+            }
+            if (digitCount === digitsBeforeCursor) {
+                newCursorPosition = i + 1; // Place cursor after the matching digit
+                break;
+            }
+        }
 
         // Update the state with the sanitized value
-        setMinBidMeat(sanitizedValue);
+        setMinBidMeat(parsedValue);
 
-        // Restore the cursor position after the DOM update
-        setTimeout(() => {
-            input.setSelectionRange(adjustedCursorPosition, adjustedCursorPosition);
-        }, 0);
+        // Restore the cursor position after formatting
+        requestAnimationFrame(() => {
+            if (numericValue > 10_000_000_000) {
+                // If capped, place the cursor at the end
+                input.setSelectionRange(parsedValue.length, parsedValue.length);
+            } else {
+                // Otherwise, set it based on the calculated position
+                input.setSelectionRange(newCursorPosition, newCursorPosition);
+            }
+        });
     };
 
     const handleFormSubmit = (e) => {

@@ -1,20 +1,21 @@
 import React, { useContext, useState, useEffect, useMemo } from "react";
-import { Link} from "react-router-dom";
+import { Link } from "react-router-dom";
 import { AuctionsContext } from "../context/AuctionsContext";
 import { UserContext } from "../context/UserContext";
-import { parseInput, convertToShorthand} from "../utils/numberUtils";
+import { parseInput, convertToShorthand } from "../utils/numberUtils";
 
 const AllAuctions = () => {
     const { auctions, updateAuction } = useContext(AuctionsContext);
     const { currentUser } = useContext(UserContext);
 
-    // Memoize processed auctions with shorthand values
+    // Memoize processed auctions with shorthand values and formatted quantity
     const processedAuctions = useMemo(() =>
             auctions.map((auction) => ({
                 ...auction,
-                shorthandMinBid: convertToShorthand(auction.minBidMeat) || "0", // Precompute shorthand
+                shorthandMinBid: convertToShorthand(auction.minBidMeat) || "0",
+                formattedQuantity: auction.quantity?.toLocaleString("en-US") || "0", // Format with commas
             })),
-        [auctions] // Only recompute if auctions change
+        [auctions]
     );
 
     const calculateRemainingTime = (endTime) => {
@@ -104,7 +105,7 @@ const AllAuctions = () => {
             return;
         }
 
-        //Check bid against current bid and minimum bid
+        // Check bid against current bid and minimum bid
         if (numericBid > (auction.currentBid || 0) && numericBid >= auction.minBidMeat) {
             const updatedAuction = {
                 ...auction,
@@ -131,31 +132,73 @@ const AllAuctions = () => {
     const handleInputChange = (auctionId, value) => {
         const inputElement = document.activeElement; // Get the input element
         if (!inputElement) return;
-        const cursorPosition = inputElement.selectionStart; // Get cursor position
-        const rawValue = value.replace(/,/g, ""); // Remove commas from the raw input
 
-        // Determine if the cursor is at the end
-        const isAtEnd = cursorPosition === value.length;
+        const rawValue = value.replace(/,/g, ""); // Remove commas for processing
+        const cursorPosition = inputElement.selectionStart; // Get the cursor position in the formatted value
 
-        // Sanitize and add commas only if typing at the end
-        const sanitizedValue = parseInput(rawValue);
+        // Count numeric digits up to the cursor position (ignoring commas)
+        let digitsBeforeCursor = 0;
+        for (let i = 0; i < cursorPosition; i++) {
+            if (/\d/.test(value[i])) {
+                digitsBeforeCursor++;
+            }
+        }
 
+        // Detect deletion: input length is shorter than the current state
+        const isDeleting = rawValue.length < (bids[auctionId]?.bidAmount.replace(/,/g, "").length || 0);
+
+        // If deleting, bypass formatting and update state directly
+        if (isDeleting) {
+            setBids((prevBids) => ({
+                ...prevBids,
+                [auctionId]: {
+                    ...prevBids[auctionId],
+                    bidAmount: value, // Use raw value directly
+                },
+            }));
+            return; // Exit early for deletion handling
+        }
+
+        // Process the raw value through parseInput while maintaining digit count
+        const parsedValue = parseInput(rawValue); // Converts to sanitized value
+        const sanitizedValue = parsedValue.replace(/,/g, ""); // Remove commas for further processing
+
+        // Check if the number is capped at 20 billion
+        const isCapped = sanitizedValue.length !== rawValue.length;
+
+        // Calculate the new cursor position based on digits before the cursor
+        let newCursorPosition = 0;
+        let digitCount = 0;
+
+        for (let i = 0; i < parsedValue.length; i++) {
+            if (/\d/.test(parsedValue[i])) {
+                digitCount++;
+            }
+
+            if (digitCount === digitsBeforeCursor) {
+                newCursorPosition = i + 1; // Place cursor after the matching digit
+                break;
+            }
+        }
+
+        // Update the state with the sanitized value
         setBids((prevBids) => ({
             ...prevBids,
             [auctionId]: {
                 ...prevBids[auctionId],
-                bidAmount: sanitizedValue, // Always update the sanitized value
+                bidAmount: parsedValue,
             },
         }));
 
-        // Restore cursor position or place it at the end if reformatting
-        setTimeout(() => {
-            if (isAtEnd) {
-                inputElement.setSelectionRange(sanitizedValue.length, sanitizedValue.length); // Move cursor to end
+        // Restore the cursor position after formatting
+        requestAnimationFrame(() => {
+            // If the input is capped, place the cursor at the end
+            if (isCapped) {
+                inputElement.setSelectionRange(parsedValue.length, parsedValue.length);
             } else {
-                inputElement.setSelectionRange(cursorPosition, cursorPosition); // Maintain original cursor position
+                inputElement.setSelectionRange(newCursorPosition, newCursorPosition);
             }
-        }, 0);
+        });
     };
 
     return (
@@ -186,14 +229,12 @@ const AllAuctions = () => {
 
                         <h2 className="text-xl font-bold text-center mb-1">
                             <span className="text-[#112D4E]">{auction.item}</span>
-                            <span className="text-[#3F72AF]"> x{auction.quantity}</span>
+                            <span className="text-[#3F72AF]"> x{auction.formattedQuantity}</span>
                         </h2>
 
-                        {/* Use memoized shorthand value */}
                         <p className="text-xs text-[#3F72AF] mb-4">
                             Minimum Bid (Meat): {auction.shorthandMinBid}
                         </p>
-                        {/* Other auction details */}
 
                         <div className="text-center mb-4">
                             <p className="text-sm text-[#3F72AF] underline">Current Bid</p>
