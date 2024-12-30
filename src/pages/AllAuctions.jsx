@@ -1,21 +1,21 @@
 import React, { useContext, useState, useEffect, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link} from "react-router-dom";
 import { AuctionsContext } from "../context/AuctionsContext";
 import { UserContext } from "../context/UserContext";
-import { parseInput, convertToShorthand } from "../utils/numberUtils";
+import { parseInput, convertToShorthand} from "../utils/numberUtils";
 
 const AllAuctions = () => {
     const { auctions, updateAuction } = useContext(AuctionsContext);
     const { currentUser } = useContext(UserContext);
 
-    // Memoize processed auctions with shorthand values and formatted quantity
+    // Memoize processed auctions with shorthand values
     const processedAuctions = useMemo(() =>
             auctions.map((auction) => ({
                 ...auction,
-                shorthandMinBid: convertToShorthand(auction.minBidMeat) || "0",
-                formattedQuantity: auction.quantity?.toLocaleString("en-US") || "0", // Format with commas
+                shorthandMinBid: convertToShorthand(auction.minBidMeat) || "0", // Precompute shorthand
+                formattedQuantity: auction.quantity?.toLocaleString("en-US") || "0", // Format quantity with commas
             })),
-        [auctions]
+        [auctions] // Only recompute if auctions change
     );
 
     const calculateRemainingTime = (endTime) => {
@@ -105,7 +105,7 @@ const AllAuctions = () => {
             return;
         }
 
-        // Check bid against current bid and minimum bid
+        //Check bid against current bid and minimum bid
         if (numericBid > (auction.currentBid || 0) && numericBid >= auction.minBidMeat) {
             const updatedAuction = {
                 ...auction,
@@ -134,7 +134,14 @@ const AllAuctions = () => {
         if (!inputElement) return;
 
         const rawValue = value.replace(/,/g, ""); // Remove commas for processing
+        const numericValue = parseInt(rawValue, 10); // Parse the raw value as a number
         const cursorPosition = inputElement.selectionStart; // Get the cursor position in the formatted value
+
+        // If the numeric value exceeds 20 billion, stop processing and retain the old value
+        const maxAmount = 20000000000;
+        if (numericValue > maxAmount) {
+            return;
+        }
 
         // Count numeric digits up to the cursor position (ignoring commas)
         let digitsBeforeCursor = 0;
@@ -232,9 +239,11 @@ const AllAuctions = () => {
                             <span className="text-[#3F72AF]"> x{auction.formattedQuantity}</span>
                         </h2>
 
+                        {/* Use memoized shorthand value */}
                         <p className="text-xs text-[#3F72AF] mb-4">
                             Minimum Bid (Meat): {auction.shorthandMinBid}
                         </p>
+                        {/* Other auction details */}
 
                         <div className="text-center mb-4">
                             <p className="text-sm text-[#3F72AF] underline">Current Bid</p>
