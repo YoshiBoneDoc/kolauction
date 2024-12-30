@@ -1,23 +1,26 @@
 import React, { useContext, useState, useEffect, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link} from "react-router-dom";
 import { AuctionsContext } from "../context/AuctionsContext";
 import { UserContext } from "../context/UserContext";
-import { parseInput, convertToShorthand } from "../utils/numberUtils";
+import { parseInput, convertToShorthand} from "../utils/numberUtils";
 
 const AllAuctions = () => {
     const { auctions, updateAuction } = useContext(AuctionsContext);
     const { currentUser, logoutUser } = useContext(UserContext); // Added logoutUser
 
+
+
     // Memoize processed auctions with shorthand values
-    const processedAuctions = useMemo(
-        () =>
-            auctions.map((auction) => ({
-                ...auction,
-                shorthandMinBid: convertToShorthand(auction.minBidMeat) || "0", // Precompute shorthand
-                formattedQuantity: auction.quantity?.toLocaleString("en-US") || "0", // Format quantity with commas
-            })),
-        [auctions]
-    );
+    const processedAuctions = useMemo(() =>
+            auctions
+                .slice()
+                .sort((a, b) => b.id - a.id) // Sort by descending ID
+                .map((auction) => ({
+                    ...auction,
+                    shorthandMinBid: convertToShorthand(auction.minBidMeat) || "0",
+                    formattedQuantity: auction.quantity?.toLocaleString("en-US") || "0",
+                }))
+        , [auctions]);
 
     const calculateRemainingTime = (endTime) => {
         if (!endTime) return { timeString: "Invalid Auction Data", isRed: false };
@@ -51,21 +54,12 @@ const AllAuctions = () => {
     );
 
     const handlePlaceBid = (auctionId) => {
+
+        // Normalize and compare usernames for case insensitivity
         const auction = auctions.find((a) => a.id === auctionId);
         const auctionOwner = String(auction.owner).trim().toLowerCase();
-        const currentUsername = currentUser?.khubUsername?.trim().toLowerCase();
+        const currentUsername = String(currentUser.khubUsername).trim().toLowerCase();
 
-        // Check if the user is logged in
-        if (!currentUsername) {
-            setBids((prevBids) => ({
-                ...prevBids,
-                [auctionId]: {
-                    ...prevBids[auctionId],
-                    bidError: "You must be logged in to place a bid.",
-                },
-            }));
-            return;
-        }
 
         // Check if the user is the owner of the auction
         if (auctionOwner === currentUsername) {
@@ -96,30 +90,178 @@ const AllAuctions = () => {
 
     const formatNumber = (number) => number.toLocaleString("en-US");
 
+    const handleCancelBid = (auctionId) => {
+        setBids((prevBids) => ({
+            ...prevBids,
+            [auctionId]: { ...prevBids[auctionId], showInput: false, bidError: "" },
+        }));
+    };
+
+    const handleBidConfirm = (auctionId) => {
+        const { bidAmount } = bids[auctionId];
+        const numericBid = parseInt(bidAmount.replace(/,/g, ""), 10);
+        const auction = auctions.find((a) => a.id === auctionId);
+
+        // Validate bid amount
+        if (!numericBid || numericBid <= 0) {
+            setBids((prevBids) => ({
+                ...prevBids,
+                [auctionId]: { ...prevBids[auctionId], bidError: "This isn't a charity. Bid at least the minimum" },
+            }));
+            return;
+        }
+
+        if (numericBid > 20000000000) {
+            setBids((prevBids) => ({
+                ...prevBids,
+                [auctionId]: { ...prevBids[auctionId], bidError: "Bid cannot exceed 20 billion." },
+            }));
+            return;
+        }
+
+        // Display confirmation popup
+        const confirmMessage = `Are you sure you want to submit this bid for ${numericBid.toLocaleString("en-US")} Meat?`;
+        if (!window.confirm(confirmMessage)) {
+            return; // Exit if user cancels
+        }
+
+        // Check if user is already the highest bidder
+        const lastBid = auction.bids?.[auction.bids.length - 1];
+        if (lastBid?.bidder === currentUser.khubUsername) {
+            setBids((prevBids) => ({
+                ...prevBids,
+                [auctionId]: { ...prevBids[auctionId], bidError: "You are already the highest bidder." },
+            }));
+            return;
+        }
+
+        //Check bid against current bid and minimum bid
+        if (numericBid > (auction.currentBid || 0) && numericBid >= auction.minBidMeat) {
+            const updatedAuction = {
+                ...auction,
+                currentBid: numericBid,
+                bids: [
+                    ...(auction.bids || []),
+                    { bidder: currentUser.khubUsername, amount: numericBid, timestamp: Date.now() },
+                ],
+            };
+            updateAuction(updatedAuction);
+
+            setBids((prevBids) => ({
+                ...prevBids,
+                [auctionId]: { bidAmount: "", bidError: "", showInput: false },
+            }));
+        } else {
+            setBids((prevBids) => ({
+                ...prevBids,
+                [auctionId]: { ...prevBids[auctionId], bidError: "Bid too low." },
+            }));
+        }
+    };
+
+    const handleInputChange = (auctionId, value) => {
+        const inputElement = document.activeElement; // Get the input element
+        if (!inputElement) return;
+
+        const rawValue = value.replace(/,/g, ""); // Remove commas for processing
+        const numericValue = parseInt(rawValue, 10); // Parse the raw value as a number
+        const cursorPosition = inputElement.selectionStart; // Get the cursor position in the formatted value
+
+        // If the numeric value exceeds 20 billion, stop processing and retain the old value
+        const maxAmount = 20000000000;
+        if (numericValue > maxAmount) {
+            return;
+        }
+
+        // Count numeric digits up to the cursor position (ignoring commas)
+        let digitsBeforeCursor = 0;
+        for (let i = 0; i < cursorPosition; i++) {
+            if (/\d/.test(value[i])) {
+                digitsBeforeCursor++;
+            }
+        }
+
+        // Detect deletion: input length is shorter than the current state
+        const isDeleting = rawValue.length < (bids[auctionId]?.bidAmount.replace(/,/g, "").length || 0);
+
+        // If deleting, bypass formatting and update state directly
+        if (isDeleting) {
+            setBids((prevBids) => ({
+                ...prevBids,
+                [auctionId]: {
+                    ...prevBids[auctionId],
+                    bidAmount: value, // Use raw value directly
+                },
+            }));
+            return; // Exit early for deletion handling
+        }
+
+        // Process the raw value through parseInput while maintaining digit count
+        const parsedValue = parseInput(rawValue); // Converts to sanitized value
+        const sanitizedValue = parsedValue.replace(/,/g, ""); // Remove commas for further processing
+
+        // Check if the number is capped at 20 billion
+        const isCapped = sanitizedValue.length !== rawValue.length;
+
+        // Calculate the new cursor position based on digits before the cursor
+        let newCursorPosition = 0;
+        let digitCount = 0;
+
+        for (let i = 0; i < parsedValue.length; i++) {
+            if (/\d/.test(parsedValue[i])) {
+                digitCount++;
+            }
+
+            if (digitCount === digitsBeforeCursor) {
+                newCursorPosition = i + 1; // Place cursor after the matching digit
+                break;
+            }
+        }
+
+        // Update the state with the sanitized value
+        setBids((prevBids) => ({
+            ...prevBids,
+            [auctionId]: {
+                ...prevBids[auctionId],
+                bidAmount: parsedValue,
+            },
+        }));
+
+        // Restore the cursor position after formatting
+        requestAnimationFrame(() => {
+            // If the input is capped, place the cursor at the end
+            if (isCapped) {
+                inputElement.setSelectionRange(parsedValue.length, parsedValue.length);
+            } else {
+                inputElement.setSelectionRange(newCursorPosition, newCursorPosition);
+            }
+        });
+    };
+
     return (
-        <div className="min-h-screen bg-[#DBE2EF] p-6">
+        <div className="min-h-screen bg-[#F9F9F9] p-6">
             {/* User Section at the Top Right */}
             <div className="absolute top-6 right-6 flex flex-col items-end text-right">
                 {currentUser ? (
                     <div className="flex flex-col items-end gap-1 text-right">
-                        <span className="text-gray-700 text-sm font-bold">
-                            Welcome,{" "}
-                            <Link
-                                to="/profile"
-                                className="text-blue-500 hover:underline"
-                            >
-                                {currentUser.khubUsername}
-                            </Link>
-                        </span>
+            <span className="text-gray-700 text-sm font-bold">
+                Welcome,{" "}
+                <Link
+                    to="/profile"
+                    className="text-[#FE5F55] hover:underline"
+                >
+                    {currentUser.khubUsername || "User"} {/* Fallback for username */}
+                </Link>
+            </span>
                         <button
                             onClick={logoutUser}
-                            className="text-blue-500 hover:underline text-sm py-0.5 px-2"
+                            className="text-[#FE5F55] hover:underline text-sm py-0.5 px-2"
                         >
                             Log Out
                         </button>
                     </div>
                 ) : (
-                    <Link to="/login" className="text-blue-500 hover:underline text-sm">
+                    <Link to="/login" className="text-[#FE5F55] hover:underline text-sm">
                         Log In
                     </Link>
                 )}
@@ -129,18 +271,19 @@ const AllAuctions = () => {
             <div className="mb-4">
                 <Link
                     to="/"
-                    className="text-[#112D4E] underline hover:text-[#3F72AF] text-sm"
+                    className="text-[#FE5F55] hover:text-[#FF9874] text-sm"
                 >
                     Home
                 </Link>
             </div>
 
-            <h1 className="text-4xl font-bold text-center text-[#112D4E] mb-8">All Auctions</h1>
+            <h1 className="text-4xl font-bold text-center text-[#7695FF] mb-8">All Auctions</h1>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 {processedAuctions.map((auction, index) => (
                     <div
-                        key={`${auction.id || 'auction'}-${index}`} // Ensure unique keys
+                        key={auction.id}
                         className="border rounded-lg shadow-lg p-4 bg-[#F9F7F7] flex flex-col items-center"
+                        style={{ backgroundColor: "#F8F6F4" }} // Tile background color set to #EBF6FF
                     >
                         {auction.image && (
                             <img
@@ -149,19 +292,25 @@ const AllAuctions = () => {
                                 className="w-32 h-32 object-contain mb-4"
                             />
                         )}
+
                         <h2 className="text-xl font-bold text-center mb-1">
-                            <span className="text-[#112D4E]">{auction.item}</span>
-                            <span className="text-[#3F72AF]"> x{auction.formattedQuantity}</span>
+                            <span className="text-[#14248A]">{auction.item}</span>
+                            <span className="text-[#94A0F0]"> x{auction.formattedQuantity}</span>
                         </h2>
+
+                        {/* Use memoized shorthand value */}
                         <p className="text-xs text-[#3F72AF] mb-4">
                             Minimum Bid (Meat): {auction.shorthandMinBid}
                         </p>
+                        {/* Other auction details */}
+
                         <div className="text-center mb-4">
-                            <p className="text-sm text-[#3F72AF] underline">Current Bid</p>
+                            <p className="text-sm text-[#94A0F0] underline">Current Bid</p>
                             <p className="text-2xl font-extrabold text-[#112D4E]">
                                 {auction.currentBid ? `${formatNumber(auction.currentBid)} Meat` : "No bids yet"}
                             </p>
                         </div>
+
                         <p
                             className={`text-xs text-center ${
                                 countdowns[index]?.isRed ? "text-red-500" : "text-gray-500"
@@ -169,14 +318,66 @@ const AllAuctions = () => {
                         >
                             {countdowns[index]?.timeString || "Auction data error"}
                         </p>
+
                         {!countdowns[index]?.isExpired ? (
                             <div className="mt-4 w-full">
-                                <Link
-                                    to={`/auction/${auction.id}`}
-                                    className="w-full bg-[#3F72AF] text-white font-bold py-2 px-4 rounded hover:bg-[#3F72AF] text-center block"
-                                >
-                                    More Info
-                                </Link>
+                                {/* Added null check for currentUser */}
+                                {currentUser?.khubUsername?.trim().toLowerCase() ===
+                                auction.owner.trim().toLowerCase() ? (
+                                    <Link
+                                        to={`/auction/${auction.id}`}
+                                        className="w-full bg-[#3F72AF] text-white font-bold py-2 px-4 rounded hover:bg-[#3F72AF] text-center block"
+                                    >
+                                        More Info
+                                    </Link>
+                                ) : (
+                                    !bids[auction.id].showInput ? (
+                                        <>
+                                            <button
+                                                onClick={() => handlePlaceBid(auction.id)}
+                                                className="w-full bg-[#3D52D5] text-white font-bold py-2 px-4 rounded hover:bg-[#7494EA]"
+                                            >
+                                                Place Bid
+                                            </button>
+                                            <Link
+                                                to={`/auction/${auction.id}`}
+                                                className="text-[#112D4E] underline hover:text-[#3F72AF] text-sm mt-2 block text-center"
+                                            >
+                                                More Info
+                                            </Link>
+                                        </>
+                                    ) : (
+                                        // Input logic for bidding
+                                        <>
+                                            <input
+                                                type="text"
+                                                value={bids[auction.id]?.bidAmount || ""}
+                                                onChange={(e) => handleInputChange(auction.id, e.target.value)}
+                                                placeholder="Enter bid (e.g., 10k, 1m)"
+                                                className="w-full p-2 border border-gray-300 rounded placeholder-gray-500"
+                                            />
+                                            <div className="flex justify-between mt-2">
+                                                <button
+                                                    onClick={() => handleBidConfirm(auction.id)}
+                                                    className="w-1/2 bg-[#3D52D5] text-white font-bold py-2 px-4 rounded hover:bg-[#7494EA] mr-2"
+                                                >
+                                                    Confirm
+                                                </button>
+                                                <button
+                                                    onClick={() => handleCancelBid(auction.id)}
+                                                    className="w-1/2 bg-[#F16055] text-white font-bold py-2 px-4 rounded hover:bg-[#FD8A8A]"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </>
+                                    )
+                                )}
+                                {bids[auction.id]?.bidError && (
+                                    <p className="text-red-500 text-center text-sm mt-2">
+                                        {bids[auction.id]?.bidError}
+                                    </p>
+                                )}
                             </div>
                         ) : (
                             <p className="text-red-500 text-center text-sm mt-4">
@@ -187,7 +388,8 @@ const AllAuctions = () => {
                             </p>
                         )}
                     </div>
-                ))}            </div>
+                ))}
+            </div>
         </div>
     );
 };

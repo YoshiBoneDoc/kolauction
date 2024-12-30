@@ -72,24 +72,24 @@ const Home = () => {
     const displayedAuctions = showAll ? popularAuctions : popularAuctions.slice(0, 4);
 
     return (
-        <div className="min-h-screen w-full bg-gray-50 flex flex-col">
+        <div className="min-h-screen w-full bg-gray-50 flex flex-col"style={{ backgroundColor: "#F9F9F9" }}>
             {/* Static Header Section */}
-            <header className="sticky top-0 z-50 bg-gray-50">
+            <header className="sticky top-0 z-50 bg-gray-50" style={{ backgroundColor: "#F9F9F9" }}>
                 <div className="flex justify-center items-center gap-32 text-sm text-gray-500 pt-4 pb-2">
                     <div className="relative flex flex-col items-center">
-                        <Link to="/auctions" className="hover:underline flex-grow-0">
+                        <Link to="/auctions" className="text-[#FF9874] hover:text-[#C62300] flex-grow-0">
                             View All Auctions
                         </Link>
                         <div className="h-px bg-gray-300 w-20 mt-2"></div>
                     </div>
                     <div className="relative flex flex-col items-center flex-grow-0">
-                        <Link to="/auction-item" className="hover:underline">
+                        <Link to="/auction-item" className="text-[#FF9874] hover:text-[#C62300] flex-grow-0">
                             Auction an Item
                         </Link>
                         <div className="h-px bg-gray-300 w-20 mt-2"></div>
                     </div>
                     <div className="relative flex flex-col items-center flex-grow-0">
-                        <Link to="/info" className="hover:underline">
+                        <Link to="/info" className="text-[#FF9874] hover:text-[#C62300] flex-grow-0">
                             Info
                         </Link>
                         <div className="h-px bg-gray-300 w-20 mt-2"></div>
@@ -104,24 +104,24 @@ const Home = () => {
                                 Welcome,{" "}
                                 <Link
                                     to="/profile"
-                                    className="text-blue-500 hover:underline"
+                                    className="text-[#FE5F55] hover:underline"
                                 >
                                     {currentUser.khubUsername}
                                 </Link>
                             </span>
                             <button
                                 onClick={logoutUser}
-                                className="text-blue-500 hover:underline text-sm py-0.5 px-2"
+                                className="text-[#FE5F55] hover:underline text-sm py-0.5 px-2"
                             >
                                 Log Out
                             </button>
                         </div>
                     ) : (
                         <div className="flex flex-col items-end gap-1">
-                            <Link to="/login" className="text-blue-500 hover:underline text-sm">
+                            <Link to="/login" className="text-[#FE5F55] hover:underline text-sm">
                                 Log In
                             </Link>
-                            <Link to="/register" className="text-blue-500 hover:underline text-sm">
+                            <Link to="/register" className="text-[#FE5F55] hover:underline text-sm">
                                 Register
                             </Link>
                         </div>
@@ -130,7 +130,7 @@ const Home = () => {
 
                 {/* Title Section */}
                 <div className="text-center mt-3">
-                    <h1 className="text-6xl font-extrabold text-blue-600">KoL Auction Bay</h1>
+                    <h1 className="text-6xl font-extrabold"style={{ color: '#7695FF' }}>KoL Auction Hub</h1>
                     <p className="text-xl text-gray-700 mt-4">
                         The best place to find and bid on rare treasures.
                     </p>
@@ -149,6 +149,7 @@ const Home = () => {
                             key={`${auction.id || 'auction'}-${index}`} // Unique key using auction ID and index
                             onClick={() => navigate(`/auction/${auction.id}`)} // Make card clickable
                             className="flex items-center border rounded-md shadow p-2 bg-white cursor-pointer hover:shadow-lg transition-transform transform hover:scale-105"
+                            style={{ backgroundColor: "#F8F6F4" }} // Tile background color
                         >
                             <img
                                 src={auction.image || "/placeholder-icon.png"}
@@ -156,12 +157,12 @@ const Home = () => {
                                 className="w-10 h-10 object-contain mr-3"
                             />
                             <div className="flex flex-col flex-grow items-center text-center justify-center h-full">
-                                <h2 className="text-lg font-bold text-[#112D4E] break-words -mb-1.5">
+                                <h2 className="text-lg font-bold text-[#14248A] break-words -mb-1.5">
                                     {auction.item}{" "}
                                     <span
-                                        className="text-[#3F72AF] whitespace-nowrap">x{auction.formattedQuantity}</span>
+                                        className="text-[#94A0F0] whitespace-nowrap">x{auction.formattedQuantity}</span>
                                 </h2>
-                                <p className="text-[11px] text-blue-500 -mb-2.5 mt-3">
+                                <p className="text-[11px] text-[#94A0F0] -mb-2.5 mt-3">
                                     Current Bid
                                 </p>
                                 <p className="text-lg font-extrabold text-[#112D4E] mt-1.5">
@@ -176,7 +177,7 @@ const Home = () => {
                                 </p>
                                 {/* Auction Timer */}
                                 <p
-                                    className={`text-sm mt-1 text-[11px] ${
+                                    className={`mt-2 -mb-1 text-[11px]  ${
                                         timers[auction.id]?.isRed ? "text-red-500" : "text-gray-600"
                                     }`}
                                 >
@@ -205,6 +206,9 @@ const Home = () => {
                     <Link to="/donate" className="text-blue-500 text-sm hover:underline">
                         Donate
                     </Link>
+                    <div className="text-[10px] text-gray-400 ml-auto flex justify-between ml-2.5">
+                        All game images are copyright Asymmetric Publications from The Kingdom of Loathing
+                    </div>
                 </div>
             </footer>
         </div>
