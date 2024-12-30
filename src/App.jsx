@@ -7,12 +7,15 @@ import Register from "./pages/Register"; // New page
 import Login from "./pages/Login"; // Import Login page
 import Profile from "./pages/Profile"; // Import Profile
 import AuctionDetails from "./pages/AuctionDetails";
-
+import InfoPage from "./pages/InfoPage.jsx";
+import DonatePage from "./pages/DonatePage.jsx";
 
 const App = () => {
     return (
         <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/donate" element={<DonatePage />} /> {/* Add route */}
+            <Route path="/info" element={<InfoPage />} /> {/* Add this route */}
             <Route path="/auctions" element={<AllAuctions />} />
             <Route path="/auction-item" element={<AuctionAnItem />} />
             <Route path="/register" element={<Register />} />

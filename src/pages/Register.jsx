@@ -12,6 +12,24 @@ const Register = () => {
     const handleSubmit = (e) => {
         e.preventDefault();
 
+        // Client-side validation for character limits
+        if (khubUsername.length > 16) {
+            setErrorMessage("Username cannot exceed 16 characters.");
+            return;
+        }
+        if (password.length > 32) {
+            setErrorMessage("Password cannot exceed 32 characters.");
+            return;
+        }
+
+        try {
+            registerUser({ khubUsername, password });
+            setErrorMessage(""); // Clear any previous error messages
+            navigate("/login"); // Redirect to login page
+        } catch (error) {
+            setErrorMessage(error.message);
+        }
+
         try {
             registerUser({ khubUsername, password });
             setErrorMessage(""); // Clear any previous error messages

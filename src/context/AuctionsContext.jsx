@@ -24,7 +24,262 @@ AuctionsProvider.propTypes = {
             endTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
             owner: "ting", // Example username
             image: "https://via.placeholder.com/150", // Placeholder image
+        },        {
+            id: "test-auction-1",
+            item: "Golden Sword",
+            quantity: 1,
+            minBidMeat: 5000,
+            mrACount: 2,
+            currentBid: 7000,
+            bids: [
+                { bidder: "user1", amount: 6000, timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+                { bidder: "user2", amount: 7000, timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() },
+            ],
+            endTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            owner: "ting", // Example username
+            image: "https://via.placeholder.com/150", // Placeholder image
         },
+        {
+            id: "test-auction-1",
+            item: "Golden Sword",
+            quantity: 1,
+            minBidMeat: 5000,
+            mrACount: 2,
+            currentBid: 7000,
+            bids: [
+                { bidder: "user1", amount: 6000, timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+                { bidder: "user2", amount: 7000, timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() },
+            ],
+            endTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            owner: "ting", // Example username
+            image: "https://via.placeholder.com/150", // Placeholder image
+        },
+        {
+            id: "test-auction-1",
+            item: "Golden Sword",
+            quantity: 1,
+            minBidMeat: 5000,
+            mrACount: 2,
+            currentBid: 7000,
+            bids: [
+                { bidder: "user1", amount: 6000, timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+                { bidder: "user2", amount: 7000, timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() },
+            ],
+            endTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            owner: "ting", // Example username
+            image: "https://via.placeholder.com/150", // Placeholder image
+        },
+        {
+            id: "test-auction-1",
+            item: "Golden Sword",
+            quantity: 1,
+            minBidMeat: 5000,
+            mrACount: 2,
+            currentBid: 7000,
+            bids: [
+                { bidder: "user1", amount: 6000, timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+                { bidder: "user2", amount: 7000, timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() },
+            ],
+            endTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            owner: "ting", // Example username
+            image: "https://via.placeholder.com/150", // Placeholder image
+        },
+        {
+            id: "test-auction-1",
+            item: "Golden Sword",
+            quantity: 1,
+            minBidMeat: 5000,
+            mrACount: 2,
+            currentBid: 7000,
+            bids: [
+                { bidder: "user1", amount: 6000, timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+                { bidder: "user2", amount: 7000, timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() },
+            ],
+            endTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            owner: "ting", // Example username
+            image: "https://via.placeholder.com/150", // Placeholder image
+        },
+        {
+            id: "test-auction-1",
+            item: "Golden Sword",
+            quantity: 1,
+            minBidMeat: 5000,
+            mrACount: 2,
+            currentBid: 7000,
+            bids: [
+                { bidder: "user1", amount: 6000, timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+                { bidder: "user2", amount: 7000, timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() },
+            ],
+            endTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            owner: "ting", // Example username
+            image: "https://via.placeholder.com/150", // Placeholder image
+        },
+        {
+            id: "test-auction-1",
+            item: "Golden Sword",
+            quantity: 1,
+            minBidMeat: 5000,
+            mrACount: 2,
+            currentBid: 7000,
+            bids: [
+                { bidder: "user1", amount: 6000, timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+                { bidder: "user2", amount: 7000, timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() },
+            ],
+            endTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            owner: "ting", // Example username
+            image: "https://via.placeholder.com/150", // Placeholder image
+        },
+        {
+            id: "test-auction-1",
+            item: "Golden Sword",
+            quantity: 1,
+            minBidMeat: 5000,
+            mrACount: 2,
+            currentBid: 7000,
+            bids: [
+                { bidder: "user1", amount: 6000, timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+                { bidder: "user2", amount: 7000, timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() },
+            ],
+            endTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            owner: "ting", // Example username
+            image: "https://via.placeholder.com/150", // Placeholder image
+        },
+        {
+            id: "test-auction-1",
+            item: "Golden Sword",
+            quantity: 1,
+            minBidMeat: 5000,
+            mrACount: 2,
+            currentBid: 7000,
+            bids: [
+                { bidder: "user1", amount: 6000, timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+                { bidder: "user2", amount: 7000, timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() },
+            ],
+            endTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            owner: "ting", // Example username
+            image: "https://via.placeholder.com/150", // Placeholder image
+        },
+        {
+            id: "test-auction-1",
+            item: "Golden Sword",
+            quantity: 1,
+            minBidMeat: 5000,
+            mrACount: 2,
+            currentBid: 7000,
+            bids: [
+                { bidder: "user1", amount: 6000, timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+                { bidder: "user2", amount: 7000, timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() },
+            ],
+            endTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            owner: "ting", // Example username
+            image: "https://via.placeholder.com/150", // Placeholder image
+        },
+        {
+            id: "test-auction-1",
+            item: "Golden Sword",
+            quantity: 1,
+            minBidMeat: 5000,
+            mrACount: 2,
+            currentBid: 7000,
+            bids: [
+                { bidder: "user1", amount: 6000, timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+                { bidder: "user2", amount: 7000, timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() },
+            ],
+            endTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            owner: "ting", // Example username
+            image: "https://via.placeholder.com/150", // Placeholder image
+        },
+        {
+            id: "test-auction-1",
+            item: "Golden Sword",
+            quantity: 1,
+            minBidMeat: 5000,
+            mrACount: 2,
+            currentBid: 7000,
+            bids: [
+                { bidder: "user1", amount: 6000, timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+                { bidder: "user2", amount: 7000, timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() },
+            ],
+            endTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            owner: "ting", // Example username
+            image: "https://via.placeholder.com/150", // Placeholder image
+        },
+        {
+            id: "test-auction-1",
+            item: "Golden Sword",
+            quantity: 1,
+            minBidMeat: 5000,
+            mrACount: 2,
+            currentBid: 7000,
+            bids: [
+                { bidder: "user1", amount: 6000, timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+                { bidder: "user2", amount: 7000, timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() },
+            ],
+            endTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            owner: "ting", // Example username
+            image: "https://via.placeholder.com/150", // Placeholder image
+        },
+        {
+            id: "test-auction-1",
+            item: "Golden Sword",
+            quantity: 1,
+            minBidMeat: 5000,
+            mrACount: 2,
+            currentBid: 7000,
+            bids: [
+                { bidder: "user1", amount: 6000, timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+                { bidder: "user2", amount: 7000, timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() },
+            ],
+            endTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            owner: "ting", // Example username
+            image: "https://via.placeholder.com/150", // Placeholder image
+        },
+        {
+            id: "test-auction-1",
+            item: "Golden Sword",
+            quantity: 1,
+            minBidMeat: 5000,
+            mrACount: 2,
+            currentBid: 7000,
+            bids: [
+                { bidder: "user1", amount: 6000, timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+                { bidder: "user2", amount: 7000, timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() },
+            ],
+            endTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            owner: "ting", // Example username
+            image: "https://via.placeholder.com/150", // Placeholder image
+        },
+        {
+            id: "test-auction-1",
+            item: "Golden Sword",
+            quantity: 1,
+            minBidMeat: 5000,
+            mrACount: 2,
+            currentBid: 7000,
+            bids: [
+                { bidder: "user1", amount: 6000, timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+                { bidder: "user2", amount: 7000, timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() },
+            ],
+            endTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            owner: "ting", // Example username
+            image: "https://via.placeholder.com/150", // Placeholder image
+        },
+        {
+            id: "test-auction-1",
+            item: "Golden Sword",
+            quantity: 1,
+            minBidMeat: 5000,
+            mrACount: 2,
+            currentBid: 7000,
+            bids: [
+                { bidder: "user1", amount: 6000, timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+                { bidder: "user2", amount: 7000, timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() },
+            ],
+            endTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            owner: "ting", // Example username
+            image: "https://via.placeholder.com/150", // Placeholder image
+        },
+
         {
             id: 12345,
             item: "Golden pubes",
@@ -72,7 +327,12 @@ AuctionsProvider.propTypes = {
             image: "https://via.placeholder.com/150",
             bids: [
                 { bidder: "user456", amount: 1100000000, timestamp: Date.now() - 3600000 },
-                { bidder: "user789", amount: 1200000000, timestamp: Date.now() - 1800000 },
+                { bidder: "user4326", amount: 1100000000, timestamp: Date.now() - 3600000 },
+                { bidder: "user416", amount: 1100000000, timestamp: Date.now() - 3600000 },
+                { bidder: "user46", amount: 1100000000, timestamp: Date.now() - 3600000 },
+                { bidder: "user45446", amount: 1100000000, timestamp: Date.now() - 3600000 },
+                { bidder: "user46", amount: 1100000000, timestamp: Date.now() - 3600000 },
+                { bidder: "user7", amount: 1200000000, timestamp: Date.now() - 1800000 },
             ],
         },
         {
