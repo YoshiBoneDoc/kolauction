@@ -335,11 +335,14 @@ const AuctionAnItem = () => {
                     <option value="" disabled>
                         Select an item
                     </option>
-                    {items.map((item) => (
-                        <option key={item.name} value={item.name}>
-                            {item.name}
-                        </option>
-                    ))}
+                    {items
+                        .slice() // Create a copy of the items array
+                        .sort((a, b) => a.name.localeCompare(b.name)) // Sort items alphabetically
+                        .map((item) => (
+                            <option key={item.name} value={item.name}>
+                                {item.name}
+                            </option>
+                        ))}
                 </select>
 
                 <label htmlFor="quantity" className="block text-gray-700 text-sm font-bold mb-2">
