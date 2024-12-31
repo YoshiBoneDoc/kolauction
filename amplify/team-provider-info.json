@@ -1,0 +1,15 @@
+{
+  "dev": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-kolauction-dev-8df83-authRole",
+      "UnauthRoleArn": "arn:aws:iam::257394477890:role/amplify-kolauction-dev-8df83-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::257394477890:role/amplify-kolauction-dev-8df83-authRole",
+      "Region": "us-east-1",
+      "DeploymentBucketName": "amplify-kolauction-dev-8df83-deployment",
+      "UnauthRoleName": "amplify-kolauction-dev-8df83-unauthRole",
+      "StackName": "amplify-kolauction-dev-8df83",
+      "StackId": "arn:aws:cloudformation:us-east-1:257394477890:stack/amplify-kolauction-dev-8df83/284b55d0-c758-11ef-afca-0e08a6941cab",
+      "AmplifyAppId": "dt7bn61k4b4l2"
+    }
+  }
+}

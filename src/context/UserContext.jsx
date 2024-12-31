@@ -15,26 +15,36 @@ export const UserProvider = ({ children }) => {
     });
 
     // Function to register a new user
-    const registerUser = (user) => {
-        const { khubUsername, password } = user;
-
-        // Validate required fields
-        if (!khubUsername || !password) {
+    const registerUser = ({ khubUsername, email, password }) => {
+        if (!khubUsername || !email || !password) {
             throw new Error("All fields are required.");
         }
 
-        const existingUser = users.find((u) => u.khubUsername === khubUsername);
-        if (existingUser) {
+        // Check if username already exists (with validation for undefined usernames)
+        const usernameExists = users.some(
+            (u) => u.khubUsername && u.khubUsername.toLowerCase() === khubUsername.toLowerCase()
+        );
+        if (usernameExists) {
             throw new Error("A user with this KHub username already exists.");
         }
 
-        setUsers([...users, user]);
+        // Check if email already exists (with validation for undefined emails)
+        const emailExists = users.some(
+            (u) => u.email && u.email.toLowerCase() === email.toLowerCase()
+        );
+        if (emailExists) {
+            throw new Error("A user with this email already exists.");
+        }
+
+        // Add the new user to the list
+        const newUser = { khubUsername, email, password };
+        setUsers((prevUsers) => [...prevUsers, newUser]);
     };
 
     // Function to log in a user
     const loginUser = (khubUsername, password) => {
         const user = users.find(
-            (u) => u.khubUsername === khubUsername && u.password === password
+            (u) => u.khubUsername.toLowerCase() === khubUsername.toLowerCase() && u.password === password
         );
 
         if (!user) {

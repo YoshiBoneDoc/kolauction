@@ -130,7 +130,7 @@ const Home = () => {
 
                 {/* Title Section */}
                 <div className="text-center mt-3">
-                    <h1 className="text-6xl font-extrabold"style={{ color: '#7695FF' }}>KoL Auction Hub</h1>
+                    <h1 className="text-6xl font-extrabold"style={{ color: '#7695FF' }}>KoL Auction Hub <span className="text-sm">Beta</span></h1>
                     <p className="text-xl text-gray-700 mt-4">
                         The best place to find and bid on rare treasures.
                     </p>

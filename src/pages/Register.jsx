@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 const Register = () => {
     const { registerUser } = useContext(UserContext);
     const [khubUsername, setKhubUsername] = useState("");
+    const [email, setEmail] = useState(""); // Email field
     const [password, setPassword] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
     const navigate = useNavigate(); // React Router navigation hook
@@ -12,30 +13,31 @@ const Register = () => {
     const handleSubmit = (e) => {
         e.preventDefault();
 
-        // Client-side validation for character limits
+        // Client-side validation for inputs
+        if (!khubUsername || !email || !password) {
+            setErrorMessage("All fields are required.");
+            return;
+        }
         if (khubUsername.length > 16) {
             setErrorMessage("Username cannot exceed 16 characters.");
             return;
         }
         if (password.length > 32) {
-            setErrorMessage("Password cannot exceed 32 characters.");
+            setErrorwMessage("Password cannot exceed 32 characters.");
+            return;
+        }
+        if (!/\S+@\S+\.\S+/.test(email)) {
+            setErrorMessage("Please enter a valid email address.");
             return;
         }
 
         try {
-            registerUser({ khubUsername, password });
+            // Register the user
+            registerUser({ khubUsername, email, password });
             setErrorMessage(""); // Clear any previous error messages
             navigate("/login"); // Redirect to login page
         } catch (error) {
-            setErrorMessage(error.message);
-        }
-
-        try {
-            registerUser({ khubUsername, password });
-            setErrorMessage(""); // Clear any previous error messages
-            navigate("/login"); // Redirect to login page
-        } catch (error) {
-            setErrorMessage(error.message);
+            setErrorMessage(error.message); // Display the error message
         }
     };
 
@@ -70,6 +72,23 @@ const Register = () => {
                         id="khubUsername"
                         value={khubUsername}
                         onChange={(e) => setKhubUsername(e.target.value)}
+                        className="w-full p-2 border rounded"
+                        required
+                    />
+                </div>
+
+                <div className="mb-4">
+                    <label
+                        htmlFor="email"
+                        className="block text-gray-700 font-bold mb-2"
+                    >
+                        Email
+                    </label>
+                    <input
+                        type="email"
+                        id="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                         className="w-full p-2 border rounded"
                         required
                     />

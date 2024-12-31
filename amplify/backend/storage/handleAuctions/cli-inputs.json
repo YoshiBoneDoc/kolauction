@@ -1,0 +1,18 @@
+{
+  "resourceName": "handleAuctions",
+  "tableName": "handleAuctions",
+  "partitionKey": {
+    "fieldName": "auctionId",
+    "fieldType": "string"
+  },
+  "gsi": [
+    {
+      "name": "someGSIname",
+      "partitionKey": {
+        "fieldName": "auctionId",
+        "fieldType": "string"
+      }
+    }
+  ],
+  "triggerFunctions": []
+}

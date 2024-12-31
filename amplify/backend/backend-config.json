@@ -1,0 +1,19 @@
+{
+  "function": {
+    "auctionHandler": {
+      "build": true,
+      "providerPlugin": "awscloudformation",
+      "service": "Lambda"
+    }
+  },
+  "storage": {
+    "handleAuctions": {
+      "providerPlugin": "awscloudformation",
+      "service": "DynamoDB"
+    },
+    "usersHandler": {
+      "providerPlugin": "awscloudformation",
+      "service": "DynamoDB"
+    }
+  }
+}

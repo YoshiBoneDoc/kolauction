@@ -13,11 +13,12 @@ const InfoPage = () => {
             <h1 className="text-4xl font-bold text-blue-600 mb-4">About KoL Auction Hub</h1>
             <p className="text-lg text-gray-700 text-center max-w-3xl mb-6">
                 Welcome to <span className="font-bold text-blue-500">kHub</span> (Kingdom of Loathing Auction Hub), a modern version of the old "KoLBay."
-                I created this site because I wanted a place where I could list my items up for bid just like the old days, without spending hours in chat advertising or refreshing the mall every minute. After not having coded for years, I also found this to be a fun little project during Crimbo Break.
+                I created this site because I wanted a place where I could list my items up for bid just like the old days, without spending hours in chat
+                advertising or refreshing the mall every minute. After not having coded for years, I also found this to be a fun little project during Crimbo Break.
             </p>
 
             <div className="text-sm text-gray-600 text-left max-w-3xl">
-                <h2 className="text-lg font-semibold text-gray-800 mb-4 underline">PLEASE NOT THIS IS A SOFT LAUNCH - WE ARE STILL UNDER CONSTRUCTION</h2>
+                <h2 className="text-lg font-semibold text-gray-800 mb-4 underline">PLEASE NOTE THIS IS A SOFT LAUNCH - WE ARE STILL UNDER CONSTRUCTION</h2>
 
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">How to Use This Site</h2>
                 <ul className="mb-6 list-none space-y-2">
