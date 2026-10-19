@@ -315,3 +315,8 @@ popular active listings for Home, one listing plus its bids for auction details,
 and only the signed-in user's auction activity for their account. Browsing and
 account refreshes run every 30 seconds; auction details every 10 seconds. Hidden
 tabs pause auction polling and refresh on return. Countdown clocks run locally.
+
+For the styled donation thank-you and error contact, stop the bot, apply
+`migrations/202610190010_donation_message_style.sql` once after `009`,
+then deploy the updated bot. The footer is saved with each newly claimed message;
+previously claimed retries retain their original wording. No refund or auction rules change.

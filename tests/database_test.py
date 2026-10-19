@@ -615,6 +615,28 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         ingest_donation({**normal_donation,'id':'5003','items':[{'id':1,'quantity':-1}]},error='Invalid donation attachments')
         for role in ['anon','authenticated']:
             ingest_donation(normal_donation,role=role,error='permission denied')
+        # Upgrade with a previously claimed donation: its retry must retain the old body.
+        legacy_donation={**normal_donation,'id':'5010','raw':{'id':'5010','type':'normal','message':'DONATE'}}
+        assert ingest_donation(legacy_donation)=='accepted'
+        legacy=json.loads(sql('select public.bot_claim_delivery(2);',role='service_role'))
+        sql(f"select public.bot_ack_delivery('{legacy['id']}','{legacy['attempt']}',false,'fixture uncertain send');",role='service_role')
+        sql((ROOT / 'supabase/migrations/202610190010_donation_message_style.sql').read_text())
+        sql(f"select public.bot_reconcile_delivery('{legacy['id']}',false,'Verified fixture request rejected and assets never left.');",role='service_role')
+        retry=json.loads(sql('select public.bot_claim_delivery(2);',role='service_role'))
+        assert retry['display_message']==legacy['display_message'] and retry['display_footer'] is None
+        sql(f"select public.bot_ack_delivery('{retry['id']}','{retry['attempt']}',true,'fixture legacy retry sent');",role='service_role')
+        styled_donation={**normal_donation,'id':'5011','raw':{'id':'5011','type':'normal','message':'DONATE'}}
+        assert ingest_donation(styled_donation)=='accepted'
+        styled=json.loads(sql('select public.bot_claim_delivery(2);',role='service_role'))
+        assert styled['display_message'].startswith('~ * ~ Thank you for supporting kHub ~ * ~')
+        assert 'It’s support from players like you' in styled['display_message']
+        assert 'That’s a business expense.' in styled['display_message']
+        assert styled['display_footer']=='If this donation was sent in error, please KMail teres minor (#3552305) with the reference ID above.'
+        sql(f"select public.bot_ack_delivery('{styled['id']}','{styled['attempt']}',false,'fixture uncertain send');",role='service_role')
+        sql(f"select public.bot_reconcile_delivery('{styled['id']}',false,'Verified fixture request rejected and assets never left.');",role='service_role')
+        retry=json.loads(sql('select public.bot_claim_delivery(2);',role='service_role'))
+        assert all(retry[key]==styled[key] for key in ['display_message','display_footer','reference_marker'])
+        sql(f"select public.bot_ack_delivery('{retry['id']}','{retry['attempt']}',true,'fixture styled retry sent');",role='service_role')
         deliveries_before=sql('select json_agg(d order by id) from khub_bot.deliveries d;')
 
         before = sql('select json_agg(t order by id) from public.auctions t;')
