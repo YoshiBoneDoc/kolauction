@@ -637,6 +637,391 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         retry=json.loads(sql('select public.bot_claim_delivery(2);',role='service_role'))
         assert all(retry[key]==styled[key] for key in ['display_message','display_footer','reference_marker'])
         sql(f"select public.bot_ack_delivery('{retry['id']}','{retry['attempt']}',true,'fixture styled retry sent');",role='service_role')
+        # The wording-only upgrade preserves historical messages and updates new donations.
+        sql((ROOT / 'supabase/migrations/202610190011_donation_message_wording.sql').read_text())
+        saved=json.loads(sql(f"select public.bot_lookup_delivery('{styled['id']}');",role='service_role'))
+        assert saved['display_message']==styled['display_message'] and saved['display_footer']==styled['display_footer']
+        revised_donation={**normal_donation,'id':'5012','raw':{'id':'5012','type':'normal','message':'DONATE'}}
+        assert ingest_donation(revised_donation)=='accepted'
+        revised=json.loads(sql('select public.bot_claim_delivery(2);',role='service_role'))
+        assert revised['display_message']=="Thanks so much for pitching in, we really appreciate your support! It’s players like you who make projects like kHub possible.\n\nRest assured, 100% of your donation will go toward keeping kHub running. Except for the part we spend on booze. That’s a business expense."
+        assert revised['display_footer']=="\n*If this donation was sent in error, please KMail teres minor (#3552305) with the reference ID above."
+        sql(f"select public.bot_ack_delivery('{revised['id']}','{revised['attempt']}',true,'fixture revised donation sent');",role='service_role')
+        # Inbox retention and separately tracked manual-review notices.
+        sql((ROOT / 'supabase/migrations/202610190012_bot_mail_review.sql').read_text())
+        def cleanup(*ids,role='service_role'):
+            return json.loads(sql("select public.bot_mail_cleanup(array["+','.join("'"+value+"'" for value in ids)+"]::text[]);",role=role))
+        assert cleanup('5012','4000','5002','999999')==['5012'] # Gifts/unknown mail never deleted.
+        held_donation={**normal_donation,'id':'5013','raw':{'id':'5013','type':'normal','message':'DONATE'}}
+        assert ingest_donation(held_donation)=='accepted'
+        assert cleanup('5013')==[]
+        held=json.loads(sql('select public.bot_claim_delivery(2);',role='service_role'))
+        assert cleanup('5013')==[]
+        sql(f"select public.bot_ack_delivery('{held['id']}','{held['attempt']}',false,'fixture uncertain transfer');",role='service_role')
+        notice=json.loads(sql('select public.bot_claim_review_notice();',role='service_role'))
+        assert notice['kind']=='notice' and notice['meat']==0 and notice['quantity']==0 and notice['item_id'] is None
+        assert notice['recipient_id']==held['recipient_id'] and notice['auction_id'] is None and notice['receipt_id'] is None
+        assert held['delivery_reference'] in notice['display_message'] and 'may already have arrived' in notice['display_message']
+        assert 'do not resend' in notice['display_message'] and notice['delivery_reference']!=held['delivery_reference']
+        assert not sql('select public.bot_claim_review_notice();',role='service_role')
+        sql(f"select public.bot_ack_delivery('{notice['id']}','{notice['attempt']}',false,'fixture notice uncertain');",role='service_role')
+        assert not sql('select public.bot_claim_review_notice();',role='service_role') # No recursive notice or retry.
+        sql('select public.bot_claim_delivery(2);',role='service_role',error='reconciliation')
+        assert cleanup('5013')==[]
+        sql(f"select public.bot_reconcile_delivery('{notice['id']}',false,'Verified notice request rejected and never sent.');",role='service_role')
+        retry=json.loads(sql('select public.bot_claim_review_notice();',role='service_role'))
+        assert retry['id']==notice['id'] and retry['display_message']==notice['display_message']
+        sql(f"select public.bot_ack_delivery('{retry['id']}','{retry['attempt']}',true,'fixture notice sent');",role='service_role')
+        assert not sql('select public.bot_claim_review_notice();',role='service_role')
+        assert cleanup('5013')==[]
+        sql(f"select public.bot_reconcile_delivery('{held['id']}',true,'Verified original sent-copy marker and exact attachments.');",role='service_role')
+        assert cleanup('5013')==['5013']
+        rejected=mail(5014,888,{'type':'verify','token':'f'*32})
+        rejected['raw']={'id':'5014','type':'normal','message':'VERIFY '+'f'*32}
+        assert 'invalid or expired' in ingest(rejected)
+        reply=json.loads(sql('select public.bot_claim_delivery(2);',role='service_role'))
+        sql(f"select public.bot_ack_delivery('{reply['id']}','{reply['attempt']}',true,'fixture rejected request reply sent');",role='service_role')
+        assert cleanup('5014')==[] # Rejections stay visible even after the reply/refund.
+        for role in ['anon','authenticated']:
+            sql("select public.bot_mail_cleanup(array['5013']);",role=role,error='permission denied')
+            sql('select public.bot_claim_review_notice();',role=role,error='permission denied')
+        # Exact donation/fee closet accounting; existing auctions keep their terms.
+        sql((ROOT / 'supabase/migrations/202610190013_closet_income.sql').read_text())
+        assert sql('select fee_bps from khub_bot.settings;')=='750'
+        assert sql(f"select fee_bps from public.auctions where id='{private_lot}';")=='0'
+        def drain_v2():
+            while True:
+                raw=sql('select public.bot_claim_delivery(2);',role='service_role')
+                if not raw: break
+                delivery=json.loads(raw)
+                sql(f"select public.bot_ack_delivery('{delivery['id']}','{delivery['attempt']}',true,'fixture confirmed send');",role='service_role')
+        def claim_closet(snapshot=None,reserve=1000,review_meat=0,review_items=None,error=None):
+            snapshot=snapshot or {'meat':'10000','closetMeat':'100','items':{'1':'100','1167':'7'},'closetItems':{}}
+            encoded=json.dumps(snapshot)
+            result=sql(f"select public.bot_claim_closet_transfer('{encoded}',{reserve},{review_meat},'{json.dumps(review_items or {})}');",role='service_role',error=error)
+            return json.loads(result) if result and not error else None
+        def ack_closet(d,moved=True):
+            sql(f"select public.bot_ack_closet_transfer('{d['id']}','{d['attempt']}',{str(moved).lower()},'fixture inventory and closet balances');",role='service_role')
+        income={**normal_donation,'id':'6000','meat':1500,'items':[{'id':1,'quantity':3}],
+                'raw':{'id':'6000','type':'normal','message':'DONATE'}}
+        assert ingest_donation(income)=='accepted' and ingest_donation(income)=='duplicate'
+        assert sql("select count(*) from khub_bot.closet_transfers where receipt_id='6000';")=='2'
+        drain_v2()
+        assert cleanup('6000')==[]
+        move=claim_closet(); assert move['meat']==1500 and move['source']=='donation'
+        assert move['before_state']=={'inventory':'10000','closet':'100'}
+        sql('select public.bot_claim_delivery(2);',role='service_role',error='closet transfer')
+        claim_closet(error='Resolve uncertain')
+        ack_closet(move,False)
+        pg_ctl('-l',str(Path(directory)/'postgres.log'),'-m','fast','-w','restart')
+        report=json.loads(sql('select public.bot_inspect();',role='service_role'))
+        assert report['closetAttention'][0]['id']==move['id']
+        assert report['closetAttention'][0]['closet_reference']==move['closet_reference']
+        sql(f"select public.bot_reconcile_closet_transfer('{move['id']}',false,'Verified closet deposit was rejected; no balance change.');",role='service_role')
+        retry=claim_closet(); assert retry['id']==move['id'] and retry['attempt']!=move['attempt']
+        sql(f"select public.bot_ack_closet_transfer('{move['id']}','{move['attempt']}',true,'stale fixture acknowledgment');",role='service_role',error='claim does not match')
+        ack_closet(retry)
+        assert cleanup('6000')==[] # Item donation still needs to be closeted.
+        item_move=claim_closet(); assert item_move['item_id']==1 and item_move['quantity']==3
+        ack_closet(item_move)
+        assert cleanup('6000')==['6000'] and claim_closet() is None
+        assert sql('select count(*) from khub_bot.closet_reconciliations;')=='1'
+        assert json.loads(sql(f"select public.bot_lookup_closet_transfer('{move['closet_reference']}');",role='service_role'))['id']==move['id']
+        # A known gift-wrapper item may itself be auctioned; protect those units.
+        sql('select public.bot_sync_catalog(\'[ {"id":1167,"name":"plain brown wrapper"} ]\');',role='service_role')
+        wrapper_lot=sql("select public.create_auction('plain brown wrapper',2,100,24,null,null,1167);",SELLER,'authenticated')
+        assert ingest(mail(6001,777,{'type':'list','auction_id':wrapper_lot},items=[{'id':1167,'quantity':2}]))=='accepted'
+        drain_v2()
+        for _ in range(2):
+            sql('select public.bot_queue_gift_packages(\'{"1167":"7"}\',\'{"1167":"1"}\');',role='service_role')
+        assert sql("select sum(quantity) from khub_bot.closet_transfers where source='gift_package';")=='4'
+        claim_closet({'meat':'10000','closetMeat':'0','items':{'1167':'6'},'closetItems':{}},review_items={'1167':'1'},error='Not enough unencumbered')
+        package=claim_closet(review_items={'1167':'1'}); assert package['item_id']==1167 and package['quantity']==4
+        ack_closet(package)
+        # An Instant Purchase is a completed sale, with no fee collection until payouts finish.
+        sale=escrow_create(10000)
+        assert sql(f"select fee_bps from public.auctions where id='{sale}';")=='750'
+        ingest(mail(6002,777,{'type':'list','auction_id':sale},items=[{'id':1,'quantity':2}]))
+        ingest(mail(6003,888,{'type':'buy','auction_id':sale},meat=10000))
+        assert sql(f"select fee_meat from public.auctions where id='{sale}';")=='750'
+        assert sql(f"select sum(meat) from khub_bot.deliveries where auction_id='{sale}' and kind='sale_meat';")=='9250'
+        assert sql(f"select count(*) from khub_bot.closet_transfers where auction_id='{sale}';")=='0'
+        drain_v2()
+        assert sql(f"select status from public.auctions where id='{sale}';")=='completed'
+        assert sql(f"select sum(meat) from khub_bot.closet_transfers where auction_id='{sale}';")=='750'
+        sql('select public.bot_tick();',role='service_role')
+        sql(f"update public.auctions set status=status where id='{sale}';")
+        assert sql(f"select count(*) from khub_bot.closet_transfers where auction_id='{sale}';")=='1'
+        claim_closet({'meat':'2200','closetMeat':'0','items':{},'closetItems':{}},review_meat=500,error='Not enough unencumbered')
+        fee=claim_closet({'meat':'2250','closetMeat':'0','items':{},'closetItems':{}},review_meat=500)
+        assert fee['meat']==750 and fee['source']=='sale_fee'; ack_closet(fee)
+        # An expired no-bid listing returns its items without any commission.
+        no_bids=escrow_create()
+        ingest(mail(6004,777,{'type':'list','auction_id':no_bids},items=[{'id':1,'quantity':2}]))
+        expire(no_bids);sql('select public.bot_tick();',role='service_role');drain_v2()
+        assert sql(f"select fee_meat from public.auctions where id='{no_bids}';")=='0'
+        assert sql(f"select count(*) from khub_bot.closet_transfers where auction_id='{no_bids}';")=='0'
+        # Percentage fees round down to whole Meat; ordinary expiry works as well.
+        rounding=escrow_create()
+        ingest(mail(6005,777,{'type':'list','auction_id':rounding},items=[{'id':1,'quantity':2}]))
+        ingest(mail(6006,888,{'type':'bid','auction_id':rounding},meat=101))
+        expire(rounding);sql('select public.bot_tick();',role='service_role');drain_v2()
+        assert sql(f"select fee_meat from public.auctions where id='{rounding}';")=='7'
+        assert sql(f"select sum(meat) from khub_bot.deliveries where auction_id='{rounding}' and kind='sale_meat';")=='94'
+        rounded_fee=claim_closet();assert rounded_fee['meat']==7;ack_closet(rounded_fee)
+        cancelled=escrow_create()
+        ingest(mail(6007,777,{'type':'list','auction_id':cancelled},items=[{'id':1,'quantity':2}]))
+        sql(f"select public.cancel_auction('{cancelled}');",SELLER,'authenticated');drain_v2()
+        assert sql(f"select count(*) from khub_bot.closet_transfers where auction_id='{cancelled}';")=='0'
+        tiny=sql("select public.create_auction('escrow item',2,1,24,null,null,1);",SELLER,'authenticated')
+        ingest(mail(6008,777,{'type':'list','auction_id':tiny},items=[{'id':1,'quantity':2}]))
+        ingest(mail(6009,888,{'type':'bid','auction_id':tiny},meat=1))
+        expire(tiny);sql('select public.bot_tick();',role='service_role');drain_v2()
+        assert sql(f"select fee_meat from public.auctions where id='{tiny}';")=='0'
+        assert sql(f"select count(*) from khub_bot.closet_transfers where auction_id='{tiny}';")=='0'
+        # Already tracked wrapper donations must not be queued a second time by the package sweep.
+        wrapper_donation={**income,'id':'6010','meat':0,'items':[{'id':1167,'quantity':1}],
+                          'raw':{'id':'6010','type':'normal','message':'DONATE'}}
+        assert ingest_donation(wrapper_donation)=='accepted'
+        sql("select public.bot_queue_gift_packages('{\"1167\":\"4\"}','{\"1167\":\"1\"}');",role='service_role')
+        assert sql("select sum(quantity) from khub_bot.closet_transfers where source='gift_package';")=='4'
+        donation_package=claim_closet({'meat':'10000','closetMeat':'0','items':{'1167':'4'},'closetItems':{}},review_items={'1167':'1'})
+        assert donation_package['source']=='donation' and donation_package['quantity']==1;ack_closet(donation_package)
+        # Maximum-size donations split into bounded operations and replay just once.
+        large_income={**income,'id':'6011','meat':20000000000,'items':[{'id':1,'quantity':5000000000}],
+                      'raw':{'id':'6011','type':'normal','message':'DONATE'}}
+        assert ingest_donation(large_income)=='accepted' and ingest_donation(large_income)=='duplicate'
+        assert sql("select count(*) from khub_bot.closet_transfers where receipt_id='6011';")=='25'
+        assert sql("select sum(meat)||':'||sum(quantity) from khub_bot.closet_transfers where receipt_id='6011';")=='20000000000:5000000000'
+        assert sql("select max(greatest(meat,quantity)) from khub_bot.closet_transfers where receipt_id='6011';")=='1000000000'
+        held_bid=escrow_create()
+        ingest(mail(6012,777,{'type':'list','auction_id':held_bid},items=[{'id':1,'quantity':2}]))
+        ingest(mail(6013,888,{'type':'bid','auction_id':held_bid},meat=1000));drain_v2()
+        claim_closet({'meat':'1000001500','closetMeat':'0','items':{},'closetItems':{}},error='Not enough unencumbered')
+        # Restricted RPCs/tables stay server-only.
+        for role in ['anon','authenticated']:
+            sql("select public.bot_queue_gift_packages('{}','{}');",role=role,error='permission denied')
+            sql("select public.bot_claim_closet_transfer('{}',1000,0,'{}');",role=role,error='permission denied')
+            sql(f"select public.bot_ack_closet_transfer('{move['id']}','{move['attempt']}',true,'test');",role=role,error='permission denied')
+            sql(f"select public.bot_lookup_closet_transfer('{move['closet_reference']}');",role=role,error='permission denied')
+            sql(f"select public.bot_reconcile_closet_transfer('{move['id']}',true,'fixture evidence');",role=role,error='permission denied')
+            sql('select * from khub_bot.closet_transfers;',role=role,error='permission denied')
+        # Revised auction headings and receipts preserve previously claimed messages.
+        ingest(mail(7000,999,{'type':'bid','auction_id':held_bid},meat=2000))
+        frozen=json.loads(sql('select public.bot_claim_delivery(2);',role='service_role'))
+        assert frozen['dedupe_key'].startswith('outbid:')
+        sql(f"select public.bot_ack_delivery('{frozen['id']}','{frozen['attempt']}',false,'fixture send uncertain');",role='service_role')
+        sql((ROOT / 'supabase/migrations/202610190014_auction_message_layout.sql').read_text())
+        sql(f"select public.bot_reconcile_delivery('{frozen['id']}',false,'Verified old request rejected; no transfer occurred.');",role='service_role')
+        retry=json.loads(sql('select public.bot_claim_delivery(2);',role='service_role'))
+        assert retry['id']==frozen['id'] and retry['display_message']==frozen['display_message']
+        sql(f"select public.bot_ack_delivery('{retry['id']}','{retry['attempt']}',true,'fixture old wording sent');",role='service_role')
+        drain_v2()
+        number=sql(f"select auction_number from public.auctions where id='{held_bid}';")
+        heading='Auction #'+number+'\n'+'-'*len('Auction #'+number)+'\nescrow item × 2'
+        ingest(mail(7001,888,{'type':'bid','auction_id':held_bid},meat=3000))
+        outbid=json.loads(sql('select public.bot_claim_delivery(2);',role='service_role'))
+        assert outbid['display_message']=='You’ve been outbid!\n\n'+heading+'\n\nYour previous bid is attached and has been returned in full.'
+        sql(f"select public.bot_ack_delivery('{outbid['id']}','{outbid['attempt']}',true,'fixture new outbid notice sent');",role='service_role')
+        drain_v2()
+        def collect_messages():
+            result=[]
+            while True:
+                raw=sql('select public.bot_claim_delivery(2);',role='service_role')
+                if not raw: return result
+                delivery=json.loads(raw);result.append(delivery)
+                sql(f"select public.bot_ack_delivery('{delivery['id']}','{delivery['attempt']}',true,'fixture message delivered');",role='service_role')
+        receipt_sale=escrow_create(10000)
+        ingest(mail(7002,777,{'type':'list','auction_id':receipt_sale},items=[{'id':1,'quantity':2}]))
+        ingest(mail(7003,888,{'type':'buy','auction_id':receipt_sale},meat=10000))
+        receipts=collect_messages()
+        number=sql(f"select auction_number from public.auctions where id='{receipt_sale}';")
+        heading='Auction #'+number+'\n'+'-'*len('Auction #'+number)+'\nescrow item × 2'
+        seller_message=next(d for d in receipts if d['kind']=='sale_meat')
+        assert seller_message['display_message']=='Your auction has sold!\n\n'+heading+'\n\nSale Price: 10,000 Meat\nCommission (7.5%): 750 Meat\nYour Proceeds: 9,250 Meat\n\nYour proceeds are attached. Enjoy!\nThanks for using kHub. We hope to see you again soon!'
+        assert all(heading in d['display_message'] for d in receipts)
+        # Legacy fee terms are rendered accurately rather than hardcoding 7.5%.
+        for lot,label in [(fee_lot,'Commission (2%): 20 Meat'),(short_lot,'Commission (0%): 0 Meat')]:
+            preview=sql(f"select khub_bot.friendly_message(d) from khub_bot.deliveries d where auction_id='{lot}' and kind='sale_meat' limit 1;")
+            assert label in preview
+        # Split receipts show total proceeds and the amount actually attached in each mail.
+        split_sale=escrow_create(2000000000)
+        ingest(mail(7004,777,{'type':'list','auction_id':split_sale},items=[{'id':1,'quantity':2}]))
+        ingest(mail(7005,888,{'type':'buy','auction_id':split_sale},meat=2000000000))
+        split_receipts=[d for d in collect_messages() if d['kind']=='sale_meat']
+        assert len(split_receipts)==2 and sum(d['meat'] for d in split_receipts)==1850000000
+        for d in split_receipts:
+            assert 'Your Proceeds: 1,850,000,000 Meat' in d['display_message']
+            assert f"Attached in this message: {d['meat']:,} Meat" in d['display_message']
+            assert 'This portion of your proceeds is attached. Enjoy!' in d['display_message']
+        split_bid=escrow_create()
+        ingest(mail(7006,777,{'type':'list','auction_id':split_bid},items=[{'id':1,'quantity':2}]))
+        ingest(mail(7007,888,{'type':'bid','auction_id':split_bid},meat=1500000000))
+        ingest(mail(7008,999,{'type':'bid','auction_id':split_bid},meat=1700000000))
+        returned=[d for d in collect_messages() if d['dedupe_key'].startswith('outbid:')]
+        assert len(returned)==2 and sum(d['meat'] for d in returned)==1500000000
+        for d in returned:
+            assert 'returned in full across multiple messages' in d['display_message']
+            assert f"This message contains {d['meat']:,} Meat." in d['display_message']
+        # No extra owner-funded buffer is required: exact remaining escrow is protected.
+        protected=json.loads(sql('select public.bot_liabilities();',role='service_role'))
+        without_buffer=claim_closet({'meat':str(int(protected['meat'])+1000000000),'closetMeat':'0',
+                                    'items':protected['items'],'closetItems':{}},reserve=0)
+        assert without_buffer['meat']==1000000000
+        ack_closet(without_buffer)
+        # Policy correction: blank funded normal mail is refunded, not donated.
+        old_blank=mail(8000,888,{'type':'donation'},items=[{'id':1904,'quantity':1}])
+        old_blank['raw']={'id':'8000','type':'normal','message':'<table class="item" rel="id=1904&n=1"></table>'}
+        assert ingest_donation(old_blank)=='accepted'
+        old_meat=mail(8001,888,{'type':'donation'},meat=50)
+        old_meat['raw']={'id':'8001','type':'normal','message':'<center>You gain 50 Meat</center>'}
+        assert ingest_donation(old_meat)=='accepted'
+        explicit=mail(8002,888,{'type':'donation'},meat=20)
+        explicit['raw']={'id':'8002','type':'normal','message':'DONATE<center>You gain 20 Meat</center>'}
+        assert ingest_donation(explicit)=='accepted'
+        wrapped=mail(8003,888,{'type':'donation'})
+        wrapped['raw']={'id':'8003','type':'giftshop','message':'BID 1001'}
+        assert ingest_donation(wrapped)=='accepted'
+        # Simulate a crash/uncertain write for this previously accepted donation.
+        old_closet=json.loads(sql("update khub_bot.closet_transfers set state='moving',attempt=gen_random_uuid(),before_state='{\"inventory\":\"1\",\"closet\":\"0\"}' where receipt_id='8000' returning row_to_json(closet_transfers);"))
+        ack_closet(old_closet,False)
+        # Reporting also works on installations without the mail-policy migration.
+        assert sql("select to_regclass('khub_bot.mail_policy_reviews') is null;")=='t'
+        sql((ROOT / 'supabase/migrations/202610190017_financial_reports.sql').read_text())
+        early_donations=json.loads(sql("select public.bot_financial_history('donations',0,100);",role='service_role'))['records']
+        assert not ({'8000','8001'} & {r['mail_id'] for r in early_donations})
+        assert {'8002','8003'} <= {r['mail_id'] for r in early_donations}
+        early_stats=json.loads(sql('select public.bot_financial_stats();',role='service_role'))
+        sql((ROOT / 'supabase/migrations/202610190015_invalid_mail_refunds.sql').read_text())
+        assert json.loads(sql('select public.bot_financial_stats();',role='service_role'))['donations']==early_stats['donations']
+        assert sql("select state from khub_bot.closet_transfers where receipt_id='8000';")=='unknown'
+        assert sql("select state from khub_bot.closet_transfers where receipt_id='8001';")=='cancelled'
+        assert sql("select state from khub_bot.closet_transfers where receipt_id='8002';")=='pending'
+        assert sql("select count(*) from khub_bot.deliveries where receipt_id in ('8000','8001') and state='cancelled';")=='2'
+        assert sql("select count(*) from khub_bot.deliveries where receipt_id in ('8002','8003') and state='pending';")=='2'
+        report=json.loads(sql('select public.bot_inspect();',role='service_role'))
+        assert {r['receipt_id'] for r in report['mailPolicyAttention']}=={'8000','8001'}
+        corrected={**old_blank,'command':{'type':'unknown'}}
+        assert ingest(corrected)=='previous_donation_review'
+        ingest({**corrected,'meat':1},error='payload changed')
+        sql("select public.bot_queue_previous_donation_refunds('{}');",role='service_role',error='Reconcile uncertain')
+        sql(f"select public.bot_reconcile_closet_transfer('{old_closet['id']}',true,'Verified original closet move happened; item currently in closet.');",role='service_role')
+        held=json.loads(sql('select public.bot_liabilities();',role='service_role'))
+        assert held['items']['1904']=='1'
+        missing={'meat':held['meat'],'items':{k:v for k,v in held['items'].items() if k!='1904'}}
+        sql(f"select public.bot_queue_previous_donation_refunds('{json.dumps(missing)}');",role='service_role',error='item #1904')
+        restored={'meat':held['meat'],'items':held['items']}
+        for _ in range(2):
+            sql(f"select public.bot_queue_previous_donation_refunds('{json.dumps(restored)}');",role='service_role')
+        assert sql("select count(*) from khub_bot.deliveries where dedupe_key like 'policy-refund:%';")=='2'
+        assert json.loads(sql('select public.bot_liabilities();',role='service_role'))==held
+        assert ingest(corrected)=='duplicate' and ingest_donation(old_blank)=='duplicate'
+        assert json.loads(sql("select payload from khub_bot.receipts where mail_id='8000';"))==old_blank
+        # A stale worker cannot record new implicit donations after the migration.
+        fresh_blank=mail(8004,888,{'type':'donation'},meat=70,items=[{'id':1,'quantity':1}])
+        fresh_blank['raw']={'id':'8004','type':'normal','message':'<center>You gain 70 Meat</center><table class="item" rel="id=1&n=1"></table>'}
+        ingest_donation(fresh_blank,error='require DONATE')
+        assert sql("select count(*) from khub_bot.receipts where mail_id='8004';")=='0'
+        refund={**fresh_blank,'command':{'type':'unknown'}}
+        assert 'Unknown command' in ingest(refund) and ingest(refund)=='duplicate'
+        invalid=mail(8005,888,{'type':'unknown'},meat=80)
+        invalid['raw']={'id':'8005','type':'normal','message':'hello<center>You gain 80 Meat</center>'}
+        assert 'Unknown command' in ingest(invalid)
+        assert sql("select sum(meat)||':'||sum(quantity) from khub_bot.deliveries where receipt_id='8004' and kind='refund';")=='70:1'
+        assert sql("select sum(meat) from khub_bot.deliveries where receipt_id='8005' and kind='refund';")=='80'
+        assert sql("select count(*) from khub_bot.closet_transfers where receipt_id in ('8004','8005');")=='0'
+        policy_messages=collect_messages()
+        invalid_replies=[d for d in policy_messages if d['receipt_id'] in ['8004','8005']]
+        assert len(invalid_replies)==3 and all('Invalid command' in d['display_message'] for d in invalid_replies)
+        assert all('being returned' in d['display_message'] for d in invalid_replies)
+        assert cleanup('8000','8001','8004','8005')==[]
+        assert json.loads(sql('select public.bot_inspect();',role='service_role'))['mailPolicyAttention']==[]
+        for role in ['anon','authenticated']:
+            sql("select public.bot_queue_previous_donation_refunds('{}');",role=role,error='permission denied')
+            sql('select * from khub_bot.mail_policy_reviews;',role=role,error='permission denied')
+            ingest(refund,role=role,error='permission denied')
+        sql((ROOT / 'supabase/migrations/202610190016_cancel_opened_package.sql').read_text())
+        sql((ROOT / 'supabase/migrations/202610190017_financial_reports.sql').read_text())
+        def financial_stats():
+            return json.loads(sql('select public.bot_financial_stats();',role='service_role'))
+        def financial_history(kind,offset=0,limit=100):
+            return json.loads(sql(f"select public.bot_financial_history('{kind}',{offset},{limit});",role='service_role'))['records']
+        for role in ['anon','authenticated']:
+            sql('select public.bot_financial_stats();',role=role,error='permission denied')
+            sql("select public.bot_financial_history('donations',0,20);",role=role,error='permission denied')
+            sql('select * from khub_bot.report_donations();',role=role,error='permission denied')
+        sql("select public.bot_financial_history('other',0,20);",role='service_role',error='Use donations or sales')
+        sql("select public.bot_financial_history('sales',-1,20);",role='service_role',error='nonnegative offset')
+        sql("select public.bot_financial_history('sales',0,101);",role='service_role',error='limit between')
+        base_report=financial_stats()
+        report_donation=mail(9100,888,{'type':'donation'},meat=200,items=[{'id':1,'quantity':3}])
+        report_donation['raw']={'id':'9100','type':'normal','message':'DONATE'}
+        assert ingest_donation(report_donation)=='accepted'
+        assert ingest_donation(report_donation)=='duplicate'
+        report_gift={**donation,'id':'9101','raw':{'id':'9101','type':'giftshop','message':'A gift'}}
+        assert ingest_donation(report_gift)=='accepted'
+        donated_report=financial_stats()
+        assert int(donated_report['donations']['receipts'])==int(base_report['donations']['receipts'])+2
+        assert int(donated_report['donations']['meat'])==int(base_report['donations']['meat'])+200
+        assert int(donated_report['donations']['gift_packages'])==int(base_report['donations']['gift_packages'])+1
+        def donated_units(report):
+            return int(next(x['quantity'] for x in report['donations']['items'] if x['item_id']==1))
+        assert donated_units(donated_report)==donated_units(base_report)+3
+        donation_rows=financial_history('donations')
+        assert not ({'8000','8001','8004','8005'} & {r['mail_id'] for r in donation_rows})
+        assert next(r for r in donation_rows if r['mail_id']=='9101')['items']==[]
+        assert next(r for r in donation_rows if r['mail_id']=='9100')['meat']=='200'
+        assert financial_history('donations',0,1)+financial_history('donations',1,1)==donation_rows[:2]
+        assert financial_history('sales',100000)==[]
+        # New funded sales count only after every delivery is acknowledged.
+        report_sale=escrow_create(10000)
+        ingest(mail(9102,777,{'type':'list','auction_id':report_sale},items=[{'id':1,'quantity':2}]))
+        ingest(mail(9103,888,{'type':'buy','auction_id':report_sale},meat=10000))
+        assert financial_stats()['sales']==base_report['sales']
+        collect_messages()
+        sold_report=financial_stats()
+        for field,delta in [('completed',1),('trade_meat',10000),('commission_meat',750),('seller_proceeds_meat',9250)]:
+            assert int(sold_report['sales'][field])==int(base_report['sales'][field])+delta
+        assert sold_report['donations']==donated_report['donations']
+        sale_rows=financial_history('sales')
+        assert len([r for r in sale_rows if r['auction_id']==split_sale])==1
+        assert next(r for r in sale_rows if r['auction_id']==split_sale)['sale_meat']=='2000000000'
+        assert next(r for r in sale_rows if r['auction_id']==report_sale)['seller_proceeds_meat']=='9250'
+        assert int(sold_report['sales']['trade_meat'])==sum(int(r['sale_meat']) for r in sale_rows)
+        assert int(sold_report['sales']['commission_meat'])==sum(int(r['commission_meat']) for r in sale_rows)
+        # Moving or withdrawing income cannot change historical accounting.
+        moved_report=json.loads(sql("begin; update khub_bot.closet_transfers set state='moved' where state='pending'; select public.bot_financial_stats(); rollback;"))
+        assert moved_report['sales']==sold_report['sales'] and moved_report['donations']==sold_report['donations']
+        def wrapper_plan(key):
+            return sql("insert into khub_bot.closet_transfers(dedupe_key,source,item_id,quantity) "
+                       f"values ('opened-test:{key}','gift_package',1167,1) returning id;")
+        opened=wrapper_plan('opened')
+        cancel_reason='Owner confirmed opening the package manually; wrapper consumed.'
+        cancel_query=f"select public.bot_cancel_opened_package('{opened}','{cancel_reason}');"
+        for role in ['anon','authenticated']:
+            sql(cancel_query,role=role,error='permission denied')
+        sql(f"select public.bot_cancel_opened_package('{opened}','short');",role='service_role',error='Record why')
+        protected_before=sql('select public.bot_liabilities();',role='service_role')
+        financial_before=sql('select json_agg(d order by id) from khub_bot.deliveries d;')
+        sql(cancel_query,role='service_role')
+        assert sql(f"select state from khub_bot.closet_transfers where id='{opened}';")=='cancelled'
+        assert sql(f"select resolution||':'||evidence from khub_bot.closet_reconciliations where transfer_id='{opened}';")=='cancelled:'+cancel_reason
+        assert sql('select public.bot_liabilities();',role='service_role')==protected_before
+        assert sql('select json_agg(d order by id) from khub_bot.deliveries d;')==financial_before
+        sql(cancel_query,role='service_role',error='Only never-attempted')
+        assert sql(f"select count(*) from khub_bot.closet_reconciliations where transfer_id='{opened}';")=='1'
+        for key,changes in [
+            ('donation',"source='donation'"),('fee',"source='sale_fee'"),
+            ('non-wrapper','item_id=1904'),('moving',"state='moving',attempt=gen_random_uuid()"),
+            ('unknown',"state='unknown',attempt=gen_random_uuid()"),('moved',"state='moved',moved_at=now()"),
+            ('previously-attempted',"before_state='{\"inventory\":\"1\",\"closet\":\"0\"}'"),
+            ('meat','item_id=null,quantity=0,meat=1'),
+        ]:
+            blocked=wrapper_plan(key)
+            sql(f"update khub_bot.closet_transfers set {changes} where id='{blocked}';")
+            sql(f"select public.bot_cancel_opened_package('{blocked}','{cancel_reason}');",role='service_role',error='Only never-attempted')
+            assert sql(f"select count(*) from khub_bot.closet_reconciliations where transfer_id='{blocked}';")=='0'
+        closet_before=sql('select json_agg(c order by id) from khub_bot.closet_transfers c;')
         deliveries_before=sql('select json_agg(d order by id) from khub_bot.deliveries d;')
 
         before = sql('select json_agg(t order by id) from public.auctions t;')
@@ -645,9 +1030,14 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         assert sql('select json_agg(t order by id) from public.auctions t;') == before
         assert sql('select json_agg(t order by id) from public.bids t;') == bids_before
         assert sql('select json_agg(d order by id) from khub_bot.deliveries d;') == deliveries_before
+        assert sql('select json_agg(c order by id) from khub_bot.closet_transfers c;') == closet_before
+        assert financial_stats()['sales']==sold_report['sales']
+        assert financial_stats()['donations']==sold_report['donations']
         assert ingest_donation()=='duplicate'
         assert ingest_donation(normal_donation)=='duplicate'
-        print('PASS: migrations, profile RLS, public reads, write restrictions, input validation, bids, concurrent bids, expiry, identity, registration conflict checks, lifecycle upgrades, cancellation/bid races, two-party completion, instant purchase validation/permissions/price caps/retries/races, lock-wait deadlines, KMail identity/activation/refunds/settlement/fees/funded purchase races/uncertain-send reconciliation, and database restart persistence')
+        assert ingest(corrected)=='duplicate'
+        assert sql("select count(*) from khub_bot.deliveries where dedupe_key like 'policy-refund:%';")=='2'
+        print('PASS: migrations, profile RLS, public reads, write restrictions, input validation, bids, concurrent bids, expiry, identity, registration conflict checks, lifecycle upgrades, cancellation/bid races, two-party completion, instant purchase validation/permissions/price caps/retries/races, lock-wait deadlines, KMail identity/activation/refunds/settlement/fees/funded purchase races/uncertain-send reconciliation, closet income accounting/protected escrow/reserves/package holds/fee collection/uncertain-move reconciliation, and database restart persistence')
     finally:
         if started:
             pg_ctl('-m', 'fast', '-w', 'stop')

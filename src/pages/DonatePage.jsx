@@ -36,7 +36,7 @@ const DonatePage = () => {
                         <span className="font-bold">Gift packages:</span> All gift packages sent to kHub are also considered donations, regardless of their message. Use normal, unwrapped KMail with the listing&apos;s command for auction deposits and bids.
                     </li>
                 </ul>
-                <p className="text-lg text-gray-700 mt-6">The bot sends a short thank-you after processing your donation. Sending <span className="font-mono">DONATE</span> without attachments returns donation instructions.</p>
+                <p className="text-lg text-gray-700 mt-6">The bot sends a short thank-you after processing your donation. Sending <span className="font-mono">DONATE</span> without attachments returns donation instructions. Normal KMail without a valid command is not a donation; attached Meat or items will be returned.</p>
                 <a href="https://www.kingdomofloathing.com/sendmessage.php?towho=3888760" target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex min-h-11 items-center text-lg text-blue-500 hover:underline">Open KoL KMail</a>
                 <p className="text-lg text-gray-700 mt-4">Questions? Send a KMail to <span className="font-bold">teres Minor (#3552305)</span>.</p>
             </div>

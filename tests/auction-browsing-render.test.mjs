@@ -103,16 +103,23 @@ test('instant purchase outcome retains pending settlement and hides further purc
     assert.doesNotMatch(html, /Purchase for 1,000 Meat/);
 });
 
-test('new escrow auctions provide funded KMail commands rather than unfunded website purchase/bid controls', () => {
+test('escrow auctions show one BID command and the optional instant price beside the current bid', () => {
     const listing = { ...auctions[0], auctionNumber: '1001', escrowMode: true, itemId: 1, instantPurchasePrice: 1000 };
     const html = render('/auction/active', [listing], {id:'buyer'});
     assert.match(html, /BID 1001/);
-    assert.match(html, /BUY 1001/);
+    assert.doesNotMatch(html, /BUY 1001/);
+    assert.equal((html.match(/BID 1001/g) || []).length, 1);
+    assert.match(html, /Use the same BID command. Any excess Meat is returned/);
+    assert.ok(html.indexOf('Current Bid') < html.indexOf('Instant Purchase Price'));
+    assert.ok(html.indexOf('Instant Purchase Price') < html.indexOf('Sold by:'));
     assert.doesNotMatch(html, /(?:BID|BUY) active/);
     assert.match(html, /Auction #1001/);
     assert.match(html, /kHub \(#3888760\)/);
     assert.doesNotMatch(html, /<button[^>]*>Purchase for/);
     assert.doesNotMatch(html, /Your bid \(Meat\)/);
+    const withoutInstant = render('/auction/active', [{ ...listing, instantPurchasePrice: null }], {id: 'buyer'});
+    assert.equal((withoutInstant.match(/BID 1001/g) || []).length, 1);
+    assert.doesNotMatch(withoutInstant, /Instant Purchase Price/);
 });
 
 test('pending item deposits display seller deposit instructions without internal item IDs', () => {

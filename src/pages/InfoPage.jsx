@@ -59,9 +59,9 @@ const InfoPage = () => {
                         your full bid in Meat, with no items. Even when raising your own bid, send the full new amount, not just the difference.
                     </li>
                     <li>
-                        <span className="font-bold">4.</span> To accept an Instant Purchase Price, send <span
-                        className="font-mono">BUY [Auction number]</span> with exactly that much Meat. A bid reaching the
-                        instant price also ends bidding at that price; any excess Meat is returned.
+                        <span className="font-bold">4.</span> If the listing offers an Instant Purchase Price, use the same <span
+                        className="font-mono">BID [Auction number]</span> message and attach that amount or more.
+                        This ends bidding at the instant price; any excess Meat is returned.
                     </li>
                     <li>
                         <span className="font-bold">5.</span> Copy the short auction number and command from the listing.
@@ -101,7 +101,7 @@ const InfoPage = () => {
                         <span className="font-bold">1.</span> When the timer expires, or an Instant Purchase is accepted,
                         <span className="font-bold"> kHub (#3888760)</span> sends the items to the winner and the winning
                         Meat payment to the seller by KMail. Both are already held by the bot, so neither party needs to send another payment or accept a trade.
-                        There is currently no auction fee.
+                        New listings have a 7.5% seller fee, deducted from the final sale price and rounded down to whole Meat. There is no fee if the auction ends without a bid. Existing listings keep the fee shown on their auction page.
                     </li>
                     <li>
                         <span className="font-bold">2.</span> If there are no accepted bids, the items are returned to

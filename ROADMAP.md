@@ -22,7 +22,12 @@ Outstanding tasks as of October 19, 2026.
   package remains untouched and subsequent polls/restarts do not send another.
 - Apply `supabase/migrations/202610190009_normal_kmail_donations.sql` after `008`
   and deploy the matching bot for normal DONATE mail. Check funded donations get
-  one thank-you, empty DONATE gets instructions, and other unknown mail still refunds.
+  one thank-you, empty DONATE gets instructions. With migration `012` and its worker, unrelated
+  mail remains untouched instead of being automatically refunded.
+
+- Apply `supabase/migrations/202610190014_auction_message_layout.sql` after `013`.
+  Verify auction-number-first underlined headings, the outbid notice, and the seller
+  sale/commission/proceeds breakdown. Check split receipts and unchanged old retries.
 
 ### 2. Finish real auction and bot testing
 
@@ -33,19 +38,60 @@ Outstanding tasks as of October 19, 2026.
 - Verify restricted recipients/items, gift donations, rollover, split deliveries,
   restarts, and interrupted or uncertain sends. Successfully sending a linking
   confirmation does not establish that every auction scenario works in game.
-- Keep current defaults documented and consistent: **0% fee**, with the auction
+- Keep current defaults documented and consistent: **7.5% seller fee on new listings (rounded down to whole Meat)**, with the auction
   duration starting when the bot accepts the seller's deposit.
 
 ### 3. Maintain the hosted bot and backups
 
-- Monitor the Oracle-hosted bot for crashes, insufficient assets,
-  unsupported/system mail, uncertain deliveries, and free-tier host interruptions.
-  Reconcile uncertainty using evidence before retrying a delivery. Keep only one
-  copy running, including read-only mode, to avoid conflicting KoL logins.
-- Back up the separate bot code securely: `/bot/` is intentionally ignored by the
-  website repository. Keep credentials private in whichever backup/repository is used.
-- Test restoring the database backup into an isolated database; checking the dump's
-  archive listing alone was not a restore test. Plan ongoing backups.
+- Apply `supabase/migrations/202610190012_bot_mail_review.sql` after `011` and
+  deploy the matching bot. Validate mixed valid/unsupported mail, retained rejected
+  requests, deferred source deletion, and one tracked manual-review notice per
+  uncertain delivery with small controlled sends. If that notice is uncertain,
+  it must remain blocked without recursive replies or automatic retries.
+- Add an external health alert and durable healthy/blocked/error heartbeat.
+  Docker already restarts crashed containers, but this cannot recover a stopped,
+  unavailable, or reclaimed VM. Keep only one bot running, including read-only mode.
+- Decide the public outage policy and add an outage banner/disable instructions
+  when appropriate. Current behavior: clocks continue; bids processed after the
+  deadline are rejected/refunded, even if sent earlier; existing accepted bids and
+  queued settlements survive in Supabase. No automatic auction extensions exist.
+- Verify all gift packages count as donations regardless of notes. With `013`,
+  normal DONATE qualifies. With `015`, blank/invalid funded normal mail is refunded,
+  and unfunded unrelated messages remain untouched.
+- Keep asset checks enabled; investigate deficits/reserve failures rather than
+  bypassing them. Test the recovery procedure and uncertain-send evidence checks.
+- Choose a private off-device code/credential backup. The laptop copy and ignored
+  `/bot/` folder alone do not cover laptop loss. A separate private code repository
+  or one replaced encrypted bundle avoids accumulating archives on the laptop.
+- Configure encrypted off-device database backups with a bounded rotation (proposed:
+  7 daily copies), upload verification and failure alerts. No destination or schedule
+  has been configured. A daily backup still leaves up to a day's recovery gap.
+- Perform a real restore of the saved backup into an isolated compatible database,
+  verify it, then delete the disposable database. Archive listing and synthetic
+  migration tests are not a real backup restore test. Keep all bots stopped after
+  any real rollback until sends since the snapshot have been reconciled.
+
+Operational details and the remaining setup are in local `bot/OPERATIONS.md`.
+
+- Apply `supabase/migrations/202610190013_closet_income.sql` after `012` and restart
+  the matching bot. Test 7.5% seller fees, protected escrow/refunds/review assets,
+  unopened gift-package closeting, exact donation moves, and C-reference reconciliation
+  with controlled small amounts. Existing listing fees stay fixed; fees enter the
+  closet queue only once the sale's outgoing deliveries are confirmed.
+- Deploy/restart the rollover-aware worker and change any existing server
+  `BOT_MEAT_RESERVE` to 0 unless an extra owner-funded buffer is specifically wanted.
+  Test the two-minute transfer pause and automatic recovery through real rollover,
+  including startup during maintenance. Unexpected interrupted writes must still
+  remain blocked for evidence. Check new gift-wrapper types when game data changes;
+  old donation receipts/fees are not automatically backfilled.
+
+- Apply `supabase/migrations/202610190015_invalid_mail_refunds.sql` after `014`
+  and restart the updated bot. Test blank/invalid normal mail refunds, explicit
+  DONATE and both empty/non-empty gift notes. Resolve C-1001 from inventory/closet
+  evidence; if its item moved, return it to inventory before the correction refund.
+- Verify the corrected GET item-closet request with a small explicit DONATE test.
+  Check recorded before/after balance diagnostics if it still fails. Unknown moves
+  remain blocked; a code update alone must not retry them.
 
 ### 4. Finish production email and account recovery checks
 

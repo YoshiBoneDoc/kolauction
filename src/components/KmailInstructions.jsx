@@ -21,7 +21,6 @@ export default function KmailInstructions({ auction, mode = 'bid' }) {
                 <p>Attach {mode === 'buy' ? <strong>exactly {auction.instantPurchasePrice.toLocaleString('en-US')} Meat</strong> : <>your <strong>full bid amount</strong>, at least {minimum.toLocaleString('en-US')} Meat</>}, with no items. This is a total for the entire listing.</p>
                 <p>Your bid is accepted only after the bot processes the funded KMail before the deadline. Outbid or rejected funds are returned by KMail.</p>
                 {mode === 'buy' && <p>Acceptance closes bidding. kHub then sends the items to you and payment to the seller.</p>}
-                {mode === 'bid' && auction.instantPurchasePrice && <p>A funded bid reaching {auction.instantPurchasePrice.toLocaleString('en-US')} Meat accepts the instant price; any excess is returned.</p>}
             </>}
             {kolIdentity && !kolIdentity.kol_player_id && <p><Link to="/profile" className="text-blue-700 underline">Link your KoL account</Link> before sending. Matching a website username is not verification.</p>}
             {!currentUser && <p><Link to="/login" className="text-blue-700 underline">Log in</Link> to link your account.</p>}

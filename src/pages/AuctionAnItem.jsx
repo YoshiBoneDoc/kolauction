@@ -82,6 +82,7 @@ export default function AuctionAnItem() {
             <Link to="/" className="mb-4 inline-flex min-h-11 items-center text-sm text-blue-700 underline">Home</Link>
             <h1 className="mb-6 text-center text-3xl font-bold text-blue-600 sm:text-4xl">Auction an Item</h1>
             <p className="mx-auto mb-4 max-w-lg text-sm text-gray-700">{kolIdentity && !kolIdentity.kol_player_id && <>First <Link to="/profile" className="text-blue-700 underline">link your KoL account</Link>. </>}Your listing activates only after kHub (#3888760) receives the exact items by KMail. Deposit instructions appear after saving.</p>
+            <p className="mx-auto mb-4 max-w-lg text-sm text-gray-700">Successful sales have a 7.5% seller fee, rounded down to whole Meat and deducted from your payment. No fee is charged if there are no accepted bids.</p>
             <div className="mx-auto max-w-lg rounded-lg bg-white p-4 shadow-md sm:p-8">
                 {error && <p role="alert" className="mb-4 break-words font-semibold text-red-700">{error}</p>}
                 {preview ? <section aria-label="Preview auction">

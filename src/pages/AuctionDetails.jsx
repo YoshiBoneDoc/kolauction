@@ -43,14 +43,16 @@ export default function AuctionDetails() {
                             <p className="text-sm text-gray-600">{active ? 'Current Bid' : result.winnerId ? 'Final price' : 'Last Bid'}</p>
                             <p className="break-words text-2xl font-extrabold text-gray-900 sm:text-3xl">{price ? `${price.toLocaleString('en-US')} Meat` : 'No bids yet'}</p>
                         </div>
+                        {active && <InstantPurchaseAction key={`purchase-${auction.id}`} auction={auction} />}
                         <p className="break-words text-sm text-gray-700">Sold by: <strong>{auction.owner || 'Unknown'}</strong></p>
+                        {auction.escrowMode && <p className="text-sm text-gray-600">Seller fee: {auction.feeBps / 100}% of the final sale price, rounded down to whole Meat. No fee without a sale.</p>}
                         <p className={`text-sm ${active && auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-600'}`}>
                             {active ? <>Ends in <time dateTime={new Date(auction.endTime).toISOString()}>{timeRemaining(auction.endTime, now)}</time></> : result.label}
                         </p>
                     </div>
                     <div className="flex min-w-0 flex-col items-center gap-4 md:col-start-1 md:row-start-1">
                         {auction.image ? <img src={auction.image} alt={auction.item} className="h-32 w-32 object-contain sm:h-48 sm:w-48" /> : <p className="text-gray-500">No Image Available</p>}
-                        {active && <div className="w-full"><InstantPurchaseAction key={`purchase-${auction.id}`} auction={auction} /><AuctionBidForm key={auction.id} auction={auction} /></div>}
+                        {active && <div className="w-full"><AuctionBidForm key={auction.id} auction={auction} /></div>}
                     </div>
                 </div>
             </div>

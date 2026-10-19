@@ -299,7 +299,7 @@ completion, and durable refund/payout obligations. The website requires this
 migration and catalog sync before new listings can be created. Existing rows are
 kept. Only the server bot gets a service-role key; never set one in browser env.
 
-Defaults: no seller fee and duration begins on exact item-deposit acceptance.
+After migration `013`, new listings charge 7.5% and duration begins on exact item-deposit acceptance. Existing listing fees stay fixed.
 `bot/README.md` documents optional fee/fixed-deadline settings, startup, supported
 KMail commands, and the operator reconciliation process. Hosted migration and
 real KoL credentials/delivery have not been applied or tested by local changes.
@@ -320,3 +320,43 @@ For the styled donation thank-you and error contact, stop the bot, apply
 `migrations/202610190010_donation_message_style.sql` once after `009`,
 then deploy the updated bot. The footer is saved with each newly claimed message;
 previously claimed retries retain their original wording. No refund or auction rules change.
+
+For the revised donation wording (without the decorative heading), apply
+`migrations/202610190011_donation_message_wording.sql` once after `010`.
+This is a database template change; the worker updated for `010` needs no rebuild.
+Newly claimed donation messages use the new text; existing retries keep their saved text.
+
+For mail retention and tracked manual-review notices, stop every bot, apply
+`migrations/202610190012_bot_mail_review.sql` once after `011`,
+then restart/deploy the matching worker. See `bot/OPERATIONS.md` for the outage and backup plan.
+
+For the 7.5% fee and donation/commission closet queue, stop all workers, apply
+`migrations/202610190013_closet_income.sql` after `012`, then restart/deploy
+the updated worker. This affects future listing fees and newly recorded income;
+existing fee terms and old donation receipts are preserved. Closet moves protect
+auction/refund holds; the optional extra operating buffer defaults to 0. Inspect C-references
+and reconcile uncertain closet moves using the operations guide.
+
+For auction-number-first message headings, the revised outbid notice and the full
+seller payment breakdown, apply `migrations/202610190014_auction_message_layout.sql` once
+after `013`. This only changes database templates: an already updated `013` worker
+needs no rebuild/restart. Previously claimed messages keep their saved wording.
+
+Stop all workers, apply `migrations/202610190015_invalid_mail_refunds.sql`
+after `014`, then restart/deploy the updated worker. Blank/invalid funded normal
+mail is refunded, not donated. Old implicit donations are held for safe correction
+refunds; uncertain C-references must be resolved from evidence first. Item closet
+requests now use GET, with safe failure diagnostics. See the bot operations guide.
+
+For an obsolete wrapper closet plan after the owner opened a gift package, apply
+`migrations/202610190016_cancel_opened_package.sql` once after `015`. It adds a
+service-only, audited cancellation command for never-attempted pending wrapper
+plans; applying the migration cancels nothing by itself. See the bot README for
+`cancel-opened-package` instructions.
+
+For private donation/commission/trade reports, apply
+`migrations/202610190017_financial_reports.sql` (normally after `016`). It also works
+without `015` on an existing escrow/short-auction-number database and is safe to
+rerun. It adds read-only,
+service-only reporting functions; no existing receipts, balances, obligations or
+auction state are changed. Use `npm run stats` from the updated bot folder.
