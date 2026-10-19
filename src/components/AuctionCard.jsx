@@ -20,6 +20,7 @@ export default function AuctionCard({ auction, now }) {
                 {auction.image && <img src={auction.image} alt="" loading="lazy" className="h-24 w-24 object-contain" />}
                 <h2 className="w-full break-words text-xl font-bold text-[#14248A]">{auction.item} <span className="text-[#5365AB]">×{auction.quantity.toLocaleString('en-US')}</span></h2>
             </Link>
+            {auction.auctionNumber && <p className="mt-2 text-center text-xs text-gray-600">Auction #{auction.auctionNumber}</p>}
             <p className="mt-3 text-center text-sm text-gray-600">Minimum bid: {auction.minBidMeat.toLocaleString('en-US')} Meat</p>
             <div className="my-3 text-center">
                 <p className="text-sm text-gray-600">{active ? 'Current bid' : result.winnerId ? 'Final price' : 'Last bid'}</p>

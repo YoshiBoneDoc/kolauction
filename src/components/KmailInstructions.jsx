@@ -3,16 +3,17 @@ import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import { UserContext } from '../context/UserContext';
 import useKolIdentity from '../hooks/useKolIdentity';
+import CopyMessage from './CopyMessage';
 
 export default function KmailInstructions({ auction, mode = 'bid' }) {
     const { currentUser } = useContext(UserContext);
     const kolIdentity = useKolIdentity();
-    const command = `${mode === 'list' ? 'LIST' : mode === 'buy' ? 'BUY' : 'BID'} ${auction.id}`;
+    const command = `${mode === 'list' ? 'LIST' : mode === 'buy' ? 'BUY' : 'BID'} ${auction.auctionNumber || auction.id}`;
     const minimum = Math.max(auction.minBidMeat, (auction.currentBid || 0) + 1);
     return (
         <section aria-label={`${mode} KMail instructions`} className="w-full space-y-3 rounded border bg-white p-3 text-left text-sm text-gray-800">
             <p>Send KMail to <strong>kHub (#3888760)</strong> with this exact message:</p>
-            <code className="block break-all rounded bg-gray-100 p-3 text-base select-all">{command}</code>
+            <CopyMessage text={command} label={`${command.split(' ')[0]} command`} className="text-base" />
             {mode === 'list' ? <>
                 <p>Attach exactly <strong>{auction.quantity.toLocaleString('en-US')} × {auction.item}</strong>, with no Meat or extra items.</p>
                 <p>{auction.startOnDeposit ? `The ${auction.auctionTime}-hour timer starts when the bot accepts your deposit.` : `The deadline remains ${new Date(auction.endTime).toLocaleString()}.`}</p>

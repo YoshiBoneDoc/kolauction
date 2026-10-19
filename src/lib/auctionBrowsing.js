@@ -37,7 +37,7 @@ export function browseAuctions(auctions, { search = '', status = 'active', sort 
 
 export function popularActiveAuctions(auctions, now = Date.now()) {
     return browseAuctions(auctions, { now }).sort((a, b) =>
-        (b.bids?.length || 0) - (a.bids?.length || 0) || a.endTime - b.endTime
+        (b.bidCount ?? b.bids?.length ?? 0) - (a.bidCount ?? a.bids?.length ?? 0) || a.endTime - b.endTime
     );
 }
 

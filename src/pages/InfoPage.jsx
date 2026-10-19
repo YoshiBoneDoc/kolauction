@@ -50,21 +50,21 @@ const InfoPage = () => {
                     <li>
                         <span className="font-bold">2.</span> After saving, follow the deposit instructions on your listing.
                         Send normal KMail to <span className="font-bold">kHub (#3888760)</span> with the exact listed items
-                        and the message <span className="font-mono">LIST [Auction ID]</span>. Attach no Meat or extra items.
+                        and the message <span className="font-mono">LIST [Auction number]</span>. Attach no Meat or extra items.
                         The auction becomes public and its timer starts when the bot accepts the deposit.
                     </li>
                     <li>
                         <span className="font-bold">3.</span> Browse &quot;All Auctions&quot; and open a listing for its bidding instructions.
-                        Send the bot normal KMail with <span className="font-mono">BID [Auction ID]</span> and attach
+                        Send the bot normal KMail with <span className="font-mono">BID [Auction number]</span> and attach
                         your full bid in Meat, with no items. Even when raising your own bid, send the full new amount, not just the difference.
                     </li>
                     <li>
                         <span className="font-bold">4.</span> To accept an Instant Purchase Price, send <span
-                        className="font-mono">BUY [Auction ID]</span> with exactly that much Meat. A bid reaching the
+                        className="font-mono">BUY [Auction number]</span> with exactly that much Meat. A bid reaching the
                         instant price also ends bidding at that price; any excess Meat is returned.
                     </li>
                     <li>
-                        <span className="font-bold">5.</span> Copy the actual Auction ID and command from the listing.
+                        <span className="font-bold">5.</span> Copy the short auction number and command from the listing.
                         A bid or purchase counts only when the bot processes the funded KMail before the deadline.
                         The bot holds the leading bid and returns the previous leading bidder&apos;s Meat when they are outbid.
                     </li>

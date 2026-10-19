@@ -37,6 +37,7 @@ export default function AuctionDetails() {
                 <div className="grid min-w-0 grid-cols-1 gap-6 md:grid-cols-2">
                     <div className="min-w-0 space-y-4 text-center md:col-start-2 md:row-start-1">
                         <h1 className="break-words text-3xl font-bold text-blue-600 sm:text-4xl">{auction.item} <span className="text-xl text-gray-600">×{auction.quantity.toLocaleString('en-US')}</span></h1>
+                        {auction.auctionNumber && <p className="text-sm text-gray-600">Auction #{auction.auctionNumber}</p>}
                         <p className="text-sm text-gray-600">Minimum Bid (Meat): {auction.minBidMeat.toLocaleString('en-US')}</p>
                         <div>
                             <p className="text-sm text-gray-600">{active ? 'Current Bid' : result.winnerId ? 'Final price' : 'Last Bid'}</p>

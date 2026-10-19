@@ -12,6 +12,7 @@ export function mapAuction(row, bidRows) {
     const latestBid = lastBid?.amount >= Number(row.current_bid) ? lastBid : null;
     return {
         id: row.id,
+        auctionNumber: row.auction_number == null ? null : String(row.auction_number),
         sellerId: row.seller_id,
         owner: row.seller_username,
         item: row.item,
@@ -43,12 +44,13 @@ export function mapAuction(row, bidRows) {
         completedAt: row.completed_at,
         cancelledAt: row.cancelled_at,
         bids,
+        bidCount: Number(row.bid_count ?? bids.length),
     };
 }
 
 function databaseError(error) {
     if (['PGRST205', 'PGRST202', '42P01', '42883', '42501'].includes(error.code)) {
-        return new Error('Auction storage is not ready. Apply any pending auction SQL migrations (including the lifecycle migration) in Supabase, then retry.');
+        return new Error('Auction storage is not ready. Apply any pending auction SQL migrations (including the auction page-read migration) in Supabase, then retry.');
     }
     return new Error(error.message || 'The database request failed. Please try again.');
 }
@@ -59,28 +61,15 @@ export function createAuctionService(client) {
         return client;
     }
 
-    async function readTable(table, columns) {
-        const rows = [];
-        const pageSize = 500;
-        for (let offset = 0; ; offset += pageSize) {
-            const { data, error } = await requireClient().from(table).select(columns)
-                .order('created_at', { ascending: true }).order('id', { ascending: true })
-                .range(offset, offset + pageSize - 1);
-            if (error) throw databaseError(error);
-            rows.push(...data);
-            if (data.length < pageSize) return rows;
-        }
-    }
-
     return {
-        async load() {
+        async load({ view = 'browse', id = null, search = '', status = 'active', sort = 'ending', page = 1 } = {}) {
             const { error } = await requireClient().rpc('finalize_expired_auctions');
             if (error) throw databaseError(error);
-            // Read bids after listings, then use any newer bid in the display.
-            const auctions = await readTable('auctions', '*');
-            const bids = await readTable('bids', '*');
-            return auctions.map((row) => mapAuction(row, bids))
-                .sort((a, b) => b.createdAt - a.createdAt);
+            const { data, error: readError } = await requireClient().rpc('read_auction_page', {
+                p_view: view, p_id: id, p_search: search, p_status: status, p_sort: sort, p_page: page,
+            });
+            if (readError) throw databaseError(readError);
+            return { auctions: data.rows.map((row) => mapAuction(row, data.bids)), total: Number(data.total) };
         },
         async create(auction) {
             const { data, error } = await requireClient().rpc('create_auction', {

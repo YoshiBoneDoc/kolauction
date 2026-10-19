@@ -7,17 +7,20 @@ import AuctionCard from '../components/AuctionCard';
 import AuctionNavigation from '../components/AuctionNavigation';
 
 export default function AllAuctions() {
-    const { auctions, isLoading, error } = useContext(AuctionsContext);
+    const { auctions, total, isLoading, error } = useContext(AuctionsContext);
     const [params, setParams] = useSearchParams();
     const now = useNow();
     const search = params.get('q') || '';
     const status = auctionFilters.some(([value]) => value === params.get('status')) ? params.get('status') : 'active';
     const sort = auctionSorts.some(([value]) => value === params.get('sort')) ? params.get('sort') : 'ending';
+    const page = Math.min(1000000, Math.max(1, Number.parseInt(params.get('page'), 10) || 1));
     const visible = useMemo(() => browseAuctions(auctions, { search, status, sort, now }), [auctions, search, status, sort, now]);
+    const found = total ?? visible.length;
 
     function update(name, value) {
         setParams((previous) => {
             const next = new URLSearchParams(previous);
+            if (name !== 'page') next.delete('page');
             if (value) next.set(name, value);
             else next.delete(name);
             return next;
@@ -51,13 +54,18 @@ export default function AllAuctions() {
                 </section>
                 {isLoading ? <p role="status">Loading auctions…</p> : <>
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                        <p role="status">{visible.length} {visible.length === 1 ? 'auction' : 'auctions'} found</p>
+                        <p role="status">{found} {found === 1 ? 'auction' : 'auctions'} found</p>
                         <button onClick={() => setParams({}, { replace: true })} className="min-h-11 bg-transparent px-3 text-blue-700 underline">Reset filters</button>
                     </div>
                     {!error && visible.length === 0 && <p className="rounded-lg border bg-white p-6">{auctions.length === 0 ? 'No auctions have been listed yet.' : 'No auctions match your search and filters. Try another item name or status.'}</p>}
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         {visible.map((auction) => <AuctionCard key={auction.id} auction={auction} now={now} />)}
                     </div>
+                    {(found > 24 || page > 1) && <nav aria-label="Auction pages" className="mt-6 flex items-center justify-center gap-4">
+                        <button disabled={page <= 1} onClick={() => update('page', String(page - 1))} className="min-h-11 rounded border bg-white px-4 py-2 disabled:opacity-50">Previous</button>
+                        <span>Page {page} of {Math.max(1, Math.ceil(found / 24))}</span>
+                        <button disabled={page * 24 >= found} onClick={() => update('page', String(page + 1))} className="min-h-11 rounded border bg-white px-4 py-2 disabled:opacity-50">Next</button>
+                    </nav>}
                 </>}
             </main>
         </div>

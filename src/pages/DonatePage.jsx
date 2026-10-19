@@ -1,5 +1,5 @@
-import React from "react";
 import { Link } from "react-router-dom";
+import CopyMessage from '../components/CopyMessage';
 
 const DonatePage = () => {
     return (
@@ -20,18 +20,25 @@ const DonatePage = () => {
 
             {/* Donation Options */}
             <div className="text-center max-w-3xl">
-                <h2 className="text-2xl font-bold text-gray-800 mb-4">Ways to Donate</h2>
+                <h2 className="text-2xl font-bold text-gray-800 mb-4">How to Donate</h2>
                 <ul className="text-left text-lg text-gray-700 space-y-4">
                     <li>
-                        <span className="font-bold">1. In-game Donation:</span> Send Meat or items to my in-game account: <span className="font-bold ">teres Minor (#3552305)</span>.
+                        <span className="font-bold">1. Send a KMail:</span> Address it to <span className="font-bold">kHub (#3888760)</span> in Kingdom of Loathing.
                     </li>
                     <li>
-                        <span className="font-bold">2. PayPal:</span> Donate via PayPal <a href="https://www.paypal.com/donate/?hosted_button_id=SR8RS43MEPK42" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">here</a>.
+                        <span className="font-bold">2. Write this exact message:</span>
+                        <CopyMessage text="DONATE" label="donation message" className="mt-2" />
                     </li>
                     <li>
-                        <span className="font-bold">3. Contact Us:</span> For other methods, reach out via kMail
+                        <span className="font-bold">3. Attach your donation:</span> Add the Meat, items, or both that you would like to donate, then send the KMail. You do not need a linked website account.
+                    </li>
+                    <li>
+                        <span className="font-bold">Gift packages:</span> All gift packages sent to kHub are also considered donations, regardless of their message. Use normal, unwrapped KMail with the listing&apos;s command for auction deposits and bids.
                     </li>
                 </ul>
+                <p className="text-lg text-gray-700 mt-6">The bot sends a short thank-you after processing your donation. Sending <span className="font-mono">DONATE</span> without attachments returns donation instructions.</p>
+                <a href="https://www.kingdomofloathing.com/sendmessage.php?towho=3888760" target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex min-h-11 items-center text-lg text-blue-500 hover:underline">Open KoL KMail</a>
+                <p className="text-lg text-gray-700 mt-4">Questions? Send a KMail to <span className="font-bold">teres Minor (#3552305)</span>.</p>
             </div>
 
             {/* Thank You Note */}

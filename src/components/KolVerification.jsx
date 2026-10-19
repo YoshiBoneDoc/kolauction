@@ -1,6 +1,7 @@
 import { useContext, useEffect, useState } from 'react';
 import { UserContext } from '../context/UserContext';
 import { supabase } from '../lib/supabase';
+import CopyMessage from './CopyMessage';
 
 export default function KolVerification() {
     const { currentUser } = useContext(UserContext);
@@ -34,7 +35,7 @@ export default function KolVerification() {
             {identity?.kol_player_id ? <p>Verified: {identity.kol_player_name} (#{identity.kol_player_id}). Auction escrow uses this player ID.</p> : <>
                 <p>Link your account before listing or bidding. Send the code from this page by KMail from the KoL account you own.</p>
                 <button onClick={request} disabled={pending || !supabase} className="min-h-11 rounded bg-blue-600 px-4 py-3 text-white disabled:opacity-50">{pending ? 'Creating code…' : challenge ? 'Get a new verification code' : 'Get verification code'}</button>
-                {challenge && <div className="space-y-2"><p>KMail <strong>kHub (#3888760)</strong> with this exact message, attaching no Meat or items:</p><code className="block break-all bg-gray-100 p-3 select-all">{challenge.command}</code><p>Valid for 20 minutes. This page checks for verification every 10 seconds while the bot is running.</p></div>}
+                {challenge && <div className="space-y-2"><p>KMail <strong>kHub (#3888760)</strong> with this exact message, attaching no Meat or items:</p><CopyMessage text={challenge.command} label="verification message" /><p>Valid for 20 minutes. This page checks for verification every 10 seconds while the bot is running.</p></div>}
             </>}
             {error && <p role="alert" className="text-red-700">{error}</p>}
         </section>

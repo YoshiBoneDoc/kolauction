@@ -24,6 +24,13 @@ test('maps persisted records, sorts bid history, and preserves large values', ()
     assert.equal(mapped.endTime - mapped.createdAt, 24 * 60 * 60 * 1000);
 });
 
+test('short auction numbers map separately from internal UUIDs', () => {
+    const auction=mapAuction({...row,auction_number:1001},[]);
+    assert.equal(auction.auctionNumber,'1001');
+    assert.equal(auction.id,row.id);
+    assert.equal(mapAuction(row,[]).auctionNumber,null);
+});
+
 test('creation sends listing fields only; identity, time, ID, and bid state are server-owned', async () => {
     let sent;
     const service = createAuctionService({ rpc: async (name, params) => {
@@ -51,29 +58,24 @@ test('invalid bid values never reach the API', async () => {
     }
 });
 
-test('reads all pages instead of silently stopping at the API row limit', async () => {
+test('loads a filtered page without downloading all auctions or bid history', async () => {
     const requested = [];
-    const service = createAuctionService({ rpc: async () => ({ error: null }), from(table) {
-        const query = {
-            select() { return query; },
-            order() { return query; },
-            async range(start, end) {
-                requested.push([table, start, end]);
-                return { error: null, data: table === 'auctions' ? Array.from({ length: start === 0 ? 500 : 1 }, (_, i) => ({ ...row, id: `auction-${start + i}` })) : [] };
-            },
-        };
-        return query;
+    const service = createAuctionService({ async rpc(name, params) {
+        requested.push([name, params]);
+        return { error: null, data: name === 'read_auction_page' ? { rows: [{...row,bid_count:12}], bids: [], total: 100 } : null };
     } });
-    const result = await service.load();
-    assert.equal(result.length, 501);
-    assert.deepEqual(requested, [['auctions', 0, 499], ['auctions', 500, 999], ['bids', 0, 499]]);
+    const result = await service.load({search:'hat',status:'all',sort:'price-desc',page:2});
+    assert.equal(result.auctions.length, 1);
+    assert.equal(result.auctions[0].bidCount, 12);
+    assert.deepEqual(result.auctions[0].bids, []);
+    assert.equal(result.total,100);
+    assert.deepEqual(requested, [['finalize_expired_auctions', undefined], ['read_auction_page', {
+        p_view:'browse',p_id:null,p_search:'hat',p_status:'all',p_sort:'price-desc',p_page:2,
+    }]]);
 });
 
 test('missing migration produces setup guidance rather than an empty listing', async () => {
-    const service = createAuctionService({ rpc: async () => ({ error: null }), from() {
-        const query = { select() { return query; }, order() { return query; }, range: async () => ({ error: { code: 'PGRST205' } }) };
-        return query;
-    } });
+    const service = createAuctionService({ rpc: async (name) => ({ error: name === 'read_auction_page' ? { code: 'PGRST202' } : null }) });
     await assert.rejects(service.load(), /Apply any pending auction SQL migrations/);
 });
 
@@ -81,15 +83,10 @@ test('missing migration produces setup guidance rather than an empty listing', a
 test('loads finalize expired auctions before reading rows', async () => {
     const calls = [];
     const service = createAuctionService({
-        async rpc(name) { calls.push(name); return { error: null }; },
-        from(table) {
-            calls.push(table);
-            const query = { select() { return query; }, order() { return query; }, range: async () => ({ data: [], error: null }) };
-            return query;
-        },
+        async rpc(name) { calls.push(name); return { error: null, data: {rows:[],bids:[],total:0} }; },
     });
     await service.load();
-    assert.deepEqual(calls, ['finalize_expired_auctions', 'auctions', 'bids']);
+    assert.deepEqual(calls, ['finalize_expired_auctions', 'read_auction_page']);
 });
 
 test('lifecycle actions send only the listing ID and propagate rejections', async () => {

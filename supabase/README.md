@@ -1,5 +1,34 @@
 # User profile database setup
 
+## Friendly bot messages and short auction commands (latest bot update)
+
+With all bot processes stopped, back up the database and run
+`migrations/202610190006_friendly_bot_messages.sql` once, then deploy the updated
+bot before restarting. It adds short auction/delivery references and readable
+KMail bodies without changing asset obligations, UUIDs, or delivery states.
+Then apply `migrations/202610190007_short_auction_commands.sql` once. Deploy the
+matching bot before the website update: website instructions use `BID 1001`,
+`BUY 1001`, and `LIST 1001`, while existing UUID commands continue to work.
+Older uncertain sends retain their original UUID markers. The migration requires
+the updated worker; older workers cannot claim deliveries after this upgrade.
+See the local [message previews](../bot/MESSAGES.md) for examples and rollout steps.
+
+For donation thank-yous, apply `migrations/202610190008_donation_acknowledgments.sql`
+once after `007`, with all bots stopped, then deploy the matching bot update.
+Gift packages remain untouched; one acknowledgment is queued per package, with
+receipt deduplication across polling and restarts.
+Then apply `migrations/202610190009_normal_kmail_donations.sql` once for explicit
+normal KMail donations: `DONATE` with assets receives a thank-you; without assets,
+it receives instructions. Deploy the matching bot after applying pending migrations.
+
+> **Bot reminder:** the auction bot is in this project's `bot/` folder and runs
+> on Oracle Cloud. It is excluded from the website Git repository. See the
+> [project README](../README.md) for its location and deployment links.
+>
+> **Bot controls:** [start/stop, LIVE/read-only, and switching between Oracle and
+> your Mac](../bot/README.md#start-stop-and-switch-liveread-only-modes).
+> These detailed instructions are in the local, gitignored `bot/` folder.
+
 In your Supabase project, open **SQL Editor → New query**, paste the contents of
 `migrations/202610180001_create_profiles.sql`, and select **Run**. Run it once.
 The transaction rolls back the whole migration if an object already exists or
@@ -274,3 +303,15 @@ Defaults: no seller fee and duration begins on exact item-deposit acceptance.
 `bot/README.md` documents optional fee/fixed-deadline settings, startup, supported
 KMail commands, and the operator reconciliation process. Hosted migration and
 real KoL credentials/delivery have not been applied or tested by local changes.
+# Auction page reads and refresh timing
+
+After the KMail escrow migration, run the entire
+`migrations/202610190005_auction_page_reads.sql` once in Supabase SQL Editor before
+deploying the latest frontend. It adds a read-only function that respects existing
+row-level security; it does not change auction records or bot processing.
+
+The website now requests 24 filtered/sorted listings per browsing page, four
+popular active listings for Home, one listing plus its bids for auction details,
+and only the signed-in user's auction activity for their account. Browsing and
+account refreshes run every 30 seconds; auction details every 10 seconds. Hidden
+tabs pause auction polling and refresh on return. Countdown clocks run locally.

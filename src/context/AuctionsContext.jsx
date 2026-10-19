@@ -1,47 +1,59 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from 'react-router-dom';
 import PropTypes from "prop-types";
 import { supabase } from "../lib/supabase";
 import { createAuctionService } from "../lib/auctions";
 import { UserContext } from "./UserContext";
+import { auctionReadRequest, auctionRefreshDelay, startAuctionRefresh } from '../lib/auctionRefresh';
 
 export const AuctionsContext = createContext();
 const storage = createAuctionService(supabase);
 
 export const AuctionsProvider = ({ children }) => {
     const { currentUser } = useContext(UserContext);
-    const [auctions, setAuctions] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState("");
+    const { pathname, search } = useLocation();
+    const request = useMemo(() => auctionReadRequest(pathname, search), [pathname, search]);
+    const key = JSON.stringify([request, currentUser?.id]);
+    const [snapshot, setSnapshot] = useState(null);
     const requestVersion = useRef(0);
+    const inFlight = useRef(null);
+    const matches = snapshot?.key === key;
+    const auctions = matches ? snapshot.auctions : [];
+    const total = matches ? snapshot.total : 0;
+    const error = matches ? snapshot.error : '';
+    const isLoading = Boolean(request && !matches);
 
-    const refreshAuctions = useCallback(async () => {
+    const refreshAuctions = useCallback(() => {
+        if (!request || (request.view === 'profile' && !currentUser?.id)) return Promise.resolve();
+        if (inFlight.current?.key === key) return inFlight.current.promise;
         const version = ++requestVersion.current;
-        try {
-            const data = await storage.load();
-            if (version === requestVersion.current) {
-                setAuctions(data);
-                setError("");
-            }
-        } catch (failure) {
-            if (version === requestVersion.current) setError(failure.message);
-        } finally {
-            if (version === requestVersion.current) setIsLoading(false);
-        }
-    }, []);
+        const promise = storage.load(request).then((data) => {
+            if (version === requestVersion.current) setSnapshot({ key, ...data, error: '' });
+        }).catch((failure) => {
+            if (version === requestVersion.current) setSnapshot((previous) => ({
+                key, auctions: previous?.key === key ? previous.auctions : [],
+                total: previous?.key === key ? previous.total : 0, error: failure.message,
+            }));
+        }).finally(() => {
+            if (inFlight.current?.promise === promise) inFlight.current = null;
+        });
+        inFlight.current = { key, promise };
+        return promise;
+    }, [request, key, currentUser?.id]);
 
     useEffect(() => {
         const requests = requestVersion;
-        refreshAuctions();
-        // Also refresh across browsers and on returning to this tab. No
-        // Realtime publication setup is required for persistence.
-        const interval = setInterval(refreshAuctions, 10000);
-        window.addEventListener("focus", refreshAuctions);
+        if (!request || (request.view === 'profile' && !currentUser?.id)) return;
+        const stop = startAuctionRefresh({
+            refresh: refreshAuctions, delay: auctionRefreshDelay(request), document, window,
+            initialDelay: request.view === 'browse' && request.search ? 250 : 0,
+        });
         return () => {
             ++requests.current;
-            clearInterval(interval);
-            window.removeEventListener("focus", refreshAuctions);
+            inFlight.current = null;
+            stop();
         };
-    }, [refreshAuctions, currentUser?.id]);
+    }, [refreshAuctions, request, currentUser?.id]);
 
     const addAuction = async (auction) => {
         const id = await storage.create(auction);
@@ -92,7 +104,7 @@ export const AuctionsProvider = ({ children }) => {
     };
 
     return (
-        <AuctionsContext.Provider value={{ auctions, isLoading, error, addAuction, placeBid, purchaseAuction, confirmTrade, cancelAuction, refreshAuctions }}>
+        <AuctionsContext.Provider value={{ auctions, total, isLoading, error, addAuction, placeBid, purchaseAuction, confirmTrade, cancelAuction, refreshAuctions }}>
             {error && (
                 <div role="alert" className="bg-red-50 text-red-700 p-4">
                     {error}{" "}

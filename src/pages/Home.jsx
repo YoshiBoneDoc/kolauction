@@ -1,4 +1,4 @@
-import { useContext, useMemo, useState } from 'react';
+import { useContext, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { AuctionsContext } from '../context/AuctionsContext';
 import { popularActiveAuctions, timeRemaining } from '../lib/auctionBrowsing';
@@ -6,11 +6,10 @@ import { useNow } from '../hooks/useNow';
 import AuctionNavigation from '../components/AuctionNavigation';
 
 export default function Home() {
-    const { auctions, isLoading, error } = useContext(AuctionsContext);
+    const { auctions, total, isLoading, error } = useContext(AuctionsContext);
     const now = useNow();
-    const [showAll, setShowAll] = useState(false);
     const popular = useMemo(() => popularActiveAuctions(auctions, now), [auctions, now]);
-    const displayed = showAll ? popular : popular.slice(0, 4);
+    const displayed = popular.slice(0, 4);
 
     return (
         <div className="flex min-h-screen w-full flex-col bg-[#F9F9F9] px-4 sm:px-6">
@@ -41,7 +40,7 @@ export default function Home() {
                         </Link>
                     ))}
                 </div>
-                {!showAll && popular.length > 4 && <button onClick={() => setShowAll(true)} className="mt-4 min-h-11 bg-transparent text-blue-700 underline">See more active auctions</button>}
+                {(total ?? popular.length) > 4 && <Link to="/auctions" className="mt-4 inline-flex min-h-11 items-center text-blue-700 underline">See more active auctions</Link>}
             </main>
             <footer className="-mx-4 border-t bg-gray-100 px-4 py-3 text-center sm:-mx-6">
                 <Link to="/donate" className="inline-flex min-h-11 items-center text-sm text-blue-700 hover:underline">Donate</Link>
