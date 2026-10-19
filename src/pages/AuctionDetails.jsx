@@ -1,309 +1,74 @@
-import { useContext, useEffect, useState, useMemo } from "react";
-import { useParams, Link } from "react-router-dom";
-import { AuctionsContext } from "../context/AuctionsContext";
-import { UserContext } from "../context/UserContext";
-import AuctionOutcome from "../components/AuctionOutcome";
-import { getAuctionStatus, auctionStatusLabels } from "../lib/auctionLifecycle";
+import { useContext } from 'react';
+import { useParams, useLocation, Link } from 'react-router-dom';
+import { AuctionsContext } from '../context/AuctionsContext';
+import AuctionOutcome from '../components/AuctionOutcome';
+import AuctionBidForm from '../components/AuctionBidForm';
+import InstantPurchaseAction from '../components/InstantPurchaseAction';
+import { getAuctionResult } from '../lib/auctionLifecycle';
+import { timeRemaining } from '../lib/auctionBrowsing';
+import { useNow } from '../hooks/useNow';
 
-const AuctionDetails = () => {
+export default function AuctionDetails() {
     const { id } = useParams();
-    const { auctions, placeBid, isLoading, error } = useContext(AuctionsContext);
-    const { currentUser } = useContext(UserContext);
-
-    const auction = auctions.find((auction) => String(auction.id) === String(id));
-
-    const [bidAmount, setBidAmount] = useState("");
-    const [bidError, setBidError] = useState("");
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [remainingTime, setRemainingTime] = useState({
-        timeString: "...",
-        isRed: false,
-    });
-    const maxBidAmount = 20000000000; // 20 billion
-
-    // Format numbers for display
-    const formattedMinBid = useMemo(
-        () => auction?.minBidMeat?.toLocaleString("en-US") || "0",
-        [auction?.minBidMeat]
-    );
-
-    const formattedCurrentBid = useMemo(
-        () => (auction?.currentBid?.toLocaleString("en-US") || "No bids yet"),
-        [auction?.currentBid]
-    );
-
-    // Calculate the remaining time for the auction
-    const calculateRemainingTime = (endTime) => {
-        if (!endTime) return { timeString: "Invalid Auction Data", isRed: false };
-
-        const currentTime = Date.now();
-        const remainingTime = new Date(endTime) - currentTime;
-
-        if (remainingTime <= 0) return { timeString: "Auction Expired", isRed: false };
-
-        const days = Math.floor(remainingTime / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((remainingTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((remainingTime % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((remainingTime % (1000 * 60)) / 1000);
-
-        return {
-            timeString: days > 0 ? `${days}d ${hours}h ${minutes}m` : `${hours}h ${minutes}m ${seconds}s`,
-            isRed: remainingTime <= 3 * 60 * 60 * 1000, // Flag for less than 3 hours
-        };
-    };
-
-
-    useEffect(() => {
-        if (!auction?.endTime) return;
-
-        setRemainingTime(calculateRemainingTime(auction.endTime));
-        const interval = setInterval(() => {
-            setRemainingTime(calculateRemainingTime(auction.endTime));
-        }, 1000);
-
-        return () => clearInterval(interval);
-    }, [auction?.endTime]);
-
-    // Handle bid input with cursor management and 20 billion cap
-    const handleBidInputChange = (e) => {
-        const inputElement = e.target;
-        const rawValue = inputElement.value.toLowerCase().replace(/,/g, "");
-        const cursorPosition = inputElement.selectionStart;
-        const maxCheck = parseInt(rawValue, 10); // Parse the raw value as a number
-
-        // If the numeric value exceeds 5 billion, stop processing and retain the old value
-        const maxAmount = 20000000000;
-        if (maxCheck > maxAmount) {
-            return;
-        }
-
-        // Handle empty input
-        if (rawValue === "") {
-            setBidAmount("");
-            setBidError("");
-            return;
-        }
-
-        // Validate and parse input
-        let numericValue;
-        const match = rawValue.match(/^(\d+)([kmb]?)$/);
-        if (match) {
-            const numberPart = parseInt(match[1], 10);
-            const suffix = match[2];
-
-            // Convert suffix
-            switch (suffix) {
-                case "k":
-                    numericValue = numberPart * 1000;
-                    break;
-                case "m":
-                    numericValue = numberPart * 1000000;
-                    break;
-                case "b":
-                    numericValue = numberPart * 1000000000;
-                    break;
-                default:
-                    numericValue = numberPart;
-            }
-
-            // Cap at max amount
-            if (numericValue > maxBidAmount) {
-                numericValue = maxBidAmount;
-                setBidError("Bid cannot exceed 20 billion.");
-            } else {
-                setBidError("");
-            }
-        } else {
-            setBidError("Invalid input. Use digits optionally followed by k, m, or b.");
-            return;
-        }
-
-        const formattedValue = numericValue.toLocaleString("en-US");
-
-        // Check if a suffix was used
-        const suffixUsed = rawValue.match(/[kmb]$/);
-
-        let newCursorPosition;
-        if (suffixUsed) {
-            // Move cursor to the end if a suffix was used
-            newCursorPosition = formattedValue.length;
-        } else {
-            // Calculate the new cursor position based on digits before the cursor
-            let digitsBeforeCursor = 0;
-            for (let i = 0; i < cursorPosition; i++) {
-                if (/\d/.test(inputElement.value[i])) {
-                    digitsBeforeCursor++;
-                }
-            }
-
-            let digitCount = 0;
-            newCursorPosition = 0;
-            for (let i = 0; i < formattedValue.length; i++) {
-                if (/\d/.test(formattedValue[i])) {
-                    digitCount++;
-                }
-                if (digitCount === digitsBeforeCursor) {
-                    newCursorPosition = i + 1;
-                    break;
-                }
-            }
-        }
-
-        setBidAmount(formattedValue);
-        requestAnimationFrame(() => {
-            inputElement.setSelectionRange(newCursorPosition, newCursorPosition);
-        });
-    };
-
-    // Handle bid submission
-    // Handle bid submission
-    const handleBidSubmit = async () => {
-        if (isSubmitting) return;
-        if (!currentUser) {
-            setBidError("Only registered users may bid.");
-            return;
-        }
-
-        const numericBid = parseInt(bidAmount.replace(/,/g, ""), 10);
-
-        // Refuse empty inputs or invalid numbers
-        if (!numericBid || numericBid <= 0) {
-            setBidError("Please enter a valid bid amount.");
-            return;
-        }
-
-        setIsSubmitting(true);
-        setBidError("");
-        try {
-            await placeBid(auction.id, numericBid);
-            setBidAmount("");
-        } catch (error) {
-            setBidError(error.message);
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
+    const { state } = useLocation();
+    const browseFrom = state?.browseFrom;
+    const backTo = typeof browseFrom === 'string' && (browseFrom === '/auctions' || browseFrom.startsWith('/auctions?')) ? browseFrom : '/auctions';
+    const { auctions, isLoading, error } = useContext(AuctionsContext);
+    const now = useNow();
+    const auction = auctions.find((listing) => String(listing.id) === id);
 
     if (isLoading) return <p role="status" className="p-6">Loading auction…</p>;
+    if (!auction) return (
+        <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gray-50 p-4">
+            <p className="text-xl font-bold text-red-700">{error ? 'Auction could not be loaded.' : 'Auction not found.'}</p>
+            <Link to={backTo} className="flex min-h-11 items-center text-blue-700 underline">Back to Auctions</Link>
+        </main>
+    );
 
-    if (!auction) {
-        return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
-                <p className="text-red-500 text-xl font-bold mb-4">{error ? "Auction could not be loaded." : "Auction not found."}</p>
-                <Link to="/auctions" className="text-blue-500 hover:underline text-lg">
-                    Back to Auctions
-                </Link>
-            </div>
-        );
-    }
-
-    const now = Date.now();
-    const isActive = getAuctionStatus(auction, now) === "active";
-
+    const result = getAuctionResult(auction, now);
+    const active = result.status === 'active';
+    const price = result.finalPrice ?? auction.currentBid;
     return (
-        <div className="min-h-screen bg-gray-50 p-6">
-            <div className="mb-6">
-                <Link to="/auctions" className="text-blue-500 underline hover:text-blue-700 text-sm">
-                    Back to Auctions
-                </Link>
+        <main className="min-h-screen bg-gray-50 p-4 sm:p-6">
+            <div className="mx-auto mb-4 max-w-4xl">
+                <Link to={backTo} className="inline-flex min-h-11 items-center text-sm text-blue-700 underline">Back to Auctions</Link>
             </div>
-
-            <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="flex flex-col items-center">
-                        {auction.image ? (
-                            <img
-                                src={auction.image}
-                                alt={auction.item}
-                                className="w-48 h-48 object-contain mb-4"
-                            />
-                        ) : (
-                            <div className="w-48 h-48 flex items-center justify-center bg-gray-100 rounded-lg mb-4">
-                                <p className="text-gray-500">No Image Available</p>
-                            </div>
-                        )}
-
-                        {currentUser && isActive && currentUser.id !== auction.sellerId && (
-                            <>
-                                <input
-                                    type="text"
-                                    value={bidAmount}
-                                    onChange={handleBidInputChange}
-                                    placeholder="Enter your bid"
-                                    className="w-full p-2 border border-gray-300 rounded text-center placeholder-gray-500 mb-2 text-sm"
-                                />
-                                <button
-                                    onClick={handleBidSubmit}
-                                    disabled={isSubmitting || auction.endTime <= Date.now()}
-                                    className="bg-blue-500 text-white font-bold py-1 px-3 rounded hover:bg-blue-700 text-sm"
-                                >
-                                    {isSubmitting ? "Submitting…" : "Place Bid"}
-                                </button>
-                                {bidError && (
-                                    <p className="text-red-500 text-center text-xs mt-2">{bidError}</p>
-                                )}
-                            </>
-                        )}
-                    </div>
-
-                    <div className="flex flex-col justify-between">
-                        <div className="text-center">
-                            <h1 className="text-4xl font-bold text-blue-600 mb-2">
-                                {auction.item}{" "}
-                                <span className="text-xl text-gray-600">
-                                    x {auction.quantity.toLocaleString("en-US")}
-                                </span>
-                            </h1>
-                            <p className="text-xs text-gray-500 mb-6">
-                                Minimum Bid (Meat): {formattedMinBid}
-                            </p>
-                            <p className="text-sm text-gray-500 underline mt-10">{isActive ? "Current Bid" : "Last Bid"}</p>
-                            <p className="text-3xl font-extrabold text-black mt-2">{formattedCurrentBid} Meat</p>
-                            <p className="text-sm text-gray-600 mt-16">Sold by: <span
-                                className="font-bold text-black">{auction.owner || "Unknown"}</span>
-                            </p>
-                            <p
-                                className={`text-xs mt-5 ${
-                                    remainingTime?.isRed ? "text-red-500" : "text-gray-500"
-                                }`}
-                            >
-                                {isActive ? `Ends in: ${remainingTime?.timeString || "…"}` : auctionStatusLabels[getAuctionStatus(auction, now)]}
-                            </p>
+            <div className="mx-auto max-w-4xl rounded-lg bg-white p-4 shadow-lg sm:p-6">
+                <div className="grid min-w-0 grid-cols-1 gap-6 md:grid-cols-2">
+                    <div className="min-w-0 space-y-4 text-center md:col-start-2 md:row-start-1">
+                        <h1 className="break-words text-3xl font-bold text-blue-600 sm:text-4xl">{auction.item} <span className="text-xl text-gray-600">×{auction.quantity.toLocaleString('en-US')}</span></h1>
+                        <p className="text-sm text-gray-600">Minimum Bid (Meat): {auction.minBidMeat.toLocaleString('en-US')}</p>
+                        <div>
+                            <p className="text-sm text-gray-600">{active ? 'Current Bid' : result.winnerId ? 'Final price' : 'Last Bid'}</p>
+                            <p className="break-words text-2xl font-extrabold text-gray-900 sm:text-3xl">{price ? `${price.toLocaleString('en-US')} Meat` : 'No bids yet'}</p>
                         </div>
+                        <p className="break-words text-sm text-gray-700">Sold by: <strong>{auction.owner || 'Unknown'}</strong></p>
+                        <p className={`text-sm ${active && auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-600'}`}>
+                            {active ? <>Ends in <time dateTime={new Date(auction.endTime).toISOString()}>{timeRemaining(auction.endTime, now)}</time></> : result.label}
+                        </p>
+                    </div>
+                    <div className="flex min-w-0 flex-col items-center gap-4 md:col-start-1 md:row-start-1">
+                        {auction.image ? <img src={auction.image} alt={auction.item} className="h-32 w-32 object-contain sm:h-48 sm:w-48" /> : <p className="text-gray-500">No Image Available</p>}
+                        {active && <div className="w-full"><InstantPurchaseAction key={`purchase-${auction.id}`} auction={auction} /><AuctionBidForm key={auction.id} auction={auction} /></div>}
                     </div>
                 </div>
             </div>
-
             <AuctionOutcome key={auction.id} auction={auction} now={now} />
-
-            <div className="max-w-4xl mx-auto bg-gray-50 mt-8 p-6 rounded-lg shadow">
-                <h2 className="text-2xl font-bold text-gray-800 mb-4">Bid History</h2>
-                {auction.bids && auction.bids.length > 0 ? (
-                    <ul className="divide-y divide-gray-200">
-                        {auction.bids
-                            .slice()
-                            .reverse()
-                            .map((bid, index) => (
-                                <li key={index} className="py-4 flex justify-between items-center">
-                                    <span className="text-gray-700 font-medium">{bid.bidder}</span>
-                                    <div className="text-right">
-                                        <span className="text-gray-900 font-bold">
-                                            {bid.amount.toLocaleString("en-US")} Meat
-                                        </span>
-                                        <br />
-                                        <span className="text-gray-500 text-xs">
-                                            {new Date(bid.timestamp).toLocaleString()}
-                                        </span>
-                                    </div>
-                                </li>
-                            ))}
-                    </ul>
-                ) : (
-                    <p className="text-gray-600">No bids yet.</p>
-                )}
-            </div>
-        </div>
+            <section aria-label="Bid history" className="mx-auto mt-6 max-w-4xl rounded-lg bg-white p-4 shadow sm:p-6">
+                <h2 className="mb-4 text-2xl font-bold text-gray-800">Bid History</h2>
+                {auction.bids?.length ? <ul className="divide-y divide-gray-200">
+                    {auction.bids.slice().reverse().map((bid, index) => (
+                        <li key={bid.id || index} className="flex flex-col gap-1 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                            <span className="min-w-0 break-words font-medium text-gray-700">{bid.bidder}</span>
+                            <div className="sm:text-right">
+                                <p className="font-bold text-gray-900">{bid.amount.toLocaleString('en-US')} Meat</p>
+                                {auction.instantPurchasedAt && bid.bidderId === auction.winnerId && bid.amount === auction.instantPurchasePrice && <p className="text-xs font-semibold text-green-800">Instant purchase</p>}
+                                <p className="text-xs text-gray-600">{new Date(bid.timestamp).toLocaleString()}</p>
+                            </div>
+                        </li>
+                    ))}
+                </ul> : <p className="text-gray-600">No bids yet.</p>}
+            </section>
+        </main>
     );
-};
-
-export default AuctionDetails;
+}

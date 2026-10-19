@@ -174,6 +174,52 @@ and purchase totals. An unrelated account must not see a confirmation control
 and cannot submit one through the API. Test seller cancellation on a separate
 active listing before bidding; its detail page should remain accessible afterward.
 
+## Optional instant purchase price
+
+Before deploying the instant purchase UI, run
+`migrations/202610190003_instant_purchase.sql` once in Supabase SQL Editor after
+the existing auction lifecycle migration. Run the entire new file. Do not rerun
+the earlier table-creation migrations. Existing listings and bids are preserved;
+existing listings have no instant purchase price and keep ordinary bidding.
+
+Sellers can optionally set an **Instant Purchase Price** for the entire listing,
+not per item. It must meet the minimum bid and be at most 20 billion Meat.
+Leaving the field blank stores `NULL` and disables instant purchasing. The price
+remains available while the listing is active, including after lower bids.
+
+`purchase_auction` reads the saved price and the buyer's authenticated profile,
+locks the listing, records a bid at exactly that price, freezes the winning buyer
+and final price, and moves the auction to `awaiting_trade`. It records
+`instant_purchased_at` without changing the original scheduled deadline. Purchase
+is also available to the current highest bidder. A bid reaching or exceeding the
+instant price follows the same transaction and records only the instant price,
+not the excess amount entered. Buyers confirm the exact amount before submitting.
+
+Sellers, anonymous users, and buyers of expired/cancelled/already-purchased
+listings cannot accept the offer. Repeating a successful purchase as the same
+buyer is safe and preserves the outcome and bid history. Purchase, bids,
+cancellation, expiry, and confirmation lock the same row so competing requests
+cannot produce multiple winners or overwrite a recorded purchase. No new direct
+table-write access is granted.
+
+The `create_auction` RPC gains an optional `p_instant_purchase_price` argument;
+older callers omitting it still create normal auctions. The migration replaces
+the old signature to avoid ambiguous PostgREST overloads. The new app requires
+this migration for listing creation and purchases; it never silently discards a
+requested instant price when the migration is missing.
+
+An accepted purchase ends bidding; it does not complete payment or item delivery.
+The existing trade workflow still applies. The launch bot must verify the
+purchase and settle/refund in-game offers before this can be used publicly.
+
+Verify with a second account: accept a listing's offer and check its saved winner,
+final price, purchase timestamp, and awaiting-trade status after refresh. Other
+buyers must then be refused. Test a bid above the instant price and check only
+the set price appears in history. Test a listing without an instant price to
+confirm ordinary bidding still works. The local database tests additionally race
+buyers/bids, verify deadline checks after lock waits, test permissions and retries,
+and confirm data survives a database restart.
+
 ## Duplicate registration validation
 
 Run `migrations/202610190002_registration_conflicts.sql` once after the profiles
@@ -208,3 +254,23 @@ Supabase SMTP settings, localhost and production callback allowlists, and manual
 verification. No additional database migration is needed for these Auth flows.
 The requested Proton mailbox is documented there; production sending has not
 been configured because Proton SMTP requires a supported custom-domain address.
+
+
+## KMail escrow bot (new workflow)
+
+The owner has replaced pending trade offers and manual completion with KMail
+escrow for new listings. Run `migrations/202610190004_kmail_escrow.sql` once after
+the instant-purchase migration, then follow [the bot runbook](../bot/README.md).
+The earlier lifecycle sections describe **legacy auctions** after this upgrade.
+Do not treat their existing bids as funded or automatically settle them.
+
+This adds private receipt/delivery/verification/catalog tables, KoL identity
+linking, pending-deposit listing privacy, service-only processing RPCs, bot-owned
+completion, and durable refund/payout obligations. The website requires this
+migration and catalog sync before new listings can be created. Existing rows are
+kept. Only the server bot gets a service-role key; never set one in browser env.
+
+Defaults: no seller fee and duration begins on exact item-deposit acceptance.
+`bot/README.md` documents optional fee/fixed-deadline settings, startup, supported
+KMail commands, and the operator reconciliation process. Hosted migration and
+real KoL credentials/delivery have not been applied or tested by local changes.

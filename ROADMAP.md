@@ -1,20 +1,24 @@
 # KoL Auction Hub roadmap
 
 Saved October 19, 2026. The site is in development and is not live.
-A working KoL trade bot is required before launch. The original Info page is the
-intended product specification; preserve its wording unless the owner explicitly
-requests edits. Recheck current code before starting each item.
+A working KoL trade bot is required before launch. The owner has replaced the
+trade-offer workflow with the KMail escrow loop documented in `bot/README.md`.
+Preserve the original Info page wording until its instructions are deliberately
+updated. Recheck current code before starting each item.
 
 ## Recommended next batch
 
-1. Design the bot workflow around the original Info page's verification,
-   pending trade offers, refunds, settlement, fee, and timing rules.
-2. Align the database and auction lifecycle with bot-verified transactions.
-3. Implement and test the bot before launch, then improve browsing and accounts.
+1. Apply the KMail escrow migration and sync the bot's item catalog.
+2. Configure server-only bot credentials and link controlled test accounts.
+3. Validate real KMail intake/delivery and restart reconciliation before launch;
+   deliberately update the Info page to the new workflow afterward.
 
 ## Priorities
 
 ### 1. Complete the auction lifecycle
+
+New KMail escrow auctions now use bot-owned settlement (section 2). The
+participant-confirmation behavior below remains for legacy records only.
 
 Initial development implementation added October 19, 2026; database setup requires running
 `supabase/migrations/202610190001_auction_lifecycle.sql` after the first two
@@ -44,43 +48,48 @@ Original requirements:
 
 ### 2. Build the trade bot before launch
 
-The original Info page describes the intended launch behavior. Implement that
-behavior rather than rewriting the page around temporary limitations.
+KMail escrow implementation added in `bot/` for **kHub (#3888760)**. Apply
+`supabase/migrations/202610190004_kmail_escrow.sql` after the instant-purchase
+migration, sync the catalog, and follow `bot/README.md`. This new workflow
+supersedes the earlier pending-trade/24-hour/manual-confirmation design for new
+listings. Legacy unfunded auctions are preserved and never assumed escrowed.
 
-- Choose the bot's KoL account and fill in placeholder names only when the owner
-  supplies the intended name.
-- Verify account ownership through kMail and link the verified KoL identity to
-  the website account.
-- Read and validate pending trade offers against listing IDs, item IDs,
-  quantities, bidder identities, and Meat amounts. Retain the Info page's message
-  conventions while defining an unambiguous auction reference for duplicate items.
-- Publish auctions and bids only after the required bot verification. Define how
-  pending verification interacts with the bidding deadline and competing bids.
-- Detect withdrawn offers and enforce the specified cancellation restrictions
-  and 24-hour penalties.
-- Handle outbid users' pending offers/refunds according to the Info page.
-- Settle the winning auction, collect the specified 2% fee, and deliver the
-  correct items and Meat to the correct parties.
-- Implement the specified response/collection workflow, including its 24-hour
-  response window and handling of missing or cancelled offers.
-- Record bot actions, trade identifiers, fees, amounts, and delivery outcomes in
-  the database. Retrying after a timeout or restart must not double-pay, double
-  refund, or deliver items twice.
-- Reconcile website state with KoL after interruptions or partial settlement,
-  and provide an administrator recovery path for unresolved trades.
-- Keep bot credentials and privileged database access in the bot's server-side
-  environment, outside the browser application.
-- Test successful settlement, no bids, outbids, withdrawals, timeouts, competing
-  bids, partial failures, and bot restarts before launch.
+Implemented and locally tested:
+
+- Single-use KMail challenges link website accounts to numeric KoL player IDs.
+- New listings remain private/pending until the exact seller's item deposit arrives.
+- Only funded KMail bids change the high bid; previous high bids return in full.
+- Instant purchase uses actual attached Meat; excess is refunded.
+- Expiry automatically queues item delivery and seller payment, or an unsold return.
+- Website bids/purchases cannot bypass funding; new escrow sales cannot be manually
+  marked completed by participants. The bot acknowledges real sends to complete them.
+- Durable receipts, deterministic/chunked outbox sends, private tables, role checks,
+  balance checks, race serialization, and audited uncertain-send reconciliation.
+- Standalone Node 24 worker, read-only default, runbook, and optional container file.
+
+Defaults matching the newly requested loop: 0% seller fee; duration starts when the
+item deposit is accepted. Settings are snapshotted on each new listing. Fee/deadline
+alternatives remain configurable; the earlier 2% fee is not silently retained.
+
+Still required before public launch:
+
+- Hosted SQL application, catalog sync, secure bot credentials, an always-on runtime.
+- Controlled real KoL tests for raw mail parsing, send acknowledgment, restricted
+  recipients/items, rollover, split amounts, refunds, and partial-failure recovery.
+- End-to-end tests of account linking and the deployed website.
+- Resolve unsupported/system mail manually; monitor private delivery attention.
+- Deliberate Info page edits to replace the old trade-offer instructions. Its
+  original text has not been rewritten as part of this implementation.
+- Production SMTP and the other account/security launch work below.
 
 ### 3. Verify KoL identities
 
-- A registered KHub username currently does not prove ownership of that KoL
-  account.
-- Implement the intended kMail verification through the bot; define any
-  administrator fallback explicitly.
-- Store verification status and enforce any restrictions in the database,
-  rather than only hiding controls in React.
+Implemented for new KMail escrow listings/bids using single-use verification
+challenges. Profile linking polls for the bot's acknowledgment. Numeric KoL IDs
+are unique across website profiles, and clients cannot assign their own verified
+IDs. Actual sender IDs come from the authenticated KoL inbox; display names alone
+are not identity proof. Controlled live linking tests and operator recovery for
+lost access remain launch checks.
 
 ### 4. Add account recovery and reliable email delivery
 
@@ -105,12 +114,48 @@ Reference: https://supabase.com/docs/guides/auth/auth-smtp
 
 ### 5. Improve auction browsing
 
-- Add item-name search.
-- Add active/completed filters.
-- Add sorting by ending soon, newest, and price.
-- Prioritize active auctions on the homepage; popular listings currently can
-  include expired auctions.
-- Make listing and bidding flows comfortable on mobile screens.
+Implemented October 19, 2026:
+
+- Item-name search with case-insensitive partial matching.
+- Active (default), ended (all outcomes), completed trades, and all-auction
+  filters. Completed trades remain distinct from expired bidding or pending trades.
+- Sorting by ending soon, newest, and price in either direction. Price uses the
+  current bid, falls back to the minimum bid, and uses final prices after settlement.
+- Search/filter/sort selections are stored in the URL for sharing, reloads, and
+  returning from a listing. Reset filters restores active auctions ending soon.
+- Homepage popular listings include only active auctions, ranked by bid count.
+  Listings disappear from active results and highlights at their bidding deadline.
+- Responsive navigation, cards, bid history, and listing/bidding forms with larger
+  touch targets and readable inputs. Listing includes item search, a separate
+  preview step, and a Back to edit action that keeps entered values.
+- Shared bidding form validates whole-number amounts, supports k/m/b shorthand,
+  confirms the intended amount, and preserves the entered bid after server errors.
+
+Validation: browsing/input regression tests, existing auth/lifecycle/service tests,
+production build, and Chrome interaction/layout checks using fixture data at
+320, 375, 768, and 1280 pixels. Hosted deployment and real database writes were
+not part of these checks. No database migration is required for this batch.
+
+#### Optional Instant Purchase Price
+
+Implemented October 19, 2026. Apply
+`supabase/migrations/202610190003_instant_purchase.sql` once in Supabase SQL Editor
+after the auction lifecycle migration, before deploying these app changes.
+
+- Optional seller-set price for the entire listing, at least the minimum bid and
+  at most 20 billion Meat. Blank means ordinary bidding; old listings stay unchanged.
+- Displayed on the homepage, listing cards, listing preview, and auction details.
+- Buyers can accept it directly. A bid reaching/exceeding it ends bidding at the
+  exact instant price. The current high bidder can also accept the instant offer.
+- Acceptance records the winner, final price, purchase timestamp, and bid history;
+  the listing moves to awaiting trade, rather than completed payment/delivery.
+- Row locking protects competing purchases, bids, cancellation, and expiry.
+  Repeated successful purchase requests from the same buyer are idempotent.
+- Local SQL tests cover upgrades, limits, authorization, price caps, concurrent
+  purchases/bids, lock-wait deadlines, trade completion, and restart persistence.
+  Service/render tests and mobile Chrome fixture checks cover the UI and RPC flow.
+- Hosted SQL execution, deployment, and end-to-end bot settlement remain separate
+  setup/launch tasks. The original Info page wording is preserved.
 
 ### 6. Add cancellation and moderation
 

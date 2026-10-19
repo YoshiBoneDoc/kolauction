@@ -1,4 +1,3 @@
-import React from "react";
 import { Link } from "react-router-dom";
 
 const InfoPage = () => {
@@ -12,7 +11,7 @@ const InfoPage = () => {
             </Link>
             <h1 className="text-4xl font-bold text-blue-600 mb-4">About KoL Auction Hub</h1>
             <p className="text-lg text-gray-700 text-center max-w-3xl mb-6">
-                Welcome to <span className="font-bold text-blue-500">kHub</span> (Kingdom of Loathing Auction Hub), a modern version of the old "KoLBay."
+                Welcome to <span className="font-bold text-blue-500">kHub</span> (Kingdom of Loathing Auction Hub), a modern version of the old &quot;KoLBay.&quot;
                 I created this site because I wanted a place where I could list my items up for bid just like the old days, without spending hours in chat
                 advertising or refreshing the mall every minute. After not having coded for years, I also found this to be a fun little project during Crimbo Break.
             </p>
@@ -23,84 +22,91 @@ const InfoPage = () => {
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">How to Use This Site</h2>
                 <ul className="mb-6 list-none space-y-2">
                     <li>
-                        <span className="font-bold">1.</span> Register using a valid username on the site. Your username
-                        on kHub must match <span className="font-bold underline">exactly</span> with your KoL name for
-                        verification.
+                        <span className="font-bold">1.</span> Register on kHub and confirm your email address. Then open
+                        &quot;Your Account&quot; to link the KoL account you will use for auctions.
                     </li>
                     <li>
-                        <span className="font-bold">2.</span> kMail <span
-                        className="font-bold">[SOME USERNAME HERE]</span> with the text: <span className="font-mono">verify registration [kHub Username]</span>.
+                        <span className="font-bold">2.</span> Get a verification code on that page and send the exact
+                        message shown, <span className="font-mono">VERIFY [your code]</span>, by KMail to <span
+                        className="font-bold">kHub (#3888760)</span>. Send it from your own KoL account, with no Meat or items attached.
                     </li>
                     <li>
-                        <span className="font-bold">3.</span> The site will verify your registration within 48 hours.
+                        <span className="font-bold">3.</span> The bot links your account when it processes your message.
+                        Codes expire after 20 minutes; you can request a new one if needed. Your account page will show when you are verified.
                     </li>
                     <li>
-                        <span className="font-bold">4.</span> Once registered and verified, you can start creating
-                        auctions and placing bids.
+                        <span className="font-bold">4.</span> Once linked, you can list items and bid using that KoL account.
+                        Verification uses your KoL player ID, so your website username does not have to match your KoL name.
                     </li>
                 </ul>
 
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">How to Create Auctions or Place Bids</h2>
                 <ul className="mb-6 list-none space-y-2">
                     <li>
-                        <span className="font-bold">1.</span> Create auctions using the "Auction an Item" page.
+                        <span className="font-bold">1.</span> Use &quot;Auction an Item&quot; to choose an item, quantity,
+                        minimum bid, and duration. You may also set an optional Instant Purchase Price to end bidding early at an agreed price.
+                        All prices are for the entire listing.
                     </li>
                     <li>
-                        <span className="font-bold">2.</span> Place bids on the "All Auctions" page or an individual
-                        auction's page.
+                        <span className="font-bold">2.</span> After saving, follow the deposit instructions on your listing.
+                        Send normal KMail to <span className="font-bold">kHub (#3888760)</span> with the exact listed items
+                        and the message <span className="font-mono">LIST [Auction ID]</span>. Attach no Meat or extra items.
+                        The auction becomes public and its timer starts when the bot accepts the deposit.
                     </li>
                     <li>
-                        <span className="font-bold">3.</span> For auctions, send a trade offer (and leave it pending for
-                        as long as the auction is active) with the item or bid amount in Meat to <span
-                        className="font-bold">[SOME USERNAME HERE]</span>.
+                        <span className="font-bold">3.</span> Browse &quot;All Auctions&quot; and open a listing for its bidding instructions.
+                        Send the bot normal KMail with <span className="font-mono">BID [Auction ID]</span> and attach
+                        your full bid in Meat, with no items. Even when raising your own bid, send the full new amount, not just the difference.
                     </li>
                     <li>
-                        <span className="font-bold">4.</span> Include the text: <span className="font-mono">[Your Username] auction [Auction Item and Quantity]</span> (case
-                        insensitive) in the trade's message for auctions.
+                        <span className="font-bold">4.</span> To accept an Instant Purchase Price, send <span
+                        className="font-mono">BUY [Auction ID]</span> with exactly that much Meat. A bid reaching the
+                        instant price also ends bidding at that price; any excess Meat is returned.
                     </li>
                     <li>
-                        <span className="font-bold">5.</span> Include the text: <span className="font-mono">[Your Username] bid [Auction Item and Quantity]</span> (case
-                        insensitive) in the trade's message for bids.
+                        <span className="font-bold">5.</span> Copy the actual Auction ID and command from the listing.
+                        A bid or purchase counts only when the bot processes the funded KMail before the deadline.
+                        The bot holds the leading bid and returns the previous leading bidder&apos;s Meat when they are outbid.
                     </li>
                     <li>
-                        <span className="font-bold">6.</span> Auctions and bids must be verified before they appear
-                        publicly.
+                        <span className="font-bold">6.</span> Use normal, unwrapped KMail for all auction commands.
+                        <span className="font-bold underline"> All gift packages sent to kHub are considered donations.</span>
+                        Gifts do not count as deposits or bids. Rejected normal auction messages have their attached Meat and items returned by the bot.
                     </li>
                 </ul>
 
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">How Do I Cancel My Bid or Auction?</h2>
                 <ul className="mb-6 list-none space-y-2">
                     <li>
-                        <span className="font-bold">1.</span> Auctions may be canceled before any bids have been placed without incurring any penalties.
+                        <span className="font-bold">1.</span> You may cancel your auction from its listing page before
+                        any bids have been accepted, without a cancellation penalty.
                     </li>
                     <li>
-                        <span className="font-bold">2.</span> The easiest way to cancel your auction is to cancel the
-                        trade in-game. If this happens for any reason (whether intentional or otherwise) before the time
-                        of the auction has concluded, your auction on the site will be removed. <span
-                        className="font-bold underline">Please note, you will not be able to place an auction for 24 hours if you cancel your auction early.</span>
+                        <span className="font-bold">2.</span> If the bot already holds your items, it will return them
+                        by KMail after cancellation. If you have not deposited them yet, there is nothing to return.
                     </li>
                     <li>
-                        <span className="font-bold">3.</span> Bids may not be canceled once they are placed. If you
-                        retract your trade offer with your bid, <span className="font-bold underline">you will not be allowed to bid on any auctions for 24 hours.</span>
+                        <span className="font-bold">3.</span> Accepted bids cannot be canceled, and a seller cannot
+                        cancel an auction once it has an accepted bid.
                     </li>
                     <li>
-                        <span className="font-bold">4.</span> If another user bids higher than your current bid on any
-                        individual auction, the bot will cancel your trade offer and your Meat will be refunded.
+                        <span className="font-bold">4.</span> If you are outbid, the bot automatically returns your
+                        full previous bid by KMail. You do not need to request a refund.
                     </li>
                 </ul>
 
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">How Auctions Are Concluded</h2>
                 <ul className="mb-6 list-none space-y-2">
                     <li>
-                        <span className="font-bold">1.</span> After the auction timer expires, our bot <span
-                        className="font-bold">[SOME USERNAME HERE]</span> will act as the middleman, accepting trades
-                        from both the seller and buyer. The bot will then send the respective items/Meat to each party.
-                        A 2% courtesy fee will be deducted for successful transactions.
+                        <span className="font-bold">1.</span> When the timer expires, or an Instant Purchase is accepted,
+                        <span className="font-bold"> kHub (#3888760)</span> sends the items to the winner and the winning
+                        Meat payment to the seller by KMail. Both are already held by the bot, so neither party needs to send another payment or accept a trade.
+                        There is currently no auction fee.
                     </li>
                     <li>
-                        <span className="font-bold">2.</span> Sellers and buyers have 24 hours after the auction ends to
-                        respond to the initial trade offer. Once both parties have accepted, the bot will finalize the
-                        trade. Winnings can be collected at any time thereafter.
+                        <span className="font-bold">2.</span> If there are no accepted bids, the items are returned to
+                        the seller. The listing shows settlement in progress until the required deliveries are confirmed.
+                        Processing and delivery depend on the bot being online; an interrupted or uncertain delivery may require manual review before it can continue.
                     </li>
                 </ul>
 

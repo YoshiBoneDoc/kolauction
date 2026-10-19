@@ -47,3 +47,6 @@ amplifytools.xcconfig
 .secret-*
 **.sample
 #amplify-do-not-edit-end
+
+# Keep the bot separate from the website repository
+/bot/

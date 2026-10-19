@@ -71,6 +71,16 @@ export const AuctionsProvider = ({ children }) => {
         await refreshAuctions();
     };
 
+    const purchaseAuction = async (auctionId) => {
+        try {
+            await storage.purchase(auctionId);
+        } catch (failure) {
+            await refreshAuctions();
+            throw failure;
+        }
+        await refreshAuctions();
+    };
+
     const cancelAuction = async (auctionId) => {
         try {
             await storage.cancel(auctionId);
@@ -82,7 +92,7 @@ export const AuctionsProvider = ({ children }) => {
     };
 
     return (
-        <AuctionsContext.Provider value={{ auctions, isLoading, error, addAuction, placeBid, confirmTrade, cancelAuction, refreshAuctions }}>
+        <AuctionsContext.Provider value={{ auctions, isLoading, error, addAuction, placeBid, purchaseAuction, confirmTrade, cancelAuction, refreshAuctions }}>
             {error && (
                 <div role="alert" className="bg-red-50 text-red-700 p-4">
                     {error}{" "}

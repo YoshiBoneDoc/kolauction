@@ -3,6 +3,7 @@ import { UserContext } from "../context/UserContext";
 import { AuctionsContext } from "../context/AuctionsContext";
 import { Link } from "react-router-dom";
 import { getAuctionResult, getAuctionStatus } from "../lib/auctionLifecycle";
+import KolVerification from "../components/KolVerification";
 import { useNow } from "../hooks/useNow";
 
 const formatNumber = (number) => number.toLocaleString('en-US');
@@ -40,20 +41,23 @@ const Profile = () => {
     });
     const completedSales = selling.filter((auction) => auction.status === 'completed');
     const completedPurchases = auctions.filter((auction) => auction.status === 'completed' && auction.winnerId === currentUser.id);
-    const totalMeatGain = completedSales.reduce((sum, auction) => sum + auction.finalPrice, 0);
+    const totalMeatGain = completedSales.reduce((sum, auction) => sum + auction.finalPrice - (auction.escrowMode ? (auction.feeMeat || 0) : 0), 0);
     const totalMeatSpent = completedPurchases.reduce((sum, auction) => sum + auction.finalPrice, 0);
     const sections = [
+        { title: 'Awaiting item deposit', records: selling.filter((auction) => auction.status === 'pending_escrow') },
+        { title: 'Sending escrow deliveries', records: auctions.filter((auction) => auction.status === 'settling' && (auction.sellerId === currentUser.id || auction.winnerId === currentUser.id)) },
         { title: 'Awaiting trade', records: awaitingTrades },
         { title: 'Active listings', records: selling.filter((auction) => getAuctionStatus(auction, now) === 'active') },
         { title: 'Active bids', records: bidding.filter((auction) => getAuctionStatus(auction, now) === 'active') },
-        { title: 'Listing history', records: selling.filter((auction) => getAuctionStatus(auction, now) !== 'active') },
-        { title: 'Bid history', records: bidding.filter((auction) => getAuctionStatus(auction, now) !== 'active') },
+        { title: 'Listing history', records: selling.filter((auction) => !['active','pending_escrow','settling'].includes(getAuctionStatus(auction, now))) },
+        { title: 'Bid history', records: bidding.filter((auction) => !['active','settling'].includes(getAuctionStatus(auction, now))) },
     ];
 
     return (
         <div className="min-h-screen bg-gray-50 p-6">
             <Link to="/" className="text-blue-500 underline">Home</Link>
             <h1 className="text-4xl font-bold text-blue-600 my-6 text-center">{currentUser.khubUsername}&apos;s Profile</h1>
+            <KolVerification />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
                 <div className="bg-white rounded shadow p-4">
                     <h2 className="font-semibold">Completed sales</h2>
@@ -64,7 +68,7 @@ const Profile = () => {
                     <p>{formatNumber(totalMeatSpent)} Meat spent</p>
                 </div>
             </div>
-            <p className="text-sm text-gray-600 mb-6">Totals include only trades confirmed by both parties. Winning bids awaiting exchange are shown below.</p>
+            <p className="text-sm text-gray-600 mb-6">Totals include completed bot deliveries (seller fees deducted) and legacy trades confirmed by both parties. Pending deliveries are shown below.</p>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {sections.map(({ title, records }) => (
                     <section key={title}>

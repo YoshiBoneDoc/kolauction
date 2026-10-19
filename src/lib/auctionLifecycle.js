@@ -1,5 +1,7 @@
 export const auctionStatusLabels = {
     active: 'Active',
+    pending_escrow: 'Awaiting item deposit',
+    settling: 'Sending escrow deliveries',
     awaiting_trade: 'Awaiting trade',
     ended_no_bids: 'Ended without bids',
     cancelled: 'Cancelled',
@@ -9,12 +11,13 @@ export const auctionStatusLabels = {
 export function getAuctionStatus(auction, now = Date.now()) {
     if (auction.status && auction.status !== 'active') return auction.status;
     if (auction.endTime > now) return 'active';
+    if (auction.escrowMode) return 'settling';
     return auction.highestBidderId ? 'awaiting_trade' : 'ended_no_bids';
 }
 
 export function getAuctionResult(auction, now = Date.now()) {
     const status = getAuctionStatus(auction, now);
-    const hasWinner = status === 'awaiting_trade' || status === 'completed';
+    const hasWinner = status === 'awaiting_trade' || status === 'completed' || status === 'settling';
     return {
         status,
         label: auctionStatusLabels[status],

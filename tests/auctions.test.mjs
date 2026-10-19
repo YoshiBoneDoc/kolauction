@@ -32,7 +32,7 @@ test('creation sends listing fields only; identity, time, ID, and bid state are 
         return { data: 'server-id', error: null };
     } });
     assert.equal(await service.create({ item: 'Test item', quantity: 2, minBidMeat: 50, auctionTime: '24', owner: 'Spoof', endTime: 1, currentBid: 99 }), 'server-id');
-    assert.deepEqual(sent, { p_item: 'Test item', p_quantity: 2, p_min_bid_meat: 50, p_duration_hours: 24, p_image: null });
+    assert.deepEqual(sent, { p_item: 'Test item', p_quantity: 2, p_min_bid_meat: 50, p_duration_hours: 24, p_image: null, p_instant_purchase_price: null, p_item_id: null });
 });
 
 test('database bid rejection propagates rather than changing local state', async () => {
@@ -112,4 +112,33 @@ test('recorded winner and final price are preserved separately from current bids
     assert.equal(mapped.winner, 'Historic name');
     assert.equal(mapped.finalPrice, 12_345_678_901);
     assert.equal(mapped.completedAt, 'done');
+});
+
+test('instant purchase listing terms and outcome survive database mapping', () => {
+    const mapped = mapAuction({ ...row, instant_purchase_price: '20000000000', instant_purchased_at: 'accepted', status: 'awaiting_trade', winner_id: 'buyer', final_price: '20000000000' }, []);
+    assert.equal(mapped.instantPurchasePrice, 20000000000);
+    assert.equal(mapped.instantPurchasedAt, 'accepted');
+    assert.equal(mapped.finalPrice, 20000000000);
+    assert.equal(mapAuction(row, []).instantPurchasePrice, null);
+});
+
+test('creation sends optional instant purchase price and does not fall back if migration is missing', async () => {
+    const calls = [];
+    const service = createAuctionService({ async rpc(name, params) {
+        calls.push([name, params]);
+        return { error: { code: 'PGRST202' } };
+    } });
+    await assert.rejects(service.create({ item: 'item', quantity: 2, minBidMeat: 100, auctionTime: 24, instantPurchasePrice: 500 }), /pending auction SQL migrations/);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0][1].p_instant_purchase_price, 500);
+});
+
+test('instant purchase sends only listing ID and preserves server rejection messages', async () => {
+    const calls = [];
+    const service = createAuctionService({ async rpc(name, params) {
+        calls.push([name, params]);
+        return { error: { message: 'This auction has ended or was cancelled.' } };
+    } });
+    await assert.rejects(service.purchase(row.id), /has ended/);
+    assert.deepEqual(calls, [['purchase_auction', { p_auction_id: row.id }]]);
 });

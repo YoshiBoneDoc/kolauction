@@ -2,6 +2,7 @@ import { useContext, useState } from "react";
 import PropTypes from "prop-types";
 import { AuctionsContext } from "../context/AuctionsContext";
 import { UserContext } from "../context/UserContext";
+import KmailInstructions from "./KmailInstructions";
 import { getAuctionResult } from "../lib/auctionLifecycle";
 
 export default function AuctionOutcome({ auction, now }) {
@@ -14,7 +15,7 @@ export default function AuctionOutcome({ auction, now }) {
     const isSeller = currentUser?.id === auction.sellerId;
     const isWinner = currentUser?.id === result.winnerId;
     const hasConfirmed = isSeller ? auction.sellerConfirmedAt : auction.buyerConfirmedAt;
-    const canCancel = result.status === 'active' && isSeller && !auction.highestBidderId;
+    const canCancel = ['active','pending_escrow'].includes(result.status) && isSeller && !auction.highestBidderId;
 
     async function act(action) {
         if (pending) return;
@@ -40,9 +41,28 @@ export default function AuctionOutcome({ auction, now }) {
         }
     }
 
+    if (auction.escrowMode) return (
+        <section aria-label="Auction escrow" className="mx-auto mt-6 max-w-4xl space-y-4 break-words rounded-lg bg-white p-4 shadow sm:p-6">
+            <h2 className="text-2xl font-bold">{result.label}</h2>
+            <p>Escrow middleman: <strong>kHub (#3888760)</strong>.</p>
+            {result.status === 'pending_escrow' && isSeller && <KmailInstructions auction={auction} mode="list" />}
+            {result.status === 'active' && <p>The seller’s items are escrowed. Bids count only after kHub receives and accepts their attached Meat.</p>}
+            {result.status === 'settling' && <p>Bidding is closed. kHub is sending the escrowed items and Meat by KMail. The record completes after the deliveries are acknowledged.</p>}
+            {result.winnerId && <p>Winner: <strong>{result.winner}</strong> · Final price: <strong>{result.finalPrice.toLocaleString('en-US')} Meat</strong></p>}
+            {auction.instantPurchasedAt && <p>The instant purchase price ended bidding early.</p>}
+            {result.status === 'completed' && <p>kHub’s item delivery and payment were acknowledged. Seller fee: {auction.feeMeat.toLocaleString('en-US')} Meat.</p>}
+            {result.status === 'ended_no_bids' && <p>No winning bid. The escrowed items have been returned to the seller.</p>}
+            {result.status === 'cancelled' && <p>This listing was cancelled. Any accepted item deposit has been returned.</p>}
+            {canCancel && <button disabled={pending} onClick={() => act('cancel')} className="min-h-11 rounded border border-red-600 bg-white px-4 py-3 text-red-700 disabled:opacity-50">{pending ? 'Saving…' : 'Cancel listing'}</button>}
+            {message && <p role="status" className="text-green-700">{message}</p>}
+            {error && <p role="alert" className="text-red-700">{error}</p>}
+        </section>
+    );
+
     return (
-        <section className="max-w-4xl mx-auto bg-white rounded-lg shadow p-6 mt-6" aria-label="Auction outcome">
+        <section className="max-w-4xl mx-auto bg-white rounded-lg shadow p-4 sm:p-6 mt-6 break-words" aria-label="Auction outcome">
             <h2 className="text-2xl font-bold mb-3">{result.label}</h2>
+            {auction.instantPurchasedAt && <p className="mb-3 text-green-800">Instant purchase accepted for {auction.finalPrice.toLocaleString('en-US')} Meat on {new Date(auction.instantPurchasedAt).toLocaleString()}. Bidding ended early.</p>}
             {result.status === 'active' && <p>Bidding is open until {new Date(auction.endTime).toLocaleString()}.</p>}
             {result.status === 'ended_no_bids' && <p>This auction ended without bids. There is no winner or trade to complete.</p>}
             {result.status === 'cancelled' && <p>The seller cancelled this listing before any bids. Its history is preserved.</p>}
@@ -67,7 +87,7 @@ export default function AuctionOutcome({ auction, now }) {
                     {(isSeller || isWinner) && (
                         hasConfirmed
                             ? <p>Your confirmation is saved. Waiting for the other party.</p>
-                            : <button disabled={pending} onClick={() => act('confirm')} className="bg-blue-600 text-white rounded px-4 py-2 disabled:opacity-50">{pending ? 'Saving…' : 'Confirm my trade is complete'}</button>
+                            : <button disabled={pending} onClick={() => act('confirm')} className="min-h-11 w-full sm:w-auto bg-blue-600 text-white rounded px-4 py-3 disabled:opacity-50">{pending ? 'Saving…' : 'Confirm my trade is complete'}</button>
                     )}
                 </div>
             )}
@@ -75,7 +95,7 @@ export default function AuctionOutcome({ auction, now }) {
             {canCancel && (
                 <div className="mt-4">
                     <p>You can cancel this listing while it is active and has no bids.</p>
-                    <button disabled={pending} onClick={() => act('cancel')} className="mt-2 border border-red-600 text-red-700 rounded px-4 py-2 disabled:opacity-50">{pending ? 'Saving…' : 'Cancel listing'}</button>
+                    <button disabled={pending} onClick={() => act('cancel')} className="mt-2 min-h-11 w-full sm:w-auto border border-red-600 text-red-700 rounded px-4 py-3 disabled:opacity-50">{pending ? 'Saving…' : 'Cancel listing'}</button>
                 </div>
             )}
             {message && <p role="status" className="text-green-700 mt-3">{message}</p>}

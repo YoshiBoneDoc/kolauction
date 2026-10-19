@@ -17,6 +17,15 @@ export function mapAuction(row, bidRows) {
         item: row.item,
         quantity: Number(row.quantity),
         minBidMeat: Number(row.min_bid_meat),
+        itemId: row.item_id,
+        escrowMode: row.escrow_mode === true,
+        startOnDeposit: row.start_on_deposit !== false,
+        itemEscrowedAt: row.item_escrowed_at,
+        settledAt: row.settled_at,
+        feeMeat: Number(row.fee_meat || 0),
+        feeBps: Number(row.fee_bps || 0),
+        instantPurchasePrice: row.instant_purchase_price == null ? null : Number(row.instant_purchase_price),
+        instantPurchasedAt: row.instant_purchased_at,
         auctionTime: row.duration_hours,
         image: row.image,
         createdAt: new Date(row.created_at).getTime(),
@@ -80,6 +89,8 @@ export function createAuctionService(client) {
                 p_min_bid_meat: auction.minBidMeat,
                 p_duration_hours: Number(auction.auctionTime),
                 p_image: auction.image || null,
+                p_instant_purchase_price: auction.instantPurchasePrice ?? null,
+                p_item_id: auction.itemId ?? null,
             });
             if (error) throw databaseError(error);
             return data;
@@ -90,6 +101,10 @@ export function createAuctionService(client) {
         },
         async cancel(auctionId) {
             const { error } = await requireClient().rpc('cancel_auction', { p_auction_id: auctionId });
+            if (error) throw databaseError(error);
+        },
+        async purchase(auctionId) {
+            const { error } = await requireClient().rpc('purchase_auction', { p_auction_id: auctionId });
             if (error) throw databaseError(error);
         },
         async bid(auctionId, amount) {
