@@ -1,11 +1,12 @@
-import React, { useContext, useState, useEffect, useMemo } from "react";
+import { useContext, useState, useEffect, useMemo } from "react";
 import { Link} from "react-router-dom";
 import { AuctionsContext } from "../context/AuctionsContext";
 import { UserContext } from "../context/UserContext";
 import { parseInput, convertToShorthand} from "../utils/numberUtils";
+import { getAuctionResult } from "../lib/auctionLifecycle";
 
 const AllAuctions = () => {
-    const { auctions, updateAuction } = useContext(AuctionsContext);
+    const { auctions, placeBid, isLoading, error } = useContext(AuctionsContext);
     const { currentUser, logoutUser } = useContext(UserContext); // Added logoutUser
 
 
@@ -14,7 +15,7 @@ const AllAuctions = () => {
     const processedAuctions = useMemo(() =>
             auctions
                 .slice()
-                .sort((a, b) => b.id - a.id) // Sort by descending ID
+                .sort((a, b) => b.createdAt - a.createdAt) // Sort by descending ID
                 .map((auction) => ({
                     ...auction,
                     shorthandMinBid: convertToShorthand(auction.minBidMeat) || "0",
@@ -42,9 +43,7 @@ const AllAuctions = () => {
         };
     };
 
-    const [countdowns, setCountdowns] = useState(() =>
-        auctions.map((auction) => calculateRemainingTime(auction.endTime))
-    );
+    const [countdowns, setCountdowns] = useState({});
 
     const [bids, setBids] = useState(() =>
         auctions.reduce((acc, auction) => {
@@ -55,23 +54,14 @@ const AllAuctions = () => {
 
     const handlePlaceBid = (auctionId) => {
 
-        // Normalize and compare usernames for case insensitivity
-        const auction = auctions.find((a) => a.id === auctionId);
-        const auctionOwner = String(auction.owner).trim().toLowerCase();
-        const currentUsername = String(currentUser.khubUsername).trim().toLowerCase();
-
-
-        // Check if the user is the owner of the auction
-        if (auctionOwner === currentUsername) {
-            setBids((prevBids) => ({
-                ...prevBids,
-                [auctionId]: {
-                    ...prevBids[auctionId],
-                    bidError: "You cannot bid on your own auction.",
-                },
-            }));
+        if (!currentUser) {
+            setBids((previous) => ({ ...previous, [auctionId]: {
+                ...previous[auctionId], bidError: "Please log in to place a bid.",
+            } }));
             return;
         }
+        const auction = auctions.find((a) => a.id === auctionId);
+        if (auction.sellerId === currentUser.id) return;
 
         // Show input field for valid users
         setBids((prevBids) => ({
@@ -81,9 +71,11 @@ const AllAuctions = () => {
     };
 
     useEffect(() => {
-        const interval = setInterval(() => {
-            setCountdowns(auctions.map((auction) => calculateRemainingTime(auction.endTime)));
-        }, 1000);
+        const tick = () => setCountdowns(Object.fromEntries(
+            auctions.map((auction) => [auction.id, calculateRemainingTime(auction.endTime)])
+        ));
+        tick();
+        const interval = setInterval(tick, 1000);
 
         return () => clearInterval(interval);
     }, [auctions]);
@@ -97,65 +89,25 @@ const AllAuctions = () => {
         }));
     };
 
-    const handleBidConfirm = (auctionId) => {
-        const { bidAmount } = bids[auctionId];
-        const numericBid = parseInt(bidAmount.replace(/,/g, ""), 10);
-        const auction = auctions.find((a) => a.id === auctionId);
-
-        // Validate bid amount
-        if (!numericBid || numericBid <= 0) {
-            setBids((prevBids) => ({
-                ...prevBids,
-                [auctionId]: { ...prevBids[auctionId], bidError: "This isn't a charity. Bid at least the minimum" },
-            }));
+    const handleBidConfirm = async (auctionId) => {
+        if (bids[auctionId]?.isSubmitting) return;
+        const numericBid = Number((bids[auctionId]?.bidAmount || "").replace(/,/g, ""));
+        const setBidState = (values) => setBids((previous) => ({
+            ...previous, [auctionId]: { ...previous[auctionId], ...values },
+        }));
+        if (!Number.isSafeInteger(numericBid) || numericBid < 1 || numericBid > 20000000000) {
+            setBidState({ bidError: "Enter a whole-number bid between 1 and 20 billion Meat." });
             return;
         }
-
-        if (numericBid > 20000000000) {
-            setBids((prevBids) => ({
-                ...prevBids,
-                [auctionId]: { ...prevBids[auctionId], bidError: "Bid cannot exceed 20 billion." },
-            }));
-            return;
-        }
-
-        // Display confirmation popup
-        const confirmMessage = `Are you sure you want to submit this bid for ${numericBid.toLocaleString("en-US")} Meat?`;
-        if (!window.confirm(confirmMessage)) {
-            return; // Exit if user cancels
-        }
-
-        // Check if user is already the highest bidder
-        const lastBid = auction.bids?.[auction.bids.length - 1];
-        if (lastBid?.bidder === currentUser.khubUsername) {
-            setBids((prevBids) => ({
-                ...prevBids,
-                [auctionId]: { ...prevBids[auctionId], bidError: "You are already the highest bidder." },
-            }));
-            return;
-        }
-
-        //Check bid against current bid and minimum bid
-        if (numericBid > (auction.currentBid || 0) && numericBid >= auction.minBidMeat) {
-            const updatedAuction = {
-                ...auction,
-                currentBid: numericBid,
-                bids: [
-                    ...(auction.bids || []),
-                    { bidder: currentUser.khubUsername, amount: numericBid, timestamp: Date.now() },
-                ],
-            };
-            updateAuction(updatedAuction);
-
-            setBids((prevBids) => ({
-                ...prevBids,
-                [auctionId]: { bidAmount: "", bidError: "", showInput: false },
-            }));
-        } else {
-            setBids((prevBids) => ({
-                ...prevBids,
-                [auctionId]: { ...prevBids[auctionId], bidError: "Bid too low." },
-            }));
+        if (!window.confirm(`Submit a bid of ${numericBid.toLocaleString("en-US")} Meat?`)) return;
+        setBidState({ isSubmitting: true, bidError: "" });
+        try {
+            await placeBid(auctionId, numericBid);
+            setBidState({ bidAmount: "", showInput: false });
+        } catch (error) {
+            setBidState({ bidError: error.message });
+        } finally {
+            setBidState({ isSubmitting: false });
         }
     };
 
@@ -182,7 +134,7 @@ const AllAuctions = () => {
         }
 
         // Detect deletion: input length is shorter than the current state
-        const isDeleting = rawValue.length < (bids[auctionId]?.bidAmount.replace(/,/g, "").length || 0);
+        const isDeleting = rawValue.length < ((bids[auctionId]?.bidAmount || "").replace(/,/g, "").length || 0);
 
         // If deleting, bypass formatting and update state directly
         if (isDeleting) {
@@ -278,8 +230,12 @@ const AllAuctions = () => {
             </div>
 
             <h1 className="text-4xl font-bold text-center text-[#7695FF] mb-8">All Auctions</h1>
+            {isLoading && <p role="status">Loading auctions…</p>}
+            {!isLoading && !error && auctions.length === 0 && <p>No auctions have been listed yet.</p>}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {processedAuctions.map((auction, index) => (
+                {processedAuctions.map((auction) => {
+                    const result = getAuctionResult(auction);
+                    return (
                     <div
                         key={auction.id}
                         className="border rounded-lg shadow-lg p-4 bg-[#F9F7F7] flex flex-col items-center"
@@ -311,19 +267,18 @@ const AllAuctions = () => {
                             </p>
                         </div>
 
-                        <p
+                        {result.status === "active" && <p
                             className={`text-xs text-center ${
-                                countdowns[index]?.isRed ? "text-red-500" : "text-gray-500"
+                                countdowns[auction.id]?.isRed ? "text-red-500" : "text-gray-500"
                             }`}
                         >
-                            {countdowns[index]?.timeString || "Auction data error"}
-                        </p>
+                            {countdowns[auction.id]?.timeString || "…"}
+                        </p>}
 
-                        {!countdowns[index]?.isExpired ? (
+                        {result.status === "active" ? (
                             <div className="mt-4 w-full">
                                 {/* Added null check for currentUser */}
-                                {currentUser?.khubUsername?.trim().toLowerCase() ===
-                                auction.owner.trim().toLowerCase() ? (
+                                {currentUser?.id === auction.sellerId ? (
                                     <Link
                                         to={`/auction/${auction.id}`}
                                         className="w-full bg-[#3F72AF] text-white font-bold py-2 px-4 rounded hover:bg-[#3F72AF] text-center block"
@@ -331,7 +286,7 @@ const AllAuctions = () => {
                                         More Info
                                     </Link>
                                 ) : (
-                                    !bids[auction.id].showInput ? (
+                                    !bids[auction.id]?.showInput ? (
                                         <>
                                             <button
                                                 onClick={() => handlePlaceBid(auction.id)}
@@ -359,9 +314,10 @@ const AllAuctions = () => {
                                             <div className="flex justify-between mt-2">
                                                 <button
                                                     onClick={() => handleBidConfirm(auction.id)}
+                                                    disabled={bids[auction.id]?.isSubmitting}
                                                     className="w-1/2 bg-[#3D52D5] text-white font-bold py-2 px-4 rounded hover:bg-[#7494EA] mr-2"
                                                 >
-                                                    Confirm
+                                                    {bids[auction.id]?.isSubmitting ? "Submitting…" : "Confirm"}
                                                 </button>
                                                 <button
                                                     onClick={() => handleCancelBid(auction.id)}
@@ -380,15 +336,17 @@ const AllAuctions = () => {
                                 )}
                             </div>
                         ) : (
-                            <p className="text-red-500 text-center text-sm mt-4">
-                                Auction Expired
-                                {auction.currentBid
-                                    ? ` | Winning Bid: ${formatNumber(auction.currentBid)}`
-                                    : " | No bids"}
-                            </p>
+                            <div className="text-center text-sm mt-4">
+                                <p className="font-semibold">{result.label}</p>
+                                {result.winnerId && (
+                                    <p>Winner: {result.winner} · {formatNumber(result.finalPrice)} Meat</p>
+                                )}
+                                <Link to={`/auction/${auction.id}`} className="text-blue-700 underline mt-2 block">View outcome and history</Link>
+                            </div>
                         )}
                     </div>
-                ))}
+                    );
+                })}
             </div>
         </div>
     );

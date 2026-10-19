@@ -1,4 +1,4 @@
-import React, { useState, useContext } from "react";
+import { useState, useContext } from "react";
 import { UserContext } from "../context/UserContext";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -8,22 +8,27 @@ const Register = () => {
     const [email, setEmail] = useState(""); // Email field
     const [password, setPassword] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
+    const [successMessage, setSuccessMessage] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const navigate = useNavigate(); // React Router navigation hook
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
+        if (isSubmitting) return;
+        setErrorMessage("");
+        setSuccessMessage("");
 
         // Client-side validation for inputs
-        if (!khubUsername || !email || !password) {
+        if (!khubUsername.trim() || !email.trim() || !password) {
             setErrorMessage("All fields are required.");
             return;
         }
-        if (khubUsername.length > 16) {
+        if (khubUsername.trim().length > 16) {
             setErrorMessage("Username cannot exceed 16 characters.");
             return;
         }
-        if (password.length > 32) {
-            setErrorwMessage("Password cannot exceed 32 characters.");
+        if (password.length < 6) {
+            setErrorMessage("Password must contain at least 6 characters.");
             return;
         }
         if (!/\S+@\S+\.\S+/.test(email)) {
@@ -31,13 +36,19 @@ const Register = () => {
             return;
         }
 
+        setIsSubmitting(true);
         try {
-            // Register the user
-            registerUser({ khubUsername, email, password });
-            setErrorMessage(""); // Clear any previous error messages
-            navigate("/login"); // Redirect to login page
+            const data = await registerUser({ khubUsername, email, password });
+            setPassword("");
+            if (data.session) {
+                navigate("/");
+            } else {
+                setSuccessMessage("Account created. Check your email for a confirmation link before logging in.");
+            }
         } catch (error) {
-            setErrorMessage(error.message); // Display the error message
+            setErrorMessage(error.message);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -57,7 +68,13 @@ const Register = () => {
                 <h1 className="text-2xl font-bold text-center mb-6">Register</h1>
 
                 {errorMessage && (
-                    <p className="text-red-500 text-sm mb-4">{errorMessage}</p>
+                    <p role="alert" className="text-red-500 text-sm mb-4">{errorMessage}</p>
+                )}
+
+                {successMessage && (
+                    <p role="status" className="text-green-700 text-sm mb-4">
+                        {successMessage} <Link to="/login" className="underline">Log in</Link>
+                    </p>
                 )}
 
                 <div className="mb-4">
@@ -70,6 +87,8 @@ const Register = () => {
                     <input
                         type="text"
                         id="khubUsername"
+                        maxLength={16}
+                        autoComplete="username"
                         value={khubUsername}
                         onChange={(e) => setKhubUsername(e.target.value)}
                         className="w-full p-2 border rounded"
@@ -87,6 +106,7 @@ const Register = () => {
                     <input
                         type="email"
                         id="email"
+                        autoComplete="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         className="w-full p-2 border rounded"
@@ -104,6 +124,8 @@ const Register = () => {
                     <input
                         type="password"
                         id="password"
+                        minLength={6}
+                        autoComplete="new-password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         className="w-full p-2 border rounded"
@@ -113,10 +135,16 @@ const Register = () => {
 
                 <button
                     type="submit"
+                    disabled={isSubmitting}
                     className="w-full bg-blue-500 text-white font-bold py-2 px-4 rounded hover:bg-blue-700"
                 >
-                    Register
+                    {isSubmitting ? "Creating account…" : "Register"}
                 </button>
+                <p className="text-sm mt-4">
+                    Already registered or waiting for an email?{' '}
+                    <Link to="/login" className="text-blue-700 underline">Log in</Link>{' · '}
+                    <Link to="/resend-confirmation" className="text-blue-700 underline">Resend confirmation</Link>
+                </p>
             </form>
         </div>
     );

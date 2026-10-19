@@ -1,11 +1,12 @@
-import React, { useContext, useMemo, useState, useEffect } from "react";
+import { useContext, useMemo, useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuctionsContext } from "../context/AuctionsContext";
 import { UserContext } from "../context/UserContext";
 import { convertToShorthand } from "../utils/numberUtils";
+import { getAuctionResult } from "../lib/auctionLifecycle";
 
 const Home = () => {
-    const { auctions } = useContext(AuctionsContext);
+    const { auctions, isLoading, error } = useContext(AuctionsContext);
     const { currentUser, logoutUser } = useContext(UserContext);
     const navigate = useNavigate();
 
@@ -143,6 +144,8 @@ const Home = () => {
             {/* Popular Items Section */}
             <div className="w-full max-w-6xl mx-auto px-4 mt-6">
                 <h2 className="text-2xl font-bold text-gray-700 mb-4">Popular Items</h2>
+                {isLoading && <p role="status">Loading auctions…</p>}
+                {!isLoading && !error && auctions.length === 0 && <p>No auctions have been listed yet.</p>}
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 pb-20">
                     {displayedAuctions.map((auction, index) => (
                         <div
@@ -181,14 +184,16 @@ const Home = () => {
                                         timers[auction.id]?.isRed ? "text-red-500" : "text-gray-600"
                                     }`}
                                 >
-                                    Ends in: {timers[auction.id]?.timeString || "Invalid Data"}
+                                    {getAuctionResult(auction).status === "active"
+                                        ? `Ends in: ${timers[auction.id]?.timeString || "…"}`
+                                        : getAuctionResult(auction).label}
                                 </p>
                             </div>
                         </div>
                     ))}
                 </div>
                 {/* See More Button */}
-                {!showAll && (
+                {!showAll && popularAuctions.length > 4 && (
                     <div className="text-center mt-4">
                         <button
                             onClick={() => setShowAll(true)}

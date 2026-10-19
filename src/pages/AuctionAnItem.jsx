@@ -1,9 +1,8 @@
-import React, { useState, useContext } from "react";
+import { useState, useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuctionsContext } from "../context/AuctionsContext";
 import { UserContext } from "../context/UserContext";
 import items from "../data/items.json";
-import { getBidErrorMessage} from "../utils/dataChecks";
 import { parseInput, convertToShorthand } from "../utils/numberUtils";
 
 
@@ -20,7 +19,8 @@ const AuctionAnItem = () => {
     const [previewImage, setPreviewImage] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
 
-    let hasSuffix = false; // Boolean to track if a suffix has been entered
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    let hasSuffix = false;
 
     const handleQuantityChange = (e) => {
         const input = e.target;
@@ -32,7 +32,6 @@ const AuctionAnItem = () => {
         console.log("Cursor Position Before:", cursorPosition);
 
 
-        const suffixes = ['k', 'm', 'b'];
         const matches = rawValue.match(/[kmb]/gi);
 
         // Ensure only one suffix is allowed
@@ -80,7 +79,6 @@ const AuctionAnItem = () => {
 
         // Process the raw value through parseInput
         let parsedValue = parseInput(rawValue); // Converts to sanitized value
-        const numericValue = parseInt(parsedValue.replace(/,/g, ""), 10);
 
         // Calculate the new cursor position
         let newCursorPosition = 0;
@@ -215,7 +213,7 @@ const AuctionAnItem = () => {
         const matchedItem = items.find((item) => item.name === selectedItem);
         const gifName = matchedItem?.image?.split("/").pop();
         const imageUrl = gifName
-            ? `http://images.kingdomofloathing.com/itemimages/${gifName}`
+            ? `https://images.kingdomofloathing.com/itemimages/${gifName}`
             : "https://via.placeholder.com/150";
 
         setPreviewImage(imageUrl);
@@ -223,7 +221,9 @@ const AuctionAnItem = () => {
         setErrorMessage(""); // Clear errors on valid input
     };
 
-    const handleConfirmAuction = () => {
+    const handleConfirmAuction = async () => {
+        if (isSubmitting) return;
+        setErrorMessage("");
         // Parse and sanitize the minimum bid input
         const parsedMinBidMeat = parseInt(minBidMeat.replace(/,/g, ""), 10);
         if (isNaN(parsedMinBidMeat) || parsedMinBidMeat <= 0) {
@@ -246,27 +246,22 @@ const AuctionAnItem = () => {
             return;
         }
 
-        // Prepare auction object
-        const endTime = Date.now() + auctionTime * 60 * 60 * 1000;
-
-        const newAuction = {
-            id: Date.now(),
-            item: selectedItem,
-            quantity: parsedQuantity,
-            minBidMeat: parsedMinBidMeat,
-            auctionTime,
-            endTime,
-            currentBid: 0,
-            owner: currentUser.khubUsername,
-            image: previewImage,
-            bids: [],
-        };
-
-        // Add auction and navigate back
-        addAuction(newAuction);
-        setShowPreview(false);
-        alert("Auction submitted!");
-        navigate("/auctions");
+        setIsSubmitting(true);
+        try {
+            await addAuction({
+                item: selectedItem,
+                quantity: parsedQuantity,
+                minBidMeat: parsedMinBidMeat,
+                auctionTime,
+                image: previewImage,
+            });
+            setShowPreview(false);
+            navigate("/auctions");
+        } catch (error) {
+            setErrorMessage(error.message);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     // Redirect for unauthenticated users
@@ -321,7 +316,7 @@ const AuctionAnItem = () => {
             <h1 className="text-4xl font-bold text-center text-blue-600 mb-8">Auction an Item</h1>
             <form onSubmit={handleFormSubmit} className="max-w-lg mx-auto bg-white shadow-md rounded px-8 pt-6 pb-8">
                 {errorMessage && (
-                    <p className="text-red-500 text-center mb-4 font-bold">{errorMessage}</p>
+                    <p role="alert" className="text-red-500 text-center mb-4 font-bold">{errorMessage}</p>
                 )}
                 <label htmlFor="item" className="block text-gray-700 text-sm font-bold mb-2">
                     Select an Item:
@@ -414,12 +409,14 @@ const AuctionAnItem = () => {
                     <div className="flex justify-center mt-4">
                         <button
                             onClick={handleConfirmAuction}
+                            disabled={isSubmitting}
                             className="bg-green-500 text-white font-bold py-2 px-4 rounded hover:bg-green-700 mx-2"
                         >
-                            Confirm Auction
+                            {isSubmitting ? "Saving…" : "Confirm Auction"}
                         </button>
                         <button
                             onClick={() => setShowPreview(false)}
+                            disabled={isSubmitting}
                             className="bg-red-500 text-white font-bold py-2 px-4 rounded hover:bg-red-700 mx-2"
                         >
                             Cancel

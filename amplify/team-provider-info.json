@@ -10,6 +10,17 @@
       "StackName": "amplify-kolauction-dev-8df83",
       "StackId": "arn:aws:cloudformation:us-east-1:257394477890:stack/amplify-kolauction-dev-8df83/284b55d0-c758-11ef-afca-0e08a6941cab",
       "AmplifyAppId": "dt7bn61k4b4l2"
+    },
+    "categories": {
+      "storage": {
+        "usersTable": {
+          "tableName": "usersTable",
+          "region": "us-east-1",
+          "arn": "arn:aws:dynamodb:us-east-1:257394477890:table/usersTable",
+          "partitionKeyName": "userId",
+          "partitionKeyType": "S"
+        }
+      }
     }
   }
 }

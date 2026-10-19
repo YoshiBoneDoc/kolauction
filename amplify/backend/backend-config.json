@@ -1,19 +1,53 @@
 {
-  "function": {
-    "auctionHandler": {
-      "build": true,
-      "providerPlugin": "awscloudformation",
-      "service": "Lambda"
+  "function": {},
+  "parameters": {
+    "AMPLIFY_storage_usersTable_arn": {
+      "usedBy": [
+        {
+          "category": "storage",
+          "resourceName": "usersTable"
+        }
+      ]
+    },
+    "AMPLIFY_storage_usersTable_partitionKeyName": {
+      "usedBy": [
+        {
+          "category": "storage",
+          "resourceName": "usersTable"
+        }
+      ]
+    },
+    "AMPLIFY_storage_usersTable_partitionKeyType": {
+      "usedBy": [
+        {
+          "category": "storage",
+          "resourceName": "usersTable"
+        }
+      ]
+    },
+    "AMPLIFY_storage_usersTable_region": {
+      "usedBy": [
+        {
+          "category": "storage",
+          "resourceName": "usersTable"
+        }
+      ]
+    },
+    "AMPLIFY_storage_usersTable_tableName": {
+      "usedBy": [
+        {
+          "category": "storage",
+          "resourceName": "usersTable"
+        }
+      ]
     }
   },
   "storage": {
-    "handleAuctions": {
+    "usersTable": {
+      "dependsOn": [],
       "providerPlugin": "awscloudformation",
-      "service": "DynamoDB"
-    },
-    "usersHandler": {
-      "providerPlugin": "awscloudformation",
-      "service": "DynamoDB"
+      "service": "DynamoDB",
+      "serviceType": "imported"
     }
   }
 }

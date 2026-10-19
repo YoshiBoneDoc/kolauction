@@ -1,30 +1,27 @@
-import React, { useState, useContext } from "react";
+import { useState, useContext } from "react";
 import { UserContext } from "../context/UserContext";
 import { Link, useNavigate } from "react-router-dom";
 
 const Login = () => {
     const { loginUser } = useContext(UserContext);
-    const [khubUsername, setKhubUsername] = useState("");
+    const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
-    const [successMessage, setSuccessMessage] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const navigate = useNavigate();
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-
+        if (isSubmitting) return;
+        setErrorMessage("");
+        setIsSubmitting(true);
         try {
-            loginUser(khubUsername, password);
-            setSuccessMessage("Login successful!");
-            setErrorMessage("");
-            setTimeout(() => {
-                setSuccessMessage("");
-                navigate("/"); // Redirect to home page after login
-            }, 2000);
+            await loginUser(email, password);
+            navigate("/");
         } catch (error) {
             setErrorMessage(error.message);
-            setSuccessMessage("");
-            setTimeout(() => setErrorMessage(""), 3000); // Clear error after 3 seconds
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -44,24 +41,23 @@ const Login = () => {
                 <h1 className="text-2xl font-bold text-center mb-6">Log In</h1>
 
                 {errorMessage && (
-                    <p className="text-red-500 text-sm mb-4">{errorMessage}</p>
+                    <p role="alert" className="text-red-500 text-sm mb-4">{errorMessage}</p>
                 )}
-                {successMessage && (
-                    <p className="text-green-500 text-sm mb-4">{successMessage}</p>
-                )}
+                <p className="text-gray-600 text-sm mb-4">Use your registered email address to log in. Your KHub username remains your display name.</p>
 
                 <div className="mb-4">
                     <label
-                        htmlFor="khubUsername"
+                        htmlFor="email"
                         className="block text-gray-700 font-bold mb-2"
                     >
-                        KHub Username
+                        Email
                     </label>
                     <input
-                        type="text"
-                        id="khubUsername"
-                        value={khubUsername}
-                        onChange={(e) => setKhubUsername(e.target.value)}
+                        type="email"
+                        id="email"
+                        autoComplete="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
                         className="w-full p-2 border rounded"
                         required
                     />
@@ -77,6 +73,7 @@ const Login = () => {
                     <input
                         type="password"
                         id="password"
+                        autoComplete="current-password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         className="w-full p-2 border rounded"
@@ -86,10 +83,15 @@ const Login = () => {
 
                 <button
                     type="submit"
+                    disabled={isSubmitting}
                     className="w-full bg-blue-500 text-white font-bold py-2 px-4 rounded hover:bg-blue-700"
                 >
-                    Log In
+                    {isSubmitting ? "Logging in…" : "Log In"}
                 </button>
+                <div className="flex flex-wrap gap-4 mt-4 text-sm text-blue-700 underline">
+                    <Link to="/forgot-password">Forgot password?</Link>
+                    <Link to="/register">Register</Link>
+                </div>
             </form>
         </div>
     );

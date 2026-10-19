@@ -71,17 +71,20 @@ const InfoPage = () => {
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">How Do I Cancel My Bid or Auction?</h2>
                 <ul className="mb-6 list-none space-y-2">
                     <li>
-                        <span className="font-bold">1.</span> The easiest way to cancel your auction is to cancel the
+                        <span className="font-bold">1.</span> Auctions may be canceled before any bids have been placed without incurring any penalties.
+                    </li>
+                    <li>
+                        <span className="font-bold">2.</span> The easiest way to cancel your auction is to cancel the
                         trade in-game. If this happens for any reason (whether intentional or otherwise) before the time
                         of the auction has concluded, your auction on the site will be removed. <span
                         className="font-bold underline">Please note, you will not be able to place an auction for 24 hours if you cancel your auction early.</span>
                     </li>
                     <li>
-                        <span className="font-bold">2.</span> Bids may not be canceled once they are placed. If you
+                        <span className="font-bold">3.</span> Bids may not be canceled once they are placed. If you
                         retract your trade offer with your bid, <span className="font-bold underline">you will not be allowed to bid on any auctions for 24 hours.</span>
                     </li>
                     <li>
-                        <span className="font-bold">3.</span> If another user bids higher than your current bid on any
+                        <span className="font-bold">4.</span> If another user bids higher than your current bid on any
                         individual auction, the bot will cancel your trade offer and your Meat will be refunded.
                     </li>
                 </ul>

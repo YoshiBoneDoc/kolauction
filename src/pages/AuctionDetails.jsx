@@ -1,17 +1,20 @@
-import React, { useContext, useEffect, useState, useMemo } from "react";
+import { useContext, useEffect, useState, useMemo } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AuctionsContext } from "../context/AuctionsContext";
 import { UserContext } from "../context/UserContext";
+import AuctionOutcome from "../components/AuctionOutcome";
+import { getAuctionStatus, auctionStatusLabels } from "../lib/auctionLifecycle";
 
 const AuctionDetails = () => {
     const { id } = useParams();
-    const { auctions, updateAuction } = useContext(AuctionsContext);
+    const { auctions, placeBid, isLoading, error } = useContext(AuctionsContext);
     const { currentUser } = useContext(UserContext);
 
     const auction = auctions.find((auction) => String(auction.id) === String(id));
 
     const [bidAmount, setBidAmount] = useState("");
     const [bidError, setBidError] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [remainingTime, setRemainingTime] = useState({
         timeString: "...",
         isRed: false,
@@ -53,6 +56,7 @@ const AuctionDetails = () => {
     useEffect(() => {
         if (!auction?.endTime) return;
 
+        setRemainingTime(calculateRemainingTime(auction.endTime));
         const interval = setInterval(() => {
             setRemainingTime(calculateRemainingTime(auction.endTime));
         }, 1000);
@@ -153,7 +157,8 @@ const AuctionDetails = () => {
 
     // Handle bid submission
     // Handle bid submission
-    const handleBidSubmit = () => {
+    const handleBidSubmit = async () => {
+        if (isSubmitting) return;
         if (!currentUser) {
             setBidError("Only registered users may bid.");
             return;
@@ -167,65 +172,33 @@ const AuctionDetails = () => {
             return;
         }
 
-        // Normalize and compare usernames for case insensitivity
-        const auctionOwner = String(auction.owner).trim().toLowerCase();
-        const currentUsername = String(currentUser.khubUsername).trim().toLowerCase();
-
-        // Check if the user is the owner of the auction
-        if (auctionOwner === currentUsername) {
-            setBidError("You cannot bid on your own auction.");
-            return;
-        }
-
-        // Check if the user is already the highest bidder
-        const lastBid = auction.bids?.[auction.bids.length - 1];
-        if (
-            lastBid &&
-            String(lastBid.bidder).trim().toLowerCase() === currentUsername
-        ) {
-            setBidError("You are already the highest bidder.");
-            return;
-        }
-
-        // Validate the bid amount
-        if (numericBid <= (auction.currentBid || 0)) {
-            setBidError("This isn't a charity.");
-            return;
-        }
-
-        if (numericBid < auction.minBidMeat) {
-            setBidError("Your bid must meet or exceed the minimum bid.");
-            return;
-        }
-
-        // Create the updated auction object
-        const updatedAuction = {
-            ...auction,
-            currentBid: numericBid,
-            bids: [
-                ...(auction.bids || []),
-                { bidder: currentUser.khubUsername, amount: numericBid, timestamp: Date.now() },
-            ],
-        };
-
-        // Update the auction
-        updateAuction(updatedAuction);
-
-        // Clear input and errors
-        setBidAmount("");
+        setIsSubmitting(true);
         setBidError("");
+        try {
+            await placeBid(auction.id, numericBid);
+            setBidAmount("");
+        } catch (error) {
+            setBidError(error.message);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
+
+    if (isLoading) return <p role="status" className="p-6">Loading auction…</p>;
 
     if (!auction) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
-                <p className="text-red-500 text-xl font-bold mb-4">Auction not found.</p>
+                <p className="text-red-500 text-xl font-bold mb-4">{error ? "Auction could not be loaded." : "Auction not found."}</p>
                 <Link to="/auctions" className="text-blue-500 hover:underline text-lg">
                     Back to Auctions
                 </Link>
             </div>
         );
     }
+
+    const now = Date.now();
+    const isActive = getAuctionStatus(auction, now) === "active";
 
     return (
         <div className="min-h-screen bg-gray-50 p-6">
@@ -250,7 +223,7 @@ const AuctionDetails = () => {
                             </div>
                         )}
 
-                        {currentUser && (
+                        {currentUser && isActive && currentUser.id !== auction.sellerId && (
                             <>
                                 <input
                                     type="text"
@@ -261,9 +234,10 @@ const AuctionDetails = () => {
                                 />
                                 <button
                                     onClick={handleBidSubmit}
+                                    disabled={isSubmitting || auction.endTime <= Date.now()}
                                     className="bg-blue-500 text-white font-bold py-1 px-3 rounded hover:bg-blue-700 text-sm"
                                 >
-                                    Place Bid
+                                    {isSubmitting ? "Submitting…" : "Place Bid"}
                                 </button>
                                 {bidError && (
                                     <p className="text-red-500 text-center text-xs mt-2">{bidError}</p>
@@ -283,7 +257,7 @@ const AuctionDetails = () => {
                             <p className="text-xs text-gray-500 mb-6">
                                 Minimum Bid (Meat): {formattedMinBid}
                             </p>
-                            <p className="text-sm text-gray-500 underline mt-10">Current Bid</p>
+                            <p className="text-sm text-gray-500 underline mt-10">{isActive ? "Current Bid" : "Last Bid"}</p>
                             <p className="text-3xl font-extrabold text-black mt-2">{formattedCurrentBid} Meat</p>
                             <p className="text-sm text-gray-600 mt-16">Sold by: <span
                                 className="font-bold text-black">{auction.owner || "Unknown"}</span>
@@ -293,12 +267,14 @@ const AuctionDetails = () => {
                                     remainingTime?.isRed ? "text-red-500" : "text-gray-500"
                                 }`}
                             >
-                                Ends In: {remainingTime?.timeString || ""}
+                                {isActive ? `Ends in: ${remainingTime?.timeString || "…"}` : auctionStatusLabels[getAuctionStatus(auction, now)]}
                             </p>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <AuctionOutcome key={auction.id} auction={auction} now={now} />
 
             <div className="max-w-4xl mx-auto bg-gray-50 mt-8 p-6 rounded-lg shadow">
                 <h2 className="text-2xl font-bold text-gray-800 mb-4">Bid History</h2>

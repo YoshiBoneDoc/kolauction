@@ -11,7 +11,9 @@
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.5.0",
+    "@supabase/supabase-js": "^2.118.0",
     "autoprefixer": "^10.4.20",
+    "aws-sdk": "^2.1692.0",
     "aws-serverless-express": "^3.4.0",
     "postcss": "^8.4.49",
     "react": "^18.3.1",
