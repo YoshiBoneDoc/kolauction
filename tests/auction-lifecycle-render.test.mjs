@@ -65,7 +65,7 @@ test('saved confirmation waits for the counterpart without another confirm butto
 });
 
 test('cancellation appears only for the seller of an active auction without bids', () => {
-    const open = { ...auction, status: 'active', endTime: 20000, highestBidderId: null, bids: [] };
+    const open = { ...auction, status: 'active', endTime: 20000, highestBidderId: null, currentBid: 0, bids: [] };
     assert.match(render({ auction: open, userId: 'seller' }), /Cancel listing/);
     assert.doesNotMatch(render({ auction: open, userId: 'buyer' }), /Cancel listing/);
     assert.doesNotMatch(render({ auction: { ...open, highestBidderId: 'buyer' }, userId: 'seller' }), /Cancel listing/);
@@ -88,5 +88,5 @@ test('profile earnings exclude winning bids that are still awaiting trade', () =
     ] });
     assert.match(html, /250 Meat received/);
     assert.doesNotMatch(html, /350 Meat received/);
-    assert.match(html, /Awaiting trade/);
+    assert.match(html, /Awaiting settlement/);
 });

@@ -22,21 +22,22 @@ const InfoPage = () => {
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">How to Use This Site</h2>
                 <ul className="mb-6 list-none space-y-2">
                     <li>
-                        <span className="font-bold">1.</span> Register on kHub and confirm your email address. Then open
-                        &quot;Your Account&quot; to link the KoL account you will use for auctions.
+                        <span className="font-bold">1.</span> Send <span className="font-mono">REGISTER</span> by normal
+                        KMail to <span className="font-bold">kHub (#3888760)</span> from the KoL account you want to use.
+                        Attach no Meat or items.
                     </li>
                     <li>
-                        <span className="font-bold">2.</span> Get a verification code on that page and send the exact
-                        message shown, <span className="font-mono">VERIFY [your code]</span>, by KMail to <span
-                        className="font-bold">kHub (#3888760)</span>. Send it from your own KoL account, with no Meat or items attached.
+                        <span className="font-bold">2.</span> The bot creates your account, automatically verifies your
+                        KoL player ID, and replies with your username and a temporary password. Your username is your
+                        actual KoL character name; custom usernames are not available.
                     </li>
                     <li>
-                        <span className="font-bold">3.</span> The bot links your account when it processes your message.
-                        Codes expire after 20 minutes; you can request a new one if needed. Your account page will show when you are verified.
+                        <span className="font-bold">3.</span> Log in with those details. You can change your password
+                        from &quot;My Account.&quot; Never use your KoL password on kHub.
                     </li>
                     <li>
-                        <span className="font-bold">4.</span> Once linked, you can list items and bid using that KoL account.
-                        Verification uses your KoL player ID, so your website username does not have to match your KoL name.
+                        <span className="font-bold">4.</span> Forgot your login? Send <span className="font-mono">CREDENTIALS</span>
+                        to the bot from that same KoL account to receive a new password. Your previous password stops working.
                     </li>
                 </ul>
 
@@ -44,7 +45,7 @@ const InfoPage = () => {
                 <ul className="mb-6 list-none space-y-2">
                     <li>
                         <span className="font-bold">1.</span> Use &quot;Auction an Item&quot; to choose an item, quantity,
-                        minimum bid, and duration. You may also set an optional Instant Purchase Price to end bidding early at an agreed price.
+                        minimum bid, and duration. You may also set an optional Buyout Price to end bidding early at an agreed price.
                         All prices are for the entire listing.
                     </li>
                     <li>
@@ -59,7 +60,7 @@ const InfoPage = () => {
                         your full bid in Meat, with no items. Even when raising your own bid, send the full new amount, not just the difference.
                     </li>
                     <li>
-                        <span className="font-bold">4.</span> If the listing offers an Instant Purchase Price, use the same <span
+                        <span className="font-bold">4.</span> If the listing offers an Buyout Price, use the same <span
                         className="font-mono">BID [Auction number]</span> message and attach that amount or more.
                         This ends bidding at the instant price; any excess Meat is returned.
                     </li>
@@ -98,7 +99,7 @@ const InfoPage = () => {
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">How Auctions Are Concluded</h2>
                 <ul className="mb-6 list-none space-y-2">
                     <li>
-                        <span className="font-bold">1.</span> When the timer expires, or an Instant Purchase is accepted,
+                        <span className="font-bold">1.</span> When the timer expires, or an buyout is accepted,
                         <span className="font-bold"> kHub (#3888760)</span> sends the items to the winner and the winning
                         Meat payment to the seller by KMail. Both are already held by the bot, so neither party needs to send another payment or accept a trade.
                         New listings have a 7.5% seller fee, deducted from the final sale price and rounded down to whole Meat. There is no fee if the auction ends without a bid. Existing listings keep the fee shown on their auction page.

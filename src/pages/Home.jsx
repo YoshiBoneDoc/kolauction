@@ -4,6 +4,9 @@ import { AuctionsContext } from '../context/AuctionsContext';
 import { popularActiveAuctions, timeRemaining } from '../lib/auctionBrowsing';
 import { useNow } from '../hooks/useNow';
 import AuctionNavigation from '../components/AuctionNavigation';
+import PendingTrades from '../components/PendingTrades';
+import SiteFooter from '../components/SiteFooter';
+import { formatCompactMeat } from '../lib/formatMeat';
 
 export default function Home() {
     const { auctions, total, isLoading, error } = useContext(AuctionsContext);
@@ -19,6 +22,7 @@ export default function Home() {
                 <p className="mt-4 text-lg text-gray-700 sm:text-xl">The best place to find and bid on rare treasures.</p>
             </header>
             <main className="mx-auto mt-6 w-full max-w-6xl flex-1 pb-8">
+                <PendingTrades />
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                     <h2 className="text-2xl font-bold text-gray-700">Popular Items</h2>
                     <Link to="/auctions" className="flex min-h-11 items-center text-blue-700 underline">Browse active auctions</Link>
@@ -32,9 +36,10 @@ export default function Home() {
                             {auction.image && <img src={auction.image} alt="" loading="lazy" className="h-12 w-12 shrink-0 object-contain" />}
                             <div className="min-w-0 flex-1 text-center">
                                 <h3 className="break-words text-lg font-bold text-[#14248A]">{auction.item} <span className="text-[#5365AB]">×{auction.quantity.toLocaleString('en-US')}</span></h3>
+                                <p className="mt-2 text-xs text-gray-600">{auction.escrowMode ? 'Escrow' : 'Direct settlement'}</p>
                                 <p className="mt-2 text-xs text-gray-600">{auction.currentBid ? 'Current bid' : 'Minimum bid'}</p>
-                                <p className="break-words font-bold text-[#112D4E]">{(auction.currentBid || auction.minBidMeat).toLocaleString('en-US')} Meat</p>
-                                {auction.instantPurchasePrice && <p className="mt-2 break-words text-xs font-semibold text-green-800">Instant purchase: {auction.instantPurchasePrice.toLocaleString('en-US')} Meat</p>}
+                                <p className="break-words font-bold text-[#112D4E]">{formatCompactMeat(auction.currentBid || auction.minBidMeat)} Meat</p>
+                                {auction.instantPurchasePrice && <p className="mt-2 break-words text-xs font-semibold text-green-800">Buyout Price: {formatCompactMeat(auction.instantPurchasePrice)}</p>}
                                 <p className={`mt-2 text-xs ${auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-600'}`}>Ends in <time dateTime={new Date(auction.endTime).toISOString()}>{timeRemaining(auction.endTime, now)}</time></p>
                             </div>
                         </Link>
@@ -42,10 +47,7 @@ export default function Home() {
                 </div>
                 {(total ?? popular.length) > 4 && <Link to="/auctions" className="mt-4 inline-flex min-h-11 items-center text-blue-700 underline">See more active auctions</Link>}
             </main>
-            <footer className="-mx-4 border-t bg-gray-100 px-4 py-3 text-center sm:-mx-6">
-                <Link to="/donate" className="inline-flex min-h-11 items-center text-sm text-blue-700 hover:underline">Donate</Link>
-                <p className="text-xs text-gray-500">All game images are copyright Asymmetric Publications from The Kingdom of Loathing</p>
-            </footer>
+            <SiteFooter className="-mx-4 sm:-mx-6" />
         </div>
     );
 }

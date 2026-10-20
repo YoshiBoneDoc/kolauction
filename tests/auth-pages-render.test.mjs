@@ -31,9 +31,12 @@ const requireModule = createRequire(import.meta.url);
 new Function('require', 'module', 'exports', outputFiles[0].text)((name) => name === 'react-router-dom' ? router : requireModule(name), compiled, compiled.exports);
 const { render } = compiled.exports;
 
-test('public email request routes render without a signed-in account', () => {
-    assert.match(render('/forgot-password'), /Send password reset link/);
-    assert.match(render('/resend-confirmation'), /Resend confirmation email/);
+test('recovery and former resend routes explain authenticated KMail recovery without email', () => {
+    for (const path of ['/forgot-password', '/resend-confirmation']) {
+        assert.match(render(path), /CREDENTIALS/);
+        assert.doesNotMatch(render(path), /type="email"/);
+        assert.match(render(path), /old password stops working/);
+    }
 });
 
 test('login and registration expose account recovery and resend navigation', () => {
@@ -41,13 +44,21 @@ test('login and registration expose account recovery and resend navigation', () 
     assert.match(login, /href="\/forgot-password"/);
     assert.match(login, /href="\/register"/);
     assert.doesNotMatch(login, /href="\/resend-confirmation"/);
-    assert.match(render('/register'), /href="\/resend-confirmation"/);
+    const register = render('/register');
+    assert.match(register, /REGISTER/);
+    assert.match(register, /kHub username \(KH_ followed by your KoL name\) and temporary password/);
+    assert.doesNotMatch(register, /Your username will be|Custom usernames are not available/);
+    assert.doesNotMatch(register, /register-username|type="text"/);
+    assert.doesNotMatch(register, /type="email"|type="password"|href="\/resend-confirmation"/);
+    assert.match(login, /kHub Username/);
+    assert.match(login, /KH_Your KoL name/);
 });
 
-test('ordinary signed-in sessions do not display the recovery password form', () => {
+test('ordinary signed-in sessions can change their temporary password', () => {
     const html = render('/reset-password', { currentUser: { id: 'buyer' }, canResetPassword: false });
-    assert.match(html, /Request a new password reset link/);
-    assert.doesNotMatch(html, /id="new-password"/);
+    assert.match(html, /id="new-password"/);
+    assert.match(html, /minLength="12"/);
+    assert.doesNotMatch(render('/change-password'), /id="new-password"/);
 });
 
 test('validated recovery sessions render both password fields', () => {
@@ -60,7 +71,7 @@ test('validated recovery sessions render both password fields', () => {
 test('expired links show an actionable error and never a password form', () => {
     const auth = { canResetPassword: true, authLinkError: 'This email link is invalid or expired. Please request a new one.' };
     const html = render('/reset-password', auth);
-    assert.match(html, /invalid or expired/);
+    assert.match(html, /Recover your login/);
     assert.doesNotMatch(html, /id="new-password"/);
     assert.match(render('/auth/confirm', auth), /Resend confirmation email/);
 });

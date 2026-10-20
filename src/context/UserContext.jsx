@@ -98,14 +98,21 @@ export const UserProvider = ({ children }) => {
         if (error) setAuthError(error.message);
     };
 
+    const changePassword = async (password) => {
+        if (!currentUser || currentUser.id !== session?.user?.id) throw new Error('Log in before changing your password.');
+        await auth.updatePassword(password);
+    };
+
     return (
         <UserContext.Provider value={{
-            currentUser,
+            currentUser: currentUser?.id === session?.user?.id ? currentUser : null,
+            signedInUserId: session?.user?.id || null,
             registerUser: auth.register,
             loginUser,
             requestPasswordReset: auth.requestPasswordReset,
             resendConfirmation: auth.resendConfirmation,
             resetPassword,
+            changePassword,
             canResetPassword: Boolean(recoveryUserId && recoveryUserId === session?.user?.id && !initialAuthLink.error),
             authLinkError: initialAuthLink.error,
             emailConfirmed: initialAuthLink.type === 'signup' && initialAuthLink.accessToken === session?.access_token && Boolean(session?.user?.email_confirmed_at),

@@ -4,6 +4,8 @@
 > It runs separately on **Oracle Cloud**, not on Cloudflare. Start with
 > [the bot README](bot/README.md) and [deployment instructions](bot/DEPLOYMENT.md).
 
+Starting a new chat? Read [the project handoff](HANDOFF.md) first.
+
 ## Where everything lives
 
 | Part | Local files | Hosting |
@@ -33,6 +35,12 @@ guide to upload it and rebuild the hosted container. The archive excludes secret
 modes log into the same KoL account and can repeatedly replace each other's sessions.
 
 ## Useful starting points
+
+New registration uses KMail to **kHub (#3888760)**: `REGISTER`. The bot creates and links the account, then sends a generated
+password. `CREDENTIALS` from the linked KoL player issues a new password. This needs
+the matching bot/website update and queued migration `019`; see the database setup.
+Existing email accounts retain their login/history and can use KMail recovery once linked.
+New accounts do not require SMTP.
 
 - [Outstanding work](ROADMAP.md)
 - [Database setup](supabase/README.md)

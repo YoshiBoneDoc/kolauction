@@ -14,7 +14,8 @@ export function mapAuction(row, bidRows) {
         id: row.id,
         auctionNumber: row.auction_number == null ? null : String(row.auction_number),
         sellerId: row.seller_id,
-        owner: row.seller_username,
+        owner: row.usernames_visible === false ? 'Seller' : row.seller_username,
+        usernamesVisible: row.usernames_visible !== false,
         item: row.item,
         quantity: Number(row.quantity),
         minBidMeat: Number(row.min_bid_meat),
@@ -36,7 +37,13 @@ export function mapAuction(row, bidRows) {
         highestBidder: latestBid?.bidder || row.highest_bidder_username,
         status: row.status || 'active',
         winnerId: row.winner_id,
-        winner: row.winner_username,
+        publicWinner: row.winner_public === true,
+        winner: row.usernames_visible === false && row.has_winner ? 'Winner' : row.winner_username,
+        hasWinner: row.has_winner,
+        ownTradeReportWithdrawn: row.own_trade_report_withdrawn === true,
+        ownTradeReport: row.own_trade_report || null,
+        tradeReported: row.trade_reported === true,
+        settlementContacts: row.usernames_visible === false ? null : row.settlement_contacts || null,
         finalPrice: row.final_price == null ? null : Number(row.final_price),
         finalizedAt: row.finalized_at,
         sellerConfirmedAt: row.seller_confirmed_at,
@@ -69,7 +76,14 @@ export function createAuctionService(client) {
                 p_view: view, p_id: id, p_search: search, p_status: status, p_sort: sort, p_page: page,
             });
             if (readError) throw databaseError(readError);
-            return { auctions: data.rows.map((row) => mapAuction(row, data.bids)), total: Number(data.total) };
+            if (data?.privacy_version !== 1) throw new Error('Auctions are temporarily unavailable while a privacy update is being completed. Please try again later.');
+            return { auctions: data.rows.map((row) => mapAuction(row, data.bids)), total: Number(data.total), seller: data.seller || null };
+        },
+        async pendingTrades(page = 1) {
+            const { data, error } = await requireClient().rpc('read_pending_trades', { p_page: page });
+            if (error) throw databaseError(error);
+            if (data?.privacy_version !== 1) throw new Error('Private trade details are temporarily unavailable.');
+            return { auctions: data.rows.map((row) => mapAuction(row, [])), total: Number(data.total) };
         },
         async create(auction) {
             const { data, error } = await requireClient().rpc('create_auction', {
@@ -80,6 +94,7 @@ export function createAuctionService(client) {
                 p_image: auction.image || null,
                 p_instant_purchase_price: auction.instantPurchasePrice ?? null,
                 p_item_id: auction.itemId ?? null,
+                p_escrow_mode: auction.escrowMode !== false,
             });
             if (error) throw databaseError(error);
             return data;
@@ -97,8 +112,8 @@ export function createAuctionService(client) {
             if (error) throw databaseError(error);
         },
         async bid(auctionId, amount) {
-            if (!Number.isSafeInteger(amount) || amount < 1 || amount > 20_000_000_000) {
-                throw new Error('Bid must be a whole number between 1 and 20 billion Meat.');
+            if (!Number.isSafeInteger(amount) || amount < 1) {
+                throw new Error('Bid must be a positive whole Meat amount that can be represented exactly.');
             }
             const { error } = await requireClient().rpc('place_bid', { p_auction_id: auctionId, p_amount: amount });
             if (error) throw databaseError(error);

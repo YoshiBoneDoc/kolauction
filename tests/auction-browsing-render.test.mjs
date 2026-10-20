@@ -62,7 +62,7 @@ test('direct detail routes expose bid fields only to eligible signed-in bidders'
     assert.match(render('/auction/active', auctions), /Log in to bid/);
     const eligible = render('/auction/active', auctions, {id: 'buyer'});
     assert.match(eligible, /Your bid \(Meat\)/);
-    assert.match(eligible, /inputMode="numeric"/);
+    assert.match(eligible, /inputMode="decimal"/);
     assert.doesNotMatch(render('/auction/active', auctions, {id: 'seller'}), /Your bid \(Meat\)/);
     assert.doesNotMatch(render('/auction/expired', auctions, {id: 'buyer'}), /Your bid \(Meat\)/);
 });
@@ -70,37 +70,34 @@ test('direct detail routes expose bid fields only to eligible signed-in bidders'
 test('instant purchase controls appear for eligible buyers including the highest bidder, but never the seller or expired listings', () => {
     const listing = { ...auctions[0], instantPurchasePrice: 1000, highestBidderId: 'buyer' };
     const buyer = render('/auction/active', [listing], {id: 'buyer'});
-    assert.match(buyer, /Purchase for 1,000 Meat/);
+    assert.match(buyer, /Buy Now/);
     assert.match(buyer, /You are the highest bidder/);
     const seller = render('/auction/active', [listing], {id: 'seller'});
-    assert.doesNotMatch(seller, /<button[^>]*>Purchase for/);
-    assert.match(seller, /Your optional instant purchase offer/);
-    assert.match(render('/auction/active', [listing]), /Log in to purchase/);
-    assert.doesNotMatch(render('/auction/active', [{ ...listing, endTime: 1 }], {id: 'buyer'}), /Purchase for 1,000 Meat/);
-    assert.doesNotMatch(render('/auction/active', auctions, {id: 'buyer'}), /Instant Purchase Price/);
+    assert.doesNotMatch(seller, /<button[^>]*>Buy Now/);
+    assert.match(seller, /Your optional buyout offer/);
+    assert.match(render('/auction/active', [listing]), /Log in to buy/);
+    assert.doesNotMatch(render('/auction/active', [{ ...listing, endTime: 1 }], {id: 'buyer'}), /Buy Now/);
+    assert.doesNotMatch(render('/auction/active', auctions, {id: 'buyer'}), /Buyout Price/);
 });
 
 test('listing form labels instant purchase optional and homepage shows its amount', () => {
-    assert.match(render('/auction-item', auctions, {id: 'seller'}), /Instant Purchase Price \(Meat, optional\)/);
-    assert.match(render('/', [{ ...auctions[0], instantPurchasePrice: 1000 }]), /Instant purchase: 1,000 Meat/);
+    assert.match(render('/auction-item', auctions, {id: 'seller'}), /Set Buyout Price \(optional\)/);
+    assert.match(render('/', [{ ...auctions[0], instantPurchasePrice: 1000 }]), /Buyout Price: 1k/);
 });
 
-test('empty item search renders a bounded dropdown rather than the entire catalog', () => {
+test('empty item search shows a typing hint without a catalog dropdown', () => {
     const html = render('/auction-item', auctions, {id: 'seller'});
-    const picker = html.match(/<select id="item"[\s\S]*?<\/select>/)?.[0];
-    assert.ok(picker);
-    assert.equal((picker.match(/<option\b/g) || []).length, 101);
-    assert.match(html, /Showing the first 100 of/);
-    assert.match(html, /Keep typing to narrow the list/);
+    assert.doesNotMatch(html, /<select id="item"|Showing the first 100 of|No items match your search/);
+    assert.match(html, /Start typing an item name…/);
 });
 
 test('instant purchase outcome retains pending settlement and hides further purchase controls', () => {
     const listing = { ...auctions[0], status: 'awaiting_trade', instantPurchasePrice: 1000, instantPurchasedAt: '2026-10-19T12:00:00Z', finalPrice: 1000, winnerId: 'buyer', winner: 'Buyer' };
     const html = render('/auction/active', [listing], {id: 'buyer'});
-    assert.match(html, /Instant purchase accepted for 1,000 Meat/);
-    assert.match(html, /Awaiting trade/);
+    assert.match(html, /Buyout accepted for 1,000 Meat/);
+    assert.match(html, /Awaiting settlement/);
     assert.doesNotMatch(html, /Trade completed/);
-    assert.doesNotMatch(html, /Purchase for 1,000 Meat/);
+    assert.doesNotMatch(html, /Buy Now/);
 });
 
 test('escrow auctions show one BID command and the optional instant price beside the current bid', () => {
@@ -110,16 +107,16 @@ test('escrow auctions show one BID command and the optional instant price beside
     assert.doesNotMatch(html, /BUY 1001/);
     assert.equal((html.match(/BID 1001/g) || []).length, 1);
     assert.match(html, /Use the same BID command. Any excess Meat is returned/);
-    assert.ok(html.indexOf('Current Bid') < html.indexOf('Instant Purchase Price'));
-    assert.ok(html.indexOf('Instant Purchase Price') < html.indexOf('Sold by:'));
+    assert.ok(html.indexOf('Current Bid') < html.indexOf('Buyout Price'));
+    assert.ok(html.indexOf('Buyout Price') < html.indexOf('Sold by:'));
     assert.doesNotMatch(html, /(?:BID|BUY) active/);
     assert.match(html, /Auction #1001/);
     assert.match(html, /kHub \(#3888760\)/);
-    assert.doesNotMatch(html, /<button[^>]*>Purchase for/);
+    assert.doesNotMatch(html, /<button[^>]*>Buy Now/);
     assert.doesNotMatch(html, /Your bid \(Meat\)/);
     const withoutInstant = render('/auction/active', [{ ...listing, instantPurchasePrice: null }], {id: 'buyer'});
     assert.equal((withoutInstant.match(/BID 1001/g) || []).length, 1);
-    assert.doesNotMatch(withoutInstant, /Instant Purchase Price/);
+    assert.doesNotMatch(withoutInstant, /Buyout Price/);
 });
 
 test('pending item deposits display seller deposit instructions without internal item IDs', () => {
@@ -139,4 +136,25 @@ test('escrow settlement has no manual confirmation control and profile separates
     const profile=render('/profile',[{...listing,status:'pending_escrow'}],{id:'seller'});
     assert.match(profile,/Awaiting item deposit/);
     assert.match(profile,/Get verification code/);
+});
+
+
+test('auction lists abbreviate prices while individual details keep exact amounts', () => {
+    const listing={...auctions[0],currentBid:59600000,minBidMeat:1500,instantPurchasePrice:6200000000};
+    const cards=render('/auctions',[listing],{id:'buyer'});
+    assert.match(cards,/Minimum bid: 1.5k Meat/);
+    assert.match(cards,/>59.6m Meat<\/p>/);
+    assert.match(cards,/Buyout Price: 6.2b<\/p>/);
+    assert.match(cards,/>Buy Now<\/button>/);
+    assert.doesNotMatch(cards,/For the entire listing|A bid reaching this amount|Instant Purchase Price/);
+    const escrowCards=render('/auctions',[{...listing,escrowMode:true}],{id:'buyer'});
+    assert.match(escrowCards,/title="View KMail buyout instructions"[^>]*>Buy Now<\/a>/);
+    assert.doesNotMatch(escrowCards,/Use the same BID command/);
+    const details=render('/auction/active',[listing],{id:'buyer'});
+    assert.match(details,/>59,600,000 Meat<\/p>/);
+    assert.match(details,/>6,200,000,000 Meat<\/p>/);
+    assert.match(details,/>Buy Now<\/button>/);
+    const home=render('/',[listing]);
+    assert.match(home,/>59.6m Meat<\/p>/);
+    assert.match(home,/Buyout Price: 6.2b/);
 });

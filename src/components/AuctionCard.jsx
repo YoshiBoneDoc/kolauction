@@ -1,3 +1,4 @@
+import WinnerLink from './WinnerLink';
 import { useContext, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Link, useLocation } from 'react-router-dom';
@@ -6,6 +7,8 @@ import { timeRemaining } from '../lib/auctionBrowsing';
 import AuctionBidForm from './AuctionBidForm';
 import { UserContext } from '../context/UserContext';
 import InstantPurchaseAction from './InstantPurchaseAction';
+import SellerLink from './SellerLink';
+import { formatCompactMeat } from '../lib/formatMeat';
 
 export default function AuctionCard({ auction, now }) {
     const [showBid, setShowBid] = useState(false);
@@ -21,10 +24,12 @@ export default function AuctionCard({ auction, now }) {
                 <h2 className="w-full break-words text-xl font-bold text-[#14248A]">{auction.item} <span className="text-[#5365AB]">×{auction.quantity.toLocaleString('en-US')}</span></h2>
             </Link>
             {auction.auctionNumber && <p className="mt-2 text-center text-xs text-gray-600">Auction #{auction.auctionNumber}</p>}
-            <p className="mt-3 text-center text-sm text-gray-600">Minimum bid: {auction.minBidMeat.toLocaleString('en-US')} Meat</p>
+            <p className="mt-2 break-words text-center text-sm">Sold by <SellerLink auction={auction} /></p>
+            <p className="mt-1 text-center text-xs text-gray-600">{auction.escrowMode ? 'Escrow' : 'Direct settlement'}</p>
+            <p className="mt-3 text-center text-sm text-gray-600">Minimum bid: {formatCompactMeat(auction.minBidMeat)} Meat</p>
             <div className="my-3 text-center">
-                <p className="text-sm text-gray-600">{active ? 'Current bid' : result.winnerId ? 'Final price' : 'Last bid'}</p>
-                <p className="break-words text-xl font-bold text-[#112D4E]">{(result.finalPrice ?? auction.currentBid) ? `${(result.finalPrice ?? auction.currentBid).toLocaleString('en-US')} Meat` : 'No bids yet'}</p>
+                <p className="text-sm text-gray-600">{active ? 'Current bid' : result.hasWinner ? 'Final price' : 'Last bid'}</p>
+                <p className="break-words text-xl font-bold text-[#112D4E]">{(result.finalPrice ?? auction.currentBid) ? `${formatCompactMeat(result.finalPrice ?? auction.currentBid)} Meat` : 'No bids yet'}</p>
             </div>
             {active ? (
                 <p className={`text-center text-sm ${auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-600'}`}>
@@ -33,11 +38,11 @@ export default function AuctionCard({ auction, now }) {
             ) : (
                 <div className="text-center text-sm">
                     <p className="font-semibold">{result.label}</p>
-                    {result.winnerId && <p className="break-words">Winner: {result.winner}</p>}
+                    {result.hasWinner && <p className="break-words">Winner: <WinnerLink auction={auction} /></p>}
                 </div>
             )}
             <div className="mt-auto pt-4">
-                {active && <InstantPurchaseAction auction={auction} />}
+                {active && <InstantPurchaseAction auction={auction} compact />}
                 {active && currentUser?.id === auction.sellerId && <p className="text-center text-sm text-gray-600">This is your listing.</p>}
                 {active && currentUser?.id !== auction.sellerId && (showBid ? (
                     <>

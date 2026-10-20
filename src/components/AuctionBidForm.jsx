@@ -3,8 +3,9 @@ import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import { AuctionsContext } from '../context/AuctionsContext';
 import { UserContext } from '../context/UserContext';
-import { parseAuctionAmount } from '../lib/auctionInputs';
+import { parseMeatAmount, normalizeAuctionAmount } from '../lib/auctionInputs';
 import KmailInstructions from './KmailInstructions';
+import SettlementTerms from './SettlementTerms';
 
 export default function AuctionBidForm({ auction }) {
     const { currentUser } = useContext(UserContext);
@@ -20,14 +21,14 @@ export default function AuctionBidForm({ auction }) {
         event.preventDefault();
         if (pending) return;
         setMessage('');
-        const bid = parseAuctionAmount(amount, 20000000000);
+        const bid = parseMeatAmount(amount);
         if (bid === null || bid < minimum) {
-            setError(`Enter a whole-number bid of at least ${minimum.toLocaleString('en-US')} Meat, up to 20 billion.`);
+            setError(`Enter a bid of at least ${minimum.toLocaleString('en-US')} Meat.`);
             return;
         }
         const instant = auction.instantPurchasePrice && bid >= auction.instantPurchasePrice;
         const prompt = instant
-            ? `Accept the instant purchase price of ${auction.instantPurchasePrice.toLocaleString('en-US')} Meat for the entire listing (${auction.quantity.toLocaleString('en-US')} × ${auction.item})? Bidding ends immediately at that price. The in-game exchange must still be completed.`
+            ? `Accept the buyout price of ${auction.instantPurchasePrice.toLocaleString('en-US')} Meat for the entire listing (${auction.quantity.toLocaleString('en-US')} × ${auction.item})? Bidding ends immediately at that price. The in-game exchange must still be completed.`
             : `Submit a bid of ${bid.toLocaleString('en-US')} Meat for ${auction.item}?`;
         if (!window.confirm(prompt)) return;
         setPending(true);
@@ -36,7 +37,7 @@ export default function AuctionBidForm({ auction }) {
             if (instant) await purchaseAuction(auction.id);
             else await placeBid(auction.id, bid);
             setAmount('');
-            setMessage(instant ? 'Instant purchase accepted. Bidding is closed; the trade is awaiting exchange.' : 'Your bid was saved.');
+            setMessage(instant ? 'Buyout accepted. Bidding is closed; the trade is awaiting exchange.' : 'Your bid was saved.');
         } catch (failure) {
             setError(failure.message);
         } finally {
@@ -51,14 +52,16 @@ export default function AuctionBidForm({ auction }) {
 
     return (
         <form onSubmit={submit} className="w-full space-y-2 text-left" aria-label={`Bid on ${auction.item}`}>
+            <div className="text-xs text-gray-700"><SettlementTerms escrowMode={false} /></div>
             <label htmlFor={inputId} className="block text-sm font-semibold">Your bid (Meat)</label>
-            <input id={inputId} type="text" inputMode="numeric" autoComplete="off"
+            <input id={inputId} type="text" inputMode="decimal" autoComplete="off"
                 value={amount} onChange={(event) => { setAmount(event.target.value); setError(''); setMessage(''); }}
+                onBlur={() => setAmount(value => normalizeAuctionAmount(value, { meat: true }))}
                 placeholder={minimum.toLocaleString('en-US')} disabled={pending}
                 aria-invalid={Boolean(error)} aria-describedby={`${inputId}-help${error ? ` ${inputId}-error` : ''}`}
                 className="min-h-11 w-full min-w-0 rounded border border-gray-400 bg-white p-3 text-base text-gray-900" />
             <p id={`${inputId}-help`} className="text-xs text-gray-600">Minimum: {minimum.toLocaleString('en-US')} Meat. Full amounts or k/m/b shorthand.</p>
-            {auction.instantPurchasePrice && <p className="text-xs text-gray-700">A bid of {auction.instantPurchasePrice.toLocaleString('en-US')} Meat or more accepts the instant purchase price and ends bidding at that price.</p>}
+            {auction.instantPurchasePrice && <p className="text-xs text-gray-700">A bid of {auction.instantPurchasePrice.toLocaleString('en-US')} Meat or more accepts the buyout price and ends bidding at that price.</p>}
             <button type="submit" disabled={pending} className="min-h-11 w-full rounded bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
                 {pending ? 'Submitting…' : 'Place Bid'}
             </button>

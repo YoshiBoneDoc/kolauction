@@ -73,3 +73,46 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* Wall of Shame: plaster wall, wooden frames, watercolor paper and brass labels. */
+.shame-page {
+  min-height: 100vh;
+  background: #eee9df;
+  color: #42382e;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='paper'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%2389755a' opacity='.08' filter='url(%23paper)' d='M0 0h180v180H0z'/%3E%3C/svg%3E");
+}
+.shame-gallery { max-width: 1152px; margin: auto; padding: 32px 24px 48px; }
+.shame-heading { text-align: center; max-width: 650px; margin: 0 auto 32px; }
+.shame-eyebrow { text-transform: uppercase; letter-spacing: .24em; font-size: 11px; font-weight: 600; color: #756249; }
+.shame-heading h1 { font-family: Georgia, 'Times New Roman', serif; font-weight: 400; font-size: clamp(2.8rem, 7vw, 5rem); margin: 16px 0; letter-spacing: -.045em; color: #493427; }
+.shame-heading > p:last-of-type { font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-size: 18px; color: #736351; }
+.shame-divider { display: block; margin-top: 20px; color: #93734c; }
+.shame-wall { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 64px 54px; padding: 32px 12px 48px; align-items: start; }
+.shame-exhibit { min-width: 0; padding-top: 22px; position: relative; }
+.shame-frame { position: relative; padding: 16px; border: 4px solid #4d3422; background: linear-gradient(110deg, #825c3a, #b18751 25%, #6b452b 65%, #966c40); box-shadow: inset 0 0 0 2px #c7a574, inset 0 0 0 5px #593a24, 5px 9px 12px #49342738, 0 2px 2px #49342740; }
+.shame-frame::before { content: ''; position: absolute; width: 34%; height: 45px; left: 33%; top: -27px; border: 1px solid #826f59; transform: rotate(0deg); clip-path: polygon(0 100%, 50% 0, 100% 100%, 98% 100%, 50% 4%, 2% 100%); background: #826f59; z-index: 0; }
+.shame-frame::after { content: ''; position: absolute; top: -29px; left: calc(50% - 3px); width: 6px; height: 6px; border-radius: 50%; background: #5e5143; box-shadow: 1px 2px 2px #49342750; }
+.shame-mat { position: relative; padding: 15px; background: #f8f4e9; box-shadow: inset 1px 2px 4px #46302140; }
+.shame-mat img { width: 100%; height: auto; aspect-ratio: 1; display: block; object-fit: cover; background: #eee7d8; box-shadow: 0 0 0 1px #b8ab95; }
+.shame-exhibit:nth-child(3n + 2) .shame-frame { transform: rotate(1.5deg); }
+.shame-exhibit:nth-child(3n + 3) .shame-frame { transform: rotate(-1deg); }
+.shame-nameplate { position: relative; margin: 23px 9px 0; padding: 15px 17px; text-align: center; background: linear-gradient(110deg, #e1cfaa, #f2e7cb 45%, #d9c49d); border: 1px solid #ad9365; box-shadow: 1px 3px 5px #4934271f, inset 0 0 0 3px #ffffff25; }
+.shame-nameplate::before, .shame-nameplate::after { content: '·'; position: absolute; top: 4px; color: #8e774f; font-weight: bold; }
+.shame-nameplate::before { left: 7px; }.shame-nameplate::after { right: 7px; }
+.shame-status { margin: 0 0 5px; font-size: 10px; font-weight: bold; letter-spacing: .13em; text-transform: uppercase; color: #795340; }
+.shame-nameplate h2 { margin: 0; font-family: Georgia, 'Times New Roman', serif; font-size: 22px; overflow-wrap: anywhere; }
+.shame-player { margin: 4px 0 12px; font-size: 12px; color: #6b5943; }
+.shame-reason { margin: 0; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-line; }
+.shame-dates { margin: 12px 0 0; font-size: 11px; color: #6b5943; }
+.shame-empty { text-align: center; padding: 16px 0 40px; }
+.shame-empty-frame { width: 240px; margin: 0 auto 30px; opacity: .85; }
+.shame-empty h2 { font-family: Georgia, 'Times New Roman', serif; font-weight: 400; font-size: 24px; }
+.shame-empty > p, .shame-notice { color: #736351; }
+.shame-notice { text-align: center; padding: 70px 20px; }
+.shame-page button { background: #faf5e8; color: #493427; border: 1px solid #bba687; min-height: 44px; }
+.shame-page button:disabled { opacity: .45; cursor: default; }
+.shame-pagination { display: flex; gap: 20px; align-items: center; justify-content: center; padding-bottom: 30px; }
+.shame-footer { border-top: 1px solid #c9bcaa; text-align: center; color: #736351; font-size: 12px; line-height: 1.8; padding: 20px 0 0; }
+.shame-footer p { margin: 4px 0; }.shame-footer a { color: #744d34; text-decoration: underline; }
+@media (max-width: 900px) { .shame-wall { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 50px 32px; } }
+@media (max-width: 560px) { .shame-wall { grid-template-columns: minmax(0, 320px); justify-content: center; padding: 24px 8px 40px; }.shame-gallery { padding: 24px 20px 36px; }.shame-heading { margin-bottom: 16px; } }

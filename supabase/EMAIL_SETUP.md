@@ -1,3 +1,9 @@
+> **Current registration:** send `REGISTER` by normal KMail to kHub (#3888760),
+> with no attachments. Your username is your verified KoL character name;
+> custom usernames are not allowed. `CREDENTIALS` requests a fresh password.
+> New accounts need no SMTP. See [current account setup](README.md#current-account-setup-kmail-registration).
+> The email setup instructions below describe the previous email-based flow.
+
 # Account email and recovery setup
 
 Implementation date: October 19, 2026.

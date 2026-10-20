@@ -39,7 +39,7 @@ test('creation sends listing fields only; identity, time, ID, and bid state are 
         return { data: 'server-id', error: null };
     } });
     assert.equal(await service.create({ item: 'Test item', quantity: 2, minBidMeat: 50, auctionTime: '24', owner: 'Spoof', endTime: 1, currentBid: 99 }), 'server-id');
-    assert.deepEqual(sent, { p_item: 'Test item', p_quantity: 2, p_min_bid_meat: 50, p_duration_hours: 24, p_image: null, p_instant_purchase_price: null, p_item_id: null });
+    assert.deepEqual(sent, { p_item: 'Test item', p_quantity: 2, p_min_bid_meat: 50, p_duration_hours: 24, p_image: null, p_instant_purchase_price: null, p_item_id: null, p_escrow_mode: true });
 });
 
 test('database bid rejection propagates rather than changing local state', async () => {
@@ -53,8 +53,8 @@ test('database bid rejection propagates rather than changing local state', async
 
 test('invalid bid values never reach the API', async () => {
     const service = createAuctionService(null);
-    for (const amount of [0, -1, 1.5, NaN, 20_000_000_001]) {
-        await assert.rejects(service.bid(row.id, amount), /whole number/);
+    for (const amount of [0, -1, 1.5, NaN, Number.MAX_SAFE_INTEGER + 1]) {
+        await assert.rejects(service.bid(row.id, amount), /whole Meat/);
     }
 });
 
@@ -62,7 +62,7 @@ test('loads a filtered page without downloading all auctions or bid history', as
     const requested = [];
     const service = createAuctionService({ async rpc(name, params) {
         requested.push([name, params]);
-        return { error: null, data: name === 'read_auction_page' ? { rows: [{...row,bid_count:12}], bids: [], total: 100 } : null };
+        return { error: null, data: name === 'read_auction_page' ? { privacy_version: 1, rows: [{...row,bid_count:12}], bids: [], total: 100 } : null };
     } });
     const result = await service.load({search:'hat',status:'all',sort:'price-desc',page:2});
     assert.equal(result.auctions.length, 1);
@@ -83,7 +83,7 @@ test('missing migration produces setup guidance rather than an empty listing', a
 test('loads finalize expired auctions before reading rows', async () => {
     const calls = [];
     const service = createAuctionService({
-        async rpc(name) { calls.push(name); return { error: null, data: {rows:[],bids:[],total:0} }; },
+        async rpc(name) { calls.push(name); return { error: null, data: {privacy_version:1,rows:[],bids:[],total:0} }; },
     });
     await service.load();
     assert.deepEqual(calls, ['finalize_expired_auctions', 'read_auction_page']);
@@ -138,4 +138,12 @@ test('instant purchase sends only listing ID and preserves server rejection mess
     } });
     await assert.rejects(service.purchase(row.id), /has ended/);
     assert.deepEqual(calls, [['purchase_auction', { p_auction_id: row.id }]]);
+});
+
+
+test('website bids above the former 20-billion limit retain their exact amount', async () => {
+    const calls=[];
+    const service=createAuctionService({async rpc(name,params){calls.push([name,params]);return {error:null};}});
+    await service.bid(row.id,50000000001);
+    assert.deepEqual(calls,[['place_bid',{p_auction_id:row.id,p_amount:50000000001}]]);
 });

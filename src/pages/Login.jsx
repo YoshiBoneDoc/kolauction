@@ -43,19 +43,20 @@ const Login = () => {
                 {errorMessage && (
                     <p role="alert" className="text-red-500 text-sm mb-4">{errorMessage}</p>
                 )}
-                <p className="text-gray-600 text-sm mb-4">Use your registered email address to log in. Your KHub username remains your display name.</p>
+                <p className="text-gray-600 text-sm mb-4">Use your kHub username (KH_ followed by your KoL name) and your kHub password.</p>
 
                 <div className="mb-4">
                     <label
                         htmlFor="email"
                         className="block text-gray-700 font-bold mb-2"
                     >
-                        Email
+                        kHub Username
                     </label>
                     <input
-                        type="email"
+                        type="text"
                         id="email"
-                        autoComplete="email"
+                        autoComplete="username"
+                        placeholder="KH_Your KoL name"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         className="w-full p-2 border rounded"

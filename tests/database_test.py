@@ -4,11 +4,19 @@ Run: python3 tests/database_test.py (requires PostgreSQL binaries).
 """
 import concurrent.futures
 import json
+import re
 from pathlib import Path
 import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
+
+def migration_sql(name):
+    matches=[p for p in [ROOT/'supabase/migrations'/name,ROOT/'supabase/migrations/queue'/name] if p.is_file()]
+    if len(matches)!=1:
+        raise ValueError(f'Expected one applied or queued migration named {name}; found {len(matches)}')
+    return matches[0].read_text()
+
 BINDIR = Path(subprocess.check_output(['pg_config', '--bindir'], text=True).strip())
 SELLER = '00000000-0000-0000-0000-000000000001'
 BUYER = '00000000-0000-0000-0000-000000000002'
@@ -53,12 +61,12 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
             grant execute on function auth.uid() to anon, authenticated;
         ''')
         for name in ['202610180001_create_profiles.sql', '202610180002_create_auctions_and_bids.sql']:
-            sql((ROOT / 'supabase' / 'migrations' / name).read_text())
+            sql(migration_sql(name))
         for uid, name in [(SELLER, 'Seller'), (BUYER, 'Buyer'), (OTHER, 'Other')]:
             metadata = json.dumps({'khub_username': name})
             sql(f"insert into auth.users (id, raw_user_meta_data, email) values ('{uid}', '{metadata}', '{name.lower()}@example.com');")
 
-        sql((ROOT / 'supabase/migrations/202610190002_registration_conflicts.sql').read_text())
+        sql(migration_sql('202610190002_registration_conflicts.sql'))
         # Both confirmed and unconfirmed accounts reserve their email addresses.
         sql(f"update auth.users set email_confirmed_at=now() where id='{SELLER}';")
         for role in ['anon', 'authenticated']:
@@ -115,7 +123,7 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         assert sql(f"select count(*) from public.bids where bidder_id='{BUYER}';", role='anon') != '0'
         # Upgrade a database that already has live and expired auctions/bids.
         previous_winner = sql(f"select bidder_username from public.bids where auction_id='{race}' order by amount desc limit 1;")
-        sql((ROOT / 'supabase/migrations/202610190001_auction_lifecycle.sql').read_text())
+        sql(migration_sql('202610190001_auction_lifecycle.sql'))
         assert sql(f"select status from public.auctions where id='{race}';") == 'awaiting_trade'
         assert sql(f"select winner_username from public.auctions where id='{race}';") == previous_winner
         sql(f"select public.finalize_auction('{race}');", BUYER, 'authenticated', error='permission denied')
@@ -192,7 +200,7 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         assert sql(f"select status from public.auctions where id='{both}';") == 'completed'
 
         # Upgrade a database with existing auction outcomes and bids.
-        sql((ROOT / 'supabase/migrations/202610190003_instant_purchase.sql').read_text())
+        sql(migration_sql('202610190003_instant_purchase.sql'))
         assert sql('select count(*) from public.auctions where instant_purchase_price is not null;') == '0'
         assert sql("select count(*) from pg_proc where proname='create_auction' and pronamespace='public'::regnamespace;") == '1'
         legacy = sql(create, SELLER, 'authenticated')
@@ -294,7 +302,7 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         assert sql(f"select count(*) from public.bids where auction_id='{locked}';") == '0'
 
         # New KMail escrow workflow. The stub service role represents the bot.
-        sql((ROOT / 'supabase/migrations/202610190004_kmail_escrow.sql').read_text())
+        sql(migration_sql('202610190004_kmail_escrow.sql'))
         catalog_json = json.dumps([{'id':1,'name':'escrow item'}])
         sql(f"select public.bot_sync_catalog('{catalog_json}');", role='service_role')
         def mail(mid, sid, command, meat=0, items=None):
@@ -431,7 +439,7 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         assert json.loads(sql('select public.bot_liabilities();',role='service_role'))=={'meat':'0','items':{}}
 
         # Page reads must preserve RLS while limiting transfer to requested records.
-        sql((ROOT / 'supabase/migrations/202610190005_auction_page_reads.sql').read_text())
+        sql(migration_sql('202610190005_auction_page_reads.sql'))
         def read_page(view='browse', uid=None, role='anon', **options):
             args=[f"p_view => '{view}'"]
             for key,value in options.items():
@@ -471,7 +479,7 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         old_id=sql("select id from khub_bot.deliveries where state='sent' order by created_at,id limit 1;")
         sql(f"update khub_bot.deliveries set state='unknown' where id='{old_id}';")
         financial_before=sql('select json_agg(json_build_array(id,state,meat,item_id,quantity,attempt,evidence) order by id) from khub_bot.deliveries;')
-        sql((ROOT / 'supabase/migrations/202610190006_friendly_bot_messages.sql').read_text())
+        sql(migration_sql('202610190006_friendly_bot_messages.sql'))
         assert sql('select json_agg(json_build_array(id,state,meat,item_id,quantity,attempt,evidence) order by id) from khub_bot.deliveries;')==financial_before
         old=json.loads(sql(f"select public.bot_lookup_delivery('{old_id}');",role='service_role'))
         assert old['reference_marker']=='[kHub delivery '+old_id+']' and old['display_message'] is None
@@ -530,7 +538,7 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         assert sql(f"select status from public.auctions where id='{pretty_lot}';")=='completed'
         assert json.loads(sql('select public.bot_liabilities();',role='service_role'))=={'meat':'0','items':{}}
         # Short auction commands resolve server-side to the same locked UUID row.
-        sql((ROOT / 'supabase/migrations/202610190007_short_auction_commands.sql').read_text())
+        sql(migration_sql('202610190007_short_auction_commands.sql'))
         short_lot=escrow_create(1000)
         number=sql(f"select auction_number from public.auctions where id='{short_lot}';")
         short_deposit=mail(3001,777,{'type':'list','auction_number':number},items=[{'id':1,'quantity':2}])
@@ -560,7 +568,7 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         for role in ['anon','authenticated']:
             ingest(mail(3999,888,{'type':'bid','auction_number':number},meat=100),role=role,error='permission denied')
         # Gift donations get one durable thank-you and no auction/asset obligations.
-        sql((ROOT / 'supabase/migrations/202610190008_donation_acknowledgments.sql').read_text())
+        sql(migration_sql('202610190008_donation_acknowledgments.sql'))
         donation=mail(4000,777,{'type':'donation'})
         donation['raw']={'id':'4000','type':'giftshop','message':'BUY '+short_lot+' with a wrapped gift'}
         def ingest_donation(payload=donation,role='service_role',error=None):
@@ -584,7 +592,7 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         ingest_donation({**donation,'sender_name':'changed sender'},error='payload changed')
         for role in ['anon','authenticated']:
             ingest_donation(role=role,error='permission denied')
-        sql((ROOT / 'supabase/migrations/202610190009_normal_kmail_donations.sql').read_text())
+        sql(migration_sql('202610190009_normal_kmail_donations.sql'))
         assert ingest_donation()=='duplicate'  # Existing gift acknowledgments survive upgrade.
         normal_donation=mail(5000,888,{'type':'donation'},meat=1234,items=[{'id':1,'quantity':2}])
         normal_donation['raw']={'id':'5000','type':'normal','message':'DONATE'}
@@ -620,7 +628,7 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         assert ingest_donation(legacy_donation)=='accepted'
         legacy=json.loads(sql('select public.bot_claim_delivery(2);',role='service_role'))
         sql(f"select public.bot_ack_delivery('{legacy['id']}','{legacy['attempt']}',false,'fixture uncertain send');",role='service_role')
-        sql((ROOT / 'supabase/migrations/202610190010_donation_message_style.sql').read_text())
+        sql(migration_sql('202610190010_donation_message_style.sql'))
         sql(f"select public.bot_reconcile_delivery('{legacy['id']}',false,'Verified fixture request rejected and assets never left.');",role='service_role')
         retry=json.loads(sql('select public.bot_claim_delivery(2);',role='service_role'))
         assert retry['display_message']==legacy['display_message'] and retry['display_footer'] is None
@@ -638,7 +646,7 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         assert all(retry[key]==styled[key] for key in ['display_message','display_footer','reference_marker'])
         sql(f"select public.bot_ack_delivery('{retry['id']}','{retry['attempt']}',true,'fixture styled retry sent');",role='service_role')
         # The wording-only upgrade preserves historical messages and updates new donations.
-        sql((ROOT / 'supabase/migrations/202610190011_donation_message_wording.sql').read_text())
+        sql(migration_sql('202610190011_donation_message_wording.sql'))
         saved=json.loads(sql(f"select public.bot_lookup_delivery('{styled['id']}');",role='service_role'))
         assert saved['display_message']==styled['display_message'] and saved['display_footer']==styled['display_footer']
         revised_donation={**normal_donation,'id':'5012','raw':{'id':'5012','type':'normal','message':'DONATE'}}
@@ -648,7 +656,7 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         assert revised['display_footer']=="\n*If this donation was sent in error, please KMail teres minor (#3552305) with the reference ID above."
         sql(f"select public.bot_ack_delivery('{revised['id']}','{revised['attempt']}',true,'fixture revised donation sent');",role='service_role')
         # Inbox retention and separately tracked manual-review notices.
-        sql((ROOT / 'supabase/migrations/202610190012_bot_mail_review.sql').read_text())
+        sql(migration_sql('202610190012_bot_mail_review.sql'))
         def cleanup(*ids,role='service_role'):
             return json.loads(sql("select public.bot_mail_cleanup(array["+','.join("'"+value+"'" for value in ids)+"]::text[]);",role=role))
         assert cleanup('5012','4000','5002','999999')==['5012'] # Gifts/unknown mail never deleted.
@@ -686,7 +694,7 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
             sql("select public.bot_mail_cleanup(array['5013']);",role=role,error='permission denied')
             sql('select public.bot_claim_review_notice();',role=role,error='permission denied')
         # Exact donation/fee closet accounting; existing auctions keep their terms.
-        sql((ROOT / 'supabase/migrations/202610190013_closet_income.sql').read_text())
+        sql(migration_sql('202610190013_closet_income.sql'))
         assert sql('select fee_bps from khub_bot.settings;')=='750'
         assert sql(f"select fee_bps from public.auctions where id='{private_lot}';")=='0'
         def drain_v2():
@@ -811,7 +819,7 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         frozen=json.loads(sql('select public.bot_claim_delivery(2);',role='service_role'))
         assert frozen['dedupe_key'].startswith('outbid:')
         sql(f"select public.bot_ack_delivery('{frozen['id']}','{frozen['attempt']}',false,'fixture send uncertain');",role='service_role')
-        sql((ROOT / 'supabase/migrations/202610190014_auction_message_layout.sql').read_text())
+        sql(migration_sql('202610190014_auction_message_layout.sql'))
         sql(f"select public.bot_reconcile_delivery('{frozen['id']}',false,'Verified old request rejected; no transfer occurred.');",role='service_role')
         retry=json.loads(sql('select public.bot_claim_delivery(2);',role='service_role'))
         assert retry['id']==frozen['id'] and retry['display_message']==frozen['display_message']
@@ -887,12 +895,12 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         ack_closet(old_closet,False)
         # Reporting also works on installations without the mail-policy migration.
         assert sql("select to_regclass('khub_bot.mail_policy_reviews') is null;")=='t'
-        sql((ROOT / 'supabase/migrations/202610190017_financial_reports.sql').read_text())
+        sql(migration_sql('202610190017_financial_reports.sql'))
         early_donations=json.loads(sql("select public.bot_financial_history('donations',0,100);",role='service_role'))['records']
         assert not ({'8000','8001'} & {r['mail_id'] for r in early_donations})
         assert {'8002','8003'} <= {r['mail_id'] for r in early_donations}
         early_stats=json.loads(sql('select public.bot_financial_stats();',role='service_role'))
-        sql((ROOT / 'supabase/migrations/202610190015_invalid_mail_refunds.sql').read_text())
+        sql(migration_sql('202610190015_invalid_mail_refunds.sql'))
         assert json.loads(sql('select public.bot_financial_stats();',role='service_role'))['donations']==early_stats['donations']
         assert sql("select state from khub_bot.closet_transfers where receipt_id='8000';")=='unknown'
         assert sql("select state from khub_bot.closet_transfers where receipt_id='8001';")=='cancelled'
@@ -940,8 +948,8 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
             sql("select public.bot_queue_previous_donation_refunds('{}');",role=role,error='permission denied')
             sql('select * from khub_bot.mail_policy_reviews;',role=role,error='permission denied')
             ingest(refund,role=role,error='permission denied')
-        sql((ROOT / 'supabase/migrations/202610190016_cancel_opened_package.sql').read_text())
-        sql((ROOT / 'supabase/migrations/202610190017_financial_reports.sql').read_text())
+        sql(migration_sql('202610190016_cancel_opened_package.sql'))
+        sql(migration_sql('202610190017_financial_reports.sql'))
         def financial_stats():
             return json.loads(sql('select public.bot_financial_stats();',role='service_role'))
         def financial_history(kind,offset=0,limit=100):
@@ -992,6 +1000,191 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         # Moving or withdrawing income cannot change historical accounting.
         moved_report=json.loads(sql("begin; update khub_bot.closet_transfers set state='moved' where state='pending'; select public.bot_financial_stats(); rollback;"))
         assert moved_report['sales']==sold_report['sales'] and moved_report['donations']==sold_report['donations']
+        # Cosmetic headings update all auction templates, preserving claimed retries.
+        ingest(mail(9200,999,{'type':'bid','auction_id':held_bid},meat=4000))
+        old_heading_delivery=json.loads(sql('select public.bot_claim_delivery(2);',role='service_role'))
+        assert re.search(r'\n-+\n',old_heading_delivery['display_message'])
+        sql(f"select public.bot_ack_delivery('{old_heading_delivery['id']}','{old_heading_delivery['attempt']}',false,'fixture send uncertain');",role='service_role')
+        def auction_templates():
+            return json.loads(sql("select json_object_agg(d.id,khub_bot.friendly_message(d)) from khub_bot.deliveries d "
+                "where d.auction_id is not null and (d.kind in ('sale_item','sale_meat','return_item') "
+                "or d.dedupe_key like any(array['activated:%','bid-accepted:%','outbid:%','excess:%']));"))
+        templates_before=auction_templates()
+        frozen_deliveries=sql('select json_agg(d order by id) from khub_bot.deliveries d;')
+        for _ in range(2):
+            sql(migration_sql('202610190018_plain_auction_headings.sql'))
+        assert sql('select json_agg(d order by id) from khub_bot.deliveries d;')==frozen_deliveries
+        assert auction_templates()=={key:re.sub(r'(\nAuction #[0-9]+)\n-+\n',r'\1\n',body) for key,body in templates_before.items()}
+        sql(f"select public.bot_reconcile_delivery('{old_heading_delivery['id']}',false,'Verified request rejected and assets never left.');",role='service_role')
+        old_heading_retry=json.loads(sql('select public.bot_claim_delivery(2);',role='service_role'))
+        assert old_heading_retry['id']==old_heading_delivery['id']
+        assert old_heading_retry['display_message']==old_heading_delivery['display_message']
+        sql(f"select public.bot_ack_delivery('{old_heading_retry['id']}','{old_heading_retry['attempt']}',true,'fixture old message delivered');",role='service_role')
+        plain_heading_deliveries=collect_messages()
+        assert plain_heading_deliveries
+        assert all(not re.search(r'\n-+\n',d['display_message']) for d in plain_heading_deliveries)
+        assert all('Auction #' in d['display_message'] for d in plain_heading_deliveries)
+        # Auth schema fields model Supabase's Admin API metadata contract. Account
+        # creation/password API transport and lost acknowledgments have JS tests.
+        sql("alter table auth.users add column raw_app_meta_data jsonb default '{}', add column banned_until timestamptz;")
+        sql(migration_sql('202610190019_kmail_accounts.sql'))
+        temp_password='Kh9!'+'A'*30
+        def account_mail(mid,sid=101001,name='KoL Player',username=None,command='register',meat=0,items=None):
+            payload=mail(mid,sid,{'type':command,**({'username':username} if username else {})},meat,items)
+            payload['sender_name']=name
+            payload['raw']={'id':str(mid),'fromid':str(sid),'fromname':name,'type':'normal','message':command.upper()}
+            return payload
+        def prepare_account(payload,password=temp_password,role='service_role',error=None):
+            encoded=json.dumps(payload).replace("'","''")
+            result=sql(f"select public.bot_prepare_account_mail('{encoded}','{password}');",role=role,error=error)
+            return None if error else json.loads(result)
+        request=account_mail(9400,name='New Player')
+        job=prepare_account(request)
+        assert job['state']=='pending' and job['username']=='New Player'
+        # Reproduce GoTrue's real Admin API ordering: raw_app_meta_data is not
+        # stamped until AFTER the initial INSERT. The old trigger rejects it.
+        unstamped_insert=f"insert into auth.users(id,email,raw_app_meta_data) values('{job['user_id']}','{job['login_email']}','{{\"provider\":\"email\"}}');"
+        sql(unstamped_insert,error='registered by KMail')
+        sql(migration_sql('202610190021_auth_creation_order.sql'))
+        # Fixed ID AND exact internal address must match the private reservation.
+        sql(f"insert into auth.users(id,email) values('{job['user_id']}','wrong@example.com');",error='registered by KMail')
+        wrong_stamp=json.dumps({'khub_account_job':'wrong-request'})
+        sql(f"insert into auth.users(id,email,raw_app_meta_data) values('{job['user_id']}','{job['login_email']}','{wrong_stamp}');",error='stamp does not match')
+
+        assert prepare_account(request,'Kh9!'+'B'*30)==job
+        assert json.loads(sql('select public.bot_pending_account_requests();',role='service_role'))==[request]
+        sql(f"select public.bot_finish_account_job('{job['mail_id']}');",role='service_role',error='not confirmed')
+        # A public/client-created Auth user cannot bypass verified registration.
+        sql("insert into auth.users(id,email,raw_user_meta_data) values(gen_random_uuid(),'bypass@example.com','{\"khub_username\":\"Bypass\"}');",error='registered by KMail')
+        def provision(job):
+            # Admin createUser first inserts provider metadata, then updates the
+            # request stamp later in the same transaction. Profile creation must
+            # succeed at INSERT, while finalization still refuses an absent stamp.
+            metadata=json.dumps({'khub_account_job':job['mail_id']})
+            sql(f"insert into auth.users(id,email,raw_user_meta_data,raw_app_meta_data,email_confirmed_at) values('{job['user_id']}','{job['login_email']}','{{\"khub_username\":\"Spoofed\"}}','{{\"provider\":\"email\"}}',now());")
+            sql(f"select public.bot_finish_account_job('{job['mail_id']}');",role='service_role',error='not confirmed')
+            sql(f"update auth.users set raw_app_meta_data=raw_app_meta_data||'{metadata}'::jsonb where id='{job['user_id']}';")
+        provision(job)
+        assert sql(f"select khub_username||':'||kol_player_id||':'||account_method from public.profiles where id='{job['user_id']}';")=='New Player:101001:kmail'
+        assert sql("select public.khub_login_address(' new PLAYER ');",role='anon')==job['login_email']
+        assert sql("select public.khub_login_address('Buyer');",role='anon')=='' # No personal email leak.
+        sql(f"select public.bot_finish_account_job('{job['mail_id']}');",role='service_role')
+        sql(f"select public.bot_finish_account_job('{job['mail_id']}');",role='service_role')
+        assert sql("select count(*) from khub_bot.deliveries where receipt_id='9400';")=='1'
+        assert sql("select temporary_password is null from khub_bot.account_jobs where mail_id='9400';")=='t'
+        assert prepare_account(request)=={'state':'done'}
+        assert cleanup('9400')==[]
+        credential_delivery=json.loads(sql('select public.bot_claim_delivery(2);',role='service_role'))
+        assert credential_delivery['receipt_id']=='9400' and temp_password in credential_delivery['display_message']
+        assert 'Username: New Player' in credential_delivery['display_message']
+        sql(f"select public.bot_ack_delivery('{credential_delivery['id']}','{credential_delivery['attempt']}',false,'fixture response lost');",role='service_role')
+        assert temp_password not in sql('select public.bot_inspect();',role='service_role')
+        assert temp_password not in sql(f"select public.bot_lookup_delivery('{credential_delivery['delivery_reference']}');",role='service_role')
+        sql(f"select public.bot_reconcile_delivery('{credential_delivery['id']}',true,'Verified credential sent-copy marker in game.');",role='service_role')
+        assert temp_password not in sql("select row_to_json(d) from khub_bot.deliveries d where receipt_id='9400';")
+        assert cleanup('9400')==['9400']
+        assert prepare_account(account_mail(9401))=={'state':'done'}
+        assert 'already has' in sql("select display_message from khub_bot.deliveries where receipt_id='9401';")
+        # Recovery cannot choose another account: only the actual sender's linked ID.
+        assert prepare_account(account_mail(9402,sid=101002,command='credentials'))=={'state':'done'}
+        assert 'No kHub account is linked' in sql("select display_message from khub_bot.deliveries where receipt_id='9402';")
+        assert prepare_account(account_mail(9403,command='credentials'))=={'state':'done'}
+        assert 'five minutes' in sql("select display_message from khub_bot.deliveries where receipt_id='9403';")
+        sql("update khub_bot.account_jobs set created_at=now()-interval '6 minutes' where mail_id='9400';")
+        reset=prepare_account(account_mail(9404,command='credentials'),password='Kh9!'+'C'*30)
+        assert reset['user_id']==job['user_id'] and reset['action']=='credentials'
+        sql("select public.bot_finish_account_job('9404');",role='service_role',error='not confirmed')
+        sql(f"update auth.users set raw_app_meta_data='{{\"khub_account_job\":\"9404\"}}' where id='{job['user_id']}';")
+        sql("select public.bot_finish_account_job('9404');",role='service_role')
+        assert sql("select count(*) from public.profiles where kol_player_id=101001;")=='1'
+        assert 'previous password no longer works' in sql("select display_message from khub_bot.deliveries where receipt_id='9404';")
+        collect_messages()
+        sql(f"update auth.users set email='changed@example.com' where id='{job['user_id']}';",error='cannot be changed')
+        sql(f"update public.profiles set khub_username='invalid@email' where id='{job['user_id']}';",job['user_id'],'authenticated',error='permission denied')
+        sql(f"update public.profiles set is_banned=true where id='{job['user_id']}';")
+        assert sql("select count(*) from khub_bot.account_bans where kol_player_id=101001 and active;")=='1'
+        assert sql("select public.khub_login_address('New Player');",role='anon')==''
+        assert prepare_account(account_mail(9406,command='credentials'))=={'state':'done'}
+        assert 'restricted' in sql("select display_message from khub_bot.deliveries where receipt_id='9406';")
+        # Already linked legacy accounts recover without SMTP, using their existing email login.
+        legacy_job=prepare_account(account_mail(9407,sid=777,name='Seller',command='credentials'))
+        assert legacy_job['user_id']==SELLER and legacy_job['login_email']=='seller@example.com'
+        sql(f"update auth.users set raw_app_meta_data='{{\"khub_account_job\":\"9407\"}}' where id='{SELLER}';")
+        sql("select public.bot_finish_account_job('9407');",role='service_role')
+        assert 'Log in with: seller@example.com' in sql("select display_message from khub_bot.deliveries where receipt_id='9407';")
+        # Attachments are refunded and cannot accidentally create/reset an account.
+        assert prepare_account(account_mail(9405,sid=101005,meat=50,items=[{'id':1,'quantity':1}]))=={'state':'done'}
+        assert sql("select count(*) from khub_bot.account_jobs where mail_id='9405';")=='0'
+        assert sql("select sum(meat)||':'||sum(quantity) from khub_bot.deliveries where receipt_id='9405';")=='50:1'
+        assert cleanup('9405')==[]
+        # Ban checks cover player ID, actual KoL name and old Auth bans.
+        sql("insert into khub_bot.account_bans(kol_player_id,reason) values(101006,'fixture ban');")
+        sql("insert into khub_bot.account_bans(username,reason) values('ReservedBan','fixture name ban');")
+        for i,payload in enumerate([account_mail(9410,sid=101006),
+            account_mail(9411,sid=101007,name='ReservedBan'),
+            account_mail(9412,sid=101008,name='reservedban')]):
+            assert prepare_account(payload)=={'state':'done'}
+            assert 'restricted' in sql(f"select display_message from khub_bot.deliveries where receipt_id='{9410+i}';")
+        sql(f"update auth.users set banned_until=now()+interval '1 day' where id='{SELLER}';")
+        assert prepare_account(account_mail(9413,sid=777,name='Seller'))=={'state':'done'}
+        sql(f"update auth.users set banned_until=null where id='{SELLER}';")
+        # A custom alias cannot override the authenticated sender's KoL name.
+        assert prepare_account(account_mail(9414,sid=101014,username='Impersonated'))=={'state':'done'}
+        assert 'without a username' in sql("select display_message from khub_bot.deliveries where receipt_id='9414';")
+        assert sql("select count(*) from khub_bot.account_jobs where mail_id='9414';")=='0'
+        # Real KoL names longer than the old 16-character alias limit are preserved.
+        long_job=prepare_account(account_mail(9415,sid=101015,name='Actual Long KoL Character Name'))
+        provision(long_job)
+        sql("select public.bot_finish_account_job('9415');",role='service_role')
+        assert sql("select khub_username from public.profiles where kol_player_id=101015;")=='Actual Long KoL Character Name'
+        # Concurrent registration claims cannot reserve the same username twice.
+        contenders=[account_mail(9420+i,sid=102000+i,name='RaceName') for i in range(2)]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            results=list(pool.map(prepare_account,contenders))
+        assert sorted(r['state'] for r in results)==['done','pending']
+        pending=next(r for r in results if r['state']=='pending')
+        sql("update public.profiles set khub_username='RaceName' where id='"+BUYER+"';",BUYER,'authenticated',error='permission denied')
+        provision(pending)
+        sql(f"select public.bot_finish_account_job('{pending['mail_id']}');",role='service_role')
+        assert sql("select count(*) from public.profiles where lower(khub_username)='racename';")=='1'
+        # Existing sessions cannot write auctions/bids after an account ban.
+        sql("insert into khub_bot.account_bans(kol_player_id,reason) values(999,'fixture restriction');")
+        assert sql(f"select is_banned from public.profiles where id='{OTHER}';")=='t'
+        sql("select public.create_auction('escrow item',2,100,24,null,null,1);",OTHER,'authenticated',error='restricted')
+        assert 'restricted' in ingest(mail(9430,999,{'type':'bid','auction_id':held_bid},meat=5000))
+        assert sql("select sum(meat) from khub_bot.deliveries where receipt_id='9430';")=='5000'
+        for role in ['anon','authenticated']:
+            prepare_account(account_mail(9440),role=role,error='permission denied')
+            sql("select public.bot_check_account_job('9400');",role=role,error='permission denied')
+            sql("select public.bot_finish_account_job('9400');",role=role,error='permission denied')
+            sql('select public.bot_pending_account_requests();',role=role,error='permission denied')
+            sql('select * from khub_bot.account_jobs;',role=role,error='permission denied')
+            sql('select * from khub_bot.account_bans;',role=role,error='permission denied')
+        collect_messages()
+        suspended_request=account_mail(9450,sid=101050,name='LaterBanned')
+        prepare_account(suspended_request)
+        sql("insert into khub_bot.account_bans(kol_player_id,reason) values(101050,'Restricted while pending');")
+        blocked_job=json.loads(sql("select public.bot_check_account_job('9450');",role='service_role'))
+        assert blocked_job['state']=='done' and blocked_job['temporary_password'] is None
+        assert sql("select count(*) from public.profiles where kol_player_id=101050;")=='0'
+        collect_messages()
+        resumable_request=account_mail(9451,sid=101051,name='ResumeAfterCrash')
+        resumable_job=prepare_account(resumable_request)
+        # Keep old/pending passwords intact while admitting short KMail-safe tokens.
+        short_password='Kh9!Ab3Cd4Ef5Gh6'
+        short_request=account_mail(9460,sid=101060,name='Short Password Player')
+        prepare_account(short_request,password=short_password,error='strong temporary password')
+        sql(migration_sql('202610190022_short_temporary_passwords.sql'))
+        prepare_account(short_request,password='TooShort',error='strong temporary password')
+        short_job=prepare_account(short_request,password=short_password)
+        assert len(short_job['temporary_password'])==16
+        assert short_job['temporary_password']==short_password
+        assert prepare_account(short_request,password='Kh9!Xy7Zt8Uv9Wq0')==short_job
+        provision(short_job)
+        sql("select public.bot_finish_account_job('9460');",role='service_role')
+        assert short_password in sql("select display_message from khub_bot.deliveries where receipt_id='9460';")
+        assert prepare_account(resumable_request)==resumable_job
+        collect_messages()
         def wrapper_plan(key):
             return sql("insert into khub_bot.closet_transfers(dedupe_key,source,item_id,quantity) "
                        f"values ('opened-test:{key}','gift_package',1167,1) returning id;")
@@ -1021,6 +1214,28 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
             sql(f"update khub_bot.closet_transfers set {changes} where id='{blocked}';")
             sql(f"select public.bot_cancel_opened_package('{blocked}','{cancel_reason}');",role='service_role',error='Only never-attempted')
             assert sql(f"select count(*) from khub_bot.closet_reconciliations where transfer_id='{blocked}';")=='0'
+        # Public gallery exposes only explicitly published, active, reviewed bans.
+        sql(migration_sql('202610190020_wall_of_shame.sql'))
+        assert json.loads(sql('select public.khub_wall_of_shame();',role='anon'))=={'entries':[],'total':0}
+        gallery_ban=sql("insert into khub_bot.account_bans(kol_player_id,reason) values(199001,'SECRET private evidence') returning id;")
+        sql(f"insert into khub_bot.ban_publications(ban_id,kol_player_name,public_reason) values({gallery_ban},'Reviewed Player','Documented public reason');")
+        for gallery_role in ['anon','authenticated']:
+            public_gallery=json.loads(sql('select public.khub_wall_of_shame();',role=gallery_role))
+            assert public_gallery['total']==1 and public_gallery['entries'][0]['kol_player_id']==199001
+            assert 'SECRET' not in json.dumps(public_gallery) and 'ban_id' not in public_gallery['entries'][0]
+            sql('select * from khub_bot.ban_publications;',role=gallery_role,error='permission denied')
+            sql("insert into khub_bot.ban_publications(ban_id,kol_player_name,public_reason) values(1,'Forged','Forged');",role=gallery_role,error='permission denied')
+            sql('select public.khub_wall_of_shame(-1,24);',role=gallery_role,error='Invalid gallery page')
+        assert json.loads(sql('select public.khub_wall_of_shame(24,24);',role='anon'))['entries']==[]
+        sql(f"update khub_bot.account_bans set active=false where id={gallery_ban};")
+        assert json.loads(sql('select public.khub_wall_of_shame();',role='anon'))['total']==0
+        sql(f"update khub_bot.account_bans set active=true where id={gallery_ban};")
+        sql(f"update khub_bot.ban_publications set banned_at=now()-interval '2 days',expires_at=now()-interval '1 day' where ban_id={gallery_ban};")
+        assert json.loads(sql('select public.khub_wall_of_shame();',role='anon'))['total']==0
+        sql(f"update khub_bot.ban_publications set expires_at=now()+interval '1 day' where ban_id={gallery_ban};")
+        assert json.loads(sql('select public.khub_wall_of_shame();',role='anon'))['total']==1
+        sql(f"update khub_bot.ban_publications set published_at=now()+interval '1 day' where ban_id={gallery_ban};")
+        assert json.loads(sql('select public.khub_wall_of_shame();',role='anon'))['total']==0
         closet_before=sql('select json_agg(c order by id) from khub_bot.closet_transfers c;')
         deliveries_before=sql('select json_agg(d order by id) from khub_bot.deliveries d;')
 
@@ -1031,13 +1246,843 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         assert sql('select json_agg(t order by id) from public.bids t;') == bids_before
         assert sql('select json_agg(d order by id) from khub_bot.deliveries d;') == deliveries_before
         assert sql('select json_agg(c order by id) from khub_bot.closet_transfers c;') == closet_before
+        assert json.loads(sql('select public.bot_pending_account_requests();',role='service_role'))==[resumable_request]
+        assert prepare_account(resumable_request)==resumable_job
         assert financial_stats()['sales']==sold_report['sales']
         assert financial_stats()['donations']==sold_report['donations']
         assert ingest_donation()=='duplicate'
         assert ingest_donation(normal_donation)=='duplicate'
         assert ingest(corrected)=='duplicate'
         assert sql("select count(*) from khub_bot.deliveries where dedupe_key like 'policy-refund:%';")=='2'
-        print('PASS: migrations, profile RLS, public reads, write restrictions, input validation, bids, concurrent bids, expiry, identity, registration conflict checks, lifecycle upgrades, cancellation/bid races, two-party completion, instant purchase validation/permissions/price caps/retries/races, lock-wait deadlines, KMail identity/activation/refunds/settlement/fees/funded purchase races/uncertain-send reconciliation, closet income accounting/protected escrow/reserves/package holds/fee collection/uncertain-move reconciliation, and database restart persistence')
+        # Public seller profiles must not expose buyers through raw tables or RPCs.
+        untouched_auctions=sql('select json_agg(a order by id) from public.auctions a;')
+        untouched_bids=sql('select json_agg(b order by id) from public.bids b;')
+        untouched_deliveries=sql('select json_agg(d order by id) from khub_bot.deliveries d;')
+        sql(migration_sql('202610200023_public_seller_profiles.sql'))
+        assert sql('select json_agg(a order by id) from public.auctions a;')==untouched_auctions
+        assert sql('select json_agg(b order by id) from public.bids b;')==untouched_bids
+        assert sql('select json_agg(d order by id) from khub_bot.deliveries d;')==untouched_deliveries
+
+        def privacy_lot(status='active',escrow=False):
+            closed=status in ('awaiting_trade','completed')
+            return sql(f"""insert into public.auctions(seller_id,seller_username,item,quantity,min_bid_meat,duration_hours,
+                end_time,current_bid,highest_bidder_id,highest_bidder_username,escrow_mode,item_id,seller_kol_id,
+                item_escrowed_at,status,winner_id,winner_username,final_price,finalized_at,
+                settled_at,seller_confirmed_at,buyer_confirmed_at,completed_at)
+                values('{SELLER}','Seller','privacy fixture',2,100,24,now()+interval '1 day',300,'{BUYER}','Buyer',
+                {str(escrow).lower()},1,777,case when {str(escrow).lower()} and '{status}'<>'pending_escrow' then now() end,
+                '{status}',{repr(BUYER) if closed else 'null'},{repr('Buyer') if closed else 'null'},
+                {'300' if closed else 'null'},{'now()' if closed else 'null'},
+                {'now()' if status=='completed' and escrow else 'null'},
+                {'now()' if status=='completed' and not escrow else 'null'},
+                {'now()' if status=='completed' and not escrow else 'null'},
+                {'now()' if status=='completed' else 'null'}) returning id;""")
+
+        open_private=privacy_lot()
+        for bidder,amount in [(BUYER,100),(OTHER,200),(BUYER,300)]:
+            sql(f"insert into public.bids(auction_id,bidder_id,bidder_username,amount) values('{open_private}','{bidder}','{'Buyer' if bidder==BUYER else 'Other'}',{amount});")
+        for uid,role in [(None,'anon'),(SELLER,'authenticated'),(OTHER,'authenticated')]:
+            page=read_page('detail',uid,role,id=open_private)
+            row=page['rows'][0]
+            assert row['seller_username']=='Seller' and row['seller_id']==SELLER
+            assert row['highest_bidder_id'] is None and row['highest_bidder_username']=='Bidder 1'
+            assert row['settlement_contacts'] is None and row['has_winner'] is False
+            assert 'seller_kol_id' not in row and 'highest_bidder_kol_id' not in row
+            assert page['bids'][0]['bidder_username']==page['bids'][2]['bidder_username']=='Bidder 1'
+            assert page['bids'][0]['bidder_id'] is None and page['bids'][2]['bidder_id'] is None
+            assert page['bids'][1]['bidder_username']==('You' if uid==OTHER else 'Bidder 2')
+        own_page=read_page('detail',BUYER,'authenticated',id=open_private)
+        assert own_page['rows'][0]['highest_bidder_id']==BUYER
+        assert own_page['rows'][0]['highest_bidder_username']=='You'
+        assert [b['bidder_username'] for b in own_page['bids']]==['You','Bidder 2','You']
+        assert all(b['bidder_id'] in (None,BUYER) for b in own_page['bids'])
+        # A passed timer alone never reveals the winning identity.
+        sql(f"update public.auctions set created_at=now()-interval '2 days',end_time=now()-interval '1 hour' where id='{open_private}';")
+        assert read_page('detail',SELLER,'authenticated',id=open_private)['rows'][0]['settlement_contacts'] is None
+        sql(f"update public.auctions set end_time=now()+interval '1 day' where id='{open_private}';")
+        sql(f"select public.place_bid('{open_private}',400);",SELLER,'authenticated',error='own auction')
+
+        direct_private=privacy_lot('awaiting_trade')
+        sql(f"insert into public.bids(auction_id,bidder_id,bidder_username,amount) values('{direct_private}','{BUYER}','Buyer',300);")
+        for uid in [SELLER,BUYER]:
+            row=read_page('detail',uid,'authenticated',id=direct_private)['rows'][0]
+            assert row['winner_id']==BUYER and row['winner_username']=='Buyer'
+            assert row['settlement_contacts']['buyer']['username']==sql(f"select khub_username from public.profiles where id='{BUYER}';")
+            assert row['settlement_contacts']['buyer']['kol_player_id']==888
+            assert row['settlement_contacts']['seller']['kol_player_id']==777
+            assert 'email' not in json.dumps(row['settlement_contacts'])
+        for uid,role in [(None,'anon'),(OTHER,'authenticated')]:
+            row=read_page('detail',uid,role,id=direct_private)['rows'][0]
+            assert row['has_winner'] is True and row['winner_id'] is None
+            assert row['winner_username']=='Bidder 1' and row['settlement_contacts'] is None
+        finished_private=privacy_lot('completed',True)
+        assert read_page('detail',SELLER,'authenticated',id=finished_private)['rows'][0]['settlement_contacts'] is None
+        assert read_page('detail',SELLER,'authenticated',id=finished_private)['rows'][0]['winner_id'] is None
+        pending_private=privacy_lot('pending_escrow',True)
+        assert read_page('detail',id=pending_private)['rows']==[]
+        assert read_page('detail',BUYER,'authenticated',id=pending_private)['rows']==[]
+        assert len(read_page('detail',SELLER,'authenticated',id=pending_private)['rows'])==1
+
+        for role in ['anon','authenticated']:
+            sql('select * from public.auctions;',role=role,error='permission denied')
+            sql('select bidder_id,bidder_username from public.bids;',role=role,error='permission denied')
+            sql('select highest_bidder_kol_id from public.auctions;',role=role,error='permission denied')
+            sql('select khub_bot.public_auction(null::public.auctions,0,null,null);',role=role,error='permission denied')
+            sql(f"select public.finalize_auction('{open_private}');",role=role,error='permission denied')
+        assert int(sql('select count(*) from public.auctions;',role='service_role'))>0
+        assert int(sql('select count(*) from public.bids;',role='service_role'))>0
+        personal=read_page('profile',BUYER,'authenticated')
+        assert all(b['bidder_id']==BUYER and b['bidder_username']=='You' for b in personal['bids'])
+        public_seller=read_page('seller',id=SELLER,status='all')
+        assert public_seller['seller']['username']=='Seller'
+        assert pending_private not in [a['id'] for a in public_seller['rows']]
+        assert all(a['seller_id']==SELLER and a['status']!='pending_escrow' for a in public_seller['rows'])
+        assert public_seller['bids']==[]
+        assert int(public_seller['seller']['stats']['escrow_sales'])==int(sql(f"select count(*) from public.auctions where seller_id='{SELLER}' and status='completed' and escrow_mode and winner_id is not null;"))
+        assert int(public_seller['seller']['stats']['escrow_value'])==int(sql(f"select coalesce(sum(final_price),0) from public.auctions where seller_id='{SELLER}' and status='completed' and escrow_mode and winner_id is not null;"))
+        assert int(public_seller['seller']['stats']['legacy_sales'])==int(sql(f"select count(*) from public.auctions where seller_id='{SELLER}' and status='completed' and not escrow_mode and winner_id is not null;"))
+        assert read_page('seller',id='00000000-0000-0000-0000-000000009999')['seller'] is None
+        sql(f"""insert into public.auctions(seller_id,seller_username,item,quantity,min_bid_meat,duration_hours,end_time)
+            select '{SELLER}','Seller','seller pagination fixture '||n,1,n,24,now()+interval '1 day' from generate_series(1,30) n;""")
+        seller_first=read_page('seller',id=SELLER,search='seller pagination fixture',sort='price-asc')
+        seller_second=read_page('seller',id=SELLER,search='seller pagination fixture',sort='price-asc',page=2)
+        assert seller_first['total']==30 and len(seller_first['rows'])==24 and len(seller_second['rows'])==6
+        assert [a['min_bid_meat'] for a in seller_first['rows']+seller_second['rows']]==list(range(1,31))
+        assert read_page('seller',id=SELLER,search='%',status='all')['total']==0
+        pg_ctl('-l',str(Path(directory)/'postgres.log'),'-m','fast','-w','restart')
+        assert read_page('detail',id=direct_private)['rows'][0]['winner_id'] is None
+        assert read_page('detail',SELLER,'authenticated',id=direct_private)['rows'][0]['winner_id']==BUYER
+        # Optional escrow is additive: old state and obligations must be byte-for-byte unchanged.
+        escrow_before=sql('select json_agg(a order by id) from public.auctions a where escrow_mode;')
+        obligations_before=sql('select json_agg(d order by id) from khub_bot.deliveries d;')
+        sql(migration_sql('202610200024_optional_escrow.sql'))
+        assert sql('select json_agg(a order by id) from public.auctions a where escrow_mode;')==escrow_before
+        assert sql('select json_agg(d order by id) from khub_bot.deliveries d;')==obligations_before
+        def direct_create(price='null',uid=SELLER,error=None):
+            return sql(f"select public.create_auction('escrow item',2,100,24,null,{price},1,false);",uid,'authenticated',error=error)
+        def pending_trades(uid,page=1,role='authenticated'):
+            return json.loads(sql(f'select public.read_pending_trades({page});',uid,role))
+        competitor=long_job['user_id']
+        direct=direct_create()
+        assert sql(f"select status||':'||fee_bps||':'||start_on_deposit||':'||(item_escrowed_at is null) from public.auctions where id='{direct}';")=='active:0:false:true'
+        assert read_page('detail',id=direct)['rows'][0]['escrow_mode'] is False
+        assert read_page('detail',id=direct)['rows'][0]['settlement_contacts'] is None
+        # Omitted argument still creates escrow, with the current stored fee.
+        default_escrow=escrow_create()
+        assert sql(f"select status||':'||fee_bps from public.auctions where id='{default_escrow}';")=='pending_escrow:750'
+        sql(f"select public.place_bid('{default_escrow}',100);",BUYER,'authenticated',error='KMail')
+        sql(f"select public.purchase_auction('{default_escrow}');",BUYER,'authenticated',error='KMail')
+        sql(f"select public.confirm_auction_trade('{default_escrow}');",SELLER,'authenticated',error='bot')
+        sql(f"select public.place_bid('{direct}',100);",SELLER,'authenticated',error='own auction')
+        sql(f"select public.purchase_auction('{direct}');",SELLER,'authenticated',error='own auction')
+        sql(f"select public.place_bid('{direct}',100);",OTHER,'authenticated',error='restricted')
+        direct_create(uid=OTHER,error='restricted')
+        # A linked number without verified ownership is insufficient.
+        sql(f"update public.profiles set kol_verified_at=null where id='{competitor}';")
+        sql(f"select public.place_bid('{direct}',100);",competitor,'authenticated',error='Verify your KoL')
+        direct_create(uid=competitor,error='Verify your KoL')
+        sql(f"update public.profiles set kol_verified_at=now() where id='{competitor}';")
+        sql(f"select public.place_bid('{direct}',100);",BUYER,'authenticated')
+        sql(f"select public.place_bid('{direct}',100);",competitor,'authenticated',error='exceed')
+        sql(f"select public.cancel_auction('{direct}');",SELLER,'authenticated',error='with bids')
+        assert read_page('detail',SELLER,'authenticated',id=direct)['rows'][0]['highest_bidder_id'] is None
+        sql(f"update public.auctions set escrow_mode=true where id='{direct}';",error='fixed')
+        sql(f"update public.auctions set escrow_mode=false where id='{default_escrow}';",error='fixed')
+        sql(f"update public.auctions set fee_bps=900 where id='{default_escrow}';",error='fixed')
+        sql(f"select public.confirm_auction_trade('{direct}');",SELLER,'authenticated',error='ended auction')
+        sql(f"update public.auctions set created_at=now()-interval '2 days',end_time=now()-interval '1 hour' where id='{direct}';")
+        assert read_page('detail',SELLER,'authenticated',id=direct)['rows'][0]['settlement_contacts'] is None
+        assert direct not in [a['id'] for a in pending_trades(SELLER)['rows']]
+        sql('select public.finalize_expired_auctions();',role='anon')
+        assert sql(f"select status||':'||final_price from public.auctions where id='{direct}';")=='awaiting_trade:100'
+        sql(f"select public.place_bid('{direct}',200);",competitor,'authenticated',error='ended')
+        sql(f"update public.auctions set final_price=200 where id='{direct}';",error='fixed winner')
+        for uid in [SELLER,BUYER]:
+            trade=next(a for a in pending_trades(uid)['rows'] if a['id']==direct)
+            assert trade['settlement_contacts']['buyer']['kol_player_id']==888
+            assert trade['settlement_contacts']['seller']['kol_player_id']==777
+        assert direct not in [a['id'] for a in pending_trades(competitor)['rows']]
+        for uid,role in [(None,'anon'),(competitor,'authenticated')]:
+            trade=read_page('detail',uid,role,id=direct)['rows'][0]
+            assert trade['winner_id'] is None and trade['winner_username']=='Bidder 1'
+            assert trade['settlement_contacts'] is None
+        sql(f"select public.confirm_auction_trade('{direct}');",competitor,'authenticated',error='Only the seller')
+        sql(f"select public.confirm_auction_trade('{direct}');",SELLER,'authenticated')
+        stamp=sql(f"select seller_confirmed_at from public.auctions where id='{direct}';")
+        sql(f"select public.confirm_auction_trade('{direct}');",SELLER,'authenticated')
+        assert sql(f"select seller_confirmed_at from public.auctions where id='{direct}';")==stamp
+        assert sql(f"select status from public.auctions where id='{direct}';")=='awaiting_trade'
+        assert direct in [a['id'] for a in pending_trades(SELLER)['rows']]
+        sql(f"select public.confirm_auction_trade('{direct}');",BUYER,'authenticated')
+        assert sql(f"select status from public.auctions where id='{direct}';")=='completed'
+        assert direct not in [a['id'] for a in pending_trades(SELLER)['rows']]
+        assert direct not in [a['id'] for a in pending_trades(BUYER)['rows']]
+        completed=sql(f"select row_to_json(a) from public.auctions a where id='{direct}';")
+        sql(f"select public.confirm_auction_trade('{direct}');",BUYER,'authenticated')
+        assert sql(f"select row_to_json(a) from public.auctions a where id='{direct}';")==completed
+        assert read_page('detail',id=direct)['rows'][0]['winner_id'] is None
+        # Instant purchase and competing requests freeze exactly one winner/bid.
+        instant=direct_create('500')
+        sql(f"select public.place_bid('{instant}',900);",BUYER,'authenticated')
+        sql(f"select public.purchase_auction('{instant}');",BUYER,'authenticated')
+        assert sql(f"select status||':'||final_price||':'||current_bid from public.auctions where id='{instant}';")=='awaiting_trade:500:500'
+        assert sql(f"select count(*) from public.bids where auction_id='{instant}';")=='1'
+        sql(f"select public.purchase_auction('{instant}');",competitor,'authenticated',error='ended')
+        race=direct_create('500')
+        def race_purchase(uid):
+            try:
+                sql(f"select public.purchase_auction('{race}');",uid,'authenticated')
+                return True
+            except AssertionError as failure:
+                assert 'ended' in str(failure)
+                return False
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            assert sum(pool.map(race_purchase,[BUYER,competitor]))==1
+        assert sql(f"select count(*) from public.bids where auction_id='{race}';")=='1'
+        # Unbid auctions close as unsold, never as a failed or completed trade.
+        unsold=direct_create()
+        sql(f"update public.auctions set created_at=now()-interval '2 days',end_time=now()-interval '1 hour' where id='{unsold}';")
+        sql('select public.finalize_expired_auctions();',role='anon')
+        assert sql(f"select status from public.auctions where id='{unsold}';")=='ended_no_bids'
+        cancelled=direct_create()
+        sql(f"select public.cancel_auction('{cancelled}');",SELLER,'authenticated')
+        assert sql(f"select status from public.auctions where id='{cancelled}';")=='cancelled'
+        # Pagination includes every pending trade, even those the viewer already confirmed.
+        for n in range(13):
+            trade=direct_create('500')
+            sql(f"select public.purchase_auction('{trade}');",BUYER,'authenticated')
+        pages=[pending_trades(SELLER,p) for p in [1,2]]
+        assert pages[0]['total']==pages[1]['total'] and pages[0]['total']>12
+        assert len(pages[0]['rows'])==12
+        assert len({a['id'] for page in pages for a in page['rows']})==pages[0]['total']
+        sql('select public.read_pending_trades();',role='anon',error='permission denied')
+        assert pending_trades(None)['rows']==[]
+        sql('select khub_bot.require_verified_trader();',BUYER,'authenticated',error='permission denied')
+        assert sql(f"select count(*) from khub_bot.deliveries where auction_id in ('{direct}','{instant}','{race}');")=='0'
+        assert sql('select json_agg(d order by id) from khub_bot.deliveries d;')==obligations_before
+        # Mail cannot accidentally fund or deposit a direct auction; attachments are refunded.
+        direct_mail=direct_create()
+        assert 'escrow' in ingest(mail(9600,888,{'type':'bid','auction_id':direct_mail},meat=200)).lower()
+        assert sql("select sum(meat) from khub_bot.deliveries where receipt_id='9600';")=='200'
+        assert sql(f"select current_bid from public.auctions where id='{direct_mail}';")=='0'
+        assert 'escrow' in ingest(mail(9601,777,{'type':'list','auction_id':direct_mail},items=[{'id':1,'quantity':2}])).lower()
+        assert sql("select sum(quantity) from khub_bot.deliveries where receipt_id='9601';")=='2'
+        # Escrow still activates and settles through the existing bot RPCs after 024.
+        assert ingest(mail(9602,777,{'type':'list','auction_id':default_escrow},items=[{'id':1,'quantity':2}]))=='accepted'
+        assert sql(f"select status from public.auctions where id='{default_escrow}';")=='active'
+        assert ingest(mail(9603,888,{'type':'bid','auction_id':default_escrow},meat=500))=='accepted'
+        expire(default_escrow)
+        sql('select public.bot_tick();',role='service_role')
+        assert sql(f"select status||':'||fee_meat from public.auctions where id='{default_escrow}';")=='settling:37'
+        assert sql(f"select sum(meat) from khub_bot.deliveries where auction_id='{default_escrow}' and kind='sale_meat';")=='463'
+        assert sql(f"select sum(quantity) from khub_bot.deliveries where auction_id='{default_escrow}' and kind='sale_item';")=='2'
+        assert read_page('detail',SELLER,'authenticated',id=default_escrow)['rows'][0]['settlement_contacts'] is None
+        unfinished_closet=json.loads(sql("select coalesce(json_agg(id),'[]') from khub_bot.closet_transfers where state in ('moving','unknown');"))
+        if unfinished_closet:
+            sql('select public.bot_claim_delivery(2);',role='service_role',error='Uncertain closet transfer')
+            # Fixture-only recovery: this isolated harness never makes KoL requests.
+            # Use the audited API; do not bypass the claim guard by editing states.
+            for transfer in unfinished_closet:
+                sql(f"select public.bot_reconcile_closet_transfer('{transfer}',false,'Isolated fixture evidence: no external closet request was executed for this unfinished claim.');",role='service_role')
+        collect_messages()
+        sql('select public.bot_tick();',role='service_role')
+        assert sql(f"select status from public.auctions where id='{default_escrow}';")=='completed'
+        pg_ctl('-l',str(Path(directory)/'postgres.log'),'-m','fast','-w','restart')
+        assert sql(f"select row_to_json(a) from public.auctions a where id='{direct}';")==completed
+        assert read_page('detail',id=direct)['rows'][0]['settlement_contacts'] is None
+        assert pending_trades(SELLER)['total']==pages[0]['total']
+        # Remove fixed price caps without changing any historical records/obligations.
+        price_auctions_before=sql('select json_agg(a order by id) from public.auctions a;')
+        price_deliveries_before=sql('select json_agg(d order by id) from khub_bot.deliveries d;')
+        price_closet_before=sql('select json_agg(c order by id) from khub_bot.closet_transfers c;')
+        sql(migration_sql('202610200025_auction_price_limits.sql'))
+        assert sql('select json_agg(a order by id) from public.auctions a;')==price_auctions_before
+        assert sql('select json_agg(d order by id) from khub_bot.deliveries d;')==price_deliveries_before
+        assert sql('select json_agg(c order by id) from khub_bot.closet_transfers c;')==price_closet_before
+        high_direct=sql("select public.create_auction('escrow item',2,50000000000,24,null,60000000000,1,false);",SELLER,'authenticated')
+        sql(f"select public.place_bid('{high_direct}',50000000001);",BUYER,'authenticated')
+        assert read_page('detail',id=high_direct)['rows'][0]['current_bid']==50000000001
+        sql(f"select public.purchase_auction('{high_direct}');",competitor,'authenticated')
+        assert sql(f"select final_price from public.auctions where id='{high_direct}';")=='60000000000'
+        assert read_page('detail',id=high_direct)['rows'][0]['winner_id'] is None
+        sql(f"select public.confirm_auction_trade('{high_direct}');",SELLER,'authenticated')
+        sql(f"select public.confirm_auction_trade('{high_direct}');",competitor,'authenticated')
+        assert sql(f"select status from public.auctions where id='{high_direct}';")=='completed'
+        precision_lot=direct_create('9007199254740991')
+        sql(f"select public.place_bid('{precision_lot}',9007199254740992);",BUYER,'authenticated',error='represented exactly')
+        sql(f"select public.purchase_auction('{precision_lot}');",BUYER,'authenticated')
+        assert read_page('detail',id=precision_lot)['rows'][0]['final_price']==9007199254740991
+        sql("select public.create_auction('escrow item',2,9007199254740992,24,null,null,1,false);",SELLER,'authenticated',error='check constraint')
+        high_escrow=escrow_create('60000000000')
+        assert ingest(mail(9700,777,{'type':'list','auction_id':high_escrow},items=[{'id':1,'quantity':2}]))=='accepted'
+        assert ingest(mail(9701,888,{'type':'bid','auction_id':high_escrow},meat=60000000000))=='accepted'
+        assert sql(f"select status||':'||final_price||':'||fee_meat from public.auctions where id='{high_escrow}';")=='settling:60000000000:4500000000'
+        assert sql(f"select sum(meat) from khub_bot.deliveries where auction_id='{high_escrow}' and kind='sale_meat';")=='55500000000'
+        assert sql(f"select count(*) from khub_bot.deliveries where auction_id='{high_escrow}' and meat>1000000000;")=='0'
+        # Commission math must not overflow bigint when a large sale uses 100% fee.
+        sql('update khub_bot.settings set fee_bps=10000;')
+        overflow_fee=escrow_create('1000000000000000')
+        sql('update khub_bot.settings set fee_bps=750;')
+        assert ingest(mail(9702,777,{'type':'list','auction_id':overflow_fee},items=[{'id':1,'quantity':2}]))=='accepted'
+        assert ingest(mail(9703,888,{'type':'bid','auction_id':overflow_fee},meat=1000000000000000))=='accepted'
+        assert sql(f"select fee_meat from public.auctions where id='{overflow_fee}';")=='1000000000000000'
+        assert '20 billion' not in sql("select khub_bot.friendly_reason('Send the full bid, meeting the minimum and exceeding the current bid.');")
+        for role in ['anon','authenticated']:
+            sql(f"select public.legacy_place_bid('{precision_lot}',1);",role=role,error='permission denied')
+            sql("select khub_bot.ingest_mail_before_invalid_refunds('{}');",role=role,error='permission denied')
+        assert ingest(mail(9701,888,{'type':'bid','auction_id':high_escrow},meat=60000000000))=='duplicate'
+        # Private bug reports: transactional storage + durable, zero-asset KMail copies.
+        from uuid import uuid4
+        bugs_old_auctions=sql('select json_agg(a order by id) from public.auctions a;')
+        bugs_old_deliveries=sql('select json_agg(d order by id) from khub_bot.deliveries d;')
+        sql(migration_sql('202610200026_bug_reports.sql'))
+        assert sql('select json_agg(a order by id) from public.auctions a;')==bugs_old_auctions
+        assert sql('select json_agg(d order by id) from khub_bot.deliveries d;')==bugs_old_deliveries
+        def literal(value): return "'"+value.replace("'","''")+"'"
+        def report(request_id,body,uid=SELLER,error=None):
+            raw=sql(f"select public.submit_bug_report('{request_id}',{literal(body)});",uid,'authenticated',error=error)
+            return None if error else json.loads(raw)
+        def inbox(uid,status='open',page=1,error=None):
+            raw=sql(f"select public.read_bug_report_inbox('{status}',{page});",uid,'authenticated',error=error)
+            return None if error else json.loads(raw)
+        owner_job=prepare_account(account_mail(9800,sid=3552305,name='teres Minor'))
+        provision(owner_job)
+        owner_id=owner_job['user_id']
+        assert sql('select public.khub_is_administrator();',owner_id,'authenticated')=='t'
+        assert sql('select count(*) from khub_bot.administrators;')=='0'
+        for uid in [SELLER,BUYER,competitor,OTHER]:
+            assert sql('select public.khub_is_administrator();',uid,'authenticated')=='f'
+            inbox(uid,error='Administrator access required')
+        # A claimed username or an unverified owner ID is not administrator authority.
+        sql(f"update public.profiles set kol_verified_at=null where id='{owner_id}';")
+        assert sql('select public.khub_is_administrator();',owner_id,'authenticated')=='f'
+        sql(f"update public.profiles set kol_verified_at=now() where id='{owner_id}';")
+        for role in ['anon','authenticated']:
+            sql('select * from khub_bot.bug_reports;',role=role,error='permission denied')
+            sql('select * from khub_bot.administrators;',role=role,error='permission denied')
+            sql('select * from khub_bot.bug_report_activity;',role=role,error='permission denied')
+            sql('select khub_bot.is_administrator(null);',role=role,error='permission denied')
+            sql(f"insert into khub_bot.administrators(user_id,note) values('{SELLER}','self promotion');",SELLER,role,error='permission denied')
+        sql("select public.submit_bug_report(gen_random_uuid(),'Anonymous bug report');",role='anon',error='permission denied')
+        report(str(uuid4()),'Restricted account report',OTHER,error='restricted')
+        report(str(uuid4()),'short',error='10 to 2,000')
+        report(str(uuid4()),'x'*2001,error='10 to 2,000')
+        sql(f"update public.profiles set kol_verified_at=null where id='{competitor}';")
+        report(str(uuid4()),'Unverified reporter test',competitor,error='Verify your KoL')
+        sql(f"update public.profiles set kol_verified_at=now() where id='{competitor}';")
+        first_bug=str(uuid4()); first_body='The listing preview lost the item selection.'
+        liabilities_before_reports=sql('select public.bot_liabilities();',role='service_role')
+        saved=report(first_bug,first_body)
+        assert re.fullmatch(r'B-[0-9]+',saved['reference'])
+        assert report(first_bug,first_body)==saved
+        assert sql(f"select count(*) from khub_bot.bug_report_deliveries where report_id='{first_bug}';")=='1'
+        report(first_bug,'A different body cannot replace the original.',error='cannot be reused')
+        report(first_bug,first_body,BUYER,error='cannot be reused')
+        report(str(uuid4()),'A second report too soon.',error='wait a minute')
+        assert sql(f"select body from khub_bot.bug_reports where id='{first_bug}';")==first_body
+        long_bug=str(uuid4()); long_body='<>&'*600
+        report(long_bug,long_body,BUYER)
+        bodies=json.loads(sql(f"select json_agg(d.display_message order by split_part(d.dedupe_key,':',3)::integer) from khub_bot.bug_report_deliveries l join khub_bot.deliveries d on d.id=l.delivery_id where l.report_id='{long_bug}';"))
+        assert len(bodies)>1 and all(len(body)<1700 for body in bodies)
+        assert ''.join(body.split('\n\n')[1] for body in bodies)=='&lt;&gt;&amp;'*600
+        assert all('<>' not in body for body in bodies)
+        assert sql('select public.bot_liabilities();',role='service_role')==liabilities_before_reports
+        assert sql("select count(*) from khub_bot.bug_report_deliveries l join khub_bot.deliveries d on d.id=l.delivery_id where recipient_id<>3552305 or kind<>'notice' or meat<>0 or item_id is not null or quantity<>0 or auction_id is not null or receipt_id is not null;")=='0'
+        # Concurrent retries insert exactly one report and one set of notifications.
+        concurrent_bug=str(uuid4()); concurrent_body='Concurrent submit lost its acknowledgment.'
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            duplicate_results=list(pool.map(lambda _:report(concurrent_bug,concurrent_body,competitor),range(2)))
+        assert duplicate_results[0]==duplicate_results[1]
+        assert sql(f"select count(*) from khub_bot.bug_report_deliveries where report_id='{concurrent_bug}';")=='1'
+        assert inbox(owner_id)['total']==3
+        assert next(r for r in inbox(owner_id)['reports'] if r['id']==first_bug)['notification']=='queued'
+        sql(f"select public.set_bug_report_status('{first_bug}','resolved');",BUYER,'authenticated',error='Administrator access required')
+        sql(f"select public.set_bug_report_status('{first_bug}','resolved');",owner_id,'authenticated')
+        sql(f"select public.set_bug_report_status('{first_bug}','resolved');",owner_id,'authenticated')
+        assert inbox(owner_id,'resolved')['total']==1
+        assert sql(f"select count(*) from khub_bot.bug_report_activity where report_id='{first_bug}';")=='1'
+        sql(f"select public.set_bug_report_status('{first_bug}','open');",owner_id,'authenticated')
+        assert sql(f"select count(*) from khub_bot.bug_report_activity where report_id='{first_bug}';")=='2'
+        # Explicit grants work, revocation takes effect immediately, bans override grants.
+        sql(f"insert into khub_bot.administrators(user_id,note) values('{competitor}','Isolated staff fixture'),('{OTHER}','Banned staff fixture');")
+        assert sql('select public.khub_is_administrator();',competitor,'authenticated')=='t'
+        assert inbox(competitor)['total']==3
+        assert sql('select public.khub_is_administrator();',OTHER,'authenticated')=='f'
+        sql(f"delete from khub_bot.administrators where user_id='{competitor}';")
+        inbox(competitor,error='Administrator access required')
+        # Exercise the existing claim/ack path, including durable uncertain sends.
+        # Give NEW report notices priority within this fixture; leave old deliveries alone.
+        sql(f"update khub_bot.deliveries d set created_at='1970-01-01' where id in(select delivery_id from khub_bot.bug_report_deliveries where report_id='{first_bug}');")
+        notice=json.loads(sql('select public.bot_claim_delivery(2);',role='service_role'))
+        assert notice['recipient_id']==3552305 and notice['meat']==0 and notice['kind']=='notice'
+        assert first_body in notice['display_message'] and notice['delivery_reference'].startswith('D-')
+        sql(f"select public.bot_ack_delivery('{notice['id']}','{notice['attempt']}',false,'Isolated fixture: uncertain acknowledgment, no external request.');",role='service_role')
+        assert next(r for r in inbox(owner_id)['reports'] if r['id']==first_bug)['notification']=='needs_review'
+        frozen=sql(f"select display_message from khub_bot.deliveries where id='{notice['id']}';")
+        pg_ctl('-l',str(Path(directory)/'postgres.log'),'-m','fast','-w','restart')
+        sql('select public.bot_claim_delivery(2);',role='service_role',error='Uncertain delivery')
+        assert report(first_bug,first_body)==saved
+        assert sql(f"select display_message from khub_bot.deliveries where id='{notice['id']}';")==frozen
+        sql(f"select public.bot_reconcile_delivery('{notice['id']}',false,'Fixture evidence: no external request was made; a resend is safe in this isolated test.');",role='service_role')
+        retry=json.loads(sql('select public.bot_claim_delivery(2);',role='service_role'))
+        assert retry['id']==notice['id'] and retry['display_message']==frozen
+        sql(f"select public.bot_ack_delivery('{retry['id']}','{retry['attempt']}',true,'Fixture acknowledgment only; no KMail was sent.');",role='service_role')
+        assert next(r for r in inbox(owner_id)['reports'] if r['id']==first_bug)['notification']=='sent'
+        # Hourly limit supplements the one-minute cooldown.
+        for n in range(4):
+            sql(f"update khub_bot.bug_reports set created_at=now()-interval '61 seconds' where reporter_id='{SELLER}';")
+            report(str(uuid4()),'Distinct fixture report number '+str(n))
+        sql(f"update khub_bot.bug_reports set created_at=now()-interval '61 seconds' where reporter_id='{SELLER}';")
+        report(str(uuid4()),'A sixth report within an hour.',error='several reports')
+        # Seed old fixture records for pagination without creating more outgoing mail.
+        sql(f"insert into khub_bot.bug_reports(id,reporter_id,reporter_username,reporter_kol_id,body,created_at) select gen_random_uuid(),'{SELLER}','Seller',777,'Pagination fixture '||n,now()-interval '2 days' from generate_series(1,24)n;")
+        first_page=inbox(owner_id,'all',1); second_page=inbox(owner_id,'all',2)
+        assert first_page['total']==second_page['total']==31
+        assert len(first_page['reports'])==20 and len(second_page['reports'])==11
+        assert len({r['id'] for r in first_page['reports']+second_page['reports']})==31
+        assert all('reporter_id' not in r for r in first_page['reports'])
+        # No report is discoverable through the public auction/profile reader.
+        assert 'Distinct fixture report' not in json.dumps(read_page('seller',id=SELLER,status='all'))
+        # Login prefix is separate from the public profile name; durable mail is immutable.
+        prefix_job=prepare_account(account_mail(99001,sid=299001,name='Exact Player'))
+        existing_mail=sql('select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d;')
+        existing_names=sql('select jsonb_agg(jsonb_build_array(id,khub_username) order by id) from public.profiles;')
+        sql(migration_sql('202610200027_prefixed_login_names.sql'))
+        assert sql('select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d;')==existing_mail
+        assert sql('select jsonb_agg(jsonb_build_array(id,khub_username) order by id) from public.profiles;')==existing_names
+        provision(prefix_job)
+        sql("select public.bot_finish_account_job('99001');",role='service_role')
+        prefix_body=sql("select display_message from khub_bot.deliveries where receipt_id='99001';")
+        assert 'kHub Username: KH_Exact Player' in prefix_body
+        assert 'Log in with:' not in prefix_body and '\nUsername:' not in prefix_body
+        for role in ['anon','authenticated']:
+            assert sql("select public.khub_login_address(' kh_exact player ');",role=role)==prefix_job['login_email']
+            assert sql("select public.khub_login_address('Exact Player');",role=role)==''
+            assert sql("select public.khub_login_address('KH_Seller');",role=role)=='' # no legacy personal email disclosure
+            sql("select public.bot_finish_account_job('99001');",role=role,error='permission denied')
+        # A real KoL name starting KH_ must get its own additional login prefix.
+        double_job=prepare_account(account_mail(99002,sid=299002,name='KH_Exact Player'))
+        provision(double_job)
+        sql("select public.bot_finish_account_job('99002');",role='service_role')
+        assert sql("select public.khub_login_address('KH_KH_Exact Player');",role='anon')==double_job['login_email']
+        assert sql("select public.khub_login_address('KH_Exact Player');",role='anon')==prefix_job['login_email']
+        assert sql("select khub_username from public.profiles where kol_player_id=299001;")=='Exact Player'
+        sql("update khub_bot.account_jobs set created_at=now()-interval '10 minutes' where mail_id='99001';")
+        sql("update khub_bot.deliveries set created_at='1970-01-01' where receipt_id='99001';")
+        credential_claim=json.loads(sql('select public.bot_claim_delivery(2);',role='service_role'))
+        assert credential_claim['receipt_id']=='99001'
+        sql(f"select public.bot_ack_delivery('{credential_claim['id']}','{credential_claim['attempt']}',true,'Fixture acknowledgment; no external KMail sent.');",role='service_role')
+        recovery_job=prepare_account(account_mail(99003,sid=299001,name='Exact Player',command='credentials'))
+        sql(f"update auth.users set raw_app_meta_data=jsonb_build_object('khub_account_job','99003') where id='{recovery_job['user_id']}';")
+        sql("select public.bot_finish_account_job('99003');",role='service_role')
+        assert 'kHub Username: KH_Exact Player' in sql("select display_message from khub_bot.deliveries where receipt_id='99003';")
+        sql(f"update public.profiles set is_banned=true where id='{prefix_job['user_id']}';")
+        assert sql("select public.khub_login_address('KH_Exact Player');",role='anon')==''
+        # Shared administrator inbox: server-filtered categories, audit trail and privacy.
+        frozen_deliveries=sql('select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d;')
+        sql(migration_sql('202610200028_shared_administrator_inbox.sql'))
+        assert sql('select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d;')==frozen_deliveries
+        def support_inbox(category='all',status='all',page=1,uid=owner_id,error=None):
+            result=sql(f"select public.read_support_inbox('{category}','{status}',{page});",uid,'authenticated',error=error)
+            return None if error else json.loads(result)
+        assert support_inbox('bug')['total']==31
+        assert support_inbox('trade')['total']==support_inbox('appeal')['total']==support_inbox('other')['total']==0
+        for uid in [SELLER,BUYER]:
+            support_inbox(uid=uid,error='Administrator access required')
+            sql(f"select public.set_support_category('{first_bug}','trade');",uid,'authenticated',error='Administrator access required')
+        sql('select public.read_support_inbox();',role='anon',error='permission denied')
+        sql('select * from khub_bot.support_category_activity;',SELLER,'authenticated',error='permission denied')
+        support_inbox('bad',error='valid inbox category')
+        sql(f"select public.set_support_category('{first_bug}','bad');",owner_id,'authenticated',error='valid inbox category')
+        ids=json.loads(sql('select jsonb_agg(id) from (select id from khub_bot.bug_reports order by report_number limit 3)s;'))
+        for report_id,category in zip(ids,['trade','appeal','other']):
+            sql(f"select public.set_support_category('{report_id}','{category}');",owner_id,'authenticated')
+            sql(f"select public.set_support_category('{report_id}','{category}');",owner_id,'authenticated')
+            assert support_inbox(category)['total']==1
+            assert support_inbox(category)['reports'][0]['id']==report_id
+            assert support_inbox(category)['reports'][0]['category']==category
+        assert support_inbox('all')['total']==31 and support_inbox('bug')['total']==28
+        assert len(support_inbox('bug',page=1)['reports'])==20
+        assert len(support_inbox('bug',page=2)['reports'])==8
+        assert sql('select count(*) from khub_bot.support_category_activity;')=='3'
+        assert sql(f"select count(*) from khub_bot.support_category_activity where administrator_id='{owner_id}' and previous_category='bug';")=='3'
+        assert sql('select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d;')==frozen_deliveries
+        # Appeals are authenticated and private, but ordinary site bans do not block them.
+        prior_deliveries=sql('select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d;')
+        sql(migration_sql('202610200029_ban_appeals.sql'))
+        assert sql('select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d;')==prior_deliveries
+        assert sql("select public.khub_login_address('KH_Exact Player');",role='anon')==''
+        assert sql("select public.khub_appeal_login_address('KH_Exact Player');",role='anon')==prefix_job['login_email']
+        assert sql("select public.khub_appeal_login_address('Exact Player');",role='anon')==''
+        assert sql("select public.khub_appeal_login_address('KH_Seller');",role='anon')==''
+        appeal_id=str(uuid4())
+        appeal_body='Please review my ban. <example> & context.'
+        def appeal(request_id,body,uid=prefix_job['user_id'],role='authenticated',error=None):
+            result=sql(f"select public.submit_ban_appeal('{request_id}','{body}');",uid,role,error=error)
+            return None if error else json.loads(result)
+        appeal(appeal_id,appeal_body,role='anon',error='permission denied')
+        result=appeal(appeal_id,appeal_body)
+        assert result['reference'].startswith('B-')
+        assert appeal(appeal_id,appeal_body)==result
+        appeal(appeal_id,appeal_body+' Different.',error='cannot be reused')
+        appeal(str(uuid4()),appeal_body,error='wait a minute')
+        assert sql(f"select category from khub_bot.bug_reports where id='{appeal_id}';")=='appeal'
+        assert sql(f"select reporter_kol_id from khub_bot.bug_reports where id='{appeal_id}';")=='299001'
+        appeal_notice=json.loads(sql(f"select to_jsonb(d) from khub_bot.deliveries d join khub_bot.bug_report_deliveries l on l.delivery_id=d.id where l.report_id='{appeal_id}';"))
+        assert appeal_notice['recipient_id']==3552305 and appeal_notice['kind']=='notice'
+        assert 'Ban appeal '+result['reference'] in appeal_notice['display_message']
+        assert '&lt;example&gt; &amp; context.' in appeal_notice['display_message']
+        assert support_inbox('appeal')['total']==2
+        support_inbox(uid=prefix_job['user_id'],error='Administrator access required')
+        sql("select public.create_auction('escrow item',2,100,24,null,null,1);",prefix_job['user_id'],'authenticated',error='restricted')
+        assert sql(f"select is_banned from public.profiles where id='{prefix_job['user_id']}';")=='t'
+        sql(f"update public.profiles set kol_verified_at=null where id='{double_job['user_id']}';")
+        appeal(str(uuid4()),appeal_body,uid=double_job['user_id'],error='verified kHub account')
+        # Confirmation reminders are participant-specific and filtered before pagination.
+        sql(migration_sql('202610200030_unconfirmed_trade_reminders.sql'))
+        all_pending=pending_trades(SELLER)
+        reminder=next(r['id'] for r in all_pending['rows'] if r['winner_id']==BUYER)
+        reminder_winner=sql(f"select winner_id from public.auctions where id='{reminder}';")
+        prior_total=all_pending['total']
+        winner_total=pending_trades(reminder_winner)['total']
+        sql(f"select public.confirm_auction_trade('{reminder}');",SELLER,'authenticated')
+        assert pending_trades(SELLER)['total']==prior_total-1
+        assert pending_trades(reminder_winner)['total']==winner_total
+        seller_pages=[pending_trades(SELLER,p) for p in range(1,(prior_total-2)//12+2)]
+        assert all(a['id']!=reminder for page in seller_pages for a in page['rows'])
+        assert len({a['id'] for page in seller_pages for a in page['rows']})==prior_total-1
+        assert sql(f"select status from public.auctions where id='{reminder}';")=='awaiting_trade'
+        details=read_page('detail',SELLER,'authenticated',id=reminder)['rows'][0]
+        assert details['seller_confirmed_at'] is not None and details['settlement_contacts'] is not None
+        sql(f"select public.confirm_auction_trade('{reminder}');",reminder_winner,'authenticated')
+        assert pending_trades(reminder_winner)['total']==winner_total-1
+        assert sql(f"select status from public.auctions where id='{reminder}';")=='completed'
+        assert pending_trades(None)['rows']==[]
+        sql('select public.read_pending_trades();',role='anon',error='permission denied')
+        # Negative participant responses require a private reason and cannot turn into success.
+        sql(migration_sql('202610200031_trade_reports.sql'))
+        trade_problem=direct_create('500',uid=competitor)
+        sql(f"select public.purchase_auction('{trade_problem}');",BUYER,'authenticated')
+        problem_key=str(uuid4()); problem_body='Received nothing. <proof> & timeline.'
+        def trade_report(key,lot,body,uid=competitor,error=None):
+            result=sql(f"select public.submit_trade_report('{key}','{lot}',{literal(body)});",uid,'authenticated',error=error)
+            return None if error else json.loads(result)
+        sql(f"select public.submit_trade_report('{problem_key}','{trade_problem}','Reason long enough.');",role='anon',error='permission denied')
+        trade_report(problem_key,trade_problem,problem_body,uid=SELLER,error='Only the seller or winning buyer')
+        trade_report(problem_key,default_escrow,problem_body,error='Only the seller or winning buyer')
+        trade_report(problem_key,trade_problem,'short',error='10 to 2,000')
+        sql(f"update khub_bot.bug_reports set created_at=now()-interval '2 hours' where reporter_id in ('{competitor}','{BUYER}');")
+        saved_problem=trade_report(problem_key,trade_problem,problem_body)
+        assert trade_report(problem_key,trade_problem,problem_body)==saved_problem
+        trade_report(problem_key,trade_problem,problem_body+' Changed.',error='cannot be reused')
+        trade_report(str(uuid4()),trade_problem,problem_body,error='already submitted')
+        sql(f"select public.confirm_auction_trade('{trade_problem}');",competitor,'authenticated',error='already reported')
+        assert trade_problem not in [r['id'] for r in pending_trades(competitor)['rows']]
+        assert trade_problem in [r['id'] for page in range(1,10) for r in pending_trades(BUYER,page)['rows']]
+        own=read_page('detail',competitor,'authenticated',id=trade_problem)['rows'][0]
+        counterparty=read_page('detail',BUYER,'authenticated',id=trade_problem)['rows'][0]
+        outsider=read_page('detail',SELLER,'authenticated',id=trade_problem)['rows'][0]
+        assert own['own_trade_report']==saved_problem['reference'] and own['trade_reported']
+        assert counterparty['own_trade_report'] is None and counterparty['trade_reported']
+        assert outsider['own_trade_report'] is None and outsider['trade_reported'] is None
+        assert problem_body not in json.dumps(read_page('detail',BUYER,'authenticated',id=trade_problem))
+        admin_problem=next(r for r in support_inbox('trade')['reports'] if r['reference']==saved_problem['reference'])
+        assert admin_problem['auction_id']==trade_problem and admin_problem['reporter_role']=='seller'
+        assert admin_problem['body']==problem_body
+        private_report_id=sql(f"select report_id from khub_bot.trade_reports where auction_id='{trade_problem}';")
+        notice=json.loads(sql(f"select to_jsonb(d) from khub_bot.deliveries d join khub_bot.bug_report_deliveries l on l.delivery_id=d.id where l.report_id='{private_report_id}';"))
+        assert notice['recipient_id']==3552305 and notice['kind']=='notice'
+        assert '&lt;proof&gt; &amp; timeline.' in notice['display_message']
+        sql(f"select public.confirm_auction_trade('{trade_problem}');",BUYER,'authenticated')
+        assert sql(f"select status from public.auctions where id='{trade_problem}';")=='awaiting_trade'
+        assert sql(f"select seller_confirmed_at is null and buyer_confirmed_at is not null from public.auctions where id='{trade_problem}';")=='t'
+        trade_report(str(uuid4()),trade_problem,problem_body,uid=BUYER,error='already confirmed')
+        for role in ['anon','authenticated']:
+            sql('select * from khub_bot.trade_reports;',role=role,error='permission denied')
+        # Buyer-negative and seller-positive have the same behavior.
+        buyer_problem=direct_create('500',uid=competitor)
+        sql(f"select public.purchase_auction('{buyer_problem}');",BUYER,'authenticated')
+        trade_report(str(uuid4()),buyer_problem,problem_body,uid=BUYER)
+        sql(f"select public.confirm_auction_trade('{buyer_problem}');",competitor,'authenticated')
+        assert sql(f"select status from public.auctions where id='{buyer_problem}';")=='awaiting_trade'
+        # Concurrent positive and negative responses by one participant cannot both win.
+        sql(f"update khub_bot.bug_reports set created_at=now()-interval '61 seconds' where reporter_id='{competitor}';")
+        response_race=direct_create('500',uid=competitor)
+        sql(f"select public.purchase_auction('{response_race}');",BUYER,'authenticated')
+        def race_response(negative):
+            try:
+                if negative: trade_report(str(uuid4()),response_race,problem_body)
+                else: sql(f"select public.confirm_auction_trade('{response_race}');",competitor,'authenticated')
+                return True
+            except AssertionError as failure:
+                assert 'already confirmed' in str(failure) or 'already reported' in str(failure)
+                return False
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            assert sum(pool.map(race_response,[True,False]))==1
+        assert sql(f"select (seller_confirmed_at is not null)::integer+(select count(*) from khub_bot.trade_reports where auction_id=a.id and reporter_id=a.seller_id) from public.auctions a where id='{response_race}';")=='1'
+        # Immediate direct feedback, optional explanations, administrator corrections and public winners.
+        old_messages=sql('select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d;')
+        old_bodies=sql('select jsonb_agg(jsonb_build_array(id,body) order by id) from khub_bot.bug_reports;')
+        sql(migration_sql('202610200032_direct_feedback_and_public_winners.sql'))
+        assert sql('select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d;')==old_messages
+        assert sql('select jsonb_agg(jsonb_build_array(id,body) order by id) from khub_bot.bug_reports;')==old_bodies
+        new_buyer_job=prepare_account(account_mail(99032,sid=399032,name='Feedback Buyer'))
+        provision(new_buyer_job)
+        sql("select public.bot_finish_account_job('99032');",role='service_role')
+        fresh_buyer=new_buyer_job['user_id']
+        def feedback(uid):
+            return read_page('seller',id=uid,status='all')['seller']['stats']
+        baseline=feedback(competitor)
+        feedback_sale=direct_create('500',uid=competitor)
+        # An expired UI timer alone cannot publish a winner.
+        still_open=read_page('detail',id=feedback_sale)['rows'][0]
+        assert still_open['winner_public'] is False and still_open['winner_id'] is None
+        sql(f"select public.purchase_auction('{feedback_sale}');",fresh_buyer,'authenticated')
+        closed_public=read_page('detail',id=feedback_sale)['rows'][0]
+        assert closed_public['winner_public'] and closed_public['winner_id']==fresh_buyer
+        assert closed_public['winner_username']=='Feedback Buyer'
+        assert closed_public['settlement_contacts'] is None and closed_public['highest_bidder_id'] is None
+        public_bids=read_page('detail',id=feedback_sale)['bids']
+        assert all(row['bidder_id'] is None and row['bidder_username'].startswith('Bidder ') for row in public_bids)
+        buyer_only=read_page('seller',id=fresh_buyer,status='all')
+        assert buyer_only['seller']['username']=='Feedback Buyer' and buyer_only['total']==0 and buyer_only['rows']==[]
+        silent_key=str(uuid4())
+        notices_before=sql('select count(*) from khub_bot.deliveries;')
+        silent=trade_report(silent_key,feedback_sale,'',uid=fresh_buyer)
+        assert silent['notification']=='not_queued'
+        assert trade_report(silent_key,feedback_sale,'   ',uid=fresh_buyer)==silent
+        assert sql('select count(*) from khub_bot.deliveries;')==notices_before
+        assert feedback(competitor)['seller_negative']==baseline['seller_negative']+1
+        assert feedback(fresh_buyer)['buyer_negative']==0
+        silent_id=sql(f"select report_id from khub_bot.trade_reports where auction_id='{feedback_sale}' and reporter_id='{fresh_buyer}';")
+        admin_silent=next(r for r in support_inbox('trade')['reports'] if r['id']==silent_id)
+        assert admin_silent['negative_counted'] is True and admin_silent['has_explanation'] is False
+        assert admin_silent['target_username']=='Actual Long KoL Character Name'
+        assert admin_silent['body']=='No explanation provided.' and admin_silent['notification']=='not_queued'
+        def review_rating(counted,uid=owner_id,reason='Reviewed the available evidence.',error=None):
+            sql(f"select public.review_trade_rating('{silent_id}',{str(counted).lower()},{literal(reason)});",uid,'authenticated',error=error)
+        review_rating(False,uid=fresh_buyer,error='Administrator access required')
+        sql(f"select public.review_trade_rating('{silent_id}',false,'Reason given');",role='anon',error='permission denied')
+        review_rating(False,reason='',error='review reason')
+        review_rating(False)
+        assert feedback(competitor)['seller_negative']==baseline['seller_negative']
+        assert sql(f"select count(*) from khub_bot.trade_reports where report_id='{silent_id}';")=='1'
+        assert sql(f"select count(*) from khub_bot.trade_rating_reviews where report_id='{silent_id}';")=='1'
+        review_rating(False)
+        assert sql(f"select count(*) from khub_bot.trade_rating_reviews where report_id='{silent_id}';")=='1'
+        review_rating(True)
+        assert feedback(competitor)['seller_negative']==baseline['seller_negative']+1
+        assert sql(f"select count(*) from khub_bot.trade_rating_reviews where report_id='{silent_id}';")=='2'
+        # Closing an inbox item is separate from whether its rating counts.
+        sql(f"select public.set_bug_report_status('{silent_id}','resolved');",owner_id,'authenticated')
+        assert feedback(competitor)['seller_negative']==baseline['seller_negative']+1
+        # One positive reply remains a positive response, not a completed sale.
+        sql(f"select public.confirm_auction_trade('{feedback_sale}');",competitor,'authenticated')
+        assert feedback(fresh_buyer)['buyer_positive']==1
+        assert sql(f"select status from public.auctions where id='{feedback_sale}';")=='awaiting_trade'
+        # A seller's negative response counts against the buyer role only, without notification spam.
+        buyer_feedback_sale=direct_create('500',uid=competitor)
+        sql(f"select public.purchase_auction('{buyer_feedback_sale}');",fresh_buyer,'authenticated')
+        trade_report(str(uuid4()),buyer_feedback_sale,'',uid=competitor)
+        assert feedback(fresh_buyer)['buyer_negative']==1 and feedback(fresh_buyer)['seller_negative']==0
+        assert sql('select count(*) from khub_bot.deliveries;')==notices_before
+        # Optional short explanations are accepted; only explained reports queue KMail.
+        explained_sale=direct_create('500',uid=competitor)
+        sql(f"select public.purchase_auction('{explained_sale}');",fresh_buyer,'authenticated')
+        explained=trade_report(str(uuid4()),explained_sale,'x',uid=fresh_buyer)
+        assert explained['notification']=='queued'
+        assert sql('select count(*) from khub_bot.deliveries;')==str(int(notices_before)+1)
+        trade_report(str(uuid4()),explained_sale,'x'*2001,uid=competitor,error='optional explanation')
+        for role in ['anon','authenticated']:
+            sql('select * from khub_bot.trade_rating_reviews;',role=role,error='permission denied')
+            sql(f"select khub_bot.profile_feedback('{fresh_buyer}');",role=role,error='permission denied')
+        # Escrow winners are also public after server close; private contact/player IDs stay hidden.
+        escrow_finished=sql("select id from public.auctions where escrow_mode and finalized_at is not null and winner_id is not null and status in ('settling','completed') order by id limit 1;")
+        assert escrow_finished
+        escrow_public=read_page('detail',id=escrow_finished)['rows'][0]
+        assert escrow_public['winner_public'] and escrow_public['winner_id'] is not None
+        assert escrow_public['settlement_contacts'] is None
+        assert 'kol_player_id' not in escrow_public
+        # Rating KMail is transactional, correctly addressed and exactly once per response.
+        notifications_before=sql('select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d;')
+        sql(migration_sql('202610200033_rating_notifications.sql'))
+        assert sql('select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d;')==notifications_before
+        assert sql('select count(*) from khub_bot.rating_notifications;')=='0'
+        def rating_notices(lot):
+            return json.loads(sql(f"select coalesce(jsonb_agg(jsonb_build_object('actor',n.actor_id,'recipient',n.recipient_id,'positive',n.positive,'role',n.recipient_role,'delivery',n.delivery_id,'kol_id',d.recipient_id,'body',d.display_message,'kind',d.kind,'meat',d.meat,'item_id',d.item_id,'auction_id',d.auction_id)),'[]') from khub_bot.rating_notifications n join khub_bot.deliveries d on d.id=n.delivery_id where n.auction_id='{lot}';"))
+        notice_trade=direct_create('500',uid=competitor)
+        sql(f"select public.purchase_auction('{notice_trade}');",fresh_buyer,'authenticated')
+        sql(f"select public.confirm_auction_trade('{notice_trade}');",fresh_buyer,'authenticated')
+        first_notice=rating_notices(notice_trade)[0]
+        assert first_notice['actor']==fresh_buyer and first_notice['recipient']==competitor
+        assert first_notice['role']=='seller' and first_notice['positive'] is True
+        assert first_notice['kol_id']==101015
+        assert 'Feedback Buyer was satisfied' in first_notice['body']
+        assert 'Positive rating has been added to your profile as a seller' in first_notice['body']
+        assert first_notice['kind']=='notice' and first_notice['meat']==0 and first_notice['item_id'] is None and first_notice['auction_id'] is None
+        sql(f"select public.confirm_auction_trade('{notice_trade}');",fresh_buyer,'authenticated')
+        assert len(rating_notices(notice_trade))==1
+        sql(f"select public.confirm_auction_trade('{notice_trade}');",competitor,'authenticated')
+        both_notices=rating_notices(notice_trade)
+        assert len(both_notices)==2
+        buyer_notice=next(r for r in both_notices if r['role']=='buyer')
+        assert buyer_notice['recipient']==fresh_buyer and buyer_notice['positive'] and buyer_notice['kol_id']==399032
+        assert 'as a buyer' in buyer_notice['body']
+        assert sql(f"select status from public.auctions where id='{notice_trade}';")=='completed'
+        sql(f"select public.confirm_auction_trade('{notice_trade}');",competitor,'authenticated')
+        assert len(rating_notices(notice_trade))==2
+        # Mixed responses notify both rated players even though the sale remains pending.
+        mixed=direct_create('500',uid=competitor)
+        sql(f"select public.purchase_auction('{mixed}');",fresh_buyer,'authenticated')
+        sql(f"select public.confirm_auction_trade('{mixed}');",fresh_buyer,'authenticated')
+        admin_notices_before=sql('select count(*) from khub_bot.deliveries where recipient_id=3552305;')
+        trade_report(str(uuid4()),mixed,'',uid=competitor)
+        mixed_notices=rating_notices(mixed)
+        assert len(mixed_notices)==2
+        negative_notice=next(r for r in mixed_notices if not r['positive'])
+        assert negative_notice['recipient']==fresh_buyer and negative_notice['role']=='buyer'
+        assert 'was not satisfied with the trade' in negative_notice['body']
+        assert 'Negative rating has been added to your profile as a buyer' in negative_notice['body']
+        assert sql(f"select status from public.auctions where id='{mixed}';")=='awaiting_trade'
+        assert sql('select count(*) from khub_bot.deliveries where recipient_id=3552305;')==admin_notices_before
+        # Optional private explanations never go into the recipient notification.
+        sql(f"update khub_bot.bug_reports set created_at=now()-interval '2 hours' where reporter_id='{fresh_buyer}';")
+        explained_notice_trade=direct_create('500',uid=competitor)
+        sql(f"select public.purchase_auction('{explained_notice_trade}');",fresh_buyer,'authenticated')
+        trade_report(str(uuid4()),explained_notice_trade,'SECRET_REPORT_ONLY private explanation.',uid=fresh_buyer)
+        assert 'SECRET_REPORT_ONLY' not in rating_notices(explained_notice_trade)[0]['body']
+        assert sql('select count(*) from khub_bot.deliveries where recipient_id=3552305;')==str(int(admin_notices_before)+1)
+        # Administrator-initiated reconciliation can notify older feedback, without a bulk resend.
+        sql(f"select public.notify_auction_ratings('{feedback_sale}');",fresh_buyer,'authenticated',error='Administrator access required')
+        sql(f"select public.notify_auction_ratings('{feedback_sale}');",role='anon',error='permission denied')
+        queued=json.loads(sql(f"select public.notify_auction_ratings('{feedback_sale}');",owner_id,'authenticated'))
+        assert queued=={'queued':2,'remaining':0}
+        assert json.loads(sql(f"select public.notify_auction_ratings('{feedback_sale}');",owner_id,'authenticated'))=={'queued':0,'remaining':0}
+        assert len(rating_notices(feedback_sale))==2
+        admin_delivery=next(r for r in support_inbox('trade',status='all')['reports'] if r['id']==silent_id)
+        assert admin_delivery['rating_notification']=='queued' and admin_delivery['missing_rating_notices']==0
+        sql(f"select public.notify_auction_ratings('{escrow_finished}');",owner_id,'authenticated',error='direct-settlement')
+        # Missing recipient verification cannot block feedback or guess a destination.
+        unverifiable=direct_create('500',uid=competitor)
+        sql(f"select public.purchase_auction('{unverifiable}');",fresh_buyer,'authenticated')
+        sql(f"update public.profiles set kol_verified_at=null where id='{competitor}';")
+        sql(f"select public.confirm_auction_trade('{unverifiable}');",fresh_buyer,'authenticated')
+        assert rating_notices(unverifiable)==[]
+        assert json.loads(sql(f"select public.notify_auction_ratings('{unverifiable}');",owner_id,'authenticated'))=={'queued':0,'remaining':1}
+        sql(f"update public.profiles set kol_verified_at=now() where id='{competitor}';")
+        assert json.loads(sql(f"select public.notify_auction_ratings('{unverifiable}');",owner_id,'authenticated'))=={'queued':1,'remaining':0}
+        for role in ['anon','authenticated']:
+            sql('select * from khub_bot.rating_notifications;',role=role,error='permission denied')
+            sql(f"select khub_bot.queue_rating_notice('{notice_trade}','{fresh_buyer}');",role=role,error='permission denied')
+        # An uncertain notification keeps its original body and cannot be re-queued.
+        test_notice=rating_notices(unverifiable)[0]
+        sql(f"update khub_bot.deliveries set created_at='1960-01-01' where id='{test_notice['delivery']}';")
+        claimed_notice=json.loads(sql('select public.bot_claim_delivery(2);',role='service_role'))
+        assert claimed_notice['id']==test_notice['delivery']
+        pg_ctl('-l',str(Path(directory)/'postgres.log'),'-m','fast','-w','restart')
+        sql('select public.bot_claim_delivery(2);',role='service_role',error='Uncertain delivery')
+        assert json.loads(sql(f"select public.notify_auction_ratings('{unverifiable}');",owner_id,'authenticated'))=={'queued':0,'remaining':0}
+        assert len(rating_notices(unverifiable))==1 and rating_notices(unverifiable)[0]['body']==test_notice['body']
+        # Author resolution retains the original response and clears its negative count/inbox clutter.
+        frozen_notice_bodies=sql('select jsonb_agg(jsonb_build_array(id,display_message,state) order by id) from khub_bot.deliveries;')
+        sql(migration_sql('202610200034_trade_resolution.sql'))
+        assert sql('select jsonb_agg(jsonb_build_array(id,display_message,state) order by id) from khub_bot.deliveries;')==frozen_notice_bodies
+        mixed_report=sql(f"select report_id from khub_bot.trade_reports where auction_id='{mixed}' and reporter_id='{competitor}';")
+        before_negative=feedback(fresh_buyer)['buyer_negative']
+        sql(f"select public.withdraw_trade_rating('{mixed}');",fresh_buyer,'authenticated',error='Only the author')
+        sql(f"select public.withdraw_trade_rating('{mixed}');",role='anon',error='permission denied')
+        sql(f"select public.withdraw_trade_rating('{mixed}');",competitor,'authenticated')
+        assert feedback(fresh_buyer)['buyer_negative']==before_negative-1
+        assert sql(f"select status||':'||resolution_kind from khub_bot.bug_reports where id='{mixed_report}';")=='resolved:participant_resolved'
+        assert sql(f"select withdrawn_by from khub_bot.trade_rating_withdrawals where report_id='{mixed_report}';")==competitor
+        assert sql(f"select body from khub_bot.bug_reports where id='{mixed_report}';")=='No explanation provided.'
+        assert mixed_report not in [r['id'] for r in support_inbox('trade',status='open')['reports']]
+        assert mixed_report in [r['id'] for r in support_inbox('trade',status='self_resolved')['reports']]
+        withdrawal_count=sql('select count(*) from khub_bot.deliveries;')
+        sql(f"select public.withdraw_trade_rating('{mixed}');",competitor,'authenticated')
+        assert sql('select count(*) from khub_bot.deliveries;')==withdrawal_count
+        assert sql(f"select count(*) from khub_bot.trade_rating_withdrawals where report_id='{mixed_report}';")=='1'
+        sql(f"select public.review_trade_rating('{mixed_report}',true,'Attempted restoration after author withdrawal.');",owner_id,'authenticated',error='withdrawn by its author')
+        own_withdrawn=read_page('detail',competitor,'authenticated',id=mixed)['rows'][0]
+        assert own_withdrawn['own_trade_report_withdrawn'] and not own_withdrawn['trade_reported']
+        assert mixed in [r['id'] for page in range(1,10) for r in pending_trades(competitor,page)['rows']]
+        before_positive=feedback(fresh_buyer)['buyer_positive']
+        sql(f"select public.confirm_auction_trade('{mixed}');",competitor,'authenticated')
+        assert sql(f"select status from public.auctions where id='{mixed}';")=='completed'
+        assert feedback(fresh_buyer)['buyer_positive']==before_positive+1
+        revised_notices=rating_notices(mixed)
+        assert len(revised_notices)==3 and len([r for r in revised_notices if r['actor']==competitor])==2
+        sql(f"select public.confirm_auction_trade('{mixed}');",competitor,'authenticated')
+        assert len(rating_notices(mixed))==3
+        # Trade-query messages are separate from ratings and remain private to admins.
+        sql(f"update khub_bot.bug_reports set created_at=now()-interval '2 hours' where reporter_id='{fresh_buyer}';")
+        query_key=str(uuid4()); query_body='Please review my remaining concern about this trade.'
+        def trade_query(key,lot,body,uid=fresh_buyer,error=None):
+            result=sql(f"select public.submit_trade_query('{key}','{lot}',{literal(body)});",uid,'authenticated',error=error)
+            return None if error else json.loads(result)
+        feedback_before_query=feedback(fresh_buyer)
+        query_result=trade_query(query_key,mixed,query_body)
+        assert trade_query(query_key,mixed,query_body)==query_result
+        assert feedback(fresh_buyer)==feedback_before_query
+        trade_query(str(uuid4()),mixed,query_body,uid=SELLER,error='Only the seller or winner')
+        query_admin=next(r for r in support_inbox('trade')['reports'] if r['id']==query_key)
+        assert query_admin['message_type']=='trade_query' and query_admin['auction_id']==mixed
+        assert query_admin['reporter_role']=='buyer' and query_admin['negative_counted'] is None
+        assert query_body not in json.dumps(read_page('detail',competitor,'authenticated',id=mixed))
+        # Newly generated negative notices explain peer resolution and the auction's query link.
+        resolving_sale=direct_create('500',uid=competitor)
+        sql(f"select public.purchase_auction('{resolving_sale}');",fresh_buyer,'authenticated')
+        trade_report(str(uuid4()),resolving_sale,'',uid=competitor)
+        resolving_notice=rating_notices(resolving_sale)[0]['body']
+        assert 'try to resolve this with them' in resolving_notice and 'withdraw their negative rating' in resolving_notice
+        assert 'As a last resort' in resolving_notice and 'Ask an administrator about this trade' in resolving_notice
+        for role in ['anon','authenticated']:
+            sql('select * from khub_bot.trade_rating_withdrawals;',role=role,error='permission denied')
+            sql('select * from khub_bot.trade_queries;',role=role,error='permission denied')
+        # Account names are returned only to signed-in, unrestricted viewers.
+        sql(migration_sql('202610200035_authenticated_name_visibility.sql'))
+        public_identity=read_page('detail',id=mixed)['rows'][0]
+        assert public_identity['seller_username']=='Seller' and public_identity['winner_username']=='Winner'
+        assert public_identity['usernames_visible'] is False and not public_identity['winner_public']
+        assert public_identity['winner_id'] is None and public_identity['settlement_contacts'] is None
+        public_profile=read_page('seller',id=fresh_buyer,status='all')['seller']
+        assert public_profile['username']=='Player profile' and public_profile['usernames_visible'] is False
+        assert public_profile['stats']['buyer_positive']>=1
+        valid_view=read_page('detail',fresh_buyer,'authenticated',id=mixed)['rows'][0]
+        assert valid_view['usernames_visible'] and valid_view['winner_username']=='Feedback Buyer'
+        assert valid_view['seller_username']=='Actual Long KoL Character Name'
+        assert valid_view['settlement_contacts'] is not None
+        spectator=read_page('detail',SELLER,'authenticated',id=mixed)['rows'][0]
+        assert spectator['winner_username']=='Feedback Buyer' and spectator['settlement_contacts'] is None
+        # Auth-level bans are checked even when a browser still holds an old JWT.
+        sql(f"update auth.users set banned_until=now()+interval '1 day' where id='{fresh_buyer}';")
+        auth_banned=read_page('detail',fresh_buyer,'authenticated',id=mixed)['rows'][0]
+        assert not auth_banned['usernames_visible'] and auth_banned['winner_username']=='Winner' and auth_banned['seller_username']=='Seller'
+        assert auth_banned['settlement_contacts'] is None
+        sql(f"update auth.users set banned_until=null where id='{fresh_buyer}';")
+        # Profile bans and active identity bans independently deny names.
+        sql(f"update public.profiles set is_banned=true where id='{fresh_buyer}';")
+        assert not read_page('detail',fresh_buyer,'authenticated',id=mixed)['rows'][0]['usernames_visible']
+        sql(f"update public.profiles set is_banned=false where id='{fresh_buyer}';")
+        assert not read_page('detail',fresh_buyer,'authenticated',id=mixed)['rows'][0]['usernames_visible']
+        assert read_page('seller',fresh_buyer,'authenticated',id=competitor,status='all')['seller']['username']=='Player profile'
+        # Explicitly remove the identity ban in the isolated fixture to restore healthy access.
+        sql("update khub_bot.account_bans set active=false where kol_player_id=399032;")
+        assert read_page('detail',fresh_buyer,'authenticated',id=mixed)['rows'][0]['usernames_visible']
+        # Public gallery entries also avoid leaking usernames, player IDs or identifying reason text.
+        gallery_public=json.loads(sql('select public.khub_wall_of_shame();',role='anon'))
+        assert not gallery_public['usernames_visible']
+        for entry in gallery_public['entries']:
+            assert entry['kol_player_name']=='Banned player' and entry['kol_player_id'] is None
+            assert entry['public_reason']=='Log in with an unrestricted account to view this reviewed ban.'
+        for role in ['anon','authenticated']:
+            sql('select khub_bot.can_view_usernames();',role=role,error='permission denied')
+        sql(f"update auth.users set banned_until=now()+interval '1 day' where id='{owner_id}';")
+        assert sql('select public.khub_is_administrator();',owner_id,'authenticated')=='f'
+        support_inbox(uid=owner_id,error='Administrator access required')
+        sql(f"update auth.users set banned_until=null where id='{owner_id}';")
+        assert sql('select public.khub_is_administrator();',owner_id,'authenticated')=='t'
+        print('PASS: all database migration, escrow, recovery, permission and persistence checks; public seller profiles, bidder anonymity, participant-only identities and seller history pagination; optional escrow, private pending trades, two-party confirmation and direct bid races; large prices, exact precision and commission arithmetic; private bug inbox, administrator permissions and durable KMail reports')
     finally:
         if started:
             pg_ctl('-m', 'fast', '-w', 'stop')

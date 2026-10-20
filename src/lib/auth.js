@@ -27,69 +27,23 @@ export function createAuthService(client, { origin } = {}) {
         return new Error(error.message || "The email could not be sent. Please try again later.");
     }
 
-    function rejectConflicts(conflicts) {
-        if (conflicts?.username_taken && conflicts?.email_taken) {
-            throw new Error("This KHub username and email address are already registered. Please log in or use different details.");
-        }
-        if (conflicts?.username_taken) {
-            throw new Error("This KHub username is already registered. Please choose another username.");
-        }
-        if (conflicts?.email_taken) {
-            throw new Error("This email address is already registered. Please log in.");
-        }
-    }
-
     return {
-        async register({ khubUsername, email, password }) {
-            const username = khubUsername.trim();
-            const normalizedEmail = email.trim().toLowerCase();
-            if (!username || username.length > 16) {
-                throw new Error("KHub username must contain 1–16 characters.");
-            }
-            if (!normalizedEmail || password.length < 6) {
-                throw new Error("Enter an email address and a password of at least 6 characters.");
-            }
-            const api = requireClient();
-            const check = await api.rpc('registration_conflicts', {
-                p_username: username, p_email: normalizedEmail,
-            });
-            if (check.error || typeof check.data?.username_taken !== 'boolean' || typeof check.data?.email_taken !== 'boolean') {
-                throw new Error("Registration is temporarily unavailable. Please try again later.");
-            }
-            rejectConflicts(check.data);
-
-            const { data, error } = await api.auth.signUp({
-                email: normalizedEmail,
-                password,
-                options: { data: { khub_username: username }, emailRedirectTo: redirects().confirmation },
-            });
-            if (error) {
-                if (['user_already_exists', 'email_exists'].includes(error.code) || /user already registered/i.test(error.message)) {
-                    rejectConflicts({ email_taken: true });
-                }
-                if (error.code === "unexpected_failure" || /database error saving new user/i.test(error.message)) {
-                    // A competing signup may have claimed the name after
-                    // our first check; the unique index remains authoritative.
-                    const latest = await api.rpc('registration_conflicts', {
-                        p_username: username, p_email: normalizedEmail,
-                    });
-                    if (!latest.error) rejectConflicts(latest.data);
-                    throw new Error("Could not create your profile. The KHub username may already be taken. Try another username; if this continues, contact support.");
-                }
-                throw error;
-            }
-            // Supabase can hide existing confirmed emails behind a fake
-            // successful response with an empty identities array.
-            if (Array.isArray(data?.user?.identities) && data.user.identities.length === 0) {
-                rejectConflicts({ email_taken: true });
-            }
-            return data;
+        async register() {
+            throw new Error("Register through kHub KMail. Send REGISTER from the KoL account you want to link.");
         },
 
-        async login(email, password) {
-            const { data, error } = await requireClient().auth.signInWithPassword({
-                email: email.trim(), password,
-            });
+        async login(identifier, password, { appeal = false } = {}) {
+            const api = requireClient();
+            const value = identifier.trim();
+            let email = value;
+            if (/^KH_/i.test(value) || !value.includes('@')) {
+                if (!/^KH_.+/i.test(value)) throw new Error("Use your kHub username: KH_ followed by your KoL name.");
+                const resolved = await api.rpc(appeal ? 'khub_appeal_login_address' : 'khub_login_address', { p_username: value });
+                if (resolved.error) throw new Error("Username login is temporarily unavailable. Please try again later.");
+                if (!resolved.data) throw new Error("Invalid username or password. Older email accounts should use their registered email address.");
+                email = resolved.data;
+            }
+            const { data, error } = await api.auth.signInWithPassword({ email: email.toLowerCase(), password });
             if (error) throw error;
             return data;
         },
@@ -112,7 +66,7 @@ export function createAuthService(client, { origin } = {}) {
         },
 
         async updatePassword(password) {
-            if (password.length < 6) throw new Error("Password must contain at least 6 characters.");
+            if (password.length < 12) throw new Error("Password must contain at least 12 characters.");
             const { error } = await requireClient().auth.updateUser({ password });
             if (error) throw error;
         },
@@ -120,13 +74,14 @@ export function createAuthService(client, { origin } = {}) {
         async loadProfile(user) {
             const { data, error } = await requireClient()
                 .from("profiles")
-                .select("id, khub_username")
+                .select("id, khub_username, is_banned, account_method")
                 .eq("id", user.id)
                 .single();
             if (error || !data) {
                 throw new Error("Your profile could not be loaded. Please sign out and sign in again. If this continues, contact support.");
             }
-            return { id: data.id, khubUsername: data.khub_username, email: user.email };
+            if (data.is_banned) throw new Error("This kHub account is restricted. Please contact support.");
+            return { id: data.id, khubUsername: data.khub_username, email: data.account_method === 'kmail' ? null : user.email, accountMethod: data.account_method };
         },
     };
 }

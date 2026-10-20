@@ -5,10 +5,13 @@ import { auctionFilters, auctionSorts, browseAuctions } from '../lib/auctionBrow
 import { useNow } from '../hooks/useNow';
 import AuctionCard from '../components/AuctionCard';
 import AuctionNavigation from '../components/AuctionNavigation';
+import PendingTrades from '../components/PendingTrades';
+import useAuctionSearch from '../hooks/useAuctionSearch';
 
 export default function AllAuctions() {
     const { auctions, total, isLoading, error } = useContext(AuctionsContext);
     const [params, setParams] = useSearchParams();
+    const [searchInput, setSearchInput] = useAuctionSearch();
     const now = useNow();
     const search = params.get('q') || '';
     const status = auctionFilters.some(([value]) => value === params.get('status')) ? params.get('status') : 'active';
@@ -32,10 +35,11 @@ export default function AllAuctions() {
             <AuctionNavigation />
             <main className="mx-auto max-w-6xl">
                 <h1 className="my-6 text-center text-3xl font-bold text-[#7695FF] sm:text-4xl">All Auctions</h1>
+                <PendingTrades />
                 <section aria-label="Find auctions" className="mb-6 grid gap-4 rounded-lg border bg-white p-4 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr]">
                     <div className="min-w-0 sm:col-span-2 lg:col-span-1">
                         <label htmlFor="auction-search" className="mb-1 block text-sm font-semibold">Search item names</label>
-                        <input id="auction-search" type="search" value={search} onChange={(event) => update('q', event.target.value)}
+                        <input id="auction-search" type="search" value={searchInput} onChange={(event) => setSearchInput(event.target.value)}
                             placeholder="Search for an item…" className="min-h-11 w-full min-w-0 rounded border border-gray-400 bg-white p-3 text-base text-gray-900" />
                     </div>
                     <div className="min-w-0">
@@ -55,7 +59,7 @@ export default function AllAuctions() {
                 {isLoading ? <p role="status">Loading auctions…</p> : <>
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                         <p role="status">{found} {found === 1 ? 'auction' : 'auctions'} found</p>
-                        <button onClick={() => setParams({}, { replace: true })} className="min-h-11 bg-transparent px-3 text-blue-700 underline">Reset filters</button>
+                        <button onClick={() => { setSearchInput(''); setParams({}, { replace: true }); }} className="min-h-11 bg-transparent px-3 text-blue-700 underline">Reset filters</button>
                     </div>
                     {!error && visible.length === 0 && <p className="rounded-lg border bg-white p-6">{auctions.length === 0 ? 'No auctions have been listed yet.' : 'No auctions match your search and filters. Try another item name or status.'}</p>}
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

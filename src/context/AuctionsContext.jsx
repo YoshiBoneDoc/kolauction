@@ -10,43 +10,64 @@ export const AuctionsContext = createContext();
 const storage = createAuctionService(supabase);
 
 export const AuctionsProvider = ({ children }) => {
-    const { currentUser } = useContext(UserContext);
+    const { currentUser, signedInUserId } = useContext(UserContext);
+    const viewerId = signedInUserId === undefined ? currentUser?.id : signedInUserId;
     const { pathname, search } = useLocation();
     const request = useMemo(() => auctionReadRequest(pathname, search), [pathname, search]);
-    const key = JSON.stringify([request, currentUser?.id]);
+    const [pendingPage, setPendingPage] = useState(1);
+    const showPending = Boolean(currentUser?.id && ['home', 'browse'].includes(request?.view));
+    const key = JSON.stringify([request, viewerId, showPending ? pendingPage : null]);
+    const sellerScope = request?.view === 'seller' ? JSON.stringify([request.id, viewerId ?? null]) : null;
     const [snapshot, setSnapshot] = useState(null);
     const requestVersion = useRef(0);
     const inFlight = useRef(null);
     const matches = snapshot?.key === key;
     const auctions = matches ? snapshot.auctions : [];
     const total = matches ? snapshot.total : 0;
+    const seller = sellerScope && snapshot?.sellerScope === sellerScope ? snapshot.seller : null;
     const error = matches ? snapshot.error : '';
+    const pendingTrades = matches ? snapshot.pendingTrades || [] : [];
+    const pendingTotal = matches ? snapshot.pendingTotal || 0 : 0;
+    const pendingError = matches ? snapshot.pendingError || '' : '';
+
+    useEffect(() => {
+        if (matches && !pendingError && pendingPage > Math.max(1, Math.ceil(pendingTotal / 12))) setPendingPage(Math.max(1, Math.ceil(pendingTotal / 12)));
+    }, [matches, pendingError, pendingPage, pendingTotal]);
     const isLoading = Boolean(request && !matches);
 
     const refreshAuctions = useCallback(() => {
         if (!request || (request.view === 'profile' && !currentUser?.id)) return Promise.resolve();
         if (inFlight.current?.key === key) return inFlight.current.promise;
         const version = ++requestVersion.current;
-        const promise = storage.load(request).then((data) => {
-            if (version === requestVersion.current) setSnapshot({ key, ...data, error: '' });
+        const readPending = () => showPending ? storage.pendingTrades(pendingPage).then(data => ({
+            pendingTrades: data.auctions, pendingTotal: data.total, pendingError: '',
+        })).catch(failure => ({ pendingTrades: [], pendingTotal: 0, pendingError: failure.message })) : Promise.resolve({});
+        const promise = storage.load(request).then(async (data) => {
+            // The main load closes expired auctions before reading personal trades.
+            const pending = await readPending();
+            if (version === requestVersion.current) setSnapshot({ key, sellerScope, ...data, ...pending, error: '' });
         }).catch((failure) => {
             if (version === requestVersion.current) setSnapshot((previous) => ({
-                key, auctions: previous?.key === key ? previous.auctions : [],
+                key, sellerScope, auctions: previous?.key === key ? previous.auctions : [],
                 total: previous?.key === key ? previous.total : 0, error: failure.message,
+                seller: sellerScope && previous?.sellerScope === sellerScope ? previous.seller : null,
+                pendingTrades: previous?.key === key ? previous.pendingTrades : [],
+                pendingTotal: previous?.key === key ? previous.pendingTotal : 0,
+                pendingError: showPending ? failure.message : '',
             }));
         }).finally(() => {
             if (inFlight.current?.promise === promise) inFlight.current = null;
         });
         inFlight.current = { key, promise };
         return promise;
-    }, [request, key, currentUser?.id]);
+    }, [request, key, sellerScope, currentUser?.id, showPending, pendingPage]);
 
     useEffect(() => {
         const requests = requestVersion;
         if (!request || (request.view === 'profile' && !currentUser?.id)) return;
         const stop = startAuctionRefresh({
             refresh: refreshAuctions, delay: auctionRefreshDelay(request), document, window,
-            initialDelay: request.view === 'browse' && request.search ? 250 : 0,
+            initialDelay: ['browse', 'seller'].includes(request.view) && request.search ? 250 : 0,
         });
         return () => {
             ++requests.current;
@@ -104,7 +125,7 @@ export const AuctionsProvider = ({ children }) => {
     };
 
     return (
-        <AuctionsContext.Provider value={{ auctions, total, isLoading, error, addAuction, placeBid, purchaseAuction, confirmTrade, cancelAuction, refreshAuctions }}>
+        <AuctionsContext.Provider value={{ auctions, total, seller, isLoading, error, pendingTrades, pendingTotal, pendingPage, setPendingPage, pendingError, addAuction, placeBid, purchaseAuction, confirmTrade, cancelAuction, refreshAuctions }}>
             {error && (
                 <div role="alert" className="bg-red-50 text-red-700 p-4">
                     {error}{" "}

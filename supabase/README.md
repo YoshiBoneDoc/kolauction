@@ -1,5 +1,371 @@
 # User profile database setup
 
+For the public framed ban gallery, see [Wall of Shame setup](WALL_OF_SHAME.md).
+
+## Authenticated name visibility (`035`)
+
+Apply `migrations/queue/202610200035_authenticated_name_visibility.sql` after `034`
+and deploy the website. This supersedes the earlier public-name rules below.
+Signed-out viewers and accounts restricted by profile, identity or Supabase Auth
+ban receive generic seller/winner/profile labels from the database. Browsing,
+prices, outcomes and aggregate statistics remain available. The frontend also
+masks names on logout and separates cached data by the actual authenticated user.
+Seller profiles keep generic navigation links for visitors.
+
+Signed-in, unrestricted accounts can see seller names and server-finalized winner
+names. Private trading contacts remain limited to the actual seller/winner, and
+are withheld from restricted accounts. Live/losing bid identities remain anonymous.
+The gallery similarly hides player names/numbers and identifying reason text from
+outsiders. Private administrator access also checks Auth-level bans. No stored
+profile name, auction result, report or KMail is changed by this migration.
+
+## Self-resolution and trade queries (`034`)
+
+Apply `migrations/queue/202610200034_trade_resolution.sql` after the already-applied
+`033`. New negative-rating KMail encourages resolving the trade with the other
+party, explains author withdrawal, and points to Ask an administrator about this
+trade as a last resort. Existing queued/uncertain messages remain unchanged.
+
+The author can Withdraw thumbs down on the auction page. This removes its negative
+count, notifies the recipient, and marks the original inbox entry Resolved by
+reporter. A matching inbox filter keeps these out of Open messages while retaining
+the original report and an author/timestamp audit record. Administrators cannot
+restore withdrawn feedback. Withdrawal alone is neutral: a separate positive
+confirmation is required to give a thumbs up or complete the sale.
+
+If the author later confirms receipt, a separate positive KMail is safely queued.
+Notification uniqueness includes the feedback polarity, preserving the original
+negative-delivery evidence. Repeated withdrawal/confirmation calls do not duplicate
+notices. Rating recipients still require verified KoL numbers.
+
+A participant-only Trade query form is linked from each closed direct auction.
+Queries are private administrator messages, associated with the auction, and do
+not modify either party's rating. Messages and notification copies use the existing
+inbox limits and durable KMail queue. No bot code update or second instance is needed.
+
+## Rating KMail and reputation summary (`033`)
+
+Apply `migrations/queue/202610200033_rating_notifications.sql` after `032`, then
+deploy the website. New direct-trade confirmations and thumbs-downs atomically
+queue one zero-asset KMail to the rated player. Seller feedback goes to the seller;
+buyer feedback goes to the winner. A rating notification is sent even when a
+negative response has no explanation. The explanation stays administrator-only;
+blank responses still do not queue an administrator copy.
+
+Each notification is durably linked to the auction, author, recipient and delivery.
+Retries, duplicate confirmations and uncertain sends cannot queue another copy.
+Existing feedback is not mass-notified. In its trade inbox entry, administrators
+can use **Send missing rating notices** to queue both parties' missing notices for
+that auction. Recipients need verified KoL player numbers; missing verification is
+reported rather than guessed. Existing queued delivery bodies are not rewritten.
+The current worker handles these notices without a code update or extra instance.
+
+The detailed public profile shows As Seller, As Buyer and Overall positive/negative
+counts and scores. Score is positive minus negative; overall combines both roles.
+The compact sidebar shows the overall score. Escrow is excluded, and one positive
+response is not proof the entire sale completed.
+
+## Direct feedback and public winners (`032`)
+
+Apply `migrations/queue/202610200032_direct_feedback_and_public_winners.sql` after
+`031`, then deploy the website. This supersedes the earlier review-first rating and
+always-anonymous winner rules below.
+
+- A participant's thumbs down counts immediately against the other party, in their
+  seller or buyer rating. Existing `031` reports count by default too. Positive
+  counts use the other participant's explicit receipt confirmation. Escrow sales
+  contribute to neither rating. A positive response alone is not a completed sale.
+- Trade explanations are optional (0–2,000 characters). A blank response creates one
+  inbox entry for rating review, without KMail. Explained reports still queue a
+  KMail copy, with the existing cooldown, splitting and uncertain-send protection.
+  One response per participant per trade and safe retries still apply.
+- The administrator inbox shows Remove/Restore thumbs-down count. Each effective
+  change requires a private review reason and records administrator, timestamp and
+  previous/new eligibility. Original feedback stays intact. Resolving an inbox
+  message does not change its rating count; excluding a count does not mark the
+  trade completed or erase either party's response.
+- Public profiles now show distinct seller/buyer counts, including accounts with
+  completed bidding as a winner but no hosted listings. Buyer histories and private
+  explanations are not added to the public profile.
+- Once the server freezes a winning result (`awaiting_trade`, `settling` or
+  `completed` with `finalized_at`), its public winner username/profile is visible
+  to everyone. An expired browser timer alone does not reveal the winner. Live and
+  losing bid identities remain anonymous. Verified player numbers and direct-trade
+  contact details remain limited to the actual seller and winner.
+
+No existing queued KMail, password, auction result or delivery is rewritten or
+resent. No bot update/restart or additional instance is required.
+
+## Direct-trade problem reports (`031`)
+
+Apply `migrations/queue/202610200031_trade_reports.sql` after `030`, then deploy
+the website. Pending trade cards and private auction details offer a red thumbs-down
+link to a required explanation form. Only the verified seller/winner of a closed
+direct sale awaiting settlement can submit. Reports enter the administrator inbox's
+Trade queries tab with auction/participant-role context and a durable KMail copy.
+Reasons remain administrator-only. Participants see a reported-issue notice, and
+the reporter's own reminder clears. The other participant can still respond.
+
+A positive confirmation and a negative report are mutually exclusive for each
+participant. Retries are idempotent, duplicate reports are prevented, and concurrent
+positive/negative responses serialize with settlement. A reported sale remains
+awaiting settlement even if the other party confirms. Reports are not automatic
+negative ratings, defaults or bans. Inbox resolution alone does not adjudicate the
+sale or erase a response; audited outcome/correction tools remain roadmap work.
+Existing reports, auctions, escrow deliveries and queued KMail are not rewritten.
+No bot code update or extra worker is required.
+
+## Personal confirmation reminders (`030`)
+
+Apply `migrations/queue/202610200030_unconfirmed_trade_reminders.sql` after `029`
+and deploy the website. A pending trade appears on home/browse only for a seller
+or winning buyer who has not confirmed yet. The server filters before counting
+and pagination. Confirming does not complete the sale until both parties confirm;
+the auction details/history still show the waiting status and private instructions.
+No stored confirmations, obligations or deliveries are rewritten; no bot restart
+or additional worker is needed.
+
+## Ban appeals (`029`)
+
+Apply `migrations/queue/202610200029_ban_appeals.sql` after `028` and deploy the
+matching website. The Wall of Shame's Submit an appeal link opens `/submit-appeal`.
+Verified account holders submit private text to the Ban appeals inbox tab and the
+existing durable KMail queue. Existing site-banned accounts can authenticate using
+an appeal-only resolver; normal username login stays blocked and trading/admin
+checks are unchanged. An appeal does not unban anybody. Supabase Auth-level bans,
+lost passwords or accounts never registered with kHub still need direct KMail
+support. The form links that fallback. Requests are idempotent and share bug-report
+rate limits across categories. Existing queued mail is untouched; no bot update
+or additional worker is needed.
+
+## Shared administrator inbox (`028`)
+
+Apply `migrations/queue/202610200028_shared_administrator_inbox.sql` after `027`,
+then deploy the matching website. The administrator-only top-right `inbox` link
+opens `/admin/inbox`; `/admin/bug-reports` remains available for old links.
+Server-side tabs cover All, Bug reports, Trade queries, Ban appeals and Other.
+Existing reports default to Bug reports. Administrators can move messages between
+categories, with an audit trail. Status filters and pagination apply within each
+category. The existing bug form continues submitting bugs; separate trade-query
+and ban-appeal forms are future work. Reports remain private to administrators.
+No queued KMail, report body or notification is rewritten or resent. No bot update
+or extra worker is needed. The Report a Bug links are omitted on the inbox page.
+
+## Login usernames (`027`)
+
+Apply `202610200027_prefixed_login_names.sql` after `026`, then deploy the matching
+website. New credential KMail shows one `kHub Username: KH_<KoL name>` line.
+Existing KMail accounts use the same password with the prefixed login name.
+Public profile/seller names stay unchanged; no account names, passwords, pending
+jobs or already queued/uncertain messages are rewritten. Old saved credential
+messages therefore still show the old name: add `KH_` when signing in.
+The prefix is a naming distinction, not an extra authentication factor.
+Legacy email accounts retain email login; their recovery mail labels it separately.
+The current worker needs no code update or additional instance for this migration.
+
+## Current account setup: KMail registration
+
+Stop all workers and apply
+[`migrations/queue/202610190019_kmail_accounts.sql`](migrations/queue/202610190019_kmail_accounts.sql)
+after `018`, then deploy/restart the matching bot and website together. Move the
+script out of `queue/` yourself after successful application. Do not rerun `019`.
+
+New players register using `REGISTER` in normal KMail to
+kHub (#3888760), without attachments. The sender's actual KoL player ID is linked
+automatically. The bot uses Supabase Admin API with an auto-confirmed internal
+address (`account-<UUID>@login.khub.invalid`); this is an Auth routing identifier,
+not a user-supplied email address or mailbox. New accounts log in with their verified KoL
+username. Custom usernames are rejected and users cannot edit their profile name.
+Existing test accounts are left untouched; this migration does not delete accounts. No signup, confirmation or recovery email is sent by this flow.
+
+`CREDENTIALS` from the same linked KoL player creates a fresh generated password.
+Old passwords cannot be retrieved. Existing email accounts keep their existing
+credentials/history; once linked through the existing VERIFY flow, KMail recovery
+can also reset their password without SMTP. Unlinked legacy accounts require
+support if their owner cannot log in; a claimed username alone never proves ownership.
+
+The database rejects public email signup without a verified pending bot job,
+reserves verified KoL names, and checks player/name/account bans. Disable **Allow new
+users to sign up** in Supabase Auth settings as an additional measure; server-side
+Admin API creation remains the bot's path. Keep email-based reauthentication off
+if no SMTP is configured; logged-in password changes use Supabase `updateUser`.
+Enforce a minimum password length of 12 in Supabase's Auth password settings to
+match the website, while retaining existing passwords for login.
+
+Account jobs and outgoing credential messages are private, service-only records.
+Pending jobs store a generated secret so retries use the same operation. Job secrets
+are cleared once replies are queued; credential bodies are cleared after an
+acknowledged send. Uncertain sends keep their exact body for reconciliation.
+Routine inspect/lookup output omits credential bodies. Saved KoL Inbox/Sent copies
+still contain the password: do not publish those messages.
+
+For operator bans, add an active record to `khub_bot.account_bans` by player ID
+(preferred) and/or username with a reason. Setting `profiles.is_banned=true` also
+records a persistent identity/name ban. To unban, review the case, deactivate all
+matching ban records and clear the profile flag; a separate Supabase Auth ban must
+also be lifted in Auth. Public users cannot edit ban state. Account and username
+bans prevent registration/recovery and block auction writes from existing sessions;
+incoming auction assets from banned players are returned. This is not an admin UI.
+
+Earlier email setup notes below describe the legacy system, not new registration.
+
+## Public seller profiles and bidder privacy (`023`)
+
+Apply `migrations/202610200023_public_seller_profiles.sql` after `022` if not already applied,
+then deploy the matching website. Move the successfully applied script yourself.
+This changes read permissions/projections, not auction records, escrow, fees or
+delivery obligations. The bot's service-role permissions remain intact and no
+worker restart is required for this migration. The assistant has not applied it.
+
+Seller usernames link to `/seller/<seller-id>`, with paginated current/history
+listings, item search, status filters and separate bot-verified and legacy sales
+totals. Feedback/rating submission is a later feature; profiles remain unrated.
+Optional new direct listings are implemented in queued migration `024`, described
+below. Existing direct trades retain their participant-confirmation workflow.
+
+Browser roles can no longer select raw `auctions` or `bids` tables. The existing
+`read_auction_page` RPC now explicitly checks visibility and projects public fields.
+Bidder names/account IDs/KoL numbers stay private; public history uses per-auction
+Bidder 1/2 labels, and a viewer's own bids are labelled You. Migration `032` makes
+the winning public username/profile visible once bidding is server-finalized. Only the seller and winning buyer of a server-finalized
+direct trade receive its private counterpart identities. Escrow recipients remain
+private and the bot still settles escrow. Pending deposits stay seller-only.
+
+The RPC also supports `p_view='seller'`, with `p_id` set to the public seller UUID,
+and returns seller summary metadata alongside the requested listing page. It never
+returns email addresses, internal Auth routing addresses, bans or donation income.
+Gross sale values include commission and count each completed listing once;
+large aggregate values use strings to preserve exact integers in JavaScript.
+
+The website requires `privacy_version=1` in the RPC response, so it shows an
+unavailable message rather than accepting an older response containing public bidder identities.
+Do not restore raw table SELECT grants to fix an old client: deploy the matching
+website instead. A full disposable-database regression suite checks these rules.
+
+## Optional escrow and private confirmation cards (`024`)
+
+Run [`202610200024_optional_escrow.sql`](migrations/queue/202610200024_optional_escrow.sql)
+once **after `023`**, then deploy the matching website. First verify `023` with
+controlled accounts. The assistant has tested disposable PostgreSQL only and has
+not applied either script to hosted Supabase. Move a successfully applied queued
+script yourself. No bot code update or extra worker is needed for `024`.
+
+- New listings default to escrow; sellers can choose Direct settlement before
+  publishing. The database fixes mode, commission and deposit-start terms at
+  creation. Existing listings/fees/obligations are not rewritten.
+- Escrow keeps the item deposit, funded KMail bids and stored commission. Direct
+  listings start immediately, use verified-account website bids/instant purchase,
+  and create no bot transfer obligations or compulsory commission. Optional tips
+  use the existing Donate page and do not gate any trading feature.
+- Direct bids are promises to pay. The site does not verify possession, hold assets,
+  enforce funding or guarantee completion. KMail LIST/BID/BUY for a direct listing
+  is rejected and any attached assets are refunded under the existing mail rules.
+- At server close, winner/price are frozen as `awaiting_trade` (shown as Awaiting
+  settlement). Only seller and winner receive verified counterpart details/KMail
+  links. Buyers remain anonymous publicly after completion too.
+- `read_pending_trades(p_page)` is authenticated and participant-scoped, with 12
+  entries per page. Home/browse reads close expired listings before loading these
+  cards. Cards persist after one confirmation, showing Waiting for the other
+  party; both confirmations are required for completion and card removal.
+- Repeated confirmation preserves the first timestamp. Silence never becomes a
+  completion or negative rating. There is no settlement deadline/automatic penalty,
+  negative report, dispute workflow or reputation scoring yet; see ROADMAP section 11.
+- Seller statistics separate bot-verified escrow from participant-confirmed direct
+  sales. Existing compatibility keys `legacy_sales`/`legacy_value` include all
+  completed direct trades, old and new; they are labelled as direct sales in the UI.
+
+Controlled rollout check: create one listing in each mode; use a second verified
+account for direct bids/instant purchase; confirm only one side and check that the
+sale remains pending; confirm the other side and check it completes. Use a third
+account and a signed-out browser to verify identities stay hidden. Check pending
+pagination, reloads and seller history; verify the escrow deposit/bid/delivery path
+separately.
+
+## Buyout form, rounding and price limits (`025`)
+
+The listing form now reveals its buyout input only after **Set Buyout Price
+(optional)**. Removing it clears the optional price. Quantity, minimum bid and
+buyout text remain unchanged while typing; clicking/tabbing out rounds to a whole
+unit and formats with commas. Shorthand is expanded before rounding, so `144.5`
+becomes `145`, `10.3` becomes `10`, and `99.7m` becomes `99,700,000`.
+
+The old 10-billion minimum-bid and 20-billion price/bid limits also existed in SQL
+and bot parsing. To remove those limits consistently, stop the existing local
+worker, apply [`025`](migrations/queue/202610200025_auction_price_limits.sql) once
+after `024`, move the successfully applied script yourself, and restart the local
+worker with the matching code. Deploy/refresh the matching website. No second bot
+instance is required. The assistant has not applied this to hosted Supabase.
+
+`025` changes validation and calculation functions, without rewriting existing
+amounts, fees, receipts, deliveries, uncertain-operation evidence or frozen messages.
+It preserves the minimum-bid/buyout relationship, positive whole-unit amounts,
+account checks and identity rules. KoL's per-mail transfer chunk sizes stay intact.
+Commission multiplication uses exact PostgreSQL numeric arithmetic before rounding
+down, avoiding overflow for large prices. The exact integer transport boundary
+(`Number.MAX_SAFE_INTEGER`, 9,007,199,254,740,991) remains enforced throughout SQL,
+website and bot so prices cannot silently change through JavaScript rounding.
+
+## Private bug reports and administrator inbox (`026`)
+
+Apply [`026`](migrations/queue/202610200026_bug_reports.sql) once after `025`, then
+deploy/refresh the matching website. Move the successfully applied script yourself.
+The assistant has not applied this to hosted Supabase. `026` needs no additional
+worker or bot code update: existing message-format-v2 workers send its queued
+zero-asset notices. If `025` is also pending, follow its stop/update/restart steps.
+
+The homepage footer now reads **Donate • Report a Bug**. `/report-a-bug` accepts
+10–2,000 characters from a signed-in, verified, unrestricted account. Reports are
+private to administrators; reporters cannot browse reports through SQL/API reads.
+A reporter who cannot log in is offered a direct KMail link to the owner instead.
+
+`submit_bug_report` saves the full text and verified reporter identity and queues
+its KMail copy to **teres Minor (#3552305)** in one transaction. The destination,
+sender identity and zero-asset notice shape are server-controlled. User text is
+escaped for KoL display and split into bounded messages without truncation. Each
+part uses the existing durable delivery reference/claim/acknowledgment protocol.
+Rollover/outages leave the report saved and the notification queued; an uncertain
+send requires normal reconciliation and is never automatically resent. The UI
+says queued, not sent. Retries retain a request UUID; the same request/body cannot
+create another report or notification set. Submission is limited to one per minute
+and five per hour per account.
+
+Sign into the website account verified as **KoL player #3552305** to receive owner
+administrator access automatically. The username alone is not authority. On the
+report page, choose **Open administrator bug inbox**, or bookmark
+`/admin/bug-reports`. The inbox has open/resolved/all filters, 20 reports per page,
+KMail delivery status, reply links, and resolve/reopen actions. Status changes are
+recorded in private `khub_bot.bug_report_activity`. Revoked/banned administrators
+cannot make further reads or changes. Ordinary users are denied in the RPCs,
+regardless of whether they know the inbox URL.
+
+For another administrator, use SQL Editor with the intended account's UUID:
+
+```sql
+insert into khub_bot.administrators (user_id, note)
+values ('REPLACE-WITH-ACCOUNT-UUID', 'Approved by owner for bug triage');
+```
+
+The account must also have a verified, unrestricted KoL identity. Revoke an extra
+grant with `delete from khub_bot.administrators where user_id = 'ACCOUNT-UUID';`.
+The owner grant is based on verified player #3552305; do not change linked identity
+columns to assign administrators. Normal users cannot change grants or read the
+private report/grant/activity tables. No service-role key is added to the website.
+
+Controlled rollout: submit one harmless report, check it appears only in the owner's
+inbox, and let the **existing local bot** deliver its KMail copy. Check that both
+read access and resolve actions fail from a normal account, and that refresh/retry
+does not duplicate the report or its notification. Do not use a second bot instance
+for this test. Local regression checks use fixture reports and fake acknowledgments;
+no real KMail has been sent by the assistant.
+
+## Queue for future migrations
+
+New website SQL scripts go in [`migrations/queue/`](migrations/queue/README.md).
+Run each script manually in Supabase SQL Editor, then move it yourself into the
+parent `migrations/` folder after it succeeds, keeping the same filename. Existing
+scripts stay where they are. Matching copies inside `bot/supabase/migrations/`
+continue to go directly in that folder, without a queue.
+
 ## Friendly bot messages and short auction commands (latest bot update)
 
 With all bot processes stopped, back up the database and run
@@ -360,3 +726,27 @@ without `015` on an existing escrow/short-auction-number database and is safe to
 rerun. It adds read-only,
 service-only reporting functions; no existing receipts, balances, obligations or
 auction state are changed. Use `npm run stats` from the updated bot folder.
+
+Apply `migrations/202610190018_plain_auction_headings.sql` after `017` to remove
+decorative dash underlines from all new auction messages. It is safe to rerun and
+requires no bot restart. Saved bodies for sent/previously claimed messages are unchanged.
+
+### Account creation order correction (`021`)
+
+After `019`, apply queued `202610190021_auth_creation_order.sql` with all workers
+stopped. `020` is independent. This fixes the original profile trigger expecting
+Admin API app metadata before Supabase has attached it. The corrected trigger
+requires the exact private reservation ID/internal address at insertion, while
+account finalization still checks the server request stamp before sending login
+credentials. Restart the updated bot; an existing pending REGISTER resumes without
+another KMail or database reset. No website redeploy is needed for this correction.
+
+
+### Short temporary passwords (`022`)
+
+Apply queued `202610190022_short_temporary_passwords.sql` after `021` with all bots
+stopped, then restart the updated worker. New generated passwords are 16 characters
+so KMail does not split long tokens. The migration lowers only the generated-secret
+minimum from 24 to 16; existing accounts, pending jobs and messages remain intact.
+For fresh credentials, send CREDENTIALS after restart (subject to the five-minute
+cooldown). No website redeploy is needed.

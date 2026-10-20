@@ -1,9 +1,11 @@
+import WinnerLink from '../components/WinnerLink';
 import { useContext } from "react";
 import { UserContext } from "../context/UserContext";
 import { AuctionsContext } from "../context/AuctionsContext";
 import { Link } from "react-router-dom";
 import { getAuctionResult, getAuctionStatus } from "../lib/auctionLifecycle";
 import KolVerification from "../components/KolVerification";
+import { formatCompactMeat } from '../lib/formatMeat';
 import { useNow } from "../hooks/useNow";
 
 const formatNumber = (number) => number.toLocaleString('en-US');
@@ -41,12 +43,12 @@ const Profile = () => {
     });
     const completedSales = selling.filter((auction) => auction.status === 'completed');
     const completedPurchases = auctions.filter((auction) => auction.status === 'completed' && auction.winnerId === currentUser.id);
-    const totalMeatGain = completedSales.reduce((sum, auction) => sum + auction.finalPrice - (auction.escrowMode ? (auction.feeMeat || 0) : 0), 0);
-    const totalMeatSpent = completedPurchases.reduce((sum, auction) => sum + auction.finalPrice, 0);
+    const totalMeatGain = completedSales.reduce((sum, auction) => sum + BigInt(auction.finalPrice ?? 0) - BigInt(auction.escrowMode ? (auction.feeMeat || 0) : 0), 0n);
+    const totalMeatSpent = completedPurchases.reduce((sum, auction) => sum + BigInt(auction.finalPrice ?? 0), 0n);
     const sections = [
         { title: 'Awaiting item deposit', records: selling.filter((auction) => auction.status === 'pending_escrow') },
         { title: 'Sending escrow deliveries', records: auctions.filter((auction) => auction.status === 'settling' && (auction.sellerId === currentUser.id || auction.winnerId === currentUser.id)) },
-        { title: 'Awaiting trade', records: awaitingTrades },
+        { title: 'Awaiting settlement', records: awaitingTrades },
         { title: 'Active listings', records: selling.filter((auction) => getAuctionStatus(auction, now) === 'active') },
         { title: 'Active bids', records: bidding.filter((auction) => getAuctionStatus(auction, now) === 'active') },
         { title: 'Listing history', records: selling.filter((auction) => !['active','pending_escrow','settling'].includes(getAuctionStatus(auction, now))) },
@@ -57,18 +59,20 @@ const Profile = () => {
         <div className="min-h-screen bg-gray-50 p-6">
             <Link to="/" className="text-blue-500 underline">Home</Link>
             <h1 className="text-4xl font-bold text-blue-600 my-6 text-center">{currentUser.khubUsername}&apos;s Profile</h1>
+            <p className="mb-4 text-center"><Link to="/change-password" className="text-blue-700 underline">Change password</Link></p>
+            {selling.some(auction => auction.status !== 'pending_escrow') && <p className="mb-4 text-center"><Link to={`/seller/${currentUser.id}`} className="text-blue-700 underline">View public seller profile</Link></p>}
             <KolVerification />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
                 <div className="bg-white rounded shadow p-4">
                     <h2 className="font-semibold">Completed sales</h2>
-                    <p>{formatNumber(totalMeatGain)} Meat received</p>
+                    <p>{formatCompactMeat(totalMeatGain)} Meat received</p>
                 </div>
                 <div className="bg-white rounded shadow p-4">
                     <h2 className="font-semibold">Completed purchases</h2>
-                    <p>{formatNumber(totalMeatSpent)} Meat spent</p>
+                    <p>{formatCompactMeat(totalMeatSpent)} Meat spent</p>
                 </div>
             </div>
-            <p className="text-sm text-gray-600 mb-6">Totals include completed bot deliveries (seller fees deducted) and legacy trades confirmed by both parties. Pending deliveries are shown below.</p>
+            <p className="text-sm text-gray-600 mb-6">Totals include completed bot deliveries (seller fees deducted) and direct trades confirmed by both parties. Pending deliveries are shown below.</p>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {sections.map(({ title, records }) => (
                     <section key={title}>
@@ -92,12 +96,12 @@ const Profile = () => {
                                                 </time>
                                             )}
                                         </div>
-                                        <p>{result.label}</p>
+                                        <p>{result.label} · {auction.escrowMode ? 'Escrow' : 'Direct settlement'}</p>
                                         {result.status === 'active' && (
-                                            <p>Current bid: {auction.currentBid > 0 ? `${formatNumber(auction.currentBid)} Meat` : 'No bids yet'}</p>
+                                            <p>Current bid: {auction.currentBid > 0 ? `${formatCompactMeat(auction.currentBid)} Meat` : 'No bids yet'}</p>
                                         )}
-                                        {result.winnerId && <p>Winner: {result.winner} · Final price: {formatNumber(result.finalPrice)} Meat</p>}
-                                        {myBids.length > 0 && <p>Your highest bid: {formatNumber(Math.max(...myBids.map((bid) => bid.amount)))} Meat</p>}
+                                        {result.hasWinner && <p>Winner: <WinnerLink auction={auction} /> · Final price: {formatCompactMeat(result.finalPrice)} Meat</p>}
+                                        {myBids.length > 0 && <p>Your highest bid: {formatCompactMeat(Math.max(...myBids.map((bid) => bid.amount)))} Meat</p>}
                                         {result.status === 'awaiting_trade' && (
                                             <p className="text-blue-700 mt-2">{auction.sellerId === currentUser.id ? 'You are the seller.' : result.winnerId === currentUser.id ? 'You won this auction.' : 'Another bidder won.'} View trade details</p>
                                         )}

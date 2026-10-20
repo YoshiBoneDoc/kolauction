@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { UserContext } from '../context/UserContext';
 
 export default function ResetPassword() {
-    const { canResetPassword, resetPassword, authLinkError } = useContext(UserContext);
+    const { currentUser, canResetPassword, resetPassword, changePassword, authLinkError } = useContext(UserContext);
+    const allowed = Boolean(currentUser) || (canResetPassword && !authLinkError);
     const [password, setPassword] = useState('');
     const [confirmation, setConfirmation] = useState('');
     const [pending, setPending] = useState(false);
@@ -12,7 +13,7 @@ export default function ResetPassword() {
 
     async function submit(event) {
         event.preventDefault();
-        if (pending || !canResetPassword) return;
+        if (pending || !allowed) return;
         setError('');
         if (password !== confirmation) {
             setError('The passwords do not match.');
@@ -20,7 +21,8 @@ export default function ResetPassword() {
         }
         setPending(true);
         try {
-            await resetPassword(password);
+            if (canResetPassword && !authLinkError) await resetPassword(password);
+            else await changePassword(password);
             setPassword('');
             setConfirmation('');
             setUpdated(true);
@@ -40,17 +42,18 @@ export default function ResetPassword() {
                         <p role="status" className="text-green-700">Your password has been updated. Use the new password the next time you log in.</p>
                         <Link to="/" className="text-blue-700 underline">Return home</Link>
                     </>
-                ) : !canResetPassword || authLinkError ? (
+                ) : !allowed ? (
                     <>
-                        <p role="alert">{authLinkError || 'Open a valid password reset link from your email to continue. This link may be missing, expired, or already used.'}</p>
-                        <Link to="/forgot-password" className="text-blue-700 underline">Request a new password reset link</Link>
+                        <p role="alert">Log in to change your password, or recover your login through kHub KMail.</p>
+                        <Link to="/forgot-password" className="text-blue-700 underline">Recover your login</Link>
                     </>
                 ) : (
                     <form onSubmit={submit} className="space-y-4">
                         <label htmlFor="new-password" className="block font-semibold">New password</label>
-                        <input id="new-password" type="password" autoComplete="new-password" minLength={6} required value={password} onChange={(event) => setPassword(event.target.value)} className="w-full border rounded p-2" />
+                        <input id="new-password" type="password" autoComplete="new-password" minLength={12} required value={password} onChange={(event) => setPassword(event.target.value)} className="w-full border rounded p-2" />
+                        <p className="text-sm text-gray-600">Use at least 12 characters and a unique password. Never reuse your KoL password.</p>
                         <label htmlFor="confirm-password" className="block font-semibold">Confirm new password</label>
-                        <input id="confirm-password" type="password" autoComplete="new-password" minLength={6} required value={confirmation} onChange={(event) => setConfirmation(event.target.value)} className="w-full border rounded p-2" />
+                        <input id="confirm-password" type="password" autoComplete="new-password" minLength={12} required value={confirmation} onChange={(event) => setConfirmation(event.target.value)} className="w-full border rounded p-2" />
                         {error && <p role="alert" className="text-red-700">{error}</p>}
                         <button type="submit" disabled={pending} className="w-full bg-blue-600 text-white rounded p-2 disabled:opacity-50">{pending ? 'Updating…' : 'Update password'}</button>
                     </form>
