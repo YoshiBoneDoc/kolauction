@@ -52,6 +52,22 @@ const InfoPage = () => {
                     <Link to="/register" className="font-medium text-blue-600 hover:underline">Register here</Link> to create your kHub account. Only one account is permitted per KoL player.
                 </p>
 
+                <h2 className="text-lg font-semibold text-gray-800 mb-2">
+                    Official kHub Accounts
+                </h2>
+
+                <p className="mb-3">
+                    <strong>kHub (#3888760)</strong> is our official auction bot, and{' '}
+                    <strong>Teres Minor (#3552305)</strong> is the site administrator.
+                </p>
+
+                <p className="mb-6">
+                    Only send auction-related items and Meat to <strong>kHub (#3888760)</strong>.
+                    Ignore messages from other accounts claiming to represent kHub,
+                    particularly those requesting items, Meat, or account information.
+                </p>
+
+
                 <h2 className="text-lg font-semibold text-gray-800 mb-3">Auction Types</h2>
                 <div className="mb-6 overflow-hidden rounded-lg border border-[#E0E5EB] bg-white">
                     <table className="w-full table-fixed text-xs leading-5 text-[#475569]">
@@ -106,82 +122,111 @@ const InfoPage = () => {
                     <p className="mt-2 text-xs leading-5">Buyouts can always be accepted at their listed price, even if below the next minimum bid.</p>
                 </section>
 
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">Creating and Bidding on Escrow Auctions</h2>
-                <ul className="mb-6 list-none space-y-2">
-                    <li>
-                        <span className="font-bold">1.</span> Use &quot;Auction an Item&quot; to choose an item, quantity,
-                        minimum bid, and duration. You may also set an optional Buyout Price to end bidding early at an agreed price.
-                        All prices are for the entire listing.
-                    </li>
-                    <li>
-                        <span className="font-bold">2.</span> After saving, follow the deposit instructions on your listing.
-                        Send normal KMail to <span className="font-bold">kHub (#3888760)</span> with the exact listed items
-                        and the message <span className="font-mono">LIST [Auction number]</span>. Attach no Meat or extra items.
-                        The auction becomes public and its timer starts when the bot accepts the deposit.
-                    </li>
-                    <li>
-                        <span className="font-bold">3.</span> Browse &quot;All Auctions&quot; and open a listing for its bidding instructions.
-                        Send the bot normal KMail with <span className="font-mono">BID [Auction number]</span> and attach
-                        your full bid in Meat, with no items. Even when raising your own bid, send the full new amount, not just the difference.
-                    </li>
-                    <li>
-                        <span className="font-bold">4.</span> If the listing offers a Buyout Price, use the same <span
-                        className="font-mono">BID [Auction number]</span> message and attach that amount or more.
-                        This ends bidding at the buyout price; any excess Meat is returned.
-                    </li>
-                    <li>
-                        <span className="font-bold">5.</span> Copy the short auction number and command from the listing.
-                        A bid or purchase counts only when the bot processes the funded KMail before the deadline.
-                        The bot holds the leading bid and returns the previous leading bidder&apos;s Meat when they are outbid.
-                    </li>
-                    <li>
-                        <span className="font-bold">6.</span> Use normal, unwrapped KMail for all auction commands.
-                        <span className="font-bold underline"> All gift packages sent to kHub are considered donations.</span>
-                        Gifts do not count as deposits or bids. Rejected normal auction messages have their attached Meat and items returned by the bot.
-                    </li>
-                </ul>
+                <h2 className="text-lg font-semibold text-gray-800 mb-2">
+                    Creating an Auction
+                </h2>
 
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">How Do I Cancel My Bid or Auction?</h2>
-                <ul className="mb-6 list-none space-y-2">
-                    <li>
-                        <span className="font-bold">1.</span> You may cancel your auction from its listing page before
-                        any bids have been accepted, without a cancellation penalty.
-                    </li>
-                    <li>
-                        <span className="font-bold">2.</span> If the bot already holds your items, it will return them
-                        by KMail after cancellation. If you have not deposited them yet, there is nothing to return.
-                    </li>
-                    <li>
-                        <span className="font-bold">3.</span> Accepted bids cannot be canceled, and a seller cannot
-                        cancel an auction once it has an accepted bid.
-                    </li>
-                    <li>
-                        <span className="font-bold">4.</span> If you are outbid, the bot automatically returns your
-                        full previous bid by KMail. You do not need to request a refund.
-                    </li>
-                </ul>
-
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">How Escrow Auctions Are Concluded</h2>
-                <ul className="mb-6 list-none space-y-2">
-                    <li>
-                        <span className="font-bold">1.</span> When the timer expires or a buyout is accepted,
-                        <span className="font-bold"> kHub (#3888760)</span> sends the items to the winner and the winning
-                        Meat payment to the seller by KMail. Both are already held by the bot, so neither party needs to send another payment or accept a trade.
-                        New escrow listings have a 7.5% seller fee, deducted from the final sale price and rounded down to whole Meat. No sale, no fee. Existing listings retain the fee agreed when created. Direct trades have no compulsory fee.
-                    </li>
-                    <li>
-                        <span className="font-bold">2.</span> If there are no accepted bids, the items are returned to
-                        the seller. The listing shows settlement in progress until the required deliveries are confirmed.
-                    </li>
-                </ul>
-
-                <p className="mb-6 text-xs italic">Refunds and deliveries typically arrive within seconds, but may take longer during outages or other service disruptions.</p>
-
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">Contact Us</h2>
-                <p>
-                    If you have any further questions, feel free to send a kMail to my main account: <span
-                    className="font-bold">Teres Minor (#3552305)</span>.
+                <p className="mb-3">
+                    <Link to="/auction-item" className="font-medium text-blue-600 hover:underline">
+                        Create an auction here
+                    </Link>
+                    . Minimum Bid and Buyout Prices are optional. All prices apply to the entire listing, not individual items.
                 </p>
+
+                <p className="mb-2 font-semibold">
+                    When does the auction timer start?
+                </p>
+
+                <ul className="mb-6 list-disc space-y-2 pl-5">
+                    <li>
+                        <strong>Escrow:</strong> Your auction goes live once our bot receives and verifies your items,
+                        typically within seconds. Deposit instructions are provided on your auction&apos;s page
+                        and are visible only to you.
+                    </li>
+                    <li>
+                        <strong>Direct Trade:</strong> Your auction goes live immediately after publishing.
+                        Items must remain in your Display Case throughout the auction.
+                        Violations may result in a warning or further action.
+                    </li>
+                </ul>
+
+                <h2 className="text-lg font-semibold text-gray-800 mb-2">
+                    Canceling Bids or Auctions
+                </h2>
+
+                <ul className="mb-6 list-disc space-y-2 pl-5">
+                    <li>
+                        <strong>Canceling an Auction:</strong> Sellers may cancel an auction before
+                        any bids have been accepted, without penalty. Escrowed items will be
+                        automatically returned by KMail.
+                    </li>
+                    <li>
+                        <strong>Canceling a Bid:</strong> Accepted bids cannot be canceled.
+                        Once an auction receives a bid, the seller can no longer cancel their sale.
+                    </li>
+                </ul>
+
+                <h2 className="text-lg font-semibold text-gray-800 mb-2">
+                    After an Auction Ends
+                </h2>
+
+                <ul className="mb-3 list-disc space-y-2 pl-5">
+                    <li>
+                        <strong>Escrow:</strong> The bot automatically sends the items to the winning bidder
+                        and the seller&apos;s proceeds by KMail. A 7.5% commission is deducted from
+                        the final sale price. If no bids were accepted, the items are returned to the seller.
+                    </li>
+                    <li>
+                        <strong>Direct Trade:</strong> The seller and winning bidder have 48 hours to complete
+                        their exchange. Both parties must confirm the outcome on kHub to close out the auction.
+
+                        <p className="mt-2 rounded border-l-[3px] border-blue-300 bg-blue-50/70 px-3 py-1 text-xs leading-4 text-gray-600">
+                            <span className="font-semibold text-gray-700">Deadline exceptions:</span>{' '}
+                            Extensions may be granted by mutual agreement or when one party
+                            makes a good-faith effort to complete the trade but is delayed
+                            by the other.
+                        </p>
+                    </li>
+                </ul>
+                <p className="mb-6 text-xs italic">
+                    Escrow deliveries and refunds typically arrive within seconds, but may be delayed during service disruptions.
+                </p>
+
+
+                <h2 className="text-lg font-semibold text-gray-800 mb-2">
+                    Trade Enforcement &amp; Ban Policy
+                </h2>
+                <p className="mb-3">
+                    Direct Trade auctions are binding commitments. Failure to honor a trade
+                    may result in the following penalties:
+                </p>
+                <ul className="mb-3 list-disc space-y-2 pl-5">
+                    <li>
+                        <strong>First offense:</strong> 14-day ban.
+                    </li>
+                    <li>
+                        <strong>Second offense:</strong> 30-day or permanent ban.
+                    </li>
+                    <li>
+                        <strong>Serious or deliberate violations:</strong> Immediate permanent ban.
+                    </li>
+                </ul>
+                <p className="mb-6">
+                    All violations are subject to administrator review. Penalties depend on
+                    the circumstances, auction value, and prior offenses. False reports
+                    and attempts to evade bans may result in additional penalties.
+                </p>
+
+
+                <h2 className="text-lg font-semibold text-gray-800 mb-2">
+                    Contact Us
+                </h2>
+
+                <p>
+                    Need help with something not covered above? Submit a [support ticket].
+                </p>
+
+                {/* TODO: Hyperlink "Submit a support ticket" to the "Other" admin mailbox. */}
             </div>
         </div>
     );
