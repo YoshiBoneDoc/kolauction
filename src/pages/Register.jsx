@@ -1,3 +1,4 @@
+import BackHomeLinks from '../components/BackHomeLinks';
 import { Link } from 'react-router-dom';
 import CopyMessage from '../components/CopyMessage';
 
@@ -5,7 +6,7 @@ export default function Register() {
     return (
         <main className="min-h-screen bg-gray-50 flex items-center justify-center p-4 sm:p-6">
             <section className="w-full max-w-lg bg-white rounded shadow p-6 space-y-4">
-                <Link to="/" className="text-blue-700 underline">Home</Link>
+                <BackHomeLinks />
                 <h1 className="text-2xl font-bold text-center">Create your kHub account</h1>
                 <p>From your KoL account, send this KMail to <strong>kHub (#3888760)</strong>. No Meat or items.</p>
                 <CopyMessage text="REGISTER" label="registration command" />

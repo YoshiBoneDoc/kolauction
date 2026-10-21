@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { createBugReportService } from '../lib/bugReports';
@@ -6,8 +6,11 @@ import { supabase } from '../lib/supabase';
 import { supportCategories, threadKey, threadRoleStatus, formatSupportTimestamp, supportTimeline } from '../lib/supportThreads';
 import TradeResponseBadge from './TradeResponseBadge';
 import AppealEvidence from './AppealEvidence';
+import AppealBanControls from './AppealBanControls';
+import { createAccountRestrictionService } from '../lib/accountRestrictions';
 
 const reports = createBugReportService(supabase);
+const accounts = createAccountRestrictionService(supabase);
 
 function RatingReview({ report, onUpdated, heading }) {
     const [editing, setEditing] = useState(false);
@@ -88,33 +91,58 @@ export default function SupportThread({ thread, expanded, onToggle, pending, onC
     const key = threadKey(thread);
     const auction = thread.auction;
     const first = thread.messages[0];
-    const timeline = supportTimeline(thread);
+    const isAppeal = !auction && first.category === 'appeal';
+    const [banRevision, setBanRevision] = useState(0);
+    const [banHistory, setBanHistory] = useState(null);
+    const historyKey = `${first.id}:${banRevision}`;
+    const currentHistory = banHistory?.key === historyKey ? banHistory : null;
+    useEffect(() => {
+        if (!isAppeal || !expanded) return;
+        let cancelled = false;
+        accounts.appealHistory(first.id).then(events => {
+            if (!cancelled) setBanHistory({ key: historyKey, events, error: '' });
+        }).catch(failure => {
+            if (!cancelled) setBanHistory({ key: historyKey, events: [], error: failure.message });
+        });
+        return () => { cancelled = true; };
+    }, [isAppeal, expanded, first.id, historyKey]);
+    const timeline = supportTimeline(thread, isAppeal ? currentHistory?.events || [] : []);
+    const messageCount = isAppeal ? thread.messages.length : timeline.length;
     const withdrawals = timeline.filter(message => message.message_type === 'trade_resolution');
     const state = thread.status === 'open' ? 'Open' : thread.resolution_kind === 'participant_resolved' ? 'Resolved by reporter' : 'Resolved';
     const canReopen = thread.messages.some(message => message.resolution_kind !== 'participant_resolved');
+    const summary = <>
+        {auction && <span className="flex h-12 w-12 shrink-0 self-center items-center justify-center rounded-md bg-gray-50">
+            {auction.image ? <img src={auction.image} alt={auction.item} className="h-10 w-10 object-contain" /> : <span className="text-xs text-gray-400">No image</span>}
+        </span>}
+        <span className={auction ? 'grid min-w-0 flex-1 gap-2 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)] md:items-stretch md:gap-4' : 'block min-w-0 flex-1'}>
+            <span className="min-w-0">
+                <span className={`block ${isAppeal ? 'truncate' : 'break-words'} text-sm font-semibold text-gray-900`}>{auction ? `${auction.quantity.toLocaleString('en-US')} × ${auction.item}` : first.reporter_username}</span>
+                <span className={`mt-1 block text-xs text-gray-500 ${isAppeal ? 'truncate' : ''}`}>{auction ? `Auction #${auction.number || auction.id}` : first.reference} · {state} · {messageCount} {messageCount === 1 ? 'message' : 'messages'}</span>
+                {withdrawals.length > 0 && <span className="mt-1 block text-xs font-semibold text-green-700">{withdrawals.length === 1 ? 'Report withdrawn' : `${withdrawals.length} reports withdrawn`}</span>}
+                {!auction && <span className="mt-1 block truncate text-sm text-gray-600">{first.body}</span>}
+            </span>
+            {auction && <><Participant thread={thread} role="seller" /><Participant thread={thread} role="buyer" /></>}
+        </span>
+    </>;
     return <article className="min-w-0 overflow-hidden rounded-lg border border-gray-200 bg-white">
-        <div className="flex flex-wrap items-start gap-3 p-3 sm:p-4">
-            <button aria-expanded={expanded} aria-controls={`body-${key}`} onClick={onToggle} className="flex min-w-0 flex-1 basis-full items-stretch gap-3 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:basis-0">
-                {auction && <span className="flex h-12 w-12 shrink-0 self-center items-center justify-center rounded-md bg-gray-50">
-                    {auction.image ? <img src={auction.image} alt={auction.item} className="h-10 w-10 object-contain" /> : <span className="text-xs text-gray-400">No image</span>}
-                </span>}
-                <span className="grid min-w-0 flex-1 gap-2 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)] md:items-stretch md:gap-4">
-                    <span className="min-w-0">
-                        <span className="block break-words text-sm font-semibold text-gray-900">{auction ? `${auction.quantity.toLocaleString('en-US')} × ${auction.item}` : first.reporter_username}</span>
-                        <span className="mt-1 block text-xs text-gray-500">{auction ? `Auction #${auction.number || auction.id}` : first.reference} · {state} · {timeline.length} {timeline.length === 1 ? 'message' : 'messages'}</span>
-                        {withdrawals.length > 0 && <span className="mt-1 block text-xs font-semibold text-green-700">{withdrawals.length === 1 ? 'Report withdrawn' : `${withdrawals.length} reports withdrawn`}</span>}
-                        {!auction && <span className="mt-1 block truncate text-sm text-gray-600">{first.body}</span>}
-                    </span>
-                    {auction && <><Participant thread={thread} role="seller" /><Participant thread={thread} role="buyer" /></>}
-                </span>
+        <div className={isAppeal ? 'flex flex-wrap items-start gap-3 px-3 py-2 sm:px-4' : 'flex flex-wrap items-start gap-3 p-3 sm:p-4'}>
+            {isAppeal ? <AppealBanControls reportId={first.id} expanded={expanded}
+                controlsId={`body-${key}`} onToggle={onToggle} onBanUpdated={() => setBanRevision(value => value + 1)}>{summary}</AppealBanControls> : <button aria-expanded={expanded} aria-controls={`body-${key}`} onClick={onToggle} className="flex min-w-0 flex-1 basis-full items-stretch gap-3 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:basis-0">
+                {summary}
                 <span aria-hidden="true" className="shrink-0 self-center text-gray-400">{expanded ? '▴' : '▾'}</span>
-            </button>
-            <div className="ml-auto w-fit shrink-0 text-right">
+            </button>}
+            <div className={`ml-auto shrink-0 text-right ${isAppeal ? 'w-32' : 'w-fit'}`}>
                 <time dateTime={thread.updated_at} className="block whitespace-nowrap text-xs leading-5 text-gray-500">{formatSupportTimestamp(thread.updated_at)}</time>
                 <ChangeType thread={thread} pending={pending} onChange={onCategoryChange} />
             </div>
         </div>
-        {expanded && <div id={`body-${key}`} className="space-y-4 border-t border-gray-100 p-4 sm:px-5">
+        {expanded && <div id={`body-${key}`} className={isAppeal ? 'space-y-3 border-t border-gray-100 px-4 py-3 sm:px-5' : 'space-y-4 border-t border-gray-100 p-4 sm:px-5'}>
+            {isAppeal && (!currentHistory ? <p role="status" className="text-xs text-gray-500">Loading ban history…</p>
+                : currentHistory.error && <div className="flex flex-wrap items-center gap-3 text-xs">
+                    <p role="alert" className="text-red-700">{currentHistory.error}</p>
+                    <button type="button" onClick={() => setBanRevision(value => value + 1)} className="text-blue-700 underline">Retry ban history</button>
+                </div>)}
             {auction && <div className="space-y-3">
                 <div className="flex justify-end text-xs"><Link to={`/auction/${auction.id}`} className="text-blue-700 underline">View auction</Link></div>
                 <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2">{['seller', 'buyer'].map(role => {
@@ -125,7 +153,16 @@ export default function SupportThread({ thread, expanded, onToggle, pending, onC
                     </section>;
                 })}</div>
             </div>}
-            <div className="divide-y divide-gray-100">{timeline.map(message => message.message_type === 'trade_resolution' ? <section key={message.id} aria-label="Report withdrawal update" className="py-3 first:pt-0 last:pb-0">
+            <div className="divide-y divide-gray-100">{timeline.map(message => message.message_type === 'account_ban_event' ? <section key={message.id} aria-label="Ban history update" className="py-2 first:pt-0 last:pb-0">
+                <div className={`rounded border-l-2 px-3 py-2 ${message.action === 'removed' ? 'border-green-300 bg-green-50' : 'border-red-200 bg-red-50/60'}`}>
+                    <div className="flex flex-wrap items-baseline justify-between gap-1 text-xs">
+                        <p className={`font-semibold ${message.action === 'removed' ? 'text-green-800' : 'text-red-800'}`}>{message.action === 'removed' ? 'Ban restriction removed' : message.action === 'updated' ? 'Ban updated' : 'Ban issued'} · {message.administrator_username}</p>
+                        <time dateTime={message.created_at} className="whitespace-nowrap text-gray-500">{new Date(message.created_at).toLocaleString('en-US')}</time>
+                    </div>
+                    {message.action !== 'removed' && <p className="mt-1 text-xs text-gray-600">{message.expires_at ? `Banned until ${new Date(message.expires_at).toLocaleString()}` : 'Permanent ban'}</p>}
+                    <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-5 text-gray-800">{message.reason}</p>
+                </div>
+            </section> : message.message_type === 'trade_resolution' ? <section key={message.id} aria-label="Report withdrawal update" className="py-3 first:pt-0 last:pb-0">
                 <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2.5">
                     <div className="flex flex-wrap items-baseline justify-between gap-1">
                         <p className="text-sm font-bold text-green-800">Report withdrawn</p>
@@ -134,15 +171,15 @@ export default function SupportThread({ thread, expanded, onToggle, pending, onC
                     <p className="mt-1 text-sm leading-5 text-green-900"><strong>{message.reporter_username}</strong> withdrew their incomplete report{message.withdrawal_confirmed_complete ? <> and changed their response to <strong>Confirmed Complete</strong>.</> : '.'}</p>
                     <p className="mt-1 text-xs text-green-700">System update · {message.reference}</p>
                 </div>
-            </section> : <section key={message.id} className="space-y-2 py-4 first:pt-0 last:pb-0">
+            </section> : <section key={message.id} className={`space-y-2 ${isAppeal ? 'py-2' : 'py-4'} first:pt-0 last:pb-0`}>
                 <div className="flex flex-wrap items-baseline justify-between gap-1 text-xs text-gray-500">
                     <p><strong className="font-medium text-gray-800">{message.reporter_username}</strong>{message.reporter_role && ` · ${message.reporter_role}`} · {message.message_type === 'trade_rating' ? `Reported Incomplete about ${message.target_username || 'the other player'}` : message.message_type === 'trade_query' ? 'Trade query' : supportCategories.find(([value]) => value === message.category)?.[1]} · {message.reference}{message.status === 'resolved' && ` · ${message.resolution_kind === 'participant_resolved' ? 'Withdrawn' : 'Resolved'}`}</p>
                     <time dateTime={message.created_at} className="whitespace-nowrap">{formatSupportTimestamp(message.created_at)}</time>
                 </div>
-                <p className="whitespace-pre-wrap break-words text-sm leading-6 text-gray-800">{message.body}</p>
+                <p className={`whitespace-pre-wrap break-words text-sm ${isAppeal ? 'leading-5' : 'leading-6'} text-gray-800`}>{message.body}</p>
                 {message.has_evidence && <AppealEvidence reportId={message.id} />}
             </section>)}</div>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4">
+            <div className={`flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 ${isAppeal ? 'pt-3' : 'pt-4'}`}>
                 {(thread.status === 'open' || canReopen) && <button onClick={() => onStatusChange(thread)} disabled={pending} className="button-green rounded-md border border-green-200 bg-green-50 px-4 py-2 text-sm font-medium text-green-800 disabled:opacity-50">{pending ? 'Saving…' : thread.status === 'open' ? 'Mark resolved' : 'Reopen conversation'}</button>}
                 {auction && <details className="text-xs text-gray-500"><summary className="cursor-pointer">Internal reference</summary><p className="mt-1 break-all font-mono">{auction.id}</p></details>}
             </div>

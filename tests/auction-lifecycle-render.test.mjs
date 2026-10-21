@@ -102,6 +102,24 @@ test('ended auctions without bids and completed trades show distinct outcomes', 
     assert.doesNotMatch(completed, /Confirm Complete/);
 });
 
+test('escrow settlement distinguishes sold lots from item returns for every viewer', () => {
+    for (const userId of ['seller', 'buyer', 'outsider', null]) {
+        const sold = render({ auction: { ...auction, escrowMode: true, status: 'settling' }, userId });
+        assert.match(sold, /items to the winner and payment to the seller/);
+        assert.match(sold, /all required deliveries/);
+        for (const status of ['settling', 'active']) {
+            const returning = render({ auction: { ...auction, escrowMode: true, status, currentBid: 0,
+                highestBidderId: null, winnerId: null, finalPrice: null }, userId });
+            assert.match(returning, /returning the deposited items to the seller/);
+            assert.doesNotMatch(returning, /payment to the seller|both deliveries|Winner:/);
+        }
+        const unsold = render({ auction: { ...auction, escrowMode: true, status: 'ended_no_bids' }, userId });
+        assert.match(unsold, /returned the items to the seller/);
+        const cancelled = render({ auction: { ...auction, escrowMode: true, status: 'cancelled' }, userId });
+        assert.match(cancelled, /Any accepted item deposit has been returned/);
+    }
+});
+
 test('administrator contact is hidden once both parties complete the trade', () => {
     for (const userId of ['seller', 'buyer']) {
         const pending = { ...auction, finalizedAt: '2026-10-20', sellerConfirmedAt: '2026-10-20' };
@@ -152,15 +170,17 @@ test('admin-excluded reports are neutral for participants and spectators without
     const excluded = { ...auction, finalizedAt: '2026-10-20', sellerReportedIncomplete: false, buyerReportedIncomplete: false, sellerReportExcluded: true, tradeReported: false, buyerConfirmedAt: '2026-10-20' };
     for (const userId of ['seller', 'buyer', 'outsider', null]) {
         const html = render({ auction: { ...excluded, ownTradeReport: userId === 'seller' ? 'B-1001' : null, ownTradeReportExcluded: userId === 'seller' }, userId });
-        assert.match(html, /border-slate-200 bg-slate-50 text-slate-500">Report excluded/);
+        assert.match(html, /border-slate-200 bg-slate-50 text-slate-500">Report dismissed/);
+        assert.match(html, /An administrator dismissed the seller’s incomplete report/);
+        assert.match(html, /No incomplete mark is counted against the buyer for this report/);
         assert.doesNotMatch(html, /Reported Incomplete|Both parties confirmed|At least one party/);
         if (userId === 'seller') {
-            assert.match(html, /Your incomplete report was excluded after administrator review/);
+            assert.match(html, /Your incomplete report was dismissed by an administrator/);
             assert.match(html, /Mark Trade Complete/);
             assert.doesNotMatch(html, />Confirm Complete<|>Report Incomplete</);
         }
         if (userId === 'buyer') {
-            assert.match(html, /The other party’s incomplete report was excluded after administrator review/);
+            assert.match(html, /The other party’s incomplete report was dismissed by an administrator/);
             assert.doesNotMatch(html, /Awaiting the other party’s response/);
         }
     }

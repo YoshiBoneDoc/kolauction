@@ -74,6 +74,19 @@ button:focus-visible {
   }
 }
 
+/* Appeal summaries show keyboard focus around the whole gray summary. */
+.appeal-summary-toggle:focus,
+.appeal-summary-toggle:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+.appeal-ban-card:has(.appeal-summary-toggle:focus-visible) {
+  outline: 2px solid #3B82F6;
+  outline-offset: -2px;
+  border-radius: 0;
+}
+
 /* Shared action colors; dimensions and shape remain with each control. */
 .button-green:hover:not(:disabled):not([aria-disabled="true"]) {
   background-color: #DCFCE7;

@@ -1,5 +1,5 @@
-import React, { useContext, useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import BackHomeLinks from '../components/BackHomeLinks';
+import { useContext, useState, useEffect } from "react";
 import { AuctionsContext } from "../context/AuctionsContext";
 
 const AllAuctions = () => {
@@ -61,12 +61,7 @@ const AllAuctions = () => {
         <div className="min-h-screen bg-gray-50 p-6">
             {/* Home Button */}
             <div className="mb-4">
-                <Link
-                    to="/"
-                    className="text-blue-500 underline hover:text-blue-700 text-sm"
-                >
-                    Home
-                </Link>
+                <BackHomeLinks />
             </div>
 
             <h1 className="text-4xl font-bold text-center text-blue-600 mb-8">All Auctions</h1>

@@ -1,5 +1,9 @@
+import BackHomeLinks from '../components/BackHomeLinks';
 import { Link } from "react-router-dom";
 import { BID_INCREMENT_TIERS } from '../lib/bidIncrements';
+
+const sectionHeadingClass = 'text-lg font-semibold leading-7 text-gray-800';
+const subheadingClass = 'text-sm font-semibold leading-5 text-gray-700';
 
 const auctionTypeComparison = [
     {
@@ -31,15 +35,10 @@ const auctionTypeComparison = [
 
 const InfoPage = () => {
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6">
-            <Link
-                to="/"
-                className="absolute top-4 left-4 text-blue-500 hover:underline"
-            >
-                Home
-            </Link>
+        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6 pt-16">
+            <BackHomeLinks className="absolute top-4 left-4" />
             <h1 className="text-4xl font-bold text-blue-600 mb-4">About KoL Auction Hub</h1>
-            <p className="text-lg text-gray-700 text-center max-w-3xl mb-6">
+            <p className="w-full max-w-3xl mb-6 text-sm leading-6 text-gray-700 text-justify">
                 Welcome to <span className="font-bold text-blue-500">kHub</span> (Kingdom of Loathing Auction Hub), a modern take on the old “kBay.”{' '}
                 I created this site because I missed the days of putting items up for auction, without having to spend hours advertising in chat with little to show for it.{' '}
                 What started as a fun little coding project over Crimbo Break somehow turned into a nearly two-year endeavor.{' '}
@@ -47,35 +46,139 @@ const InfoPage = () => {
             </p>
 
             <div className="text-sm text-gray-600 text-left max-w-3xl">
-                <h2 className="text-lg font-semibold text-gray-800 mb-2">Getting Started</h2>
+                <h2 className={`${sectionHeadingClass} mb-2`}>Getting Started</h2>
                 <p className="mb-6">
                     <Link to="/register" className="font-medium text-blue-600 hover:underline">Register here</Link> to create your kHub account. Only one account is permitted per KoL player.
                 </p>
 
-                <h2 className="text-lg font-semibold text-gray-800 mb-2">
+                <h2 className={`${sectionHeadingClass} mb-2`}>
                     Official kHub Accounts
                 </h2>
 
                 <p className="mb-3">
                     <strong>kHub (#3888760)</strong> is our official auction bot, and{' '}
-                    <strong>Teres Minor (#3552305)</strong> is the site administrator.
+                    <strong>Teres Minor (#3552305)</strong> is the site’s creator and administrator.{' '}
+                    No other accounts are authorized to contact you on behalf of kHub.{' '}
+                    Ignore any messages claiming otherwise, especially those requesting items, Meat, or account information.
+                </p>
+
+                <p className="mb-3">
+                    Please send only auction-related items and Meat to <strong>kHub (#3888760)</strong>, following the KMail instructions provided on the site.{' '}
+                    Items or Meat sent without the required KMail message will be automatically returned.
                 </p>
 
                 <p className="mb-6">
-                    Only send auction-related items and Meat to <strong>kHub (#3888760)</strong>.
-                    Ignore messages from other accounts claiming to represent kHub,
-                    particularly those requesting items, Meat, or account information.
+                    The only exceptions are <Link to="/donate" className="text-blue-600 hover:underline">donations</Link> and gift packages, which are treated as donations.
                 </p>
 
 
-                <h2 className="text-lg font-semibold text-gray-800 mb-3">Auction Types</h2>
+                <h2 className={`${sectionHeadingClass} mb-2`}>
+                    Creating an Auction
+                </h2>
+
+                <p className="mb-3">
+                    <Link to="/auction-item" className="font-medium text-blue-600 hover:underline">
+                        Create an auction here
+                    </Link>
+                    . Minimum Bid and Buyout Prices are optional. All prices apply to the entire listing, not individual items.
+                </p>
+
+                <h3 className={`${subheadingClass} mb-2`}>
+                    When does an auction go live?
+                </h3>
+
+                <ul className="mb-6 list-disc space-y-2 pl-5">
+                    <li>
+                        <strong className={subheadingClass}>Escrow:</strong> Your auction goes live once our bot receives and verifies your items,
+                        typically within seconds. Deposit instructions are provided on your auction&apos;s page
+                        and are visible only to you.
+                    </li>
+                    <li>
+                        <strong className={subheadingClass}>Direct Trade:</strong> Your auction goes live immediately after publishing.
+                        Items must remain in your Display Case throughout the auction.
+                        Violations may result in a warning or further action.
+                    </li>
+                </ul>
+
+                <h2 className={`${sectionHeadingClass} mb-4`}>Bidding Privacy</h2>
+                <p className="mb-6">Bidders remain anonymous while an auction is active, with your own bids labeled as “You.” Seller identities are visible to help buyers make informed decisions, while winning bidders are revealed only after the auction ends. All player identities are hidden from guests and banned users.</p>
+
+                <h2 className={`${sectionHeadingClass} mb-2`}>
+                    Canceling Bids or Auctions
+                </h2>
+
+                <ul className="mb-6 list-disc space-y-2 pl-5">
+                    <li>
+                        <strong className={subheadingClass}>Canceling an Auction:</strong> Sellers may cancel an auction before
+                        any bids have been accepted, without penalty. Escrowed items will be
+                        automatically returned by KMail.
+                    </li>
+                    <li>
+                        <strong className={subheadingClass}>Canceling a Bid:</strong> Accepted bids cannot be canceled.
+                        Once an auction receives a bid, the seller can no longer cancel their sale.
+                    </li>
+                </ul>
+
+                <h2 className={`${sectionHeadingClass} mb-2`}>
+                    After an Auction Ends
+                </h2>
+
+                <ul className="mb-3 list-disc space-y-2 pl-5">
+                    <li>
+                        <strong className={subheadingClass}>Escrow:</strong> The bot automatically sends the items to the winning bidder
+                        and the seller&apos;s proceeds by KMail. A 7.5% commission is deducted from
+                        the final sale price. If no bids were accepted, the items are returned to the seller.
+                    </li>
+                    <li>
+                        <strong className={subheadingClass}>Direct Trade:</strong> The seller and winning bidder have 48 hours to complete
+                        their exchange. Both parties must confirm the outcome on kHub to close out the auction.
+
+                        <p className="mt-2 rounded border-l-[3px] border-blue-300 bg-blue-50/70 px-3 py-1 text-xs leading-4 text-gray-600">
+                            <span className={subheadingClass}>Deadline exceptions:</span>{' '}
+                            Extensions may be granted by mutual agreement or when one party
+                            makes a good-faith effort to complete the trade but is delayed
+                            by the other.
+                        </p>
+                    </li>
+                </ul>
+                <p className="mb-6 text-xs italic">
+                    Escrow deliveries and refunds typically arrive within seconds, but may be delayed during service disruptions.
+                </p>
+
+
+                <h2 className={`${sectionHeadingClass} mb-2`}>
+                    Trade Enforcement &amp; Ban Policy
+                </h2>
+                <p className="mb-3">
+                    Direct Trade auctions are binding commitments. Failure to honor a trade
+                    may result in the following penalties:
+                </p>
+                <ul className="mb-3 list-disc space-y-2 pl-5">
+                    <li>
+                        <strong className={subheadingClass}>First offense:</strong> 14-day ban.
+                    </li>
+                    <li>
+                        <strong className={subheadingClass}>Second offense:</strong> 30-day or permanent ban.
+                    </li>
+                    <li>
+                        <strong className={subheadingClass}>Serious or deliberate violations:</strong> Immediate permanent ban.
+                    </li>
+                </ul>
+                <p className="mb-6">
+                    All violations are subject to administrator review. Penalties depend on
+                    the circumstances, auction value, and prior offenses. False reports
+                    and attempts to evade bans may result in additional penalties.
+                </p>
+
+
+                <h2 className={`${sectionHeadingClass} mb-3`}>Auction Types</h2>
                 <div className="mb-6 overflow-hidden rounded-lg border border-[#E0E5EB] bg-white">
                     <table className="w-full table-fixed text-xs leading-5 text-[#475569]">
                         <caption className="sr-only">Escrow and Direct Trade auction comparison</caption>
                         <thead className="text-gray-800">
                             <tr>
-                                <th scope="col" className="w-1/2 border-r border-t-[3px] border-r-[#E0E5EB] border-t-[#93B4E8] bg-[#EAF2FF] px-3 py-1.5 text-center font-semibold">Escrow</th>
-                                <th scope="col" className="w-1/2 border-t-[3px] border-t-[#9EBFA8] bg-[#EDF5EF] px-3 py-1.5 text-center font-semibold">Direct Trade</th>
+                                <th scope="col" className={`${subheadingClass} w-1/2 border-r border-t-[3px] border-r-[#E0E5EB] border-t-[#93B4E8] bg-[#EAF2FF] px-3 py-1.5 text-center`}>Escrow</th>
+                                <th scope="col" className={`${subheadingClass} w-1/2 border-t-[3px] border-t-[#9EBFA8] bg-[#EDF5EF] px-3 py-1.5 text-center`}>Direct Trade</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -87,7 +190,7 @@ const InfoPage = () => {
                         {auctionTypeComparison.map(({ heading, escrow, direct }) => (
                             <tbody key={heading}>
                                 <tr>
-                                    <th scope="rowgroup" colSpan={2} className="border-y border-[#E5E7EB] bg-[#F1F3F6] px-3 py-[3px] text-center text-[11px] leading-4 font-semibold">{heading}</th>
+                                    <th scope="rowgroup" colSpan={2} className={`${subheadingClass} border-y border-[#E5E7EB] bg-[#F1F3F6] px-3 py-[3px] text-center`}>{heading}</th>
                                 </tr>
                                 <tr className="bg-white">
                                     <td className="border-r border-[#E0E5EB] px-3 py-2 align-top">{escrow}</td>
@@ -98,18 +201,15 @@ const InfoPage = () => {
                     </table>
                 </div>
 
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">Bidding Privacy</h2>
-                <p className="mb-6">Bidders remain anonymous while an auction is active, with your own bids labeled as “You.” Seller identities are visible to help buyers make informed decisions, while winning bidders are revealed only after the auction ends. All player identities are hidden from guests and banned users.</p>
-
                 <section aria-labelledby="bid-increases-title" className="mb-6">
-                    <h2 id="bid-increases-title" className="mb-2 text-lg font-semibold text-gray-800">Minimum Bid Increases</h2>
+                    <h2 id="bid-increases-title" className={`${sectionHeadingClass} mb-2`}>Minimum Bid Increases</h2>
                     <p className="mb-3">The first bid must meet the seller’s minimum price. Each subsequent bid must exceed the current highest bid by at least the amount shown below. These rules apply to both Escrow and Direct Trade auctions.</p>
                     <div className="max-w-md overflow-hidden rounded-md border border-gray-200">
                         <table className="w-full text-xs leading-5">
                             <caption className="sr-only">Minimum increases based on the current highest bid, in Meat</caption>
                             <thead className="bg-gray-100 text-gray-700"><tr>
-                                <th scope="col" className="px-3 py-1.5 text-left font-semibold">Current Highest Bid</th>
-                                <th scope="col" className="px-3 py-1.5 text-right font-semibold">Required Increase</th>
+                                <th scope="col" className={`${subheadingClass} px-3 py-1.5 text-left`}>Current Highest Bid</th>
+                                <th scope="col" className={`${subheadingClass} px-3 py-1.5 text-right`}>Required Increase</th>
                             </tr></thead>
                             <tbody className="divide-y divide-gray-200">
                                 {BID_INCREMENT_TIERS.map(tier => <tr key={tier.label} className="bg-white odd:bg-gray-50">
@@ -122,111 +222,14 @@ const InfoPage = () => {
                     <p className="mt-2 text-xs leading-5">Buyouts can always be accepted at their listed price, even if below the next minimum bid.</p>
                 </section>
 
-                <h2 className="text-lg font-semibold text-gray-800 mb-2">
-                    Creating an Auction
-                </h2>
-
-                <p className="mb-3">
-                    <Link to="/auction-item" className="font-medium text-blue-600 hover:underline">
-                        Create an auction here
-                    </Link>
-                    . Minimum Bid and Buyout Prices are optional. All prices apply to the entire listing, not individual items.
-                </p>
-
-                <p className="mb-2 font-semibold">
-                    When does the auction timer start?
-                </p>
-
-                <ul className="mb-6 list-disc space-y-2 pl-5">
-                    <li>
-                        <strong>Escrow:</strong> Your auction goes live once our bot receives and verifies your items,
-                        typically within seconds. Deposit instructions are provided on your auction&apos;s page
-                        and are visible only to you.
-                    </li>
-                    <li>
-                        <strong>Direct Trade:</strong> Your auction goes live immediately after publishing.
-                        Items must remain in your Display Case throughout the auction.
-                        Violations may result in a warning or further action.
-                    </li>
-                </ul>
-
-                <h2 className="text-lg font-semibold text-gray-800 mb-2">
-                    Canceling Bids or Auctions
-                </h2>
-
-                <ul className="mb-6 list-disc space-y-2 pl-5">
-                    <li>
-                        <strong>Canceling an Auction:</strong> Sellers may cancel an auction before
-                        any bids have been accepted, without penalty. Escrowed items will be
-                        automatically returned by KMail.
-                    </li>
-                    <li>
-                        <strong>Canceling a Bid:</strong> Accepted bids cannot be canceled.
-                        Once an auction receives a bid, the seller can no longer cancel their sale.
-                    </li>
-                </ul>
-
-                <h2 className="text-lg font-semibold text-gray-800 mb-2">
-                    After an Auction Ends
-                </h2>
-
-                <ul className="mb-3 list-disc space-y-2 pl-5">
-                    <li>
-                        <strong>Escrow:</strong> The bot automatically sends the items to the winning bidder
-                        and the seller&apos;s proceeds by KMail. A 7.5% commission is deducted from
-                        the final sale price. If no bids were accepted, the items are returned to the seller.
-                    </li>
-                    <li>
-                        <strong>Direct Trade:</strong> The seller and winning bidder have 48 hours to complete
-                        their exchange. Both parties must confirm the outcome on kHub to close out the auction.
-
-                        <p className="mt-2 rounded border-l-[3px] border-blue-300 bg-blue-50/70 px-3 py-1 text-xs leading-4 text-gray-600">
-                            <span className="font-semibold text-gray-700">Deadline exceptions:</span>{' '}
-                            Extensions may be granted by mutual agreement or when one party
-                            makes a good-faith effort to complete the trade but is delayed
-                            by the other.
-                        </p>
-                    </li>
-                </ul>
-                <p className="mb-6 text-xs italic">
-                    Escrow deliveries and refunds typically arrive within seconds, but may be delayed during service disruptions.
-                </p>
-
-
-                <h2 className="text-lg font-semibold text-gray-800 mb-2">
-                    Trade Enforcement &amp; Ban Policy
-                </h2>
-                <p className="mb-3">
-                    Direct Trade auctions are binding commitments. Failure to honor a trade
-                    may result in the following penalties:
-                </p>
-                <ul className="mb-3 list-disc space-y-2 pl-5">
-                    <li>
-                        <strong>First offense:</strong> 14-day ban.
-                    </li>
-                    <li>
-                        <strong>Second offense:</strong> 30-day or permanent ban.
-                    </li>
-                    <li>
-                        <strong>Serious or deliberate violations:</strong> Immediate permanent ban.
-                    </li>
-                </ul>
-                <p className="mb-6">
-                    All violations are subject to administrator review. Penalties depend on
-                    the circumstances, auction value, and prior offenses. False reports
-                    and attempts to evade bans may result in additional penalties.
-                </p>
-
-
-                <h2 className="text-lg font-semibold text-gray-800 mb-2">
+                <h2 className={`${sectionHeadingClass} mb-1 text-center`}>
                     Contact Us
                 </h2>
 
-                <p>
-                    Need help with something not covered above? Submit a [support ticket].
+                <p className="text-center">
+                    Need help with something not covered above? <Link to="/support" className="text-blue-600 hover:underline">Submit a support ticket</Link>.
                 </p>
 
-                {/* TODO: Hyperlink "Submit a support ticket" to the "Other" admin mailbox. */}
             </div>
         </div>
     );

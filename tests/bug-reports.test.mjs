@@ -46,6 +46,29 @@ test('anonymous users get login/contact guidance, signed-in users get a private 
     assert.doesNotMatch(signedIn,/Open administrator bug inbox/);
 });
 
+test('Info support link opens the general support form with login guidance for guests',()=>{
+    assert.match(render('/info'),/href="\/support"[^>]*>Submit a support ticket/);
+    const guest=render('/support');
+    assert.match(guest,/Submit a Support Ticket/);
+    assert.match(guest,/Log in/);
+    assert.doesNotMatch(guest,/<textarea/);
+    const signedIn=render('/support',{id:'reporter'});
+    assert.match(signedIn,/How can we help\?/);
+    assert.match(signedIn,/Submit support ticket/);
+    assert.match(signedIn,/Support tickets are private to administrators/);
+    assert.doesNotMatch(signedIn,/What went wrong|how to reproduce|Send bug report/);
+});
+
+test('general support submits text and a stable key to its dedicated server route',async()=>{
+    const calls=[];
+    const service=createBugReportService({async rpc(name,params){calls.push([name,params]);return {data:{reference:'B-1002'}};}});
+    assert.equal((await service.submitSupportTicket('request-id','  Please help with my account.  ')).reference,'B-1002');
+    assert.deepEqual(calls,[['submit_support_ticket',{p_request_id:'request-id',p_body:'Please help with my account.'}]]);
+    for(const body of ['short','x'.repeat(2001)]) await assert.rejects(service.submitSupportTicket('id',body),/10 to 2,000/);
+    assert.equal(calls.length,1);
+    await assert.rejects(createBugReportService({async rpc(){return {data:{}};}}).submitSupportTicket('id','Please help with my account.'),/retry/);
+});
+
 test('administrator route never embeds cached private reports before authentication/authorization',()=>{
     assert.match(render('/admin/bug-reports'),/Log in.*administrator account/);
     const signedIn=render('/admin/bug-reports',{id:'normal'});

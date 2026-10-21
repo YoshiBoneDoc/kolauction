@@ -11,6 +11,8 @@ import KmailInstructions from "./KmailInstructions";
 import { getAuctionResult } from "../lib/auctionLifecycle";
 import { tradeResponseStatus, tradeResponseSummary } from '../lib/tradeResponses';
 import TradeResponseBadge from './TradeResponseBadge';
+import { canSendTradeQuery } from '../lib/tradeQueries';
+import TradeReportDismissals from './TradeReportDismissals';
 
 export default function AuctionOutcome({ auction, now }) {
     const { currentUser } = useContext(UserContext);
@@ -48,6 +50,8 @@ export default function AuctionOutcome({ auction, now }) {
         return <TradeResponseBadge status={status} role={role} username={username} />;
     }
     const canCancel = ['active','pending_escrow'].includes(result.status) && isSeller && !auction.highestBidderId && !auction.currentBid && !auction.bidCount;
+    const escrowContact = auction.escrowMode && canSendTradeQuery(auction, currentUser)
+        ? <Link to={`/auction/${auction.id}/trade-query`} className="inline-block text-sm text-blue-700 underline">Contact an Administrator</Link> : null;
 
     async function cancelListing() {
         if (pending || !window.confirm('Cancel this listing? It will remain in history and no longer accept bids.')) return;
@@ -64,6 +68,7 @@ export default function AuctionOutcome({ auction, now }) {
     if (result.status === 'active') return isSeller ? <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <p className="text-sm text-gray-600">{canCancel ? 'This is your listing. You may cancel before the first bid.' : 'This is your listing.'}</p>
         {canCancel && <button disabled={pending} onClick={cancelListing} className="button-red ml-auto min-h-9 rounded border px-3 py-1.5 text-xs font-medium disabled:opacity-50">{pending ? 'Saving…' : 'Cancel this listing'}</button>}
+        {escrowContact && <div className="w-full">{escrowContact}</div>}
         {message && <p role="status" className="w-full text-sm text-green-700">{message}</p>}
         {error && <p role="alert" className="w-full text-sm text-red-700">{error}</p>}
     </div> : null;
@@ -81,12 +86,15 @@ export default function AuctionOutcome({ auction, now }) {
             <p>Handled by our bot, <strong>kHub (#3888760)</strong>.</p>
             {result.status === 'bidding_closed' && <p className="text-sm text-gray-600">New bids are closed following an account restriction. Existing funded bids and escrow deliveries remain protected; the bot will settle the auction at its deadline.</p>}
             {result.status === 'pending_escrow' && isSeller && <KmailInstructions auction={auction} mode="list" />}
-            {result.status === 'settling' && <p>Bidding has closed. The bot is delivering the items and payment via KMail. This trade will be marked complete once both deliveries are confirmed.</p>}
+            {result.status === 'settling' && <p>{result.hasWinner
+                ? 'Bidding has closed. The bot is sending the items to the winner and payment to the seller via KMail. Settlement finishes once all required deliveries are confirmed.'
+                : 'This auction did not result in a sale. The bot is returning the deposited items to the seller via KMail. The return finishes once all required deliveries are confirmed.'}</p>}
             {result.hasWinner && <p>Winner: <strong><WinnerLink auction={auction} /></strong> · Final price: <strong>{result.finalPrice.toLocaleString('en-US')} Meat</strong></p>}
             {auction.instantPurchasedAt && <p>The buyout price ended bidding early.</p>}
             {result.status === 'completed' && <p>The items and payment have been delivered via KMail.{isSeller && <> Seller fee: {auction.feeMeat.toLocaleString('en-US')} Meat.</>}</p>}
             {result.status === 'ended_no_bids' && <p>No bids were accepted. The bot has returned the items to the seller.</p>}
             {result.status === 'cancelled' && <p>This listing was cancelled. Any accepted item deposit has been returned.</p>}
+            {escrowContact}
             {canCancel && <button disabled={pending} onClick={cancelListing} className="button-red min-h-11 rounded border px-4 py-3 disabled:opacity-50">{pending ? 'Saving…' : 'Cancel listing'}</button>}
             {message && <p role="status" className="text-green-700">{message}</p>}
             {error && <p role="alert" className="text-red-700">{error}</p>}
@@ -118,6 +126,7 @@ export default function AuctionOutcome({ auction, now }) {
                         {(isSeller || isWinner || result.status === 'completed') && <h3 className="mb-2 font-bold text-black">Trade status:</h3>}
                         <p>{responseStatus('seller')}</p>
                         <p>{responseStatus('buyer')}</p>
+                        <TradeReportDismissals auction={auction} />
                     </div>
                     {result.status === 'awaiting_trade' && (isSeller || isWinner) && (
                         ownUnwithdrawnReport

@@ -51,6 +51,28 @@ test('non-admin errors and malformed search responses are not treated as success
     await assert.rejects(malformed.search('Player'), /could not be loaded/);
 });
 
+test('appeal account lookup uses the report ID and rejects unavailable or unauthorized data', async () => {
+    const calls = [];
+    const account = { id: 'appellant-id', username: 'Appellant', is_banned: true };
+    const service = createAccountRestrictionService({ async rpc(name, args) { calls.push({ name, args }); return { data: account }; } });
+    assert.deepEqual(await service.reportAccount('appeal-id'), account);
+    assert.deepEqual(calls, [{ name: 'read_appeal_account', args: { p_report_id: 'appeal-id' } }]);
+    assert.equal(await createAccountRestrictionService({ async rpc() { return { data: null }; } }).reportAccount('missing'), null);
+    await assert.rejects(createAccountRestrictionService({ async rpc() { return { data: [] }; } }).reportAccount('id'), /could not be loaded/);
+    await assert.rejects(createAccountRestrictionService({ async rpc() { return { error: { code: '42501' } }; } }).reportAccount('id'), /Administrator access required/);
+});
+
+test('appeal history uses the report ID, validates events and preserves full reasons', async () => {
+    const events = [{ id: 'ban-event-1', action: 'issued', created_at: '2026-10-20T12:00:00Z', reason: 'Full reason. '.repeat(80) }];
+    const calls = [];
+    const service = createAccountRestrictionService({ async rpc(name, args) { calls.push({ name, args }); return { data: events }; } });
+    assert.deepEqual(await service.appealHistory('appeal-id'), events);
+    assert.deepEqual(calls, [{ name: 'read_appeal_ban_history', args: { p_report_id: 'appeal-id' } }]);
+    for (const data of [null, {}, [{ ...events[0], created_at: 'invalid' }]]) {
+        await assert.rejects(createAccountRestrictionService({ async rpc() { return { data }; } }).appealHistory('id'), /history could not be loaded/);
+    }
+});
+
 test('auction ban reviews keep completion decisions distinct from ban lifting and ticket resolution', async () => {
     const calls = [];
     const service = createAccountRestrictionService({ async rpc(name, args) { calls.push({ name, args }); return { data: name === 'read_auction_ban_reviews' ? [] : null }; } });

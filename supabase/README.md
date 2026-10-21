@@ -14,7 +14,8 @@ Seller profiles keep generic navigation links for visitors.
 
 Signed-in, unrestricted accounts can see seller names and server-finalized winner
 names. Private trading contacts remain limited to the actual seller/winner, and
-are withheld from restricted accounts. Live/losing bid identities remain anonymous.
+are withheld from restricted accounts. Live/losing bid identities remain anonymous
+to ordinary viewers; migration 062 adds server-authorized administrator access.
 The gallery similarly hides player names/numbers and identifying reason text from
 outsiders. Private administrator access also checks Auth-level bans. No stored
 profile name, auction result, report or KMail is changed by this migration.
@@ -785,3 +786,80 @@ or a bad mark automatically. Withdrawn/admin-dismissed reports stay excluded;
 restoring an early report cannot bypass the grace period. Separate thumbs feedback
 and completed-trade counts are unaffected. Existing historical records are not
 rewritten. Deploy the website to show the matching profile-help explanation.
+
+
+## General support tickets (056)
+
+Apply `migrations/queue/202610210056_general_support_tickets.sql` after 055, then
+deploy the website. The Info page's Contact Us link opens `/support`, a general
+support version of the existing Report a Bug form. Its dedicated authenticated
+RPC assigns `other` server-side, so tickets appear in the Other admin inbox folder.
+
+Tickets require a verified, unrestricted account and use the existing 10–2,000
+character limits, shared reporting rate limits, administrator-only inbox access,
+and escaped KMail notices to teres Minor (#3552305). Stable retry keys prevent
+additional records/notices; a category change by an administrator is preserved on
+retry. Private source records distinguish support tickets from bug/trade reports.
+No existing messages are recategorized. The existing bot processes these notice
+deliveries; no bot code update is required.
+
+## Account-failure notifications (059)
+
+Apply `migrations/queue/202610210059_account_failure_notices.sql` after 058, then
+deploy the updated standalone bot. Failed saved registration/recovery requests
+stay pending for automatic retry and queue at most one friendly player KMail,
+one private Other inbox system report, and one KMail to teres Minor (#3552305).
+No website update is required. The player is not told to resubmit while an existing
+request is pending. Alert failures are retried without blocking unrelated safe
+payouts. Completed/rejected/restricted requests do not get misleading failure mail.
+
+System reports have an explicit source flag and no human reporter UUID, allowing
+notification before a registration creates a profile. Existing submission retry
+checks become null-safe so players cannot claim a system report ID. The alert RPC
+is service-only; recipients and safe message bodies come from the saved job, not
+browser input. No passwords, login addresses or raw Auth errors are included.
+Requests that cannot yet be saved, including database outages, retain their KMail
+for retry; a notice cannot be queued until the database is available. Existing
+financial and uncertain-delivery safeguards remain enforced.
+
+
+### Bot message wording audit (060)
+
+Apply `migrations/queue/202610210060_clear_bot_messages.sql` after 059, then deploy
+website changes for the corrected escrow settlement panel. The SQL template update
+requires no worker restart. It distinguishes split returns from complete refunds,
+self-raised bids from another player outbidding you, and historical acceptance/response
+notices from current auction state. It also updates buyout/restriction guidance and
+account-page navigation. Existing saved messages, financial records, delivery states
+and retry/reconciliation evidence are untouched. Full examples and event behavior:
+[Bot messages](../bot/MESSAGES.md). Account-failure notices still require the current
+059 worker deployed to Oracle.
+
+
+### Escrow auction-linked administrator queries (061)
+
+Apply `migrations/queue/202610210061_escrow_trade_queries.sql` after 060 and deploy
+the website. Escrow listings now link to the existing Trade query form for their
+seller at every stage and for finalized winning buyers. Guests, restricted accounts,
+leading bidders and unrelated players cannot submit. Queries use the existing
+private Trade inbox, grouped auction context, cooldowns and stable retry IDs. KMail
+notices identify the method/item/quantity and final price when available. Submission
+does not alter payment, delivery, confirmation or feedback state. No bot restart is
+required; the matching standalone migration and message documentation are bundled.
+
+
+### Administrator auction identities (062)
+
+Apply `migrations/queue/202610210062_administrator_auction_identities.sql` after 061,
+then refresh the website. Unrestricted, verified administrators see seller names,
+all bidder names/account IDs, and winner identities through the existing auction
+endpoints, including held/canceled listings and pending Escrow deposits. Their own
+bids show their actual username rather than You. Pending Escrow listings are also
+available on administrator detail and seller-history views.
+
+Authorization uses the private server-side administrator checks (including explicit
+operator grants), not user-editable metadata or a frontend role flag. Restricting an
+administrator revokes this access. Ordinary users, guests and restricted viewers
+keep their existing aliases and visibility rules. Trading contacts, private reports,
+financial records and participant controls are not broadened. No bot restart or
+frontend bundle change is required; refresh to fetch the newly authorized data.

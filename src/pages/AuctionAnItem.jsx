@@ -1,3 +1,4 @@
+import BackHomeLinks from '../components/BackHomeLinks';
 import { useState, useContext, useDeferredValue, useEffect, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuctionsContext } from '../context/AuctionsContext';
@@ -102,7 +103,7 @@ export default function AuctionAnItem() {
 
     if (!currentUser) return (
         <main className="min-h-screen bg-gray-50 p-4">
-            <Link to="/" className="inline-flex min-h-11 items-center text-blue-700 underline">Home</Link>
+            <BackHomeLinks />
             <div className="mx-auto mt-12 max-w-lg space-y-4 text-center">
                 <h1 className="text-2xl font-bold text-red-700">You must be logged in to auction an item.</h1>
                 <Link to="/login" className="inline-flex min-h-11 items-center text-lg text-blue-700 underline">Log In</Link>
@@ -113,7 +114,7 @@ export default function AuctionAnItem() {
 
     return (
         <main className="min-h-screen bg-gray-50 p-4 sm:p-6">
-            <Link to="/" className="mb-4 inline-flex min-h-11 items-center text-sm text-blue-700 underline">Home</Link>
+            <BackHomeLinks className="mb-4" />
             <h1 className="mb-6 text-center text-3xl font-bold text-blue-600 sm:text-4xl">Auction an Item</h1>
             {!preview && <p className="mx-auto mb-4 max-w-lg text-sm text-gray-700">{kolIdentity && !kolIdentity.kol_player_id && <>First <Link to="/profile" className="text-blue-700 underline">link your KoL account</Link>. </>}Choose how your sale will settle. The mode stays fixed after publishing.</p>}
             <div className="mx-auto max-w-lg rounded-lg bg-white p-4 shadow-md sm:p-8">

@@ -7,7 +7,7 @@ import { threadRoleStatus } from '../src/lib/supportThreads.js';
 test('responses use clear labels with matching light badge and text colors', () => {
     for (const [response,label,color,background] of [
         [{},'Awaiting response','text-slate-500','border-slate-200 bg-slate-50'],
-        [{reportExcluded:true},'Report excluded','text-slate-500','border-slate-200 bg-slate-50'],
+        [{reportExcluded:true},'Report dismissed','text-slate-500','border-slate-200 bg-slate-50'],
         [{reportedIncomplete:true},'Reported Incomplete','text-red-700','border-red-200 bg-red-50'],
         [{confirmedAt:'2026-10-20'},'Confirmed Complete','text-green-800','border-green-200 bg-green-50'],
         [{resolvedAt:'2026-10-20'},'Confirmed Complete','text-green-800','border-green-200 bg-green-50'],
@@ -24,7 +24,7 @@ test('auction mapping keeps neutral completion separate from positive rating evi
 
 test('admin-excluded reports use a neutral badge without implying completion', () => {
     const thread={auction:{seller:{}},messages:[{reporter_role:'seller',message_type:'trade_rating',negative_counted:false,feedback_withdrawn:false}]};
-    assert.equal(threadRoleStatus(thread,'seller').label,'Report excluded');
+    assert.equal(threadRoleStatus(thread,'seller').label,'Report dismissed');
     thread.auction.seller.resolved_at='2026-10-20';
     assert.equal(threadRoleStatus(thread,'seller').label,'Confirmed Complete');
 });
@@ -37,9 +37,9 @@ test('response summaries describe each combination without waiting on an existin
         [{confirmedComplete:true,otherConfirmedComplete:true},'Both you and the other party confirmed this trade as complete.'],
         [{confirmedComplete:true},'You confirmed this trade as complete. Awaiting the other party’s response.'],
         [{reportedIncomplete:true},'You reported this trade as incomplete. Awaiting the other party’s response.'],
-        [{reportExcluded:true},'Your incomplete report was excluded after administrator review.'],
-        [{confirmedComplete:true,otherReportExcluded:true},'You confirmed this trade as complete. The other party’s incomplete report was excluded after administrator review.'],
-        [{reportedIncomplete:true,otherReportExcluded:true},'You reported this trade as incomplete. The other party’s incomplete report was excluded after administrator review.'],
+        [{reportExcluded:true},'Your incomplete report was dismissed by an administrator.'],
+        [{confirmedComplete:true,otherReportExcluded:true},'You confirmed this trade as complete. The other party’s incomplete report was dismissed by an administrator.'],
+        [{reportedIncomplete:true,otherReportExcluded:true},'You reported this trade as incomplete. The other party’s incomplete report was dismissed by an administrator.'],
         [{},''],
     ]) assert.equal(tradeResponseSummary(response),expected);
     const neutral=tradeResponseSummary({confirmedComplete:true,resolvedIncomplete:true,otherReportedIncomplete:true});

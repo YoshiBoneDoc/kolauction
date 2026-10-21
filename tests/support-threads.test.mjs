@@ -33,6 +33,34 @@ const thread = { id:'auction-1',is_trade:true,updated_at:'2026-10-20T13:00:00Z',
         seller:{name:'Seller',player_id:111,confirmed_at:null},buyer:{name:'Buyer',player_id:222,confirmed_at:'2026-10-20'}},
     messages:[message,{...message,id:'query-1',reference:'B-1004',body:'Please review the exchange.',message_type:'trade_query',negative_counted:null}] };
 
+test('appeal summaries load ban details in the header without adding controls to expanded messages', () => {
+    const appeal = { ...thread, id: 'appeal-1', is_trade: false, auction: null,
+        messages: [{ ...message, id: 'appeal-1', category: 'appeal', message_type: 'general' }] };
+    assert.match(render(appeal), /Loading ban details/);
+    assert.match(render({ ...appeal, status: 'resolved' }, true), /Loading ban details/);
+    assert.doesNotMatch(render(thread, true), /Appeal account controls/);
+    assert.doesNotMatch(render({ ...appeal, messages: [{ ...appeal.messages[0], category: 'other' }] }, true), /Appeal account controls/);
+    const expanded = render(appeal, true);
+    assert.ok(expanded.indexOf('Appeal account controls') < expanded.indexOf('id="body-message-appeal-1"'));
+    assert.doesNotMatch(expanded, /Manage ban|Hide ban controls|Refresh ban details/);
+    assert.doesNotMatch(render(appeal, true), /Change ban|Lift ban|Permanently banned/);
+});
+
+test('ban events and appeal replies share newest-first ordering without truncating their full text', () => {
+    const appeal = { ...thread, is_trade: false, auction: null,
+        messages: [{ ...message, id: 'appeal', category: 'appeal', message_type: 'general', created_at: '2026-10-20T13:00:00Z' }] };
+    const reason = 'Complete ban reason. '.repeat(40);
+    const events = [
+        { id: 'ban-event-1', action: 'issued', created_at: '2026-10-20T12:00:00Z', reason },
+        { id: 'ban-event-2', action: 'removed', created_at: '2026-10-20T14:00:00Z', reason: 'Appeal accepted.' },
+    ];
+    const timeline = supportTimeline(appeal, events);
+    assert.deepEqual(timeline.map(entry => entry.id), ['ban-event-2', 'appeal', 'ban-event-1']);
+    assert.equal(timeline[2].reason, reason);
+    assert.equal(timeline[0].message_type, 'account_ban_event');
+    assert.equal(appeal.messages.length, 1);
+});
+
 test('collapsed trade rows show item, participants and responses without message or delivery clutter', () => {
     const html=render(thread);
     assert.match(html,/aria-expanded="false" aria-controls="body-trade-auction-1"/);
@@ -115,7 +143,7 @@ test('standalone messages keep their own identity and no auction or rating contr
 test('summary statuses distinguish each party and ignore queries, withdrawn and excluded feedback', () => {
     assert.equal(threadRoleStatus(thread,'seller').label,'Reported Incomplete');
     assert.equal(threadRoleStatus(thread,'buyer').label,'Confirmed Complete');
-    assert.equal(threadRoleStatus({...thread,messages:[{...message,negative_counted:false}]},'seller').label,'Report excluded');
+    assert.equal(threadRoleStatus({...thread,messages:[{...message,negative_counted:false}]},'seller').label,'Report dismissed');
     for (const changes of [{message_type:'trade_query'},{feedback_withdrawn:true}]) {
         assert.equal(threadRoleStatus({...thread,messages:[{...message,...changes}]},'seller').label,'Awaiting response');
     }

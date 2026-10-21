@@ -159,7 +159,9 @@ test('closed cards keep a consistent trade badge and summary across modes and vi
                     ? /send <strong>2 × Test item<\/strong> in exchange for <strong>500 Meat/
                     : /send <strong>500 Meat<\/strong> in exchange for <strong>2 × Test item/);
             } else {
-                assert.doesNotMatch(html,/Your trading partner:|Verified Buyer|Verified Seller|Reference: B-5678|Withdraw Incomplete Report|Contact an Administrator|Trade instructions/);
+                assert.doesNotMatch(html,/Your trading partner:|Verified Buyer|Verified Seller|Reference: B-5678|Withdraw Incomplete Report|Trade instructions/);
+                if (escrowMode && participant) assert.match(html,/Contact an Administrator/);
+                else assert.doesNotMatch(html,/Contact an Administrator/);
             }
             if (!escrowMode) assert.match(top,/At least one party reported the trade incomplete/);
             assert.doesNotMatch(html,/Confirm Complete|Report Incomplete/);
@@ -253,6 +255,59 @@ test('a reported trade offers author withdrawal and a participant-only administr
     assert.doesNotMatch(withdrawn,/Withdraw Incomplete Report|Negative Feedback Submitted|Report Incomplete/);
     assert.match(render({path:'/auction/direct/trade-query',auctions:[trade]}),/<textarea[^>]*minLength="10"/);
     assert.doesNotMatch(render({path:'/auction/direct/trade-query',auctions:[trade],user:{id:'outsider'}}),/<textarea/);
+});
+
+test('Escrow queries reuse the existing form for sellers and finalized winners only', () => {
+    for (const status of ['pending_escrow', 'active', 'settling', 'completed', 'ended_no_bids', 'cancelled']) {
+        const closedSale = ['settling', 'completed'].includes(status);
+        const lot = { ...auction, escrowMode: true, status, endTime: Date.now() + 86400000,
+            finalizedAt: closedSale ? '2026-10-21' : null, winnerId: closedSale ? 'buyer' : null,
+            hasWinner: closedSale, finalPrice: closedSale ? 500 : null, feeMeat: 0,
+            currentBid: closedSale ? 500 : 0 };
+        for (const user of [{ id: 'seller' }, { id: 'buyer' }, { id: 'outsider' }, { id: 'seller', isBanned: true }, null]) {
+            const allowed = user && !user.isBanned && (user.id === 'seller' || (closedSale && user.id === 'buyer'));
+            const query = render({ path: '/auction/direct/trade-query', auctions: [lot], user });
+            assert.equal(/<textarea/.test(query), Boolean(allowed), `${status}: ${user?.id}`);
+            if (allowed) {
+                assert.match(query, /Escrow/);
+                assert.match(query, /KMail or delivery details/);
+                assert.doesNotMatch(query, /try to resolve the trade with the other party first/);
+            }
+            // App replaces the whole site for banned users; test other viewers here.
+            if (!user?.isBanned) {
+                const detail = render({ path: '/auction/direct', auctions: [lot], user });
+                assert.equal(/Contact an Administrator/.test(detail), Boolean(allowed), `${status} link: ${user?.id}`);
+            }
+        }
+    }
+    const leading = { ...auction, escrowMode: true, status: 'active', endTime: Date.now() + 86400000,
+        highestBidderId: 'buyer', winnerId: null, finalizedAt: null };
+    assert.doesNotMatch(render({ path: '/auction/direct/trade-query', auctions: [leading], user: { id: 'buyer' } }), /<textarea/);
+});
+
+test('dismissed reports explain administrator action and the cleared mark publicly without completing the trade', () => {
+    for (const role of ['seller', 'buyer']) {
+        const target = role === 'seller' ? 'buyer' : 'seller';
+        const lot = { ...auction, finalizedAt: '2026-10-21', [`${role}ReportExcluded`]: true,
+            [`${target}ConfirmedAt`]: '2026-10-21', tradeReported: false };
+        for (const user of [{ id: 'seller' }, { id: 'buyer' }, { id: 'outsider' }, null]) {
+            const html = render({ path: '/auction/direct', auctions: [lot], user });
+            const top = html.split('aria-label="Auction outcome"')[0];
+            assert.match(top, /Awaiting settlement/);
+            assert.match(top, new RegExp(`The ${role}’s incomplete report was dismissed by an administrator`));
+            assert.match(html, new RegExp(`An administrator dismissed the ${role}’s incomplete report`));
+            assert.match(html, new RegExp(`No incomplete mark is counted against the ${target} for this report`));
+            assert.doesNotMatch(html, /Both parties confirmed|Trade completed/);
+        }
+        const mixed = render({ path: '/auction/direct', auctions: [{ ...lot, [`${target}ReportedIncomplete`]: true,
+            [`${target}ConfirmedAt`]: null, tradeReported: true }] });
+        assert.match(mixed, /Reported Incomplete/);
+        assert.match(mixed, /dismissed by an administrator/);
+    }
+    const both = render({ path: '/auction/direct', auctions: [{ ...auction, sellerReportExcluded: true, buyerReportExcluded: true }] });
+    assert.match(both, /Both incomplete reports were dismissed by an administrator/);
+    assert.match(both, /No incomplete mark is counted against the buyer for this report/);
+    assert.match(both, /No incomplete mark is counted against the seller for this report/);
 });
 
 test('both participants see matching response badges and the neutral withdrawal dialog', () => {

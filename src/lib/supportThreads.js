@@ -25,7 +25,7 @@ export function threadRoleStatus(thread, role) {
 
 // Withdrawal updates are durable report history, rendered once alongside the
 // original messages. They never create another report or change its category.
-export function supportTimeline(thread) {
+export function supportTimeline(thread, banEvents = []) {
     const entries = thread.messages.flatMap(message => {
         if (message.message_type !== 'trade_rating' || !message.feedback_withdrawn) return [message];
         const resolvedAt = thread.auction?.[message.reporter_role]?.resolved_at;
@@ -37,6 +37,7 @@ export function supportTimeline(thread) {
             withdrawal_confirmed_complete: message.withdrawal_confirmed_complete ?? Boolean(resolvedAt),
         }];
     });
+    entries.push(...banEvents.map(event => ({ ...event, message_type: 'account_ban_event' })));
     const timestamp = entry => entry.created_at ? new Date(entry.created_at).getTime() : -Infinity;
     return entries.sort((a, b) => timestamp(b) - timestamp(a));
 }

@@ -1,3 +1,4 @@
+import BackHomeLinks from '../components/BackHomeLinks';
 import { useState, useContext } from "react";
 import { UserContext } from "../context/UserContext";
 import { Link, useNavigate } from "react-router-dom";
@@ -26,17 +27,12 @@ const Login = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">
-            <Link
-                to="/"
-                className="absolute top-4 left-4 text-blue-500 hover:underline"
-            >
-                Home
-            </Link>
+        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 py-16">
+            <BackHomeLinks className="absolute top-4 left-4" />
 
             <form
                 onSubmit={handleSubmit}
-                className="w-full max-w-md bg-white shadow-md rounded p-6"
+                className="w-full max-w-md bg-white shadow-md rounded p-6 [color-scheme:light]"
             >
                 <h1 className="text-2xl font-bold text-center mb-6">Log In</h1>
 
@@ -59,7 +55,7 @@ const Login = () => {
                         placeholder="KH_Your KoL name"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full p-2 border rounded"
+                        className="w-full p-2 border border-gray-400 rounded bg-white text-gray-900 placeholder:text-gray-500"
                         required
                     />
                 </div>
@@ -77,7 +73,7 @@ const Login = () => {
                         autoComplete="current-password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="w-full p-2 border rounded"
+                        className="w-full p-2 border border-gray-400 rounded bg-white text-gray-900 placeholder:text-gray-500"
                         required
                     />
                 </div>

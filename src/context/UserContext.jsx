@@ -46,6 +46,7 @@ export const UserProvider = ({ children }) => {
                 navigateRef.current('/reset-password', { replace: true });
             }
             setSession(nextSession ? { ...nextSession } : null);
+            if (event === 'SIGNED_OUT') navigateRef.current('/', { replace: true });
         });
         return () => subscription.unsubscribe();
     }, []);
@@ -103,9 +104,17 @@ export const UserProvider = ({ children }) => {
     };
 
     const logoutUser = async () => {
-        if (!supabase) return;
-        const { error } = await supabase.auth.signOut();
-        if (error) setAuthError(error.message);
+        try {
+            if (supabase) {
+                const { error } = await supabase.auth.signOut();
+                if (error) { setAuthError(error.message); return; }
+            }
+            clearRecovery();
+            setSession(null);
+            setCurrentUser(null);
+            setAuthError('');
+            navigate('/', { replace: true });
+        } catch (error) { setAuthError(error.message); }
     };
 
     const changePassword = async (password) => {

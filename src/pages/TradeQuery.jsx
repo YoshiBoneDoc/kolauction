@@ -7,6 +7,7 @@ import AuctionNavigation from '../components/AuctionNavigation';
 import SiteFooter from '../components/SiteFooter';
 import { supabase } from '../lib/supabase';
 import { BUG_REPORT_MAX_LENGTH, createBugReportService } from '../lib/bugReports';
+import { canSendTradeQuery } from '../lib/tradeQueries';
 
 const reports = createBugReportService(supabase);
 
@@ -35,7 +36,7 @@ function TradeQueryForm({ auction }) {
     if (reference) return <p role="status" className="rounded border border-green-300 bg-green-50 p-4">Trade query saved: {reference}. An administrator can review your concern.</p>;
     return <form onSubmit={submit} className="space-y-3 rounded-lg border bg-white p-4 sm:p-6">
         <label htmlFor="trade-problem" className="block font-semibold">What would you like the administrator to review?</label>
-        <p id="trade-problem-help" className="text-sm text-gray-600">Describe your concern and any attempts to resolve it with the other party. Your message is private to administrators. Contacting an administrator does not change trade responses or feedback ratings.</p>
+        <p id="trade-problem-help" className="text-sm text-gray-600">{auction.escrowMode ? 'Describe your concern, including any relevant KMail or delivery details.' : 'Describe your concern and any attempts to resolve it with the other party.'} Your message is private to administrators. {auction.escrowMode ? 'Sending a query does not change payments or delivery status.' : 'Contacting an administrator does not change trade responses or feedback ratings.'}</p>
         <textarea id="trade-problem" rows={8} required minLength={10} maxLength={BUG_REPORT_MAX_LENGTH} disabled={pending}
             value={body} onChange={event => { setBody(event.target.value); setError(''); requestId.current = null; }}
             aria-describedby="trade-problem-help trade-problem-length" className="block w-full min-w-0 rounded border border-gray-400 p-3 text-base text-gray-900" />
@@ -52,9 +53,7 @@ export default function TradeQuery() {
     const { auctions, isLoading, error } = useContext(AuctionsContext);
     const userId = signedInUserId || currentUser?.id;
     const auction = auctions.find(entry => String(entry.id) === id);
-    const isSeller = Boolean(userId && auction?.sellerId === userId);
-    const participant = Boolean(userId && auction && (isSeller || auction.winnerId === userId));
-    const eligible = participant && !auction.escrowMode && ['awaiting_trade','completed'].includes(auction.status) && auction.finalizedAt;
+    const eligible = canSendTradeQuery(auction, currentUser);
 
     return <div className="flex min-h-screen flex-col bg-gray-50">
         <div className="px-4 sm:px-6"><AuctionNavigation /></div>
@@ -63,10 +62,10 @@ export default function TradeQuery() {
             <h1 className="text-3xl font-bold text-blue-700">Trade query</h1>
             {isLoading ? <p role="status">Loading trade…</p> : error ? <p role="alert">This trade could not be loaded.</p>
                 : !userId ? <p><Link to="/login" className="text-blue-700 underline">Log in</Link> as the seller or winning buyer to report a problem.</p>
-                : !eligible ? <p>Only the seller or winning buyer of a closed direct sale can send a trade query.</p>
+                : !eligible ? <p>Trade queries are available to the seller of an Escrow listing, or the seller and winning buyer after a sale closes. An unrestricted account is required.</p>
                 : <>
-                    <p className="break-words">Auction #{auction.auctionNumber || auction.id}: {auction.quantity.toLocaleString('en-US')} × {auction.item} · {auction.finalPrice.toLocaleString('en-US')} Meat</p>
-                    <p className="text-sm text-gray-600">Please try to resolve the trade with the other party first. If you still have concerns, send a private query to the administrator inbox.</p>
+                    <p className="break-words">Auction #{auction.auctionNumber || auction.id}: {auction.quantity.toLocaleString('en-US')} × {auction.item} · {auction.escrowMode ? 'Escrow' : 'Direct Trade'}{auction.finalPrice != null && <> · {auction.finalPrice.toLocaleString('en-US')} Meat</>}</p>
+                    <p className="text-sm text-gray-600">{auction.escrowMode ? 'Send a private query about this auction to the administrator inbox.' : 'Please try to resolve the trade with the other party first. If you still have concerns, send a private query to the administrator inbox.'}</p>
                     <TradeQueryForm key={`${id}:${userId}`} auction={auction} />
                 </>}
         </main>

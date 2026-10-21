@@ -4,7 +4,7 @@ import { createAccountRestrictionService } from '../lib/accountRestrictions';
 import { supabase } from '../lib/supabase';
 
 const accounts = createAccountRestrictionService(supabase);
-function RestrictionEditor({ account, onUpdated }) {
+export function RestrictionEditor({ account, onUpdated, renderSummary }) {
     const [action, setAction] = useState('');
     const [duration, setDuration] = useState('7');
     const [customExpiry, setCustomExpiry] = useState('');
@@ -29,14 +29,17 @@ function RestrictionEditor({ account, onUpdated }) {
         } catch (failure) { setError(failure.message); }
         finally { setPending(false); }
     }
-    return <article className="space-y-3 rounded-md border border-gray-200 bg-white p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
+    const status = <>
+        <span data-appeal-ban-status={renderSummary ? '' : undefined} className={`${renderSummary ? 'truncate ' : 'mt-1 '}block text-sm ${account.is_banned ? 'font-medium text-red-700' : 'text-gray-500'}`}>{account.is_banned ? account.expires_at ? `Banned until ${new Date(account.expires_at).toLocaleString()}` : 'Permanently banned' : 'Not banned'}</span>
+        {account.is_banned && account.reason && <span className={`mt-1 block text-xs text-gray-600 ${renderSummary ? 'truncate' : 'break-words'}`}>{account.reason}</span>}
+    </>;
+    return <article className={renderSummary ? 'appeal-ban-card space-y-3 rounded bg-gray-50 px-3 py-2' : 'space-y-3 rounded-md border border-gray-200 bg-white p-4'}>
+        <div className={renderSummary ? 'flex flex-wrap items-start gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_184px]' : 'flex flex-wrap items-start justify-between gap-3'}>
+            {renderSummary ? renderSummary(status) : <div>
                 <h3 className="font-semibold text-gray-900">{account.username} {account.player_id && <span className="text-sm font-normal text-gray-500">(#{account.player_id})</span>}</h3>
-                <p className={`mt-1 text-sm ${account.is_banned ? 'font-medium text-red-700' : 'text-gray-500'}`}>{account.is_banned ? account.expires_at ? `Banned until ${new Date(account.expires_at).toLocaleString()}` : 'Permanently banned' : 'Not banned'}</p>
-                {account.is_banned && account.reason && <p className="mt-1 break-words text-xs text-gray-600">{account.reason}</p>}
-            </div>
-            {!action && <div className="flex gap-3 text-xs">
+                {status}
+            </div>}
+            {!action && <div className="ml-auto flex shrink-0 gap-3 text-xs">
                 <button onClick={() => { setAction('ban'); setNotice(''); }} className="button-red rounded border px-3 py-2 font-medium">{account.is_banned ? 'Change ban' : 'Ban account'}</button>
                 {account.is_banned && <button onClick={() => { setAction('lift'); setNotice(''); }} className="button-green rounded border border-green-200 bg-green-50 px-3 py-2 font-medium text-green-800">Lift ban</button>}
             </div>}
@@ -64,7 +67,7 @@ function RestrictionEditor({ account, onUpdated }) {
         {notice && <p role="status" className="text-sm text-green-700">{notice}</p>}
     </article>;
 }
-RestrictionEditor.propTypes = { account: PropTypes.object.isRequired, onUpdated: PropTypes.func.isRequired };
+RestrictionEditor.propTypes = { account: PropTypes.object.isRequired, onUpdated: PropTypes.func.isRequired, renderSummary: PropTypes.func };
 
 export default function AdminAccountControls() {
     const [query, setQuery] = useState('');

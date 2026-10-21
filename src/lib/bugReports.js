@@ -3,12 +3,12 @@ export const BUG_REPORT_MAX_LENGTH = 2000;
 function reportingError(error, administrator = false) {
     if (error.code === '42501' && administrator) return new Error('Administrator access required.');
     if (error.code === 'P0001') return new Error(error.message);
-    return new Error(administrator ? 'The inbox is temporarily unavailable. Please try again later.' : 'Bug reporting is temporarily unavailable. Please try again later.');
+    return new Error(administrator ? 'The inbox is temporarily unavailable. Please try again later.' : 'Reporting is temporarily unavailable. Please try again later.');
 }
 
 export function createBugReportService(client) {
     async function rpc(name, params, administrator = false) {
-        if (!client) throw new Error('Bug reporting is temporarily unavailable. Please try again later.');
+        if (!client) throw new Error('Reporting is temporarily unavailable. Please try again later.');
         const { data, error } = await client.rpc(name, params);
         if (error) throw reportingError(error, administrator);
         return data;
@@ -20,6 +20,13 @@ export function createBugReportService(client) {
             if (text.length < 10 || text.length > BUG_REPORT_MAX_LENGTH) throw new Error('Please describe the bug in 10 to 2,000 characters.');
             const data = await rpc('submit_bug_report', { p_request_id: requestId, p_body: text });
             if (!/^B-\d+$/.test(data?.reference || '')) throw new Error('The report response could not be confirmed. Please retry your submission.');
+            return data;
+        },
+        async submitSupportTicket(requestId, body) {
+            const text = body.trim();
+            if (text.length < 10 || text.length > BUG_REPORT_MAX_LENGTH) throw new Error('Describe what you need help with in 10 to 2,000 characters.');
+            const data = await rpc('submit_support_ticket', { p_request_id: requestId, p_body: text });
+            if (!/^B-\d+$/.test(data?.reference || '')) throw new Error('The ticket response could not be confirmed. Please retry your submission.');
             return data;
         },
         async inbox(status = 'open', page = 1) {

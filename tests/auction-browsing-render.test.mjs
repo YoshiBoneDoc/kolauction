@@ -39,8 +39,7 @@ test('Info explains first bids, both trade modes and exact buyouts alongside all
     assert.match(html, /Minimum Bid Increases/);
     assert.match(html, /first bid must meet the seller/);
     assert.match(html, /both Escrow and Direct Trade/);
-    assert.match(html, /20m bid requires at least 21m/);
-    assert.match(html, /buyout can always be accepted at its exact price/);
+    assert.match(html, /Buyouts can always be accepted at their listed price, even if below the next minimum bid/);
     const table = html.match(/<table[^>]*>\s*<caption[^>]*>Minimum increases[\s\S]*?<\/table>/)[0];
     assert.equal((table.match(/<tr/g) || []).length, 10);
     assert.match(table, /10m–under 100m/);
@@ -54,6 +53,17 @@ const auctions = [
     { ...base, id: 'pending', item: 'Pending accessory', status: 'awaiting_trade' },
     { ...base, id: 'expired', item: 'Expired accessory', endTime: Date.now() - 1000, bids: Array(10).fill({bidder: 'Buyer', amount: 200, timestamp: Date.now() - 10000}) },
 ];
+
+test('auction details render server-authorized bidder names without replacing them with aliases', () => {
+    const listing = { ...auctions[0], owner: 'Actual Seller', currentBid: 200,
+        highestBidderId: 'bidder-b', highestBidder: 'Actual Bidder B', usernamesVisible: true,
+        bids: [{ id: 'a', bidderId: 'bidder-a', bidder: 'Actual Bidder A', amount: 100, timestamp: Date.now() },
+            { id: 'b', bidderId: 'bidder-b', bidder: 'Actual Bidder B', amount: 200, timestamp: Date.now() }] };
+    const html = render('/auction/active', [listing], { id: 'administrator' });
+    assert.match(html, /Actual Seller/);
+    assert.match(html, /Actual Bidder A/);
+    assert.match(html, /Actual Bidder B/);
+});
 
 test('browse route applies URL search and completed filter together to real auction cards', () => {
     const html = render('/auctions?q=ACCESSORY&status=completed&sort=price-desc', auctions);

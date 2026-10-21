@@ -36,6 +36,21 @@ export function createAccountRestrictionService(client) {
         return data;
     }
     return {
+        async appealHistory(reportId) {
+            const data = await rpc('read_appeal_ban_history', { p_report_id: reportId });
+            if (!Array.isArray(data) || data.some(event => typeof event.id !== 'string'
+                || !['issued', 'updated', 'removed'].includes(event.action)
+                || !Number.isFinite(Date.parse(event.created_at)) || typeof event.reason !== 'string')) {
+                throw new Error('Ban history could not be loaded. Please retry.');
+            }
+            return data;
+        },
+        async reportAccount(reportId) {
+            const data = await rpc('read_appeal_account', { p_report_id: reportId });
+            if (data === null) return null;
+            if (!data || typeof data.id !== 'string' || typeof data.is_banned !== 'boolean') throw new Error('The account could not be loaded. Please retry.');
+            return data;
+        },
         async auctions() {
             const data = await rpc('read_auction_ban_reviews', {});
             if (!Array.isArray(data)) throw new Error('Auction reviews could not be loaded.');

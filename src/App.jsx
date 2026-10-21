@@ -26,6 +26,7 @@ const App = () => {
             <Route path="/" element={<Home />} />
             <Route path="/submit-appeal" element={<SubmitAppeal />} />
             <Route path="/report-a-bug" element={<ReportBug />} />
+            <Route path="/support" element={<ReportBug support />} />
             <Route path="/admin/inbox" element={<BugReportInbox />} />
             <Route path="/admin/bug-reports" element={<BugReportInbox />} />
             <Route path="/donate" element={<DonatePage />} /> {/* Add route */}

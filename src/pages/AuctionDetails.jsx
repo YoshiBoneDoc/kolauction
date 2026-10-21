@@ -14,6 +14,7 @@ import WinnerLink from '../components/WinnerLink';
 import DirectTradeHelp from '../components/DirectTradeHelp';
 import EscrowProtection from '../components/EscrowProtection';
 import { formatCompactMeat } from '../lib/formatMeat';
+import TradeReportDismissals from '../components/TradeReportDismissals';
 
 export default function AuctionDetails() {
     const { id } = useParams();
@@ -75,6 +76,7 @@ export default function AuctionDetails() {
                             <div className="space-y-0.5 border-t border-gray-200 pt-3">
                                 <p className={`text-lg font-bold ${statusColor}`}>{statusLabel}</p>
                                 {reportedIncomplete && <p className="text-xs leading-4 text-gray-500">At least one party reported the trade incomplete.</p>}
+                                <TradeReportDismissals auction={auction} compact />
                             </div>
                         </> : active ? <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
                             <span className="inline-flex rounded border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Live</span>
