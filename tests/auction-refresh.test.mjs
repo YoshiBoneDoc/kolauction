@@ -7,6 +7,9 @@ test('routes scope auction reads and preserve browsing filters/page', () => {
     assert.equal(auctionReadRequest('/auction-item'),null);
     assert.deepEqual(auctionReadRequest('/auction/abc'),{view:'detail',id:'abc'});
     assert.deepEqual(auctionReadRequest('/profile'),{view:'profile'});
+    assert.deepEqual(auctionReadRequest('/profile/'),{view:'profile'});
+    assert.deepEqual(auctionReadRequest('/auctions/', '?q=hat&page=2'),auctionReadRequest('/auctions', '?q=hat&page=2'));
+    assert.equal(auctionReadRequest('/does-not-exist'),null);
     assert.deepEqual(auctionReadRequest('/auctions','?q=hat&status=completed&sort=price-desc&page=3'),{
         view:'browse',search:'hat',status:'completed',sort:'price-desc',page:3,
     });

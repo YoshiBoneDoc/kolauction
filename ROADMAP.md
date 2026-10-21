@@ -4,15 +4,9 @@ Remaining work only. Updated October 20, 2026.
 
 ## 1. Direct-settlement disputes and feedback
 
-- Add audited corrections to positive confirmations and settlement outcomes,
-  appeals and reviewed penalties. Keep buyer and seller behavior separate.
-- Define completion deadlines, reminders, outage grace periods, and overdue/disputed
-  card states. Silence must not count as a negative response.
-- Handle early withdrawals separately from nonpayment/non-delivery. Auctions ending
-  without bids must not count as defaults.
-- Define a completion rate and its denominator. Keep participant confirmations,
-  completed sales and thumbs-down counts distinct; escrow must not inflate direct
-  reputation. Unsold auctions and missing responses must not count as defaults.
+
+- add kmailed reminders for direct trade deadlines on conclusion, outage grace periods
+  card states. 
 
 ## 2. Find a seller
 
@@ -23,25 +17,30 @@ Remaining work only. Updated October 20, 2026.
 
 ## 3. Completed-sales gallery and public statistics
 
-- Add a paginated **Completed auctions** page with compact cards showing thumbnails,
-  quantity, final price, completion date, seller profile and settlement mode.
-- Include successful sales only. Keep unsold, cancelled, withdrawn, disputed,
-  awaiting-settlement and unconfirmed outcomes in seller history instead.
-- Show lifetime completed-sale count, gross sale value, item units, and participating
-  seller/buyer counts if practical. Keep escrow and participant-confirmed direct
-  totals separate, and decide how to include older manually confirmed trades.
 - Count each sale once; exclude tips/donations and avoid adding commission twice.
   Reviewed reversals must update eligibility and totals. Preserve public buyer
   anonymity and keep donation/commission income reports private.
 
 ## 4. Moderation and security
 
-- Build dispute and abusive-listing tools with administrator-only access, operator
-  intervention, appeals and audited moderation actions.
+- Add abusive-listing moderation tools and remaining dispute controls. Account
+  bans, expiry, lifting bans, auction holds/review, preserved funded escrow obligations
+  and private appeals with image evidence are implemented (auction handling requires migration 051);
+  see [account moderation instructions](supabase/ACCOUNT_BANS.md).
 - Review GitHub dependency alerts and address applicable issues.
 
 ## 5. Operations and backups
 
+- Apply migration 055 to delay profile incomplete counts and their Meat totals
+  until 48 hours after auction close (including early buyouts).
+- Apply migration 054 and retry `npm run sync-catalog` from `bot/` to repair
+  first imports blocked by Supabase safe-update checks; see
+  [catalog publishing recovery](supabase/ITEM_CATALOG.md#publishing-blocked-after-the-initial-rollout).
+- Apply migration 053 and deploy the website to activate tiered minimum bid
+  increases for Direct and Escrow auctions; the Info page includes the thresholds.
+- Roll out migration 052 and the updated Oracle bot/website to enable weekly
+  KoLmafia item updates and server-enforced tradeable-only listings; see
+  [item catalog rollout](supabase/ITEM_CATALOG.md).
 - Configure external alerts for stopped, unavailable or reclaimed bot hosts.
 - Decide outage/late-bid policy and add an outage banner or participation controls.
   Decide whether outages should pause or extend auction clocks.
@@ -90,3 +89,7 @@ Operational instructions: [bot operations and recovery](bot/OPERATIONS.md).
 ## 9. bidding mechanics
 
 -  change it so people cant just bid 1 meat over to beat the current bid.
+
+## 9. buy auctions
+
+-  Add buying auctions ex. some wants to buy x2000 5-balls for 100 meat each.  maybe escrow only?

@@ -2,6 +2,7 @@ import { getAuctionStatus } from './auctionLifecycle.js';
 
 export const auctionFilters = [
     ['active', 'Active'],
+    ['on_hold', 'On hold'],
     ['ended', 'Ended (all outcomes)'],
     ['completed', 'Completed trades'],
     ['all', 'All auctions'],
@@ -23,7 +24,7 @@ export function browseAuctions(auctions, { search = '', status = 'active', sort 
     return auctions.filter((auction) => {
         const lifecycle = getAuctionStatus(auction, now);
         const matchesStatus = status === 'all'
-            || (status === 'ended' ? lifecycle !== 'active' && lifecycle !== 'pending_escrow' : lifecycle === status);
+            || (status === 'ended' ? !['active', 'pending_escrow', 'on_hold', 'bidding_closed'].includes(lifecycle) : lifecycle === status);
         return matchesStatus && auction.item.toLocaleLowerCase().includes(query);
     }).sort((a, b) => {
         let comparison = 0;

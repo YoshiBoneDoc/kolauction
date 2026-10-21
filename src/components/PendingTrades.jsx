@@ -1,4 +1,5 @@
-import { useContext, useState } from 'react';
+import { useContext, useId, useState } from 'react';
+import ConfirmTradeButton from './ConfirmTradeButton';
 import { Link } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { AuctionsContext } from '../context/AuctionsContext';
@@ -7,53 +8,41 @@ import { formatCompactMeat } from '../lib/formatMeat';
 
 function TradeCard({ auction }) {
     const { currentUser } = useContext(UserContext);
-    const { confirmTrade } = useContext(AuctionsContext);
-    const [pending, setPending] = useState(false);
-    const [error, setError] = useState('');
     const isSeller = auction.sellerId === currentUser.id;
-    const confirmed = isSeller ? auction.sellerConfirmedAt : auction.buyerConfirmedAt;
-
-    async function confirm() {
-        if (pending || !window.confirm('Confirm only after you received the agreed items or Meat in KoL. This gives the other party a positive rating and notifies them by KMail. Has the other party completed the trade?')) return;
-        setPending(true);
-        setError('');
-        try { await confirmTrade(auction.id); }
-        catch (failure) { setError(failure.message); }
-        finally { setPending(false); }
-    }
-
-    return <article className="min-w-0 space-y-2 rounded-lg border border-amber-300 bg-white p-4">
-        <h3 className="break-words font-bold">{auction.quantity.toLocaleString('en-US')} × {auction.item}</h3>
-        <p className="text-sm">Auction #{auction.auctionNumber || auction.id} · Direct settlement · {formatCompactMeat(auction.finalPrice)} Meat</p>
-        <p className="text-sm">{isSeller ? 'You are the seller.' : 'You are the winning buyer.'}</p>
-        {confirmed ? <p className="text-sm text-green-800">Your confirmation is saved. Waiting for the other party.</p> : <>
-            <p className="text-sm">Did the other party complete the trade?</p>
-            <div className="flex flex-wrap gap-2">
-            <button onClick={confirm} disabled={pending} className="min-h-11 rounded bg-green-700 px-4 py-2 text-white disabled:opacity-50">{pending ? 'Saving…' : '👍 Yes, I received my side'}</button>
-            {!auction.ownTradeReport && <Link to={`/auction/${auction.id}/report-trade`} className="inline-flex min-h-11 items-center rounded border border-red-700 bg-white px-4 py-2 text-red-700">👎 No, report a problem</Link>}
-            </div>
-        </>}
-        <Link to={`/auction/${auction.id}`} className="flex min-h-11 items-center text-sm text-blue-700 underline">Private trade details and instructions</Link>
-        {error && <p role="alert" className="break-words text-sm text-red-700">{error}</p>}
+    return <article className="flex min-w-0 flex-col gap-2 rounded border border-amber-200 bg-white px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <div className="min-w-0">
+            <h3 className="text-sm font-semibold leading-5"><Link to={`/auction/${auction.id}`} title="Private trade details and instructions" className="break-words text-gray-900 hover:text-blue-700 hover:underline">{auction.quantity.toLocaleString('en-US')} × {auction.item}</Link></h3>
+            <p className="mt-0.5 text-xs leading-4 text-gray-500">#{auction.auctionNumber || auction.id} · {isSeller ? 'Seller' : 'Buyer'} · <span className="font-medium text-gray-700">{formatCompactMeat(auction.finalPrice)} Meat</span></p>
+            {auction.banReviewRequired && <p className="mt-1 max-w-xl text-xs text-slate-600">Account restriction: contact an administrator before sending further assets. Only confirm what you have received.</p>}
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <ConfirmTradeButton auctionId={auction.id} className="button-green inline-flex min-h-8 items-center justify-center rounded border border-green-700 bg-green-700 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50" />
+            {!auction.ownTradeReport && <Link to={`/auction/${auction.id}/report-trade`} className="button-red inline-flex min-h-8 items-center justify-center rounded border px-3 py-1.5 text-xs font-medium">Report Incomplete</Link>}
+        </div>
     </article>;
 }
 
 export default function PendingTrades() {
     const { currentUser } = useContext(UserContext);
+    const [expanded, setExpanded] = useState(false);
+    const listId = useId();
     const { pendingTrades = [], pendingTotal = 0, pendingPage = 1, setPendingPage, pendingError, refreshAuctions } = useContext(AuctionsContext);
     if (!currentUser) return null;
-    const visibleTrades = pendingTrades.filter(auction => (!auction.ownTradeReport || auction.ownTradeReportWithdrawn) && !(auction.sellerId === currentUser.id ? auction.sellerConfirmedAt : auction.buyerConfirmedAt));
+    const visibleTrades = pendingTrades.filter(auction => (!auction.ownTradeReport || auction.ownTradeReportWithdrawn)
+        && !(auction.sellerId === currentUser.id ? auction.sellerConfirmedAt || auction.sellerResolvedAt : auction.buyerConfirmedAt || auction.buyerResolvedAt));
     const visibleTotal = Math.max(0, pendingTotal - (pendingTrades.length - visibleTrades.length));
     if (!visibleTotal && !pendingError) return null;
-    return <section aria-label="Your pending trades" className="mb-6 space-y-3 rounded-lg border border-amber-400 bg-amber-50 p-4">
-        <h2 className="text-xl font-bold">Trade awaiting your confirmation</h2>
-        <p className="text-sm">{visibleTotal} pending {visibleTotal === 1 ? 'trade' : 'trades'}. Only confirm after receiving your side. A sale completes when both participants confirm.</p>
+    const displayedTrades = expanded ? visibleTrades : visibleTrades.slice(0, 3);
+    return <section aria-label="Your pending trades" className="mb-4 space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3">
+        <h2 className="text-base font-bold">{visibleTotal === 1 ? 'Trade' : 'Trades'} awaiting your response</h2>
+        <p className="text-xs leading-5 text-gray-600">{visibleTotal} pending {visibleTotal === 1 ? 'trade' : 'trades'} · Only confirm after receiving your side. Both parties must confirm completion.</p>
         {pendingError && <p role="alert" className="text-red-700">{pendingError} <button onClick={refreshAuctions} className="min-h-11 underline">Retry</button></p>}
-        <div className="grid gap-3 md:grid-cols-2">{visibleTrades.map(auction => <TradeCard key={auction.id} auction={auction} />)}</div>
-        {(visibleTotal > 12 || pendingPage > 1) && <nav aria-label="Pending trade pages" className="flex flex-wrap items-center justify-center gap-3">
-            <button disabled={pendingPage <= 1} onClick={() => setPendingPage(pendingPage - 1)} className="min-h-11 rounded border bg-white px-3 disabled:opacity-50">Previous trades</button>
+        <div id={listId} className="space-y-2">{displayedTrades.map(auction => <TradeCard key={auction.id} auction={auction} />)}</div>
+        {visibleTrades.length > 3 && <button type="button" aria-expanded={expanded} aria-controls={listId} onClick={() => setExpanded(value => !value)} className="min-h-8 text-xs font-medium text-blue-700 underline hover:text-blue-800">{expanded ? 'Show fewer trades' : `Show ${visibleTrades.length - 3} more ${visibleTrades.length - 3 === 1 ? 'trade' : 'trades'}`}</button>}
+        {(visibleTotal > 12 || pendingPage > 1) && (expanded || visibleTrades.length <= 3) && <nav aria-label="Pending trade pages" className="flex flex-wrap items-center justify-center gap-3">
+            <button disabled={pendingPage <= 1} onClick={() => { setExpanded(false); setPendingPage(pendingPage - 1); }} className="min-h-11 rounded border bg-white px-3 disabled:opacity-50">Previous trades</button>
             <span>Page {pendingPage} of {Math.max(1, Math.ceil(visibleTotal / 12))}</span>
-            <button disabled={pendingPage * 12 >= visibleTotal} onClick={() => setPendingPage(pendingPage + 1)} className="min-h-11 rounded border bg-white px-3 disabled:opacity-50">Next trades</button>
+            <button disabled={pendingPage * 12 >= visibleTotal} onClick={() => { setExpanded(false); setPendingPage(pendingPage + 1); }} className="min-h-11 rounded border bg-white px-3 disabled:opacity-50">Next trades</button>
         </nav>}
     </section>;
 }

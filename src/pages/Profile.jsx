@@ -1,5 +1,5 @@
 import WinnerLink from '../components/WinnerLink';
-import { useContext } from "react";
+import { useContext, useState } from "react";
 import { UserContext } from "../context/UserContext";
 import { AuctionsContext } from "../context/AuctionsContext";
 import { Link } from "react-router-dom";
@@ -21,18 +21,33 @@ const formatTimeLeft = (endTime, now) => {
 
 const Profile = () => {
     const { currentUser } = useContext(UserContext);
-    const { auctions, isLoading } = useContext(AuctionsContext);
+    const { auctions, isLoading, error, refreshAuctions } = useContext(AuctionsContext);
     const now = useNow();
+    const [retrying, setRetrying] = useState(false);
 
     if (!currentUser) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+            <div className="min-h-screen flex flex-col items-center justify-center bg-[#F1F3F5]">
                 <p className="text-red-500 text-xl font-bold mb-4">You must be logged in to view your profile.</p>
                 <Link to="/login" className="text-blue-500 hover:underline text-lg">Log In</Link>
             </div>
         );
     }
     if (isLoading) return <p role="status" className="p-6">Loading your auction history…</p>;
+
+    if (error) return <main className="min-h-screen bg-[#F1F3F5] p-6">
+        <Link to="/" className="text-blue-500 underline">Home</Link>
+        <h1 className="my-6 text-center text-4xl font-bold text-blue-600">My Account</h1>
+        <section aria-labelledby="history-unavailable" className="mx-auto max-w-xl space-y-3 rounded border border-gray-200 bg-white p-6">
+            <h2 id="history-unavailable" className="text-lg font-semibold text-gray-900">Auction history unavailable</h2>
+            <p className="text-gray-600">Your totals and trade history could not be loaded. Please try again.</p>
+            <button disabled={retrying} onClick={async () => {
+                setRetrying(true);
+                try { await refreshAuctions(); }
+                finally { setRetrying(false); }
+            }} className="rounded bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800 disabled:opacity-50">{retrying ? 'Retrying…' : 'Try again'}</button>
+        </section>
+    </main>;
 
     const selling = auctions.filter((auction) => auction.sellerId === currentUser.id);
     const bidding = auctions.filter((auction) => auction.bids.some((bid) => bid.bidderId === currentUser.id));
@@ -56,18 +71,18 @@ const Profile = () => {
     ];
 
     return (
-        <div className="min-h-screen bg-gray-50 p-6">
+        <div className="min-h-screen bg-[#F1F3F5] p-6">
             <Link to="/" className="text-blue-500 underline">Home</Link>
             <h1 className="text-4xl font-bold text-blue-600 my-6 text-center">{currentUser.khubUsername}&apos;s Profile</h1>
             <p className="mb-4 text-center"><Link to="/change-password" className="text-blue-700 underline">Change password</Link></p>
             {selling.some(auction => auction.status !== 'pending_escrow') && <p className="mb-4 text-center"><Link to={`/seller/${currentUser.id}`} className="text-blue-700 underline">View public seller profile</Link></p>}
             <KolVerification />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-                <div className="bg-white rounded shadow p-4">
+                <div className="bg-white rounded border border-gray-200 shadow p-4">
                     <h2 className="font-semibold">Completed sales</h2>
                     <p>{formatCompactMeat(totalMeatGain)} Meat received</p>
                 </div>
-                <div className="bg-white rounded shadow p-4">
+                <div className="bg-white rounded border border-gray-200 shadow p-4">
                     <h2 className="font-semibold">Completed purchases</h2>
                     <p>{formatCompactMeat(totalMeatSpent)} Meat spent</p>
                 </div>
@@ -83,9 +98,9 @@ const Profile = () => {
                                 const result = getAuctionResult(auction, now);
                                 const myBids = auction.bids.filter((bid) => bid.bidderId === currentUser.id);
                                 return (
-                                    <Link key={auction.id} to={`/auction/${auction.id}`} className="block rounded shadow border bg-white p-4">
+                                    <article key={auction.id} className="block rounded shadow border border-gray-200 bg-white p-4">
                                         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                                            <h3 className="font-bold">{auction.item} × {formatNumber(auction.quantity)}</h3>
+                                            <h3 className="font-bold"><Link to={`/auction/${auction.id}`} className="text-gray-900 hover:underline">{auction.item} × {formatNumber(auction.quantity)}</Link></h3>
                                             {result.status === 'active' && (
                                                 <time
                                                     dateTime={new Date(auction.endTime).toISOString()}
@@ -103,9 +118,9 @@ const Profile = () => {
                                         {result.hasWinner && <p>Winner: <WinnerLink auction={auction} /> · Final price: {formatCompactMeat(result.finalPrice)} Meat</p>}
                                         {myBids.length > 0 && <p>Your highest bid: {formatCompactMeat(Math.max(...myBids.map((bid) => bid.amount)))} Meat</p>}
                                         {result.status === 'awaiting_trade' && (
-                                            <p className="text-blue-700 mt-2">{auction.sellerId === currentUser.id ? 'You are the seller.' : result.winnerId === currentUser.id ? 'You won this auction.' : 'Another bidder won.'} View trade details</p>
+                                            <p className="text-blue-700 mt-2">{auction.sellerId === currentUser.id ? 'You are the seller.' : result.winnerId === currentUser.id ? 'You won this auction.' : 'Another bidder won.'} <Link to={`/auction/${auction.id}`} className="text-blue-700 underline">View trade details</Link></p>
                                         )}
-                                    </Link>
+                                    </article>
                                 );
                             })}
                         </div>

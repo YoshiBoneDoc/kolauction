@@ -469,7 +469,10 @@ policies, and the `create_auction` and `place_bid` functions used by React.
 Listings, quantities, minimum prices, seller IDs, end times, current bids,
 and complete bid history are stored in PostgreSQL. The profile page derives
 current/past listings and bid totals from those saved records. The item catalog
-in `src/data/items.json` is static reference data, not user-created listings.
+is shared reference data, not user-created listings. After migration 052 the bot
+refreshes the validated KoLmafia catalog weekly and the website reads tradeable
+items from the database; `src/data/items.json` is the bundled fallback. See
+[catalog setup and automatic updates](ITEM_CATALOG.md).
 Form drafts, search/display choices, and unsubmitted bid amounts remain temporary.
 
 Public visitors can read listings and bid history, including seller/bidder
@@ -750,3 +753,35 @@ so KMail does not split long tokens. The migration lowers only the generated-sec
 minimum from 24 to 16; existing accounts, pending jobs and messages remain intact.
 For fresh credentials, send CREDENTIALS after restart (subject to the five-minute
 cooldown). No website redeploy is needed.
+
+## Minimum bid increases (053)
+
+Apply `migrations/queue/202610210053_tiered_bid_increments.sql` after 052 and deploy
+the matching website. Both Direct bids and funded Escrow KMail use the same tiers
+shown on the Info page. The first bid meets the seller minimum; subsequent bids
+use the current accepted bid's tier. At 10b and above, the increase is 1%, rounded
+up to whole Meat. A bidder may exceed the required minimum by any whole amount.
+
+Exact buyouts remain valid below the next ordinary bid. A larger bid reaching the
+buyout still closes at the saved buyout price, with excess funded Meat refunded.
+Low/stale funded bids receive their full refund and a reply naming the exact next
+minimum. Existing bids, prices, deadlines and frozen delivery messages are kept.
+
+The existing bot uses database RPCs, so these rules do not require another bot
+code deployment. Its matching SQL copy is included for future installations.
+
+
+## Incomplete-profile grace period (055)
+
+Apply `migrations/queue/202610210055_incomplete_trade_grace_period.sql` after 054.
+Profile incomplete counts and their associated Meat totals exclude reports until
+48 hours after the auction actually closed. Early buyouts use their finalization
+time; ordinary auctions use their deadline even if background finalization was
+late. Counts are computed on read, without a timer, bot restart or scheduled job.
+
+Reports may still be filed and reviewed immediately and remain visible in the
+auction's trade status and support inbox. Passing 48 hours does not create a report
+or a bad mark automatically. Withdrawn/admin-dismissed reports stay excluded;
+restoring an early report cannot bypass the grace period. Separate thumbs feedback
+and completed-trade counts are unaffected. Existing historical records are not
+rewritten. Deploy the website to show the matching profile-help explanation.

@@ -1,6 +1,7 @@
 import { auctionFilters, auctionSorts } from './auctionBrowsing.js';
 
 export function auctionReadRequest(pathname, search = '') {
+    pathname = pathname.replace(/\/+$/, '') || '/';
     if (pathname === '/') return { view: 'home' };
     if (pathname === '/profile') return { view: 'profile' };
     const detail = pathname.match(/^\/auction\/([^/]+)(?:\/(?:report-trade|trade-query))?\/?$/);

@@ -35,13 +35,13 @@ function TradeQueryForm({ auction }) {
     if (reference) return <p role="status" className="rounded border border-green-300 bg-green-50 p-4">Trade query saved: {reference}. An administrator can review your concern.</p>;
     return <form onSubmit={submit} className="space-y-3 rounded-lg border bg-white p-4 sm:p-6">
         <label htmlFor="trade-problem" className="block font-semibold">What would you like the administrator to review?</label>
-        <p id="trade-problem-help" className="text-sm text-gray-600">Explain your concern and what you have tried with the other party. This message is private to administrators; it does not add or change a rating. Please leave out passwords.</p>
+        <p id="trade-problem-help" className="text-sm text-gray-600">Describe your concern and any attempts to resolve it with the other party. Your message is private to administrators. Contacting an administrator does not change trade responses or feedback ratings.</p>
         <textarea id="trade-problem" rows={8} required minLength={10} maxLength={BUG_REPORT_MAX_LENGTH} disabled={pending}
             value={body} onChange={event => { setBody(event.target.value); setError(''); requestId.current = null; }}
             aria-describedby="trade-problem-help trade-problem-length" className="block w-full min-w-0 rounded border border-gray-400 p-3 text-base text-gray-900" />
         <p id="trade-problem-length" className="text-right text-xs text-gray-600">{body.length.toLocaleString('en-US')} / 2,000 characters</p>
         {error && <p role="alert" className="break-words text-red-700">{error}</p>}
-        <button disabled={pending} className="min-h-11 rounded bg-red-700 px-5 py-3 font-semibold text-white disabled:opacity-50">{pending ? 'Saving…' : 'Send trade query'}</button>
+        <button disabled={pending} className="button-red min-h-11 rounded px-5 py-3 font-semibold disabled:opacity-50">{pending ? 'Saving…' : 'Send trade query'}</button>
     </form>;
 }
 TradeQueryForm.propTypes = { auction: PropTypes.object.isRequired };
@@ -66,7 +66,7 @@ export default function TradeQuery() {
                 : !eligible ? <p>Only the seller or winning buyer of a closed direct sale can send a trade query.</p>
                 : <>
                     <p className="break-words">Auction #{auction.auctionNumber || auction.id}: {auction.quantity.toLocaleString('en-US')} × {auction.item} · {auction.finalPrice.toLocaleString('en-US')} Meat</p>
-                    <p className="text-sm text-gray-600">Please try to resolve the trade with the other party first. If you still have concerns, send a private query to the administrator inbox. A copy is queued by KMail to teres Minor.</p>
+                    <p className="text-sm text-gray-600">Please try to resolve the trade with the other party first. If you still have concerns, send a private query to the administrator inbox.</p>
                     <TradeQueryForm key={`${id}:${userId}`} auction={auction} />
                 </>}
         </main>

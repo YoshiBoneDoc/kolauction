@@ -3,12 +3,10 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { AuctionsContext } from '../context/AuctionsContext';
 import { UserContext } from '../context/UserContext';
 import AuctionCard from '../components/AuctionCard';
-import { formatCompactMeat } from '../lib/formatMeat';
 import { auctionFilters, auctionSorts } from '../lib/auctionBrowsing';
 import { useNow } from '../hooks/useNow';
 import useAuctionSearch from '../hooks/useAuctionSearch';
-import FeedbackCounts from '../components/FeedbackCounts';
-import ReputationSummary from '../components/ReputationSummary';
+import TradeHistorySummary from '../components/TradeHistorySummary';
 
 const number = value => BigInt(value ?? 0).toLocaleString('en-US');
 
@@ -56,45 +54,15 @@ export default function SellerProfile() {
                 </nav>
                 <div className={`grid grid-cols-1 items-start gap-6 ${detailed ? '' : 'lg:grid-cols-[minmax(0,1fr)_18rem]'}`}>
                     <aside aria-label="Seller statistics" className={`order-first min-w-0 space-y-5 break-words rounded-lg border bg-white p-5 ${detailed ? '' : 'lg:order-last'}`}>
-                        <section className="space-y-2">
-                            <h2 className="text-xl font-bold">Direct-settlement history</h2>
-                            {detailed && <p className="text-sm text-gray-600">Trades where the buyer relied on this seller to deliver without escrow.</p>}
-                            {BigInt(stats.legacy_sales ?? 0) > 0n ? <>
-                                <p className="text-lg font-semibold">{number(stats.legacy_sales)} completed sales</p>
-                                <p>{formatCompactMeat(stats.legacy_value)} Meat in sales</p>
-                                {detailed && <p className="text-xs text-gray-600">Confirmed by both participants. kHub did not handle these transfers.</p>}
-                            </> : <p className="text-sm text-gray-600">No completed direct sales yet.</p>}
-                        </section>
-                        <ReputationSummary stats={stats} detailed={detailed} />
-                        <section className="space-y-2 border-t pt-4">
-                            <h2 className="font-bold">Seller rating · direct settlement</h2>
-                            {!detailed && <FeedbackCounts positive={stats.seller_positive} negative={stats.seller_negative} />}
-                            {detailed && <p className="text-xs text-gray-600">Feedback from winning buyers. Thumbs up counts the buyer’s confirmation that they received their side; it does not prove both sides completed the trade. Thumbs down counts immediately, including reports awaiting review. Administrators can exclude a thumbs-down count after review. Escrow sales do not establish a direct-settlement track record.</p>}
-                        </section>
-                        {(detailed || BigInt(stats.buyer_positive ?? 0) > 0n || BigInt(stats.buyer_negative ?? 0) > 0n) && <section className="space-y-2 border-t pt-4">
-                            <h2 className="font-bold">Buyer rating · direct settlement</h2>
-                            {!detailed && <FeedbackCounts positive={stats.buyer_positive} negative={stats.buyer_negative} />}
-                            {detailed && <p className="text-xs text-gray-600">Feedback this player received as a winning buyer, from sellers. The same counting rules apply. Seller and buyer feedback stay separate; escrow trades do not contribute to either rating. Explanations and moderation notes remain private.</p>}
-                        </section>}
-                        <section className="space-y-2 border-t pt-4">
-                            <h2 className="font-bold">Listing activity</h2>
-                            <p>{number(stats.active)} active</p>
-                            <p>{number(stats.pending)} awaiting settlement</p>
-                            <p>{number(stats.unsold)} ended without bids</p>
-                            <p>{number(stats.cancelled)} cancelled</p>
-                            {detailed && <p className="text-sm text-gray-600">Activity covers both settlement modes. Awaiting settlement means the sale is not complete yet. Listings that ended without bids and cancellations are not counted as completed sales or automatic defaults.</p>}
-                        </section>
-                        <section className="space-y-2 border-t pt-4">
-                            <h2 className="font-bold">Escrow sales</h2>
-                            <p>{number(stats.escrow_sales)} completed sales</p>
-                            <p>{formatCompactMeat(stats.escrow_value)} Meat in sales</p>
-                            {detailed && <p>{number(stats.escrow_units)} item units sold</p>}
-                            {detailed && <p className="text-xs text-gray-600">Bot-verified deliveries. Shown separately from the seller’s direct-settlement history. Sale value includes commission.</p>}
-                        </section>
-                        {detailed && <section className="space-y-2 border-t pt-4">
-                            <h2 className="font-bold">How to read these totals</h2>
-                            <p className="text-sm text-gray-600">Completed sales count auctions, not individual items. Sale value is the total agreed Meat across completed sales. Item units count quantities across completed escrow sales. These lifetime totals include all of this seller’s public history and do not change with the listing filters below.</p>
-                            <p className="text-sm text-gray-600">A completion rate is not available yet. Pending trades and missing feedback do not prove a failure to deliver.</p>
+                        <TradeHistorySummary stats={stats} detailed={detailed} />
+                        {detailed && <section aria-label="Listing activity" className="border-t border-gray-200 pt-5">
+                            <h2 className="mb-3 font-bold text-gray-900">Listing activity</h2>
+                            <dl className="grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
+                                {[[stats.active, 'Active'], [stats.pending, 'Awaiting settlement'], [stats.unsold, 'Ended without bids'], [stats.cancelled, 'Canceled (before bids)']].map(([value, label]) => <div key={label} className="rounded-md bg-gray-50 px-3 py-2">
+                                    <dt title={label === 'Canceled (before bids)' ? 'Cancelled before receiving a valid bid' : undefined} className="text-xs text-gray-500">{label}</dt>
+                                    <dd className="mt-1 text-lg font-semibold text-gray-700">{number(value)}</dd>
+                                </div>)}
+                            </dl>
                         </section>}
                     </aside>
                     <section aria-label="Seller auctions" className="min-w-0 space-y-4">

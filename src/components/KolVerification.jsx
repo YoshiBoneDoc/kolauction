@@ -30,7 +30,7 @@ export default function KolVerification() {
         setPending(false);
     }
     return (
-        <section aria-label="KoL account linking" className="mb-6 space-y-3 rounded border bg-white p-4">
+        <section aria-label="KoL account linking" className="mb-6 space-y-3 rounded border border-gray-200 bg-white p-4">
             <h2 className="text-xl font-bold">Your KoL account</h2>
             {identity?.kol_player_id ? <p>Verified: {identity.kol_player_name} (#{identity.kol_player_id}). Auction escrow uses this player ID.</p> : <>
                 <p>Link your account before listing or bidding. Send the code from this page by KMail from the KoL account you own.</p>

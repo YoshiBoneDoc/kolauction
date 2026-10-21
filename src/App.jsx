@@ -17,6 +17,7 @@ import ReportBug from './pages/ReportBug';
 import TradeQuery from './pages/TradeQuery';
 import ReportTrade from './pages/ReportTrade';
 import SubmitAppeal from './pages/SubmitAppeal';
+import NotFound from './pages/NotFound';
 import BugReportInbox from './pages/BugReportInbox';
 
 const App = () => {
@@ -44,6 +45,7 @@ const App = () => {
             <Route path="/auction/:id/trade-query" element={<TradeQuery />} />
             <Route path="/auction/:id/report-trade" element={<ReportTrade />} />
             <Route path="/auction/:id" element={<AuctionDetails />} />
+            <Route path="*" element={<NotFound />} />
 
         </Routes>
     );

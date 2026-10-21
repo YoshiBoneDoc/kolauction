@@ -48,23 +48,29 @@ test('missing username and unavailable lookup never attempt a login', async () =
 });
 
 function profileClient(profile) {
-    return { from(table) { assert.equal(table, 'profiles'); return { select(columns) {
-        assert.equal(columns, 'id, khub_username, is_banned, account_method');
-        return { eq(column, id) { assert.equal(column, 'id'); assert.equal(id, 'user-1');
-            return { single: async () => ({ data: profile }) }; } };
+    return { async rpc(name) { assert.equal(name, 'read_my_account_access'); return { data: profile && {
+        server_now: new Date().toISOString(), ban_expires_at: null, ...profile,
     } }; } };
 }
 
-test('bot-created profiles hide internal email and load the server-owned username', async () => {
+test('bot-created profiles hide internal email and load the server-owned access state', async () => {
     const auth = build(profileClient({ id: 'user-1', khub_username: 'Player', account_method: 'kmail', is_banned: false }));
-    assert.deepEqual(await auth.loadProfile({ id: 'user-1', email: 'private@login.khub.invalid' }), {
-        id: 'user-1', khubUsername: 'Player', accountMethod: 'kmail', email: null,
-    });
+    const user = await auth.loadProfile({ id: 'user-1', email: 'private@login.khub.invalid' });
+    assert.equal(user.id, 'user-1'); assert.equal(user.khubUsername, 'Player'); assert.equal(user.email, null);
+    assert.equal(user.accountMethod, 'kmail'); assert.equal(user.isBanned, false); assert.equal(user.banExpiresAt, null);
+    assert.ok(Number.isFinite(user.serverOffset));
 });
 
-test('missing and banned profiles fail closed', async () => {
-    await assert.rejects(build(profileClient(null)).loadProfile({ id: 'user-1' }), /could not be loaded/);
-    await assert.rejects(build(profileClient({ id: 'user-1', is_banned: true })).loadProfile({ id: 'user-1' }), /restricted/);
+test('missing, mismatched and malformed profiles fail closed', async () => {
+    for (const profile of [null, { id: 'someone-else', is_banned: false }, { id: 'user-1' },
+        { id: 'user-1', is_banned: true, ban_expires_at: 'invalid' }]) {
+        await assert.rejects(build(profileClient(profile)).loadProfile({ id: 'user-1' }), /could not be loaded/);
+    }
+});
+
+test('restricted profile loads enough information for a ban screen and expiry countdown', async () => {
+    const user = await build(profileClient({ id: 'user-1', is_banned: true, ban_expires_at: '2027-01-02T00:00:00Z' })).loadProfile({ id: 'user-1' });
+    assert.equal(user.isBanned, true); assert.equal(user.banExpiresAt, '2027-01-02T00:00:00Z');
 });
 
 test('password changes enforce length and preserve server failures', async () => {

@@ -2082,6 +2082,1085 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         support_inbox(uid=owner_id,error='Administrator access required')
         sql(f"update auth.users set banned_until=null where id='{owner_id}';")
         assert sql('select public.khub_is_administrator();',owner_id,'authenticated')=='t'
+        # Administrator conversations group all auction messages before pagination.
+        preserved_deliveries=sql('select jsonb_agg(jsonb_build_array(id,display_message,state) order by id) from khub_bot.deliveries;')
+        sql(migration_sql('202610200036_support_threads.sql'))
+        assert sql('select jsonb_agg(jsonb_build_array(id,display_message,state) order by id) from khub_bot.deliveries;')==preserved_deliveries
+        def threads(category='all',status='all',page=1,uid=owner_id,error=None):
+            value=sql(f"select public.read_support_threads('{category}','{status}',{page});",uid,'authenticated',error=error)
+            return None if error else json.loads(value)
+        def update_thread(thread_id,is_trade=True,status=None,category=None,uid=owner_id,error=None):
+            sql(f"select public.update_support_thread('{thread_id}',{str(is_trade).lower()},{literal(status) if status else 'null'},{literal(category) if category else 'null'});",uid,'authenticated',error=error)
+        for uid in [SELLER,fresh_buyer,competitor]:
+            threads(uid=uid,error='Administrator access required')
+            update_thread(mixed,status='resolved',uid=uid,error='Administrator access required')
+        sql('select public.read_support_threads();',role='anon',error='permission denied')
+        sql(f"select public.update_support_thread('{mixed}',true,'resolved',null);",role='anon',error='permission denied')
+        threads(category='invalid',error='valid inbox category')
+        threads(status='invalid',error='valid inbox page')
+        threads(page=0,error='valid inbox page')
+        update_thread(mixed,status='bad',error='valid report status')
+        update_thread(mixed,status='resolved',category='trade',error='one inbox update')
+        # More than a page of messages for one auction must still form exactly one row.
+        sql("update khub_bot.bug_reports set created_at=now()-interval '2 days';")
+        extra_queries=[]
+        for index in range(23):
+            report=str(uuid4()); extra_queries.append(report)
+            sql(f"insert into khub_bot.bug_reports(id,reporter_id,reporter_username,reporter_kol_id,body,category) values('{report}','{fresh_buyer}','Feedback Buyer',399032,'Grouped query number {index}.','trade');")
+            sql(f"insert into khub_bot.trade_queries(report_id,auction_id,requester_id) values('{report}','{mixed}','{fresh_buyer}');")
+        for index in range(21):
+            report=str(uuid4())
+            sql(f"insert into khub_bot.bug_reports(id,reporter_id,reporter_username,reporter_kol_id,body,category) values('{report}','{fresh_buyer}','Feedback Buyer',399032,'Separate bug number {index}.','bug');")
+        thread_pages=[threads(page=page) for page in range(1,20)]
+        all_threads=[t for page in thread_pages for t in page['threads']]
+        assert len(all_threads)==thread_pages[0]['total']
+        assert len({(t['id'],t['is_trade']) for t in all_threads})==len(all_threads)
+        assert len(thread_pages[0]['threads'])==20
+        grouped=next(t for t in all_threads if t['is_trade'] and t['id']==mixed)
+        assert len(grouped['messages'])==25
+        assert grouped['status']=='open' and grouped['auction']['id']==mixed
+        assert grouped['auction']['buyer']['name']=='Feedback Buyer'
+        assert grouped['auction']['seller']['confirmed_at'] is not None
+        assert {m['id'] for m in grouped['messages']}=={mixed_report,query_key,*extra_queries}
+        assert {m['message_type'] for m in grouped['messages']}=={'trade_rating','trade_query'}
+        assert len({m['id'] for m in grouped['messages']})==25
+        feedback_before_threads=feedback(fresh_buyer)
+        update_thread(mixed,status='resolved')
+        assert sql(f"select count(*) from khub_bot.bug_reports where id in (select report_id from khub_bot.trade_queries where auction_id='{mixed}') and status='open';")=='0'
+        assert sql(f"select resolution_kind from khub_bot.bug_reports where id='{mixed_report}';")=='participant_resolved'
+        assert not any(t['id']==mixed for t in threads(status='open')['threads'])
+        assert feedback(fresh_buyer)==feedback_before_threads
+        update_thread(mixed,status='open')
+        assert sql(f"select status||':'||resolution_kind from khub_bot.bug_reports where id='{mixed_report}';")=='resolved:participant_resolved'
+        assert sql(f"select count(*) from khub_bot.bug_report_activity where report_id='{query_key}';")=='2'
+        update_thread(mixed,category='other')
+        moved=next(t for t in threads(category='other')['threads'] if t['id']==mixed)
+        assert len(moved['messages'])==25 and all(m['category']=='other' for m in moved['messages'])
+        assert not any(t['id']==mixed for page in range(1,10) for t in threads(category='trade',page=page)['threads'])
+        # A differently categorized message still returns the entire auction history.
+        sql(f"select public.set_support_category('{query_key}','trade');",owner_id,'authenticated')
+        split=next(t for t in threads(category='trade')['threads'] if t['id']==mixed)
+        assert len(split['messages'])==25 and any(m['category']=='other' for m in split['messages'])
+        # Each side's independent negative count remains available to review.
+        sql(f"update khub_bot.bug_reports set created_at=now()-interval '2 hours' where reporter_id='{fresh_buyer}';")
+        buyer_report=str(uuid4())
+        trade_report(buyer_report,resolving_sale,'The delivery did not arrive.',uid=fresh_buyer)
+        dual=next(t for t in threads(category='trade')['threads'] if t['id']==resolving_sale)
+        assert {m['reporter_role'] for m in dual['messages'] if m['negative_counted']}=={'seller','buyer'}
+        sql(f"select public.review_trade_rating('{buyer_report}',false,'Reviewed the buyer explanation.');",owner_id,'authenticated')
+        dual=next(t for t in threads(category='trade')['threads'] if t['id']==resolving_sale)
+        assert next(m for m in dual['messages'] if m['id']==buyer_report)['negative_counted'] is False
+        assert any(m['reporter_role']=='seller' and m['negative_counted'] for m in dual['messages'])
+        update_thread(resolving_sale,status='resolved')
+        # New messages reopen a conversation through its derived state, without rewriting history.
+        report=str(uuid4())
+        sql(f"insert into khub_bot.bug_reports(id,reporter_id,reporter_username,reporter_kol_id,body,category) values('{report}','{fresh_buyer}','Feedback Buyer',399032,'A new follow-up after resolution.','trade');")
+        sql(f"insert into khub_bot.trade_queries(report_id,auction_id,requester_id) values('{report}','{resolving_sale}','{fresh_buyer}');")
+        reopened=next(t for t in threads(status='open')['threads'] if t['id']==resolving_sale)
+        assert reopened['status']=='open' and any(m['status']=='resolved' for m in reopened['messages'])
+        # Standalone issues remain separate and use the same audited actions.
+        single=next(t for t in all_threads if not t['is_trade'])
+        update_thread(single['id'],is_trade=False,status='resolved')
+        assert sql(f"select status from khub_bot.bug_reports where id='{single['id']}';")=='resolved'
+        update_thread(query_key,is_trade=False,status='open',error='Conversation not found')
+        # Completion after withdrawing an incomplete report is neutral, never positive.
+        frozen_messages=sql('select jsonb_agg(jsonb_build_array(id,display_message,state) order by id) from khub_bot.deliveries;')
+        sql(migration_sql('202610200037_neutral_trade_resolution.sql'))
+        assert sql('select jsonb_agg(jsonb_build_array(id,display_message,state) order by id) from khub_bot.deliveries;')==frozen_messages
+        assert sql(f"select seller_resolved_at is null and buyer_resolved_at is null from public.auctions where id='{mixed}';")=='t'
+        neutral_lot=direct_create('500',uid=competitor)
+        sql(f"select public.purchase_auction('{neutral_lot}');",fresh_buyer,'authenticated')
+        neutral_report=str(uuid4())
+        trade_report(neutral_report,neutral_lot,'',uid=competitor)
+        before_neutral_buyer=feedback(fresh_buyer)
+        before_neutral_seller=feedback(competitor)
+        for uid in [competitor,fresh_buyer]:
+            view=read_page('detail',uid,'authenticated',id=neutral_lot)['rows'][0]
+            assert view['seller_reported_incomplete'] is True and view['buyer_reported_incomplete'] is False
+        for uid,role in [(None,'anon'),(SELLER,'authenticated')]:
+            view=read_page('detail',uid,role,id=neutral_lot)['rows'][0]
+            assert view['seller_reported_incomplete'] is None and view['buyer_reported_incomplete'] is None
+        sql(f"select public.withdraw_trade_rating('{neutral_lot}');",fresh_buyer,'authenticated',error='Only the author')
+        sql(f"select public.withdraw_trade_rating('{neutral_lot}');",role='anon',error='permission denied')
+        sql(f"update public.auctions set seller_resolved_at=now() where id='{neutral_lot}';",competitor,'authenticated',error='permission denied')
+        sql(f"select public.withdraw_trade_rating('{neutral_lot}');",competitor,'authenticated')
+        view=read_page('detail',competitor,'authenticated',id=neutral_lot)['rows'][0]
+        assert view['seller_resolved_at'] is not None and view['seller_confirmed_at'] is None
+        assert view['own_trade_report_withdrawn'] and not view['seller_reported_incomplete']
+        assert view['status']=='awaiting_trade'
+        assert feedback(fresh_buyer)['buyer_negative']==before_neutral_buyer['buyer_negative']-1
+        assert feedback(fresh_buyer)['buyer_positive']==before_neutral_buyer['buyer_positive']
+        assert feedback(competitor)==before_neutral_seller
+        assert not any(r['id']==neutral_lot for page in range(1,10) for r in pending_trades(competitor,page)['rows'])
+        assert any(r['id']==neutral_lot for page in range(1,10) for r in pending_trades(fresh_buyer,page)['rows'])
+        sql(f"select public.confirm_auction_trade('{neutral_lot}');",competitor,'authenticated',error='No positive rating can be added')
+        notice_count=sql('select count(*) from khub_bot.deliveries;')
+        sql(f"select public.withdraw_trade_rating('{neutral_lot}');",competitor,'authenticated')
+        assert sql('select count(*) from khub_bot.deliveries;')==notice_count
+        withdrawal_notice=sql(f"select display_message from khub_bot.deliveries where dedupe_key='rating-withdrawal:{neutral_lot}:{competitor}';")
+        assert 'trade was successfully completed' in withdrawal_notice and 'No positive rating was added' in withdrawal_notice
+        # The other participant can still confirm normally; neither action changes the neutral response.
+        sql(f"select public.confirm_auction_trade('{neutral_lot}');",fresh_buyer,'authenticated')
+        assert sql(f"select status from public.auctions where id='{neutral_lot}';")=='completed'
+        assert feedback(fresh_buyer)['buyer_positive']==before_neutral_buyer['buyer_positive']
+        assert feedback(competitor)['seller_positive']==before_neutral_seller['seller_positive']+1
+        neutral_admin=next(t for t in threads()['threads'] if t['id']==neutral_lot)
+        assert neutral_admin['auction']['seller']['resolved_at'] is not None
+        assert neutral_admin['auction']['seller']['confirmed_at'] is None
+        assert 'Confirmed Complete' in rating_notices(neutral_lot)[-1]['body']
+        # Both sides can withdraw independent reports; no positive confirmations/notices are created.
+        both_neutral=direct_create('500',uid=competitor)
+        sql(f"select public.purchase_auction('{both_neutral}');",fresh_buyer,'authenticated')
+        trade_report(str(uuid4()),both_neutral,'',uid=competitor)
+        trade_report(str(uuid4()),both_neutral,'',uid=fresh_buyer)
+        both_before={uid:feedback(uid) for uid in [competitor,fresh_buyer]}
+        for uid in [competitor,fresh_buyer]:
+            sql(f"select public.withdraw_trade_rating('{both_neutral}');",uid,'authenticated')
+        assert sql(f"select status from public.auctions where id='{both_neutral}';")=='completed'
+        assert sql(f"select seller_confirmed_at is null and buyer_confirmed_at is null and seller_resolved_at is not null and buyer_resolved_at is not null from public.auctions where id='{both_neutral}';")=='t'
+        assert sql(f"select count(*) from khub_bot.rating_notifications where auction_id='{both_neutral}' and positive;")=='0'
+        for uid in [competitor,fresh_buyer]:
+            now_feedback=feedback(uid)
+            assert now_feedback['seller_positive']==both_before[uid]['seller_positive']
+            assert now_feedback['buyer_positive']==both_before[uid]['buyer_positive']
+            sql(f"select public.confirm_auction_trade('{both_neutral}');",uid,'authenticated',error='No positive rating can be added')
+        # Buyer withdrawal also completes a trade whose seller confirmed earlier.
+        buyer_neutral=direct_create('500',uid=competitor)
+        sql(f"select public.purchase_auction('{buyer_neutral}');",fresh_buyer,'authenticated')
+        sql(f"select public.confirm_auction_trade('{buyer_neutral}');",competitor,'authenticated')
+        trade_report(str(uuid4()),buyer_neutral,'',uid=fresh_buyer)
+        seller_before=feedback(competitor)
+        sql(f"select public.withdraw_trade_rating('{buyer_neutral}');",fresh_buyer,'authenticated')
+        assert sql(f"select status from public.auctions where id='{buyer_neutral}';")=='completed'
+        assert feedback(competitor)['seller_positive']==seller_before['seller_positive']
+        assert feedback(competitor)['seller_negative']==seller_before['seller_negative']-1
+        # Publish only response statuses for closed direct sales; retain identity and contact privacy.
+        frozen_messages=sql('select jsonb_agg(jsonb_build_array(id,display_message,state) order by id) from khub_bot.deliveries;')
+        sql(migration_sql('202610200038_public_trade_responses.sql'))
+        assert sql('select jsonb_agg(jsonb_build_array(id,display_message,state) order by id) from khub_bot.deliveries;')==frozen_messages
+        public_lot=direct_create('500',uid=competitor)
+        sql(f"select public.purchase_auction('{public_lot}');",fresh_buyer,'authenticated')
+        sql(f"select public.confirm_auction_trade('{public_lot}');",fresh_buyer,'authenticated')
+        sql(f"update khub_bot.bug_reports set created_at=now()-interval '2 hours' where reporter_id='{competitor}';")
+        private_report=str(uuid4()); private_body='Private explanation for administrators only.'
+        trade_report(private_report,public_lot,private_body,uid=competitor)
+        for uid,role in [(competitor,'authenticated'),(fresh_buyer,'authenticated'),(SELLER,'authenticated'),(None,'anon')]:
+            page_view=read_page('detail',uid,role,id=public_lot)
+            view=page_view['rows'][0]
+            assert view['seller_reported_incomplete'] is True and view['buyer_reported_incomplete'] is False
+            assert view['trade_reported'] is True and view['buyer_confirmed_at'] is not None
+            assert private_body not in json.dumps(page_view)
+            if uid not in [competitor,fresh_buyer]:
+                assert view['settlement_contacts'] is None and view['own_trade_report'] is None
+                assert view['own_trade_report_withdrawn'] is None
+                assert all(bid['bidder_id'] is None for bid in page_view['bids'])
+            if uid is None:
+                assert view['seller_username']=='Seller' and view['winner_username']=='Winner'
+                assert view['winner_id'] is None and view['usernames_visible'] is False
+            else:
+                assert view['seller_username']=='Actual Long KoL Character Name' and view['winner_username']=='Feedback Buyer'
+        # Restricting the account masks names and contacts, while public response facts remain visible.
+        sql(f"update auth.users set banned_until=now()+interval '1 day' where id='{fresh_buyer}';")
+        restricted=read_page('detail',fresh_buyer,'authenticated',id=public_lot)['rows'][0]
+        assert restricted['trade_reported'] is True and restricted['seller_reported_incomplete'] is True
+        assert restricted['seller_username']=='Seller' and restricted['winner_username']=='Winner'
+        assert restricted['settlement_contacts'] is None
+        sql(f"update auth.users set banned_until=null where id='{fresh_buyer}';")
+        # Withdrawing the report updates the public warning and badges without changing positive counts.
+        target_before=feedback(fresh_buyer)
+        sql(f"select public.withdraw_trade_rating('{public_lot}');",competitor,'authenticated')
+        for uid,role in [(SELLER,'authenticated'),(None,'anon')]:
+            view=read_page('detail',uid,role,id=public_lot)['rows'][0]
+            assert not view['trade_reported'] and not view['seller_reported_incomplete']
+            assert view['seller_resolved_at'] is not None and view['buyer_confirmed_at'] is not None
+            assert view['status']=='completed' and view['settlement_contacts'] is None
+        assert feedback(fresh_buyer)['buyer_positive']==target_before['buyer_positive']
+        active_lot=direct_create('500',uid=competitor)
+        active_public=read_page('detail',id=active_lot)['rows'][0]
+        assert active_public['trade_reported'] is None and active_public['seller_reported_incomplete'] is None
+        # Independent optional feedback: no historical responses become thumb votes.
+        frozen_messages=sql('select jsonb_agg(jsonb_build_array(id,display_message,state) order by id) from khub_bot.deliveries;')
+        sql(migration_sql('202610200039_independent_trade_feedback.sql'))
+        assert sql('select jsonb_agg(jsonb_build_array(id,display_message,state) order by id) from khub_bot.deliveries;')==frozen_messages
+        sql(migration_sql('202610210040_final_trade_feedback.sql'))
+        assert sql('select count(*) from khub_bot.trade_feedback;')=='0'
+        for uid in [competitor,fresh_buyer]:
+            assert all(feedback(uid)[key]==0 for key in ['seller_positive','seller_negative','buyer_positive','buyer_negative'])
+        separate=direct_create('500',uid=competitor)
+        for uid in [competitor,fresh_buyer]:
+            sql(f"select public.rate_trade_partner('{separate}',1);",uid,'authenticated',error='closed direct sale')
+        sql(f"select public.purchase_auction('{separate}');",fresh_buyer,'authenticated')
+        sql(f"select public.rate_trade_partner('{separate}',1);",competitor,'authenticated',error='before rating')
+        baseline_buyer=feedback(fresh_buyer); baseline_seller=feedback(competitor)
+        sql(f"select public.confirm_auction_trade('{separate}');",competitor,'authenticated')
+        assert feedback(fresh_buyer)['buyer_positive']==0
+        assert feedback(fresh_buyer)['buyer_confirmed']==baseline_buyer['buyer_confirmed']+1
+        # A completed response notifies the partner without awarding feedback.
+        latest_body=sql(f"select d.display_message from khub_bot.rating_notifications n join khub_bot.deliveries d on d.id=n.delivery_id where n.auction_id='{separate}' and n.actor_id='{competitor}';")
+        assert 'does not change your feedback score' in latest_body and 'rating has been added' not in latest_body
+        sql(f"select public.rate_trade_partner('{separate}',-1);",competitor,'authenticated')
+        sql(f"select public.rate_trade_partner('{separate}',-1);",competitor,'authenticated')
+        assert feedback(fresh_buyer)['buyer_negative']==1 and feedback(fresh_buyer)['buyer_positive']==0
+        assert feedback(fresh_buyer)['buyer_confirmed']==baseline_buyer['buyer_confirmed']+1
+        assert sql(f"select count(*) from khub_bot.trade_feedback where auction_id='{separate}';")=='1'
+        # Votes are private to their author; recipients and spectators see only profile totals.
+        for uid,role in [(competitor,'authenticated'),(fresh_buyer,'authenticated'),(SELLER,'authenticated'),(None,'anon')]:
+            row=read_page('detail',uid,role,id=separate)['rows'][0]
+            assert row['own_feedback']==(-1 if uid==competitor else None)
+        sql(f"select public.rate_trade_partner('{separate}',1);",SELLER,'authenticated',error='closed direct sale')
+        sql(f"select public.rate_trade_partner('{separate}',1);",role='anon',error='permission denied')
+        sql(f"select public.rate_trade_partner('{separate}',0);",competitor,'authenticated',error='thumbs')
+        sql(f"select public.rate_trade_partner('{separate}',null);",competitor,'authenticated',error='thumbs')
+        sql(f"update auth.users set banned_until=now()+interval '1 day' where id='{competitor}';")
+        sql(f"select public.rate_trade_partner('{separate}',1);",competitor,'authenticated',error='unrestricted')
+        assert read_page('detail',competitor,'authenticated',id=separate)['rows'][0]['own_feedback'] is None
+        sql(f"update auth.users set banned_until=null where id='{competitor}';")
+        sql('select * from khub_bot.trade_feedback;',competitor,'authenticated',error='permission denied')
+        # An incomplete response neither creates feedback nor restricts its polarity.
+        trade_report(str(uuid4()),separate,'',uid=fresh_buyer)
+        assert feedback(competitor)['seller_negative']==0
+        assert feedback(competitor)['seller_incomplete']==baseline_seller['seller_incomplete']+1
+        sql(f"select public.rate_trade_partner('{separate}',1);",fresh_buyer,'authenticated')
+        assert feedback(competitor)['seller_positive']==1
+        assert feedback(competitor)['seller_incomplete']==baseline_seller['seller_incomplete']+1
+        # Resolve the issue: completion changes while both explicit votes stay intact.
+        sql(f"select public.withdraw_trade_rating('{separate}');",fresh_buyer,'authenticated')
+        assert feedback(competitor)['seller_incomplete']==baseline_seller['seller_incomplete']
+        assert feedback(competitor)['seller_confirmed']==baseline_seller['seller_confirmed']+1
+        assert feedback(competitor)['seller_positive']==1 and feedback(fresh_buyer)['buyer_negative']==1
+        assert sql(f"select status from public.auctions where id='{separate}';")=='completed'
+        # Ratings are final, including after completion. Identical retries stay idempotent.
+        sql(f"select public.rate_trade_partner('{separate}',1);",competitor,'authenticated',error='cannot be changed')
+        sql(f"select public.rate_trade_partner('{separate}',-1);",competitor,'authenticated')
+        assert feedback(fresh_buyer)['buyer_positive']==0 and feedback(fresh_buyer)['buyer_negative']==1
+        assert sql(f"select count(*) from khub_bot.trade_feedback where auction_id='{separate}';")=='2'
+        assert sql(f"select status from public.auctions where id='{separate}';")=='completed'
+        # Existing resolved trades are also eligible; escrow/unsold/cancelled sales are not.
+        sql(f"select public.rate_trade_partner('{public_lot}',-1);",competitor,'authenticated')
+        sql(f"select public.rate_trade_partner('{active_lot}',1);",competitor,'authenticated',error='closed direct sale')
+        # Commas belong only in generated display amounts/quantities, never identifiers or ledgers.
+        frozen_messages=sql('select jsonb_agg(jsonb_build_array(id,display_message,state) order by id) from khub_bot.deliveries;')
+        sql(migration_sql('202610210041_comma_formatted_bot_numbers.sql'))
+        assert sql('select jsonb_agg(jsonb_build_array(id,display_message,state) order by id) from khub_bot.deliveries;')==frozen_messages
+        for value in [0,19,999,1000,99000000000,9007199254740993,9223372036854775807]:
+            assert sql(f'select khub_bot.format_message_number({value}::bigint);')==f'{value:,}'
+        formatted=direct_create('99000000000',uid=competitor)
+        sql(f"update public.auctions set quantity=12345 where id='{formatted}';")
+        sql(f"select public.purchase_auction('{formatted}');",fresh_buyer,'authenticated')
+        sql(f"select public.confirm_auction_trade('{formatted}');",fresh_buyer,'authenticated')
+        body=sql(f"select d.display_message from khub_bot.rating_notifications n join khub_bot.deliveries d on d.id=n.delivery_id where n.auction_id='{formatted}' and n.actor_id='{fresh_buyer}';")
+        assert 'Agreed total: 99,000,000,000 Meat' in body and '12,345 x escrow item' in body
+        auction_number=sql(f"select auction_number from public.auctions where id='{formatted}';")
+        assert f'Auction #{auction_number}' in body
+        assert sql(f"select final_price from public.auctions where id='{formatted}';")=='99000000000'
+        # Friendly escrow deliveries use the same grouped quantities and preserve item-name digits.
+        sql(f"update public.auctions set item='item 1234567' where id='{formatted}';")
+        friendly=sql(f"select khub_bot.friendly_message(jsonb_populate_record(null::khub_bot.deliveries,jsonb_build_object('auction_id','{formatted}'::uuid,'kind','sale_item')));")
+        assert 'item 1234567 × 12,345' in friendly
+        # Administrator report headers are formatted; private user-entered text and player IDs remain exact.
+        sql(f"update khub_bot.bug_reports set created_at=now()-interval '2 hours' where reporter_id='{competitor}';")
+        format_report=str(uuid4())
+        trade_report(format_report,formatted,'Keep my number 1234567 unchanged.',uid=competitor)
+        report_body=sql(f"select d.display_message from khub_bot.bug_report_deliveries r join khub_bot.deliveries d on d.id=r.delivery_id where r.report_id='{format_report}';")
+        assert 'Agreed total: 99,000,000,000 Meat' in report_body and 'Keep my number 1234567 unchanged.' in report_body
+        player_number=sql(f"select kol_player_id from public.profiles where id='{competitor}';")
+        assert f'(#{player_number})' in report_body
+        # Purchase totals count completed auctions only, separately for each settlement mode.
+        source_before=sql('select jsonb_agg(to_jsonb(a) order by id) from public.auctions a;')
+        sql(migration_sql('202610210042_profile_purchase_totals.sql'))
+        assert sql('select jsonb_agg(to_jsonb(a) order by id) from public.auctions a;')==source_before
+        for uid in [competitor,fresh_buyer,SELLER,BUYER]:
+            stats=feedback(uid)
+            for escrow,key in [('false','direct_bought_value'),('true','escrow_bought_value')]:
+                expected=sql(f"select coalesce(sum(final_price),0)::text from public.auctions where winner_id='{uid}' and escrow_mode={escrow} and status='completed' and finalized_at is not null;")
+                assert stats[key]==expected and isinstance(stats[key],str)
+        before_purchase=feedback(fresh_buyer)
+        # The 99b formatted sale is awaiting resolution; it contributes only once both parties complete.
+        assert sql(f"select status from public.auctions where id='{formatted}';")=='awaiting_trade'
+        sql(f"select public.withdraw_trade_rating('{formatted}');",competitor,'authenticated')
+        after_purchase=feedback(fresh_buyer)
+        assert int(after_purchase['direct_bought_value'])==int(before_purchase['direct_bought_value'])+99000000000
+        assert after_purchase['escrow_bought_value']==before_purchase['escrow_bought_value']
+        assert sql(f"select status from public.auctions where id='{formatted}';")=='completed'
+        public_stats=read_page('seller',None,'anon',id=fresh_buyer)['seller']['stats']
+        assert public_stats['direct_bought_value']==after_purchase['direct_bought_value']
+        assert public_stats['escrow_bought_value']==after_purchase['escrow_bought_value']
+        # Admin exclusion clears public bad marks while retaining evidence and separate votes.
+        frozen_messages=sql('select jsonb_agg(jsonb_build_array(id,display_message,state) order by id) from khub_bot.deliveries;')
+        sql(migration_sql('202610210043_excluded_trade_report_status.sql'))
+        assert sql('select jsonb_agg(jsonb_build_array(id,display_message,state) order by id) from khub_bot.deliveries;')==frozen_messages
+        disputed=direct_create('500',uid=competitor)
+        sql(f"select public.purchase_auction('{disputed}');",fresh_buyer,'authenticated')
+        seller_dispute=str(uuid4()); buyer_dispute=str(uuid4())
+        trade_report(seller_dispute,disputed,'',uid=competitor)
+        trade_report(buyer_dispute,disputed,'',uid=fresh_buyer)
+        sql(f"select public.rate_trade_partner('{disputed}',-1);",competitor,'authenticated')
+        sql(f"select public.rate_trade_partner('{disputed}',1);",fresh_buyer,'authenticated')
+        before_review={uid:feedback(uid) for uid in [competitor,fresh_buyer]}
+        auction_before_review=sql(f"select to_jsonb(a) from public.auctions a where id='{disputed}';")
+        first_view=read_page('detail',id=disputed)['rows'][0]
+        assert first_view['trade_reported'] and first_view['seller_reported_incomplete'] and first_view['buyer_reported_incomplete']
+        sql(f"select public.review_trade_rating('{seller_dispute}',false,'Reviewed evidence: excluded seller report.');",owner_id,'authenticated')
+        # One legitimate report still keeps the auction warning active.
+        one_view=read_page('detail',id=disputed)['rows'][0]
+        assert one_view['trade_reported'] and one_view['buyer_reported_incomplete']
+        assert not one_view['seller_reported_incomplete'] and one_view['seller_report_excluded']
+        sql(f"select public.review_trade_rating('{buyer_dispute}',false,'Reviewed evidence: excluded buyer report.');",owner_id,'authenticated')
+        for uid,role in [(competitor,'authenticated'),(fresh_buyer,'authenticated'),(SELLER,'authenticated'),(None,'anon')]:
+            view=read_page('detail',uid,role,id=disputed)['rows'][0]
+            assert not view['trade_reported'] and not view['seller_reported_incomplete'] and not view['buyer_reported_incomplete']
+            assert view['seller_report_excluded'] and view['buyer_report_excluded']
+            assert view['status']=='awaiting_trade' and view['seller_confirmed_at'] is None and view['buyer_confirmed_at'] is None
+            if uid in [competitor,fresh_buyer]:
+                assert view['own_trade_report_excluded'] is True and view['own_trade_report'] is not None
+                assert view['own_feedback']==(-1 if uid==competitor else 1)
+            else:
+                assert view['own_trade_report_excluded'] is None and view['own_trade_report'] is None and view['own_feedback'] is None
+        assert sql(f"select to_jsonb(a) from public.auctions a where id='{disputed}';")==auction_before_review
+        for uid,removed_key in [(competitor,'seller_incomplete'),(fresh_buyer,'buyer_incomplete')]:
+            after=feedback(uid)
+            assert after[removed_key]==before_review[uid][removed_key]-1
+            for key in ['seller_confirmed','buyer_confirmed','seller_positive','seller_negative','buyer_positive','buyer_negative','direct_bought_value']:
+                assert after[key]==before_review[uid][key]
+        assert sql(f"select count(*) from khub_bot.trade_reports where auction_id='{disputed}';")=='2'
+        assert sql(f"select count(*) from khub_bot.trade_rating_reviews where report_id in ('{seller_dispute}','{buyer_dispute}');")=='2'
+        # Closing the support thread doesn't complete the trade or restore excluded marks.
+        sql(f"select public.update_support_thread('{disputed}',true,'resolved',null);",owner_id,'authenticated')
+        assert sql(f"select to_jsonb(a) from public.auctions a where id='{disputed}';")==auction_before_review
+        assert not read_page('detail',id=disputed)['rows'][0]['trade_reported']
+        # An audited restoration returns only that report's mark and counter.
+        sql(f"select public.review_trade_rating('{seller_dispute}',true,'Further evidence supports this report.');",owner_id,'authenticated')
+        restored=read_page('detail',id=disputed)['rows'][0]
+        assert restored['trade_reported'] and restored['seller_reported_incomplete'] and not restored['seller_report_excluded']
+        assert not restored['buyer_reported_incomplete'] and restored['buyer_report_excluded']
+        assert feedback(fresh_buyer)['buyer_incomplete']==before_review[fresh_buyer]['buyer_incomplete']
+        # Excluded reports remain withdrawable only by their original author to acknowledge completion.
+        sql(f"select public.withdraw_trade_rating('{disputed}');",fresh_buyer,'authenticated')
+        resolved_view=read_page('detail',fresh_buyer,'authenticated',id=disputed)['rows'][0]
+        assert not resolved_view['buyer_report_excluded'] and resolved_view['buyer_resolved_at'] is not None
+        assert resolved_view['trade_reported'] and resolved_view['status']=='awaiting_trade'
+        # A profile's completed points wait for BOTH acknowledgements of completion.
+        all_auctions_before=sql('select jsonb_agg(to_jsonb(a) order by id) from public.auctions a;')
+        reports_before=sql('select jsonb_agg(to_jsonb(t) order by report_id) from khub_bot.trade_reports t;')
+        votes_before=sql('select jsonb_agg(to_jsonb(f) order by auction_id,actor_id) from khub_bot.trade_feedback f;')
+        sql(migration_sql('202610210044_completed_trade_counts.sql'))
+        assert sql('select jsonb_agg(to_jsonb(a) order by id) from public.auctions a;')==all_auctions_before
+        assert sql('select jsonb_agg(to_jsonb(t) order by report_id) from khub_bot.trade_reports t;')==reports_before
+        assert sql('select jsonb_agg(to_jsonb(f) order by auction_id,actor_id) from khub_bot.trade_feedback f;')==votes_before
+        for uid in [competitor,fresh_buyer,SELLER,BUYER]:
+            stats=feedback(uid)
+            assert stats['seller_confirmed']==int(sql(f"select count(*) from public.auctions where seller_id='{uid}' and not escrow_mode and status='completed' and winner_id is not null and finalized_at is not null;"))
+            assert stats['buyer_confirmed']==int(sql(f"select count(*) from public.auctions where winner_id='{uid}' and not escrow_mode and status='completed' and finalized_at is not null;"))
+        # One confirmation, a conflicting response, and an admin exclusion each leave completed points unchanged.
+        wait_both=direct_create('500',uid=competitor)
+        sql(f"select public.purchase_auction('{wait_both}');",fresh_buyer,'authenticated')
+        seller_base=feedback(competitor); buyer_base=feedback(fresh_buyer)
+        sql(f"select public.confirm_auction_trade('{wait_both}');",fresh_buyer,'authenticated')
+        assert feedback(competitor)['seller_confirmed']==seller_base['seller_confirmed']
+        assert feedback(fresh_buyer)['buyer_confirmed']==buyer_base['buyer_confirmed']
+        late_report=str(uuid4())
+        trade_report(late_report,wait_both,'',uid=competitor)
+        assert feedback(competitor)['seller_confirmed']==seller_base['seller_confirmed']
+        assert feedback(fresh_buyer)['buyer_confirmed']==buyer_base['buyer_confirmed']
+        sql(f"select public.review_trade_rating('{late_report}',false,'Report dismissed after reviewing evidence.');",owner_id,'authenticated')
+        assert feedback(competitor)['seller_confirmed']==seller_base['seller_confirmed']
+        assert feedback(fresh_buyer)['buyer_confirmed']==buyer_base['buyer_confirmed']
+        sql(f"select public.withdraw_trade_rating('{wait_both}');",competitor,'authenticated')
+        for _ in range(2):
+            assert feedback(competitor)['seller_confirmed']==seller_base['seller_confirmed']+1
+            assert feedback(fresh_buyer)['buyer_confirmed']==buyer_base['buyer_confirmed']+1
+            sql(f"select public.withdraw_trade_rating('{wait_both}');",competitor,'authenticated')
+        # The ordinary confirmation path also waits for both, regardless of who responds first.
+        plain=direct_create('500',uid=competitor)
+        sql(f"select public.purchase_auction('{plain}');",fresh_buyer,'authenticated')
+        seller_base=feedback(competitor); buyer_base=feedback(fresh_buyer)
+        sql(f"select public.confirm_auction_trade('{plain}');",competitor,'authenticated')
+        sql(f"select public.rate_trade_partner('{plain}',1);",competitor,'authenticated')
+        assert feedback(competitor)['seller_confirmed']==seller_base['seller_confirmed']
+        assert feedback(fresh_buyer)['buyer_confirmed']==buyer_base['buyer_confirmed']
+        assert feedback(fresh_buyer)['buyer_positive']==buyer_base['buyer_positive']+1
+        sql(f"select public.confirm_auction_trade('{plain}');",fresh_buyer,'authenticated')
+        assert feedback(competitor)['seller_confirmed']==seller_base['seller_confirmed']+1
+        assert feedback(fresh_buyer)['buyer_confirmed']==buyer_base['buyer_confirmed']+1
+        public_stats=read_page('seller',None,'anon',id=competitor)['seller']['stats']
+        assert public_stats['seller_confirmed']==seller_base['seller_confirmed']+1
+        # Incomplete values use the agreed lot price and mirror the reviewed per-role counts.
+        all_auctions_before=sql('select jsonb_agg(to_jsonb(a) order by id) from public.auctions a;')
+        sql(migration_sql('202610210045_incomplete_trade_values.sql'))
+        assert sql('select jsonb_agg(to_jsonb(a) order by id) from public.auctions a;')==all_auctions_before
+        for uid in [competitor,fresh_buyer,SELLER,BUYER]:
+            stats=feedback(uid)
+            for reported_role,target_column,key in [('buyer','seller_id','seller_incomplete_value'),('seller','winner_id','buyer_incomplete_value')]:
+                expected=sql(f"select coalesce(sum(a.final_price),0)::text from khub_bot.trade_reports t join public.auctions a on a.id=t.auction_id where t.counts_negative and t.withdrawn_at is null and not a.escrow_mode and t.reporter_role='{reported_role}' and a.{target_column}='{uid}';")
+                assert stats[key]==expected and isinstance(stats[key],str)
+        seller_value_base=feedback(competitor); buyer_value_base=feedback(fresh_buyer)
+        cheap=direct_create('10000',uid=competitor)
+        costly=direct_create('10000000000',uid=competitor)
+        cheap_report=str(uuid4()); costly_buyer_report=str(uuid4()); costly_seller_report=str(uuid4())
+        for lot in [cheap,costly]:
+            sql(f"select public.purchase_auction('{lot}');",fresh_buyer,'authenticated')
+        trade_report(cheap_report,cheap,'',uid=fresh_buyer)
+        trade_report(costly_buyer_report,costly,'',uid=fresh_buyer)
+        trade_report(costly_seller_report,costly,'',uid=competitor)
+        assert int(feedback(competitor)['seller_incomplete_value'])==int(seller_value_base['seller_incomplete_value'])+10000+10000000000
+        assert int(feedback(fresh_buyer)['buyer_incomplete_value'])==int(buyer_value_base['buyer_incomplete_value'])+10000000000
+        # Quantity is two, but the final price already covers the entire lot: no double multiplication.
+        sql(f"select public.review_trade_rating('{costly_buyer_report}',false,'Dismissed after administrator review.');",owner_id,'authenticated')
+        assert int(feedback(competitor)['seller_incomplete_value'])==int(seller_value_base['seller_incomplete_value'])+10000
+        assert int(feedback(fresh_buyer)['buyer_incomplete_value'])==int(buyer_value_base['buyer_incomplete_value'])+10000000000
+        sql(f"select public.review_trade_rating('{costly_buyer_report}',true,'Restored after additional evidence.');",owner_id,'authenticated')
+        assert int(feedback(competitor)['seller_incomplete_value'])==int(seller_value_base['seller_incomplete_value'])+10000+10000000000
+        sql(f"select public.withdraw_trade_rating('{costly}');",fresh_buyer,'authenticated')
+        assert int(feedback(competitor)['seller_incomplete_value'])==int(seller_value_base['seller_incomplete_value'])+10000
+        assert int(feedback(fresh_buyer)['buyer_incomplete_value'])==int(buyer_value_base['buyer_incomplete_value'])+10000000000
+        sql(f"select public.withdraw_trade_rating('{costly}');",competitor,'authenticated')
+        assert feedback(fresh_buyer)['buyer_incomplete_value']==buyer_value_base['buyer_incomplete_value']
+        assert int(feedback(fresh_buyer)['direct_bought_value'])==int(buyer_value_base['direct_bought_value'])+10000000000
+        for uid,expected in [(competitor,feedback(competitor)),(fresh_buyer,feedback(fresh_buyer))]:
+            stats=read_page('seller',None,'anon',id=uid)['seller']['stats']
+            assert stats['seller_incomplete_value']==expected['seller_incomplete_value']
+            assert stats['buyer_incomplete_value']==expected['buyer_incomplete_value']
+            for key in ['seller_positive','seller_negative','buyer_positive','buyer_negative']:
+                assert expected[key]==(seller_value_base if uid==competitor else buyer_value_base)[key]
+        # Escrow winning-bid counts use completed deliveries, independently of direct trades.
+        all_auctions_before=sql('select jsonb_agg(to_jsonb(a) order by id) from public.auctions a;')
+        sql(migration_sql('202610210046_escrow_purchase_counts.sql'))
+        assert sql('select jsonb_agg(to_jsonb(a) order by id) from public.auctions a;')==all_auctions_before
+        for uid in [competitor,fresh_buyer,SELLER,BUYER]:
+            expected=int(sql(f"select count(*) from public.auctions where winner_id='{uid}' and escrow_mode and status='completed' and finalized_at is not null;"))
+            assert feedback(uid)['escrow_buys']==expected
+        escrow_before=feedback(BUYER)
+        pending_escrow_purchase=privacy_lot('active',True)
+        assert feedback(BUYER)['escrow_buys']==escrow_before['escrow_buys']
+        sql(f"update public.auctions set status='settling',winner_id='{BUYER}',winner_username='Buyer',final_price=300,finalized_at=now(),settlement_outcome='completed' where id='{pending_escrow_purchase}';")
+        assert feedback(BUYER)['escrow_buys']==escrow_before['escrow_buys']
+        sql(f"update public.auctions set status='completed',settled_at=now(),completed_at=now() where id='{pending_escrow_purchase}';")
+        escrow_after=feedback(BUYER)
+        assert escrow_after['escrow_buys']==escrow_before['escrow_buys']+1
+        assert int(escrow_after['escrow_bought_value'])==int(escrow_before['escrow_bought_value'])+300
+        assert escrow_after['buyer_confirmed']==escrow_before['buyer_confirmed']
+        assert read_page('seller',None,'anon',id=BUYER)['seller']['stats']['escrow_buys']==escrow_after['escrow_buys']
+        # The inbox shows actual reporter withdrawals even when the original report had no explanation.
+        frozen_messages=sql('select jsonb_agg(jsonb_build_array(id,display_message,state) order by id) from khub_bot.deliveries;')
+        sql(migration_sql('202610210047_support_withdrawal_updates.sql'))
+        assert sql('select jsonb_agg(jsonb_build_array(id,display_message,state) order by id) from khub_bot.deliveries;')==frozen_messages
+        threads(uid=competitor,error='Administrator access required')
+        sql('select public.read_support_threads();',role='anon',error='permission denied')
+        silent_withdrawal=direct_create('500',uid=competitor)
+        sql(f"select public.purchase_auction('{silent_withdrawal}');",fresh_buyer,'authenticated')
+        silent_withdrawal_report=str(uuid4())
+        trade_report(silent_withdrawal_report,silent_withdrawal,'',uid=competitor)
+        before_withdrawal=next(t for t in threads()['threads'] if t['id']==silent_withdrawal)
+        assert len(before_withdrawal['messages'])==1
+        original=before_withdrawal['messages'][0]
+        assert original['body']=='No explanation provided.' and original['withdrawn_at'] is None
+        assert original['withdrawal_confirmed_complete'] is False
+        sql(f"select public.withdraw_trade_rating('{silent_withdrawal}');",competitor,'authenticated')
+        after_withdrawal=next(t for t in threads(status='self_resolved')['threads'] if t['id']==silent_withdrawal)
+        saved=after_withdrawal['messages'][0]
+        assert saved['feedback_withdrawn'] and saved['withdrawn_at'] is not None and saved['withdrawal_confirmed_complete'] is True
+        assert saved['reporter_username']==original['reporter_username'] and saved['reference']==original['reference']
+        assert saved['created_at']==original['created_at'] and saved['body']==original['body']
+        assert after_withdrawal['updated_at']==saved['withdrawn_at']
+        assert after_withdrawal['auction']['seller']['resolved_at']==saved['withdrawn_at']
+        assert after_withdrawal['auction']['status']=='awaiting_trade'
+        sql(f"select public.withdraw_trade_rating('{silent_withdrawal}');",competitor,'authenticated')
+        repeated=next(t for t in threads()['threads'] if t['id']==silent_withdrawal)
+        assert len(repeated['messages'])==1 and repeated['messages'][0]['withdrawn_at']==saved['withdrawn_at']
+        assert sql(f"select count(*) from khub_bot.trade_rating_withdrawals where report_id='{silent_withdrawal_report}';")=='1'
+        # The other party can withdraw their own report later; both events retain distinct timestamps.
+        silent_buyer_report=str(uuid4())
+        trade_report(silent_buyer_report,silent_withdrawal,'',uid=fresh_buyer)
+        sql(f"select public.withdraw_trade_rating('{silent_withdrawal}');",fresh_buyer,'authenticated')
+        both_updates=next(t for t in threads()['threads'] if t['id']==silent_withdrawal)
+        assert len(both_updates['messages'])==2 and both_updates['auction']['status']=='completed'
+        assert all(m['withdrawal_confirmed_complete'] and m['withdrawn_at'] is not None for m in both_updates['messages'])
+        assert both_updates['updated_at']==max(m['withdrawn_at'] for m in both_updates['messages'])
+        # An administrator closing a conversation is never described as the reporter confirming completion.
+        no_withdrawal=direct_create('500',uid=competitor)
+        sql(f"select public.purchase_auction('{no_withdrawal}');",fresh_buyer,'authenticated')
+        no_withdrawal_report=str(uuid4())
+        trade_report(no_withdrawal_report,no_withdrawal,'',uid=competitor)
+        update_thread(no_withdrawal,status='resolved')
+        admin_closed=next(t for t in threads()['threads'] if t['id']==no_withdrawal)
+        assert admin_closed['messages'][0]['withdrawn_at'] is None
+        assert not admin_closed['messages'][0]['withdrawal_confirmed_complete']
+        # Older withdrawals that never acknowledged completion retain their original meaning.
+        legacy_message=next(m for page in range(1,(threads()['total']+19)//20+1) for t in threads(page=page)['threads'] for m in t['messages'] if m['message_type']=='trade_rating' and m['feedback_withdrawn'] and not m['withdrawal_confirmed_complete'])
+        assert legacy_message['withdrawn_at'] is not None
+        public=read_page('detail',None,'anon',id=silent_withdrawal)
+        assert 'withdrawal_confirmed_complete' not in json.dumps(public) and 'withdrawn_at' not in json.dumps(public)
+        # Account restrictions preserve password authentication for appeals while blocking trade APIs.
+        sql(f"update auth.users set banned_until=now()+interval '3 days' where id='{fresh_buyer}';")
+        sql(migration_sql('202610210048_restricted_accounts_and_appeal_evidence.sql'))
+        sql(migration_sql('202610210049_administrator_account_controls.sql'))
+        def access(uid):
+            return json.loads(sql('select public.read_my_account_access();',uid,'authenticated'))
+        assert access(fresh_buyer)['is_banned'] and access(fresh_buyer)['ban_expires_at'] is not None
+        assert sql(f"select banned_until is null from auth.users where id='{fresh_buyer}';")=='t'
+        assert access(prefix_job['user_id'])['is_banned'] # pre-existing permanent bans survive
+        assert not access(competitor)['is_banned']
+        assert 'reason' not in access(fresh_buyer)
+        sql('select public.read_my_account_access();',role='anon',error='permission denied')
+        sql("select public.read_admin_accounts('Feedback');",competitor,'authenticated',error='Administrator access required')
+        sql("select public.read_admin_accounts('Feedback');",role='anon',error='permission denied')
+        def ban(uid,expiry='null',actor=owner_id,error=None):
+            return sql(f"select public.set_account_restriction('{uid}','Reviewed failure to honor trade',{expiry});",actor,'authenticated',error=error)
+        def lift(uid,actor=owner_id,error=None):
+            return sql(f"select public.lift_account_restriction('{uid}','Reviewed and lifted restriction');",actor,'authenticated',error=error)
+        ban(competitor,actor=fresh_buyer,error='Administrator access required')
+        ban(owner_id,error='own administrator')
+        ban(competitor,"now()-interval '1 minute'",error='future expiry')
+        lift(fresh_buyer)
+        assert not access(fresh_buyer)['is_banned']
+        restriction_lot=direct_create('500',uid=competitor)
+        sql(f"select public.purchase_auction('{restriction_lot}');",fresh_buyer,'authenticated')
+        ban(competitor,"now()+interval '1 day'")
+        assert access(competitor)['is_banned'] and access(competitor)['ban_expires_at'] is not None
+        target_username=sql(f"select khub_username from public.profiles where id='{competitor}';")
+        assert sql(f"select public.khub_login_address('KH_{target_username}');",role='anon').endswith('@login.khub.invalid')
+        # An already-issued authenticated token cannot bypass a new ban.
+        before_incomplete=feedback(fresh_buyer)['buyer_incomplete']
+        trade_report(str(uuid4()),restriction_lot,'',uid=competitor,error='restricted')
+        assert feedback(fresh_buyer)['buyer_incomplete']==before_incomplete
+        sql(f"select public.confirm_auction_trade('{restriction_lot}');",competitor,'authenticated',error='restricted')
+        direct_create(uid=competitor,error='restricted')
+        sql(f"select public.submit_trade_query('{uuid4()}','{restriction_lot}','Please review this exchange.');",competitor,'authenticated',error='restricted')
+        sql(f"select public.submit_bug_report('{uuid4()}','Please review my account.');",competitor,'authenticated',error='restricted')
+        # Bounded private evidence is saved atomically with the appeal and can only be read by admins.
+        sql(f"update khub_bot.bug_reports set created_at=now()-interval '2 hours' where reporter_id='{competitor}';")
+        evidence_id=str(uuid4())
+        png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aN1cAAAAASUVORK5CYII='
+        evidence_call=f"select public.submit_ban_appeal_with_evidence('{evidence_id}','Please review my ban and attached evidence.','{png}','image/png');"
+        first_evidence=sql(evidence_call,competitor,'authenticated')
+        assert sql(evidence_call,competitor,'authenticated')==first_evidence
+        assert sql(f"select count(*) from khub_bot.appeal_evidence where report_id='{evidence_id}';")=='1'
+        sql(f"select public.read_appeal_evidence('{evidence_id}');",competitor,'authenticated',error='Administrator access required')
+        sql(f"select public.read_appeal_evidence('{evidence_id}');",role='anon',error='permission denied')
+        image=json.loads(sql(f"select public.read_appeal_evidence('{evidence_id}');",owner_id,'authenticated'))
+        assert image=={'mime_type':'image/png','base64':png}
+        sql('select * from khub_bot.appeal_evidence;',competitor,'authenticated',error='permission denied')
+        sql(f"select public.submit_ban_appeal_with_evidence('{evidence_id}','Please review my ban and attached evidence.');",competitor,'authenticated',error='different evidence')
+        invalid_id=str(uuid4())
+        sql(f"select public.submit_ban_appeal_with_evidence('{invalid_id}','Please review my ban and attached evidence.','PHN2Zz48L3N2Zz4=','image/svg+xml');",competitor,'authenticated',error='PNG, JPEG or WebP')
+        sql(f"select public.submit_ban_appeal_with_evidence('{invalid_id}','Please review my ban and attached evidence.','PHN2Zz48L3N2Zz4=','image/png');",competitor,'authenticated',error='valid PNG')
+        sql(f"select public.submit_ban_appeal_with_evidence('{invalid_id}','Please review my ban and attached evidence.',repeat('A',2796205),'image/png');",competitor,'authenticated',error='up to 2 MB')
+        assert sql(f"select count(*) from khub_bot.bug_reports where id='{invalid_id}';")=='0'
+        evidence_thread=next(t for t in threads(category='appeal')['threads'] if any(m['id']==evidence_id for m in t['messages']))
+        assert next(m for m in evidence_thread['messages'] if m['id']==evidence_id)['has_evidence']
+        assert png not in json.dumps(evidence_thread)
+        account_result=json.loads(sql(f"select public.read_admin_accounts('{target_username}');",owner_id,'authenticated'))
+        account_row=next(r for r in account_result if r['id']==competitor)
+        assert account_row['is_banned'] and account_row['expires_at'] and account_row['reason']
+        prefixed_result=json.loads(sql(f"select public.read_admin_accounts('KH_{target_username}');",owner_id,'authenticated'))
+        assert any(r['id']==competitor for r in prefixed_result)
+        # Expired bans stop restricting the account without a manual cleanup job.
+        sql(f"update khub_bot.account_bans set expires_at=now()-interval '1 second' where active and kol_player_id=(select kol_player_id from public.profiles where id='{competitor}');")
+        assert not access(competitor)['is_banned']
+        assert direct_create(uid=competitor)
+        ban(competitor)
+        assert access(competitor)['is_banned'] and access(competitor)['ban_expires_at'] is None
+        lift(competitor)
+        assert not access(competitor)['is_banned']
+        # Later native Auth bans are mirrored before they can prevent appeal sign-in.
+        sql(f"update auth.users set banned_until=now()+interval '2 days' where id='{competitor}';")
+        assert access(competitor)['is_banned'] and access(competitor)['ban_expires_at']
+        assert sql(f"select banned_until is null from auth.users where id='{competitor}';")=='t'
+        lift(competitor)
+        assert not access(competitor)['is_banned']
+        assert int(sql(f"select count(*) from khub_bot.account_ban_activity where administrator_id='{owner_id}';"))>=5
+        sql('select * from khub_bot.account_ban_activity;',competitor,'authenticated',error='permission denied')
+        # The early-access ceiling applies only to minimum bids on newly created escrow listings.
+        legacy_large_escrow=sql("select public.create_auction('escrow item',2,2000000,24,null,null,1,true);",competitor,'authenticated')
+        prior_auctions=sql('select jsonb_agg(to_jsonb(a) order by id) from public.auctions a;')
+        sql(migration_sql('202610210050_early_access_escrow_minimum_limit.sql'))
+        assert sql('select jsonb_agg(to_jsonb(a) order by id) from public.auctions a;')==prior_auctions
+        assert sql(f"select min_bid_meat from public.auctions where id='{legacy_large_escrow}';")=='2000000'
+        before_limit_count=sql('select count(*) from public.auctions;')
+        for mode in ['', ',true']:
+            sql(f"select public.create_auction('escrow item',2,1000001,24,null,null,1{mode});",competitor,'authenticated',error='Choose Direct')
+        assert sql('select count(*) from public.auctions;')==before_limit_count
+        for minimum in [999999,1000000]:
+            allowed=sql(f"select public.create_auction('escrow item',2,{minimum},24,null,2000000,1,true);",competitor,'authenticated')
+            assert sql(f"select status from public.auctions where id='{allowed}';")=='pending_escrow'
+            assert sql(f"select instant_purchase_price from public.auctions where id='{allowed}';")=='2000000'
+        unrestricted_direct=sql("select public.create_auction('escrow item',2,1000001,24,null,null,1,false);",competitor,'authenticated')
+        assert sql(f"select status from public.auctions where id='{unrestricted_direct}';")=='active'
+        sql("select public.create_auction('escrow item',2,1000000,24,null,null,1,true);",role='anon',error='permission denied')
+        # Give the isolated Auth stub the columns used by Supabase email/password users.
+        sql('''alter table auth.users
+            add column instance_id uuid, add column aud text, add column role text,
+            add column encrypted_password text, add column is_super_admin boolean,
+            add column created_at timestamptz, add column updated_at timestamptz,
+            add column confirmation_token text, add column recovery_token text,
+            add column email_change_token_current text, add column email_change_token_new text,
+            add column email_change text, add column phone_change_token text,
+            add column phone_change text, add column reauthentication_token text;
+            create table auth.identities(id uuid primary key,provider_id text not null,user_id uuid not null references auth.users(id),
+                identity_data jsonb not null,provider text not null,created_at timestamptz,updated_at timestamptz,unique(provider_id,provider));
+        ''')
+        sql("insert into khub_bot.catalog(id,name) values(364,'asbestos ore'),(2,'seal tooth'),(3,'helmet turtle'),(10,'disco ball'),(8684,'Cold Fang') on conflict(id) do update set name=excluded.name;")
+        seed_sql=(ROOT/'supabase/testing/seed_test_accounts.sql').read_text()
+        original_financial=sql("select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d where kind<>'notice';")
+        deliveries_before=set(json.loads(sql('select coalesce(jsonb_agg(id),\'[]\') from khub_bot.deliveries;')))
+        sql(seed_sql)
+        assert sql('select count(*) from khub_bot.test_accounts;')=='6'
+        assert sql('select count(*) from khub_bot.test_auction_fixtures;')=='11'
+        assert sql("select count(*) from auth.identities where user_id in (select user_id from khub_bot.test_accounts);")=='6'
+        assert sql("select count(*) from auth.users u join khub_bot.test_accounts t on t.user_id=u.id where u.encrypted_password=crypt(t.username,u.encrypted_password);")=='6'
+        assert sql('select count(*) from khub_bot.test_accounts t where khub_bot.is_administrator(t.user_id);')=='0'
+        banned_test=sql("select user_id from khub_bot.test_accounts where username='banned';")
+        assert not access(banned_test)['is_banned']
+        assert sql("select bool_and(state='done' and temporary_password is null) from khub_bot.account_jobs where mail_id like 'khub-test-v1-%';")=='t'
+        assert sql("select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d where kind<>'notice';")==original_financial
+        new_deliveries=json.loads(sql('select coalesce(jsonb_agg(to_jsonb(d)),\'[]\') from khub_bot.deliveries d;'))
+        assert all(d['recipient_id']==3552305 and d['kind']=='notice' for d in new_deliveries if d['id'] not in deliveries_before)
+        assert all(r['status']=='pending_escrow' for r in json.loads(sql("select jsonb_agg(to_jsonb(a)) from public.auctions a join khub_bot.test_auction_fixtures f on f.auction_id=a.id where a.escrow_mode;")))
+        assert sql("select status from public.auctions where id=(select auction_id from khub_bot.test_auction_fixtures where seed_key='direct-both-complete');")=='completed'
+        assert sql("select count(*) from khub_bot.trade_reports where auction_id=(select auction_id from khub_bot.test_auction_fixtures where seed_key='direct-incomplete');")=='1'
+        assert sql("select public.khub_login_address('KH_test1');",role='anon').endswith('@login.khub.invalid')
+        seeded_fingerprint=sql('select jsonb_agg(to_jsonb(a) order by a.id) from public.auctions a join khub_bot.test_auction_fixtures f on f.auction_id=a.id;')
+        user_fingerprint=sql('select jsonb_agg(to_jsonb(u) order by u.id) from auth.users u join khub_bot.test_accounts t on t.user_id=u.id;')
+        delivery_fingerprint=sql('select jsonb_agg(to_jsonb(d) order by d.id) from khub_bot.deliveries d;')
+        ban(banned_test)
+        sql(seed_sql)
+        assert access(banned_test)['is_banned']
+        assert sql('select jsonb_agg(to_jsonb(a) order by a.id) from public.auctions a join khub_bot.test_auction_fixtures f on f.auction_id=a.id;')==seeded_fingerprint
+        assert sql('select jsonb_agg(to_jsonb(u) order by u.id) from auth.users u join khub_bot.test_accounts t on t.user_id=u.id;')==user_fingerprint
+        assert sql('select jsonb_agg(to_jsonb(d) order by d.id) from khub_bot.deliveries d;')==delivery_fingerprint
+        seed_lot=sql("select auction_id from khub_bot.test_auction_fixtures where seed_key='direct-no-bids';")
+        sql(f"select public.place_bid('{seed_lot}',1100);",competitor,'authenticated',error='test auction')
+        sql("insert into khub_bot.deliveries(dedupe_key,recipient_id,kind,meat,message) values('test-no-real-refund',9000000001,'refund',100,'No real refund');",error='cannot receive real escrow assets')
+        assert sql("select count(*) from khub_bot.deliveries where dedupe_key='test-no-real-refund';")=='0'
+        sql('select * from khub_bot.test_accounts;',competitor,'authenticated',error='permission denied')
+        # Restrictions reconcile existing auctions and serialize with all bidding paths.
+        sql(migration_sql('202610210051_banned_auction_obligations.sql'))
+        lift(competitor)
+        lift(fresh_buyer)
+        def review(lot,action,actor=owner_id,error=None):
+            return sql(f"select public.review_banned_auction('{lot}','{action}','Evidence reviewed by administrator');",actor,'authenticated',error=error)
+        def auction_state(lot):
+            return json.loads(sql(f"select to_jsonb(a) from public.auctions a where id='{lot}';"))
+        empty_banned=direct_create(uid=competitor)
+        held_seller=direct_create(1000,uid=competitor)
+        sql(f"select public.place_bid('{held_seller}',150);",fresh_buyer,'authenticated')
+        ban(competitor)
+        assert auction_state(empty_banned)['status']=='cancelled'
+        held=auction_state(held_seller)
+        assert held['status']=='on_hold' and held['winner_id'] is None and held['ban_review_required']
+        sql(f"select public.place_bid('{held_seller}',160);",owner_id,'authenticated',error='administrator review')
+        sql(f"select public.purchase_auction('{held_seller}');",fresh_buyer,'authenticated',error='administrator review')
+        sql(f"update public.auctions set created_at=now()-interval '2 days',end_time=now()-interval '1 day' where id='{held_seller}';")
+        sql('select public.finalize_expired_auctions();',role='anon')
+        assert auction_state(held_seller)['status']=='on_hold' and auction_state(held_seller)['winner_id'] is None
+        for role,actor in [('anon',None),('authenticated',fresh_buyer)]:
+            sql('select public.read_auction_ban_reviews();',actor,role,error='permission denied' if role=='anon' else 'Administrator access required')
+        review(held_seller,'cancel',actor=fresh_buyer,error='Administrator access required')
+        review(held_seller,'resume',error='Lift the affected bans')
+        assert any(a['id']==held_seller for a in json.loads(sql('select public.read_auction_ban_reviews();',owner_id,'authenticated')))
+        public_hold=read_page('detail',id=held_seller)['rows'][0]
+        assert public_hold['status']=='on_hold' and public_hold['ban_review_required']
+        assert 'Evidence reviewed' not in json.dumps(public_hold) and public_hold['winner_id'] is None
+        lift(competitor)
+        assert auction_state(held_seller)['status']=='on_hold' # lift/expiry never silently restarts bidding
+        review(held_seller,'resume')
+        resumed=auction_state(held_seller)
+        assert resumed['status']=='active' and not resumed['ban_review_required']
+        assert sql(f"select end_time>now() from public.auctions where id='{held_seller}';")=='t'
+        sql(f"select public.place_bid('{held_seller}',160);",owner_id,'authenticated')
+        # A banned unfunded leading bidder must not become the automatic winner.
+        held_buyer=direct_create(uid=competitor)
+        sql(f"select public.place_bid('{held_buyer}',200);",fresh_buyer,'authenticated')
+        ban(fresh_buyer)
+        assert auction_state(held_buyer)['status']=='on_hold'
+        review(held_buyer,'cancel')
+        assert auction_state(held_buyer)['status']=='voided' and auction_state(held_buyer)['winner_id'] is None
+        assert sql(f"select count(*) from public.bids where auction_id='{held_buyer}';")=='1'
+        # Existing direct obligations stay intact; explicit reviewed completion
+        # is separate from ticket resolution/report dismissal and requires both sides.
+        lift(fresh_buyer)
+        obligation=direct_create(500,uid=competitor)
+        sql(f"select public.purchase_auction('{obligation}');",fresh_buyer,'authenticated')
+        ban(fresh_buyer)
+        assert auction_state(obligation)['status']=='awaiting_trade' and auction_state(obligation)['ban_review_required']
+        sql(f"select public.confirm_auction_trade('{obligation}');",fresh_buyer,'authenticated',error='restricted')
+        before_count=feedback(competitor)['seller_confirmed']
+        review(obligation,'buyer_complete')
+        assert auction_state(obligation)['status']=='awaiting_trade'
+        assert feedback(competitor)['seller_confirmed']==before_count
+        review(obligation,'buyer_complete',error='already recorded complete')
+        review(obligation,'seller_complete')
+        assert auction_state(obligation)['status']=='completed'
+        assert feedback(competitor)['seller_confirmed']==before_count+1
+        assert not any(a['id']==obligation for a in json.loads(sql('select public.read_auction_ban_reviews();',owner_id,'authenticated')))
+        assert sql(f"select count(*) from khub_bot.trade_feedback where auction_id='{obligation}';")=='0'
+        assert sql(f"select count(*) from khub_bot.auction_ban_reviews where auction_id='{obligation}' and action in ('seller_complete','buyer_complete');")=='2'
+        # Escrow: seller restrictions reject/refund new bid mail, without changing
+        # already-held items/Meat or preventing their original deadline settlement.
+        lift(fresh_buyer)
+        escrow_seller_id=int(sql(f"select kol_player_id from public.profiles where id='{competitor}';"))
+        escrow_buyer_id=int(sql(f"select kol_player_id from public.profiles where id='{fresh_buyer}';"))
+        escrow_lot=sql("select public.create_auction('escrow item',2,100,24,null,null,1,true);",competitor,'authenticated')
+        assert ingest(mail(9800001,escrow_seller_id,{'type':'list','auction_id':escrow_lot},items=[{'id':1,'quantity':2}]))=='accepted'
+        assert ingest(mail(9800002,escrow_buyer_id,{'type':'bid','auction_id':escrow_lot},meat=200))=='accepted'
+        ban(competitor)
+        ban(fresh_buyer)
+        funded_before=auction_state(escrow_lot)
+        assert funded_before['status']=='active' and funded_before['current_bid']==200
+        assert read_page('detail',id=escrow_lot)['rows'][0]['bidding_restricted']
+        owner_player=int(sql(f"select kol_player_id from public.profiles where id='{owner_id}';"))
+        rejected=mail(9800003,owner_player,{'type':'bid','auction_id':escrow_lot},meat=300)
+        assert 'restricted seller' in ingest(rejected)
+        assert ingest(rejected)=='duplicate'
+        assert sql("select sum(meat) from khub_bot.deliveries where receipt_id='9800003' and kind='refund';")=='300'
+        assert auction_state(escrow_lot)['current_bid']==200
+        sql(f"update public.auctions set created_at=now()-interval '2 days',end_time=now()-interval '1 second' where id='{escrow_lot}';")
+        sql('select public.bot_tick();',role='service_role')
+        settled=auction_state(escrow_lot)
+        assert settled['status']=='settling' and settled['winner_id']==fresh_buyer
+        assert sql(f"select sum(meat) from khub_bot.deliveries where auction_id='{escrow_lot}' and kind='sale_meat';")=='185'
+        assert sql(f"select count(*) from khub_bot.deliveries where auction_id='{escrow_lot}' and kind='sale_item';")=='1'
+        sql('select * from khub_bot.auction_ban_reviews;',owner_id,'authenticated',error='permission denied')
+        # A ban racing a new bid is atomic: either a prior bid is retained on
+        # hold, or the bid-free listing closes before the bid can be accepted.
+        lift(competitor)
+        lift(fresh_buyer)
+        race_lot=direct_create(uid=competitor)
+        def racing_bid():
+            try:
+                sql(f"select public.place_bid('{race_lot}',150);",fresh_buyer,'authenticated')
+                return True
+            except AssertionError as failure:
+                assert 'administrator review' in str(failure), str(failure)
+                return False
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            raced=pool.submit(racing_bid)
+            restricted=pool.submit(ban,competitor)
+            accepted=raced.result(timeout=10)
+            restricted.result(timeout=10)
+        race_state=auction_state(race_lot)
+        assert race_state['status']==('on_hold' if accepted else 'cancelled')
+        assert race_state['winner_id'] is None
+        assert sql(f"select count(*) from public.bids where auction_id='{race_lot}';")==('1' if accepted else '0')
+        # Legacy profile/native Auth bans use exactly the same auction handling.
+        lift(competitor)
+        native_lot=direct_create(uid=competitor)
+        sql(f"select public.place_bid('{native_lot}',150);",fresh_buyer,'authenticated')
+        sql(f"update auth.users set banned_until=now()+interval '1 day' where id='{competitor}';")
+        assert auction_state(native_lot)['status']=='on_hold'
+        sql(f"update khub_bot.account_bans set expires_at=now()-interval '1 second' where active and kol_player_id={escrow_seller_id};")
+        assert not access(competitor)['is_banned']
+        assert auction_state(native_lot)['status']=='on_hold'
+        review(native_lot,'resume')
+        profile_lot=direct_create(uid=competitor)
+        sql(f"update public.profiles set is_banned=true where id='{competitor}';")
+        assert auction_state(profile_lot)['status']=='cancelled'
+        lift(competitor)
+        # A seller banned before depositing cannot activate the listing. A
+        # deposited but bid-free listing queues its item return exactly once.
+        pending_restricted=sql("select public.create_auction('escrow item',2,100,24,null,null,1,true);",competitor,'authenticated')
+        deposited_restricted=sql("select public.create_auction('escrow item',2,100,24,null,null,1,true);",competitor,'authenticated')
+        assert ingest(mail(9800004,escrow_seller_id,{'type':'list','auction_id':deposited_restricted},items=[{'id':1,'quantity':2}]))=='accepted'
+        ban(competitor)
+        assert auction_state(pending_restricted)['status']=='cancelled'
+        assert auction_state(deposited_restricted)['status']=='settling'
+        assert auction_state(deposited_restricted)['settlement_outcome']=='cancelled'
+        returned=sql(f"select count(*) from khub_bot.deliveries where auction_id='{deposited_restricted}' and kind='return_item';")
+        assert returned=='1'
+        ban(competitor)
+        assert sql(f"select count(*) from khub_bot.deliveries where auction_id='{deposited_restricted}' and kind='return_item';")==returned
+        # A banned escrow leader can be outbid/refunded on an unrestricted
+        # seller's auction; already-held bid Meat is never silently confiscated.
+        lift(competitor)
+        escrow_outbid=sql("select public.create_auction('escrow item',2,100,24,null,null,1,true);",competitor,'authenticated')
+        assert ingest(mail(9800005,escrow_seller_id,{'type':'list','auction_id':escrow_outbid},items=[{'id':1,'quantity':2}]))=='accepted'
+        assert ingest(mail(9800006,escrow_buyer_id,{'type':'bid','auction_id':escrow_outbid},meat=200))=='accepted'
+        ban(fresh_buyer)
+        assert ingest(mail(9800007,owner_player,{'type':'bid','auction_id':escrow_outbid},meat=300))=='accepted'
+        assert auction_state(escrow_outbid)['highest_bidder_id']==owner_id
+        assert sql("select sum(meat) from khub_bot.deliveries where receipt_id='9800007' and recipient_id="+str(escrow_buyer_id)+" and kind='refund';")=='200'
+        # Dedicated hold filtering does not misclassify paused auctions as ended.
+        hold_filter=read_page('browse',None,'anon',status='on_hold')['rows']
+        assert all(a['status']=='on_hold' for a in hold_filter)
+        assert all(a['status']!='on_hold' for a in read_page('browse',None,'anon',status='ended')['rows'])
+        # Current item data is shared by the website and bot; eligibility is
+        # checked on the server even when a client bypasses the item selector.
+        catalog_business_fingerprint=sql("select md5((select jsonb_agg(to_jsonb(a) order by id)::text from public.auctions a)||coalesce((select jsonb_agg(to_jsonb(d) order by id)::text from khub_bot.deliveries d),''));")
+        sql(migration_sql('202610210052_live_tradeable_item_catalog.sql'))
+        assert sql('select public.bot_item_catalog_state() is null;',role='service_role')=='t'
+        assert json.loads(sql('select public.read_item_catalog();',role='anon'))=={'ready':False,'fetched_at':None,'items':[]}
+        sql("select public.create_auction('seal tooth',1,100,24,null,null,2,false);",competitor,'authenticated',error='catalog is being updated')
+        for role in ['anon','authenticated']:
+            sql("select public.bot_replace_item_catalog('[]',now(),repeat('a',64));",competitor if role=='authenticated' else None,role,error='permission denied')
+            sql('select public.bot_item_catalog_state();',competitor if role=='authenticated' else None,role,error='permission denied')
+        source_items=json.loads((ROOT/'src/data/items.json').read_text())
+        complete_catalog=source_items+[
+            {'id':26,'name':"Dolphin King map fixture",'image':'map.gif','tradeable':False},
+            {'id':43,'name':'worthless trinket','image':'trinket.gif','tradeable':False},
+            {'id':2000000000,'name':'gift-only fixture','image':'gift.gif','tradeable':False}]
+        for padding in range(10000-len(complete_catalog)):
+            complete_catalog.append({'id':1500000+padding,'name':f'Untradeable fixture {padding}','image':'fixture.gif','tradeable':False})
+        catalog_file=Path(directory)/'catalog-snapshot.json'
+        sql('create table public.catalog_import_fixture(payload jsonb); grant select on public.catalog_import_fixture to service_role;')
+        def catalog_payload(items):
+            catalog_file.write_text(json.dumps(items))
+            sql(f"truncate public.catalog_import_fixture; insert into public.catalog_import_fixture select pg_read_file('{catalog_file}')::jsonb;")
+        def catalog_import(fetched='clock_timestamp()',error=None):
+            return sql(f"select public.bot_replace_item_catalog((select payload from public.catalog_import_fixture),{fetched},repeat('a',64));",role='service_role',error=error)
+        catalog_payload(complete_catalog)
+        catalog_import()
+        assert sql("select md5((select jsonb_agg(to_jsonb(a) order by id)::text from public.auctions a)||coalesce((select jsonb_agg(to_jsonb(d) order by id)::text from khub_bot.deliveries d),''));")==catalog_business_fingerprint
+        listed=json.loads(sql('select public.read_item_catalog();',role='anon'))
+        assert listed['ready'] and len(listed['items'])==len(source_items)
+        assert all(item['tradeable'] for item in listed['items'])
+        assert not any(item['id'] in (26,43,2000000000) for item in listed['items'])
+        assert next(item for item in listed['items'] if item['id']==6618)['image']=='otherimages/folders/folder01.gif'
+        for mode in ['true','false']:
+            for item_id,name in [(43,'worthless trinket'),(2000000000,'gift-only fixture')]:
+                sql(f"select public.create_auction('{name}',1,100,24,null,null,{item_id},{mode});",competitor,'authenticated',error='Only tradeable items')
+        sql("select public.create_auction('seal tooth',1,100,24,null,null,43,false);",competitor,'authenticated',error='current catalog item')
+        safe_image_lot=sql("select public.create_auction('seal tooth',1,100,24,'https://example.com/untrusted.gif',null,2,false);",competitor,'authenticated')
+        assert auction_state(safe_image_lot)['image']=='https://images.kingdomofloathing.com/itemimages/tooth.gif'
+        folder_lot=sql("select public.create_auction('folder (red)',1,100,24,null,null,6618,true);",competitor,'authenticated')
+        assert auction_state(folder_lot)['image']=='https://images.kingdomofloathing.com/otherimages/folders/folder01.gif'
+        sql("select public.bot_sync_catalog('[{\"id\":43,\"name\":\"worthless trinket\"}]');",role='service_role',error='updated bot sync-catalog')
+        catalog_fingerprint=sql('select md5(jsonb_agg(to_jsonb(c) order by id)::text) from khub_bot.catalog c;')
+        catalog_import("clock_timestamp()-interval '1 year'",error='Stale')
+        for malformed in [complete_catalog[:-1],complete_catalog[:-1]+[complete_catalog[0]],
+            [{**item,'tradeable':'true'} if item['id']==2 else item for item in complete_catalog],
+            [{**item,'image':'../bad.gif'} if item['id']==2 else item for item in complete_catalog],
+            [{**item,'tradeable':False} for item in complete_catalog]]:
+            catalog_payload(malformed)
+            catalog_import(error='catalog' if len(malformed)<10000 else 'IDs' if malformed[-1]['id']==complete_catalog[0]['id'] else 'tradeability' if all(item['tradeable'] is False for item in malformed) else 'fields')
+            assert sql('select md5(jsonb_agg(to_jsonb(c) order by id)::text) from khub_bot.catalog c;')==catalog_fingerprint
+        # Eligibility changes and newly discovered items go live atomically while
+        # old auction descriptions and financial obligations remain unchanged.
+        catalog_business_fingerprint=sql("select md5((select jsonb_agg(to_jsonb(a) order by id)::text from public.auctions a)||coalesce((select jsonb_agg(to_jsonb(d) order by id)::text from khub_bot.deliveries d),''));")
+        next_catalog=[{**item,'tradeable':False} if item['id']==364 else item for item in complete_catalog if item['id']!=12344]
+        next_catalog.append({'id':1600000,'name':'Next weekly item','image':'weekly.gif','tradeable':True})
+        catalog_payload(next_catalog); catalog_import()
+        refreshed=json.loads(sql('select public.read_item_catalog();',role='anon'))['items']
+        assert any(item['id']==1600000 for item in refreshed)
+        assert not any(item['id'] in (364,12344) for item in refreshed)
+        assert sql("select md5((select jsonb_agg(to_jsonb(a) order by id)::text from public.auctions a)||coalesce((select jsonb_agg(to_jsonb(d) order by id)::text from khub_bot.deliveries d),''));")==catalog_business_fingerprint
+        assert sql('select not is_current and not tradeable from khub_bot.catalog where id=12344;')=='t'
+        sql("select public.create_auction('asbestos ore',1,100,24,null,null,364,false);",competitor,'authenticated',error='Only tradeable items')
+        weekly_lot=sql("select public.create_auction('Next weekly item',1,100,24,null,null,1600000,false);",competitor,'authenticated')
+        assert auction_state(weekly_lot)['item_id']==1600000
+        # Increment rules apply only to subsequent accepted bids; migration
+        # itself cannot rewrite a price, bid, deadline, receipt or delivery.
+        def bidding_fingerprint():
+            return sql("select md5((select jsonb_agg(to_jsonb(a) order by id)::text from public.auctions a)||(select jsonb_agg(to_jsonb(b) order by id)::text from public.bids b)||coalesce((select jsonb_agg(to_jsonb(d) order by id)::text from khub_bot.deliveries d),''));")
+        before_increments=bidding_fingerprint()
+        sql(migration_sql('202610210053_tiered_bid_increments.sql'))
+        assert bidding_fingerprint()==before_increments
+        increment_cases=[(0,10),(999,10),(1000,100),(9999,100),(10000,1000),(99999,1000),
+            (100000,10000),(999999,10000),(1000000,100000),(9999999,100000),
+            (10000000,1000000),(99999999,1000000),(100000000,10000000),(999999999,10000000),
+            (1000000000,100000000),(9999999999,100000000),(10000000000,100000000),
+            (10000000001,100000001),(12345678901,123456790),(9007199254740991,90071992547410)]
+        for current,increment in increment_cases:
+            assert sql(f'select khub_bot.bid_increment({current});')==str(increment)
+            assert sql(f'select khub_bot.minimum_auction_bid(1,{current});')==str(current+increment if current else 1)
+        for role in ['anon','authenticated','service_role']:
+            sql('select khub_bot.minimum_auction_bid(100,20000000);',role=role,error='permission denied')
+        lift(fresh_buyer); lift(competitor); lift(SELLER)
+        serial=iter(range(9910001,9990000))
+        def increment_mail(lot,amount,sid,command='bid'):
+            return mail(next(serial),sid,{'type':command,'auction_id':lot},meat=amount)
+        def increment_lot(escrow=False,buyout='null',minimum=100):
+            lot=sql(f"select public.create_auction('seal tooth',1,{minimum},24,null,{buyout},2,{'true' if escrow else 'false'});",competitor,'authenticated')
+            if escrow:
+                assert ingest(mail(next(serial),escrow_seller_id,{'type':'list','auction_id':lot},items=[{'id':2,'quantity':1}]))=='accepted'
+            return lot
+        first_only=increment_lot(minimum=20000000)
+        sql(f"select public.place_bid('{first_only}',19999999);",fresh_buyer,'authenticated',error='20,000,000')
+        sql(f"select public.place_bid('{first_only}',20000000);",fresh_buyer,'authenticated')
+        sql(f"select public.place_bid('{first_only}',20000001);",owner_id,'authenticated',error='21,000,000')
+        assert auction_state(first_only)['current_bid']==20000000
+        sql(f"select public.place_bid('{first_only}',21000001);",owner_id,'authenticated') # Above the floor need not be a multiple.
+        sql(f"select public.place_bid('{first_only}',22000000);",fresh_buyer,'authenticated',error='22,000,001')
+        assert auction_state(first_only)['current_bid']==21000001
+        # Test actual Direct writes at each tier as well as exact percentage math.
+        for current,increment in [(999,10),(1000,100),(10000,1000),(100000,10000),(1000000,100000),
+            (10000000,1000000),(100000000,10000000),(1000000000,100000000),(10000000001,100000001)]:
+            lot=increment_lot(minimum=1)
+            sql(f"select public.place_bid('{lot}',{current});",fresh_buyer,'authenticated')
+            sql(f"select public.place_bid('{lot}',{current+increment-1});",owner_id,'authenticated',error=f'{current+increment:,}')
+            sql(f"select public.place_bid('{lot}',{current+increment});",owner_id,'authenticated')
+            assert auction_state(lot)['current_bid']==current+increment
+        # Exact buyouts bypass the normal increase, both explicit purchases and
+        # bids that reach/exceed buyout; accepted prices never get rounded up.
+        for route in ['bid','purchase','above']:
+            lot=increment_lot(buyout=20500000)
+            sql(f"select public.place_bid('{lot}',20000000);",fresh_buyer,'authenticated')
+            if route=='purchase': sql(f"select public.purchase_auction('{lot}');",owner_id,'authenticated')
+            else: sql(f"select public.place_bid('{lot}',{20500000 if route=='bid' else 22000000});",owner_id,'authenticated')
+            assert auction_state(lot)['status']=='awaiting_trade' and auction_state(lot)['final_price']==20500000
+        # Funded KMail rejection preserves the prior winner/bid and queues one
+        # full refund, with a human-readable exact next minimum in the reply.
+        escrow_increment=increment_lot(escrow=True)
+        assert ingest(increment_mail(escrow_increment,20000000,escrow_buyer_id))=='accepted'
+        tiny=increment_mail(escrow_increment,20000001,owner_player)
+        result=ingest(tiny)
+        assert '21,000,000 Meat' in result
+        assert auction_state(escrow_increment)['current_bid']==20000000
+        refund_before=sql(f"select sum(meat) from khub_bot.deliveries where receipt_id='{tiny['id']}' and kind='refund';")
+        assert refund_before=='20000001'
+        assert '21,000,000 Meat' in sql(f"select string_agg(coalesce(display_message,khub_bot.friendly_message(d)),' ') from khub_bot.deliveries d where receipt_id='{tiny['id']}';")
+        assert ingest(tiny)=='duplicate'
+        assert sql(f"select sum(meat) from khub_bot.deliveries where receipt_id='{tiny['id']}' and kind='refund';")==refund_before
+        assert ingest(increment_mail(escrow_increment,21000000,owner_player))=='accepted'
+        assert auction_state(escrow_increment)['current_bid']==21000000
+        # The current tier changes after crossing a boundary, not before.
+        crossed=increment_lot(escrow=True,minimum=1)
+        assert ingest(increment_mail(crossed,999,escrow_buyer_id))=='accepted'
+        assert ingest(increment_mail(crossed,1009,owner_player))=='accepted'
+        assert '1,109 Meat' in ingest(increment_mail(crossed,1108,escrow_buyer_id))
+        assert ingest(increment_mail(crossed,1109,escrow_buyer_id))=='accepted'
+        for command in ['bid','buy']:
+            lot=increment_lot(escrow=True,buyout=20500000)
+            assert ingest(increment_mail(lot,20000000,escrow_buyer_id))=='accepted'
+            assert ingest(increment_mail(lot,20500000,owner_player,command))=='accepted'
+            assert auction_state(lot)['final_price']==20500000 and auction_state(lot)['status']=='settling'
+        oversized=increment_lot(escrow=True,buyout=20500000)
+        assert ingest(increment_mail(oversized,20000000,escrow_buyer_id))=='accepted'
+        extra=increment_mail(oversized,22000000,owner_player)
+        assert ingest(extra)=='accepted'
+        assert auction_state(oversized)['final_price']==20500000
+        assert sql(f"select sum(meat) from khub_bot.deliveries where receipt_id='{extra['id']}' and recipient_id={owner_player} and kind='refund';")=='1500000'
+        under_buy=increment_lot(escrow=True,buyout=30000000)
+        assert ingest(increment_mail(under_buy,20000000,escrow_buyer_id))=='accepted'
+        assert 'instant purchase price' in ingest(increment_mail(under_buy,20500000,owner_player,'buy'))
+        # Concurrent stale bids recheck the newly accepted amount under lock.
+        race_direct=increment_lot()
+        sql(f"select public.place_bid('{race_direct}',20000000);",fresh_buyer,'authenticated')
+        def race_increment(uid):
+            try:
+                sql(f"select public.place_bid('{race_direct}',21000000);",uid,'authenticated'); return True
+            except AssertionError as failure:
+                assert '22,000,000' in str(failure), str(failure); return False
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            outcomes=list(pool.map(race_increment,[owner_id,SELLER]))
+        assert sum(outcomes)==1 and auction_state(race_direct)['current_bid']==21000000
+        assert sql(f"select count(*) from public.bids where auction_id='{race_direct}';")=='2'
+        race_escrow=increment_lot(escrow=True)
+        assert ingest(increment_mail(race_escrow,20000000,escrow_buyer_id))=='accepted'
+        seller_player=int(sql(f"select kol_player_id from public.profiles where id='{SELLER}';"))
+        racers=[increment_mail(race_escrow,21000000,owner_player),increment_mail(race_escrow,21000000,seller_player)]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            outcomes=list(pool.map(ingest,racers))
+        assert outcomes.count('accepted')==1 and any('22,000,000 Meat' in result for result in outcomes)
+        rejected_racer=racers[next(i for i,result in enumerate(outcomes) if result!='accepted')]
+        assert sql(f"select sum(meat) from khub_bot.deliveries where receipt_id='{rejected_racer['id']}' and kind='refund';")=='21000000'
+        assert auction_state(race_escrow)['current_bid']==21000000
+        assert sql(f"select count(*) from public.bids where auction_id='{race_escrow}';")=='2'
+        # Existing precision and account restriction boundaries stay intact.
+        maximum=increment_lot(minimum=1)
+        sql(f"select public.place_bid('{maximum}',9007199254740990);",fresh_buyer,'authenticated')
+        sql(f"select public.place_bid('{maximum}',9007199254740991);",owner_id,'authenticated',error='maximum supported bid')
+        sql(f"select public.place_bid('{race_direct}',22000000);",role='anon',error='permission denied')
+        ban(SELLER)
+        sql(f"select public.place_bid('{race_direct}',22000000);",SELLER,'authenticated',error='restricted')
+        # Supabase's safe-update guard rejects the original unfiltered reset.
+        # Exercise the repaired function for both first import and replacement.
+        catalog_business_fingerprint=sql("select md5((select jsonb_agg(to_jsonb(a) order by id)::text from public.auctions a)||coalesce((select jsonb_agg(to_jsonb(d) order by id)::text from khub_bot.deliveries d),''));")
+        sql(migration_sql('202610210054_safe_catalog_import.sql'))
+        importer=sql("select pg_get_functiondef('public.bot_replace_item_catalog(jsonb,timestamptz,text)'::regprocedure);")
+        assert re.search(r'update khub_bot.catalog set is_current=false,tradeable=false\s+where is_current or tradeable;',importer)
+        sql('delete from khub_bot.item_catalog_state where id; update khub_bot.catalog set is_current=false,tradeable=false where is_current or tradeable;')
+        catalog_payload(complete_catalog)
+        catalog_import()
+        assert json.loads(sql('select public.read_item_catalog();',role='anon'))['ready'] is True
+        assert int(sql('select count(*) from khub_bot.catalog where is_current;'))==len(complete_catalog)
+        catalog_import()
+        assert sql("select md5((select jsonb_agg(to_jsonb(a) order by id)::text from public.auctions a)||coalesce((select jsonb_agg(to_jsonb(d) order by id)::text from khub_bot.deliveries d),''));")==catalog_business_fingerprint
+        for mode in ['true','false']:
+            created=sql(f"select public.create_auction('seal tooth',1,100,24,null,null,2,{mode});",competitor,'authenticated')
+            assert len(created)==36
+            sql(f"select public.create_auction('worthless trinket',1,100,24,null,null,43,{mode});",competitor,'authenticated',error='tradeable')
+        sql("select public.bot_replace_item_catalog('[]',now(),repeat('a',64));",competitor,'authenticated',error='permission denied')
+        # Grace applies only to profile marks/value, never to report availability
+        # or independent thumbs feedback. Migration itself never rewrites data.
+        grace_fingerprint=sql("select md5((select jsonb_agg(to_jsonb(a) order by id)::text from public.auctions a)||coalesce((select jsonb_agg(to_jsonb(t) order by report_id)::text from khub_bot.trade_reports t),'')||coalesce((select jsonb_agg(to_jsonb(d) order by id)::text from khub_bot.deliveries d),''));")
+        sql(migration_sql('202610210055_incomplete_trade_grace_period.sql'))
+        assert sql("select md5((select jsonb_agg(to_jsonb(a) order by id)::text from public.auctions a)||coalesce((select jsonb_agg(to_jsonb(t) order by report_id)::text from khub_bot.trade_reports t),'')||coalesce((select jsonb_agg(to_jsonb(d) order by id)::text from khub_bot.deliveries d),''));")==grace_fingerprint
+        grace_base={uid:feedback(uid) for uid in [competitor,fresh_buyer]}
+        def grace_lot(end_expr,final_expr,report_roles=('seller','buyer')):
+            lot=sql("select public.create_auction('seal tooth',1,100,720,null,200,2,false);",competitor,'authenticated')
+            # Set historical closure while the test listing is still active;
+            # finalized terms are immutable after this first transition.
+            sql(f"update public.auctions set created_at=now()-interval '40 days',end_time={end_expr},finalized_at={final_expr},status='awaiting_trade',winner_id='{fresh_buyer}',winner_username='Feedback Buyer',final_price=200 where id='{lot}';")
+            reports={}
+            for role in report_roles:
+                reports[role]=str(uuid4())
+                trade_report(reports[role],lot,'',uid=competitor if role=='seller' else fresh_buyer)
+            return lot,reports
+        recent,recent_reports=grace_lot("now()+interval '10 days'",'now()')
+        for uid in [competitor,fresh_buyer]:
+            for key in ['seller_incomplete','buyer_incomplete','seller_incomplete_value','buyer_incomplete_value']:
+                assert feedback(uid)[key]==grace_base[uid][key]
+        for viewer,role in [(None,'anon'),(competitor,'authenticated'),(fresh_buyer,'authenticated'),(owner_id,'authenticated')]:
+            detail=read_page('detail',viewer,role,id=recent)['rows'][0]
+            assert detail['seller_reported_incomplete'] and detail['buyer_reported_incomplete']
+            stats=read_page('seller',viewer,role,id=competitor)['seller']['stats']
+            assert stats['seller_incomplete']==grace_base[competitor]['seller_incomplete']
+        # Feedback remains independent of the 48-hour incomplete-report grace.
+        thumb_before=feedback(fresh_buyer)['buyer_negative']
+        sql(f"select public.rate_trade_partner('{recent}',-1);",competitor,'authenticated')
+        assert feedback(fresh_buyer)['buyer_negative']==thumb_before+1
+        assert feedback(fresh_buyer)['buyer_incomplete']==grace_base[fresh_buyer]['buyer_incomplete']
+        # Normal expiry uses its deadline, not delayed background finalization.
+        expired,_=grace_lot("now()-interval '49 hours'",'now()')
+        assert feedback(competitor)['seller_incomplete']==grace_base[competitor]['seller_incomplete']+1
+        assert feedback(fresh_buyer)['buyer_incomplete']==grace_base[fresh_buyer]['buyer_incomplete']+1
+        # Buyouts use actual early closure, not a future original deadline, and
+        # an already-mature report counts immediately even if filed just now.
+        early,early_reports=grace_lot("now()+interval '10 days'","now()-interval '49 hours'")
+        for uid,key in [(competitor,'seller_incomplete'),(fresh_buyer,'buyer_incomplete')]:
+            assert feedback(uid)[key]==grace_base[uid][key]+2
+            assert int(feedback(uid)[key+'_value'])==int(grace_base[uid][key+'_value'])+400
+        # Boundary is checked in one transaction with the same stable now():
+        # just before 48h excludes; exactly 48h includes, with no tick/job call.
+        boundary,_=grace_lot("now()-interval '47 hours'",'now()')
+        for delta,expected in [("interval '48 hours'-interval '1 microsecond'",2),("interval '48 hours'",3)]:
+            result=sql(f"begin; update public.auctions set end_time=now()-({delta}) where id='{boundary}'; select khub_bot.profile_feedback('{competitor}'); commit;")
+            stats=json.loads(result)
+            assert stats['seller_incomplete']==grace_base[competitor]['seller_incomplete']+expected
+            assert int(stats['seller_incomplete_value'])==int(grace_base[competitor]['seller_incomplete_value'])+200*expected
+        # Withdrawals and admin dismissals still remove mature marks and value;
+        # a review restoration cannot bypass the grace on a newer trade.
+        sql(f"select public.review_trade_rating('{early_reports['buyer']}',false,'Dismissed after reviewing the exchange.');",owner_id,'authenticated')
+        assert feedback(competitor)['seller_incomplete']==grace_base[competitor]['seller_incomplete']+2
+        sql(f"select public.review_trade_rating('{recent_reports['buyer']}',false,'Reviewing this early report.');",owner_id,'authenticated')
+        sql(f"select public.review_trade_rating('{recent_reports['buyer']}',true,'Report retained pending the trade deadline.');",owner_id,'authenticated')
+        assert feedback(competitor)['seller_incomplete']==grace_base[competitor]['seller_incomplete']+2
+        sql(f"select public.withdraw_trade_rating('{early}');",competitor,'authenticated')
+        assert feedback(fresh_buyer)['buyer_incomplete']==grace_base[fresh_buyer]['buyer_incomplete']+2
+        assert int(feedback(fresh_buyer)['buyer_incomplete_value'])==int(grace_base[fresh_buyer]['buyer_incomplete_value'])+400
+        # No report means no automatic bad mark when a deadline passes.
+        before_no_report=feedback(competitor)['seller_incomplete']
+        grace_lot("now()-interval '5 days'","now()-interval '5 days'",report_roles=())
+        assert feedback(competitor)['seller_incomplete']==before_no_report
+        print('PASS: exact 48-hour profile grace for both roles/counts/values, actual buyout close versus delayed natural finalization, automatic read-time maturity, immediate report visibility, separate feedback, dismissal/withdrawal and no automatic marks for silence')
+        print('PASS: safe-update-compatible catalog reset, first import and replacement, publishing in both modes, preserved tradeability/permissions and unchanged historical auctions/deliveries')
+        print('PASS: all bid-increment boundaries and exact 1% rounding, unchanged first bids and existing records, Direct/Escrow parity, typed/explicit buyout exceptions, excess refunds, actionable KMail errors, duplicate receipts and serialized concurrent bids')
+        print('PASS: atomic current catalog replacement, server-enforced tradeability in both modes, canonical images/folder paths, public reference-only data, service-only imports, stale/malformed snapshot rejection, live new items and unchanged historical auctions/financial obligations')
+        print('PASS: bans close bid-free listings, hold direct commitments, block browser bids/buyouts, preserve history, require admin review, audit evidence-based two-party completion, and refund new escrow bids while honoring funded settlement')
+        print('PASS: repeatable SQL test accounts, password hashes/identities, no admin privileges, unbanned initial account, preserved admin ban, mock direct trade states, notification redirection and no fabricated escrow transfers')
+        print('PASS: new escrow minimums above 1M are rejected including default-mode API calls; exact 1M, Direct and larger buyouts remain allowed; existing records stay unchanged')
+        print('PASS: admin-only bans/lifts, preserved restrictions, temporary expiry, stale-session trading/report protection, authenticated appeals, private atomic image evidence and audit records')
+        print('PASS: durable admin withdrawal metadata for silent reports, correct event time/order, idempotency, both participants, legacy withdrawals and no false completion from admin ticket closure')
+        print('PASS: completed escrow purchase counts exclude active/settling deliveries, stay separate from direct trades, and match public profile totals')
+        print('PASS: role-specific incomplete trade values distinguish 10k and 10b, count final prices once, follow exclusion/restoration/withdrawal and retain exact public totals without changing feedback')
+        print('PASS: completed points wait for both parties, conflicts and dismissed reports add no completion, resolved trades count once, feedback stays independent and historical source records are unchanged')
+        print('PASS: admin-excluded reports clear per-party/public incomplete marks and profile counts, preserve reports/audits/feedback, never imply completion, and restore correctly')
+        print('PASS: exact completed purchase totals for direct and escrow trades, no pending purchases, public aggregate projection and unchanged source records')
+        print('PASS: comma-formatted direct/escrow message amounts and quantities, exact large integers, untouched identifiers/user text/ledger values and frozen delivery bodies')
+        print('PASS: separate feedback and trade-confirmation counts, optional response-gated votes, final votes/idempotency, private votes, banned/anonymous/outsider protection, and unchanged trade outcomes')
+        print('PASS: public trade responses for every viewer, private names/contacts/report text, and public resolution updates')
+        print('PASS: neutral completion after withdrawal, no positive rating conversion, participant-only response statuses and unchanged historical notifications')
+        print('PASS: grouped support threads, cross-page histories, per-party rating reviews, atomic resolution/category changes and administrator-only access')
         print('PASS: all database migration, escrow, recovery, permission and persistence checks; public seller profiles, bidder anonymity, participant-only identities and seller history pagination; optional escrow, private pending trades, two-party confirmation and direct bid races; large prices, exact precision and commission arithmetic; private bug inbox, administrator permissions and durable KMail reports')
     finally:
         if started:

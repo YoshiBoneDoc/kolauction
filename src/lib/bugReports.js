@@ -36,12 +36,17 @@ export function createBugReportService(client) {
             if (!/^B-\d+$/.test(data?.reference || '')) throw new Error('The trade report response could not be confirmed. Please retry your submission.');
             return data;
         },
-        async submitAppeal(requestId, body) {
+        async submitAppeal(requestId, body, image = null) {
             const text = body.trim();
             if (text.length < 10 || text.length > BUG_REPORT_MAX_LENGTH) throw new Error('Please describe your appeal in 10 to 2,000 characters.');
-            const data = await rpc('submit_ban_appeal', { p_request_id: requestId, p_body: text });
+            const data = image
+                ? await rpc('submit_ban_appeal_with_evidence', { p_request_id: requestId, p_body: text, p_image_base64: image.base64, p_mime_type: image.mime_type })
+                : await rpc('submit_ban_appeal', { p_request_id: requestId, p_body: text });
             if (!/^B-\d+$/.test(data?.reference || '')) throw new Error('The appeal response could not be confirmed. Please retry your submission.');
             return data;
+        },
+        async readAppealEvidence(reportId) {
+            return await rpc('read_appeal_evidence', { p_report_id: reportId }, true);
         },
         async supportInbox(category = 'all', status = 'open', page = 1) {
             const data = await rpc('read_support_inbox', { p_category: category, p_status: status, p_page: page }, true);
@@ -54,6 +59,16 @@ export function createBugReportService(client) {
             const text = reason.trim();
             if (text.length < 3 || text.length > 1000) throw new Error('Add a review reason in 3 to 1,000 characters.');
             await rpc('review_trade_rating', { p_report_id: reportId, p_counted: counted, p_reason: text }, true);
+        },
+        async supportThreads(category = 'all', status = 'open', page = 1) {
+            const data = await rpc('read_support_threads', { p_category: category, p_status: status, p_page: page }, true);
+            if (!Array.isArray(data?.threads) || !Number.isSafeInteger(Number(data.total)) || Number(data.total) < 0) {
+                throw new Error('The inbox could not be loaded. Please try again.');
+            }
+            return { ...data, total: Number(data.total) };
+        },
+        async updateSupportThread(threadId, isTrade, { status = null, category = null }) {
+            await rpc('update_support_thread', { p_thread_id: threadId, p_is_trade: isTrade, p_status: status, p_category: category }, true);
         },
         async withdrawTradeRating(auctionId) {
             await rpc('withdraw_trade_rating', { p_auction_id: auctionId });

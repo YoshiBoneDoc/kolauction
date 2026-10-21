@@ -36,7 +36,7 @@ export default function Home() {
                             {auction.image && <img src={auction.image} alt="" loading="lazy" className="h-12 w-12 shrink-0 object-contain" />}
                             <div className="min-w-0 flex-1 text-center">
                                 <h3 className="break-words text-lg font-bold text-[#14248A]">{auction.item} <span className="text-[#5365AB]">×{auction.quantity.toLocaleString('en-US')}</span></h3>
-                                <p className="mt-2 text-xs text-gray-600">{auction.escrowMode ? 'Escrow' : 'Direct settlement'}</p>
+                                <p className="mt-2"><span className="inline-flex rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">{auction.escrowMode ? 'Escrow' : 'Direct trade'}</span></p>
                                 <p className="mt-2 text-xs text-gray-600">{auction.currentBid ? 'Current bid' : 'Minimum bid'}</p>
                                 <p className="break-words font-bold text-[#112D4E]">{formatCompactMeat(auction.currentBid || auction.minBidMeat)} Meat</p>
                                 {auction.instantPurchasePrice && <p className="mt-2 break-words text-xs font-semibold text-green-800">Buyout Price: {formatCompactMeat(auction.instantPurchasePrice)}</p>}

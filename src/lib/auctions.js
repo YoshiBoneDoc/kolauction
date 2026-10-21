@@ -1,3 +1,4 @@
+import { ESCROW_MIN_BID_LIMIT, ESCROW_MIN_BID_ERROR } from './escrowPolicy.js';
 export function mapAuction(row, bidRows) {
     const bids = bidRows.filter((bid) => bid.auction_id === row.id)
         .sort((a, b) => Number(a.amount) - Number(b.amount))
@@ -36,10 +37,14 @@ export function mapAuction(row, bidRows) {
         highestBidderId: latestBid?.bidderId || row.highest_bidder_id,
         highestBidder: latestBid?.bidder || row.highest_bidder_username,
         status: row.status || 'active',
+        banReviewRequired: row.ban_review_required === true,
+        biddingRestricted: row.bidding_restricted === true,
         winnerId: row.winner_id,
         publicWinner: row.winner_public === true,
         winner: row.usernames_visible === false && row.has_winner ? 'Winner' : row.winner_username,
         hasWinner: row.has_winner,
+        ownFeedback: row.own_feedback ?? null,
+        ownTradeReportExcluded: row.own_trade_report_excluded === true,
         ownTradeReportWithdrawn: row.own_trade_report_withdrawn === true,
         ownTradeReport: row.own_trade_report || null,
         tradeReported: row.trade_reported === true,
@@ -48,6 +53,12 @@ export function mapAuction(row, bidRows) {
         finalizedAt: row.finalized_at,
         sellerConfirmedAt: row.seller_confirmed_at,
         buyerConfirmedAt: row.buyer_confirmed_at,
+        sellerResolvedAt: row.seller_resolved_at,
+        buyerResolvedAt: row.buyer_resolved_at,
+        sellerReportExcluded: row.seller_report_excluded === true,
+        buyerReportExcluded: row.buyer_report_excluded === true,
+        sellerReportedIncomplete: row.seller_reported_incomplete ?? null,
+        buyerReportedIncomplete: row.buyer_reported_incomplete ?? null,
         completedAt: row.completed_at,
         cancelledAt: row.cancelled_at,
         bids,
@@ -86,6 +97,7 @@ export function createAuctionService(client) {
             return { auctions: data.rows.map((row) => mapAuction(row, [])), total: Number(data.total) };
         },
         async create(auction) {
+            if (auction.escrowMode !== false && Number(auction.minBidMeat) > ESCROW_MIN_BID_LIMIT) throw new Error(ESCROW_MIN_BID_ERROR);
             const { data, error } = await requireClient().rpc('create_auction', {
                 p_item: auction.item,
                 p_quantity: auction.quantity,
@@ -101,6 +113,11 @@ export function createAuctionService(client) {
         },
         async confirmTrade(auctionId) {
             const { error } = await requireClient().rpc('confirm_auction_trade', { p_auction_id: auctionId });
+            if (error) throw databaseError(error);
+        },
+        async rateTrade(auctionId, rating) {
+            if (![1, -1].includes(rating)) throw new Error('Choose thumbs up or thumbs down.');
+            const { error } = await requireClient().rpc('rate_trade_partner', { p_auction_id: auctionId, p_rating: rating });
             if (error) throw databaseError(error);
         },
         async cancel(auctionId) {

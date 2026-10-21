@@ -3,19 +3,22 @@ import PropTypes from "prop-types";
 import { supabase, initialAuthLink } from "../lib/supabase";
 import { createAuthService } from "../lib/auth";
 import { recoveryUserForEvent } from "../lib/authLinks";
-import { useNavigate } from "react-router-dom";
+import BannedAccount from "../components/BannedAccount";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 
 export const UserContext = createContext();
 const auth = createAuthService(supabase);
 
 export const UserProvider = ({ children }) => {
     const navigate = useNavigate();
+    const { pathname } = useLocation();
     const navigateRef = useRef(navigate);
     const recoveryUserRef = useRef(null);
     useEffect(() => { navigateRef.current = navigate; }, [navigate]);
     const [recoveryUserId, setRecoveryUserId] = useState(null);
     const [session, setSession] = useState(supabase ? undefined : null);
     const [currentUser, setCurrentUser] = useState(null);
+    const [loadedUserId, setLoadedUserId] = useState(null);
     const [hasLoaded, setHasLoaded] = useState(!supabase);
     const [authError, setAuthError] = useState("");
 
@@ -57,20 +60,27 @@ export const UserProvider = ({ children }) => {
             return;
         }
         setCurrentUser((previous) => previous?.id === session.user.id ? previous : null);
-        auth.loadProfile(session.user)
-            .then((user) => {
-                if (!cancelled) setCurrentUser(user);
-            })
-            .catch((error) => {
+        let checking = false;
+        async function refresh() {
+            if (checking) return;
+            checking = true;
+            try {
+                const user = await auth.loadProfile(session.user);
+                if (!cancelled) { setCurrentUser(user); setAuthError(""); }
+            } catch (error) {
                 if (!cancelled) {
-                    setCurrentUser(null);
+                    setCurrentUser(previous => previous?.id === session.user.id && previous.isBanned ? previous : null);
                     setAuthError(error.message);
                 }
-            })
-            .finally(() => {
-                if (!cancelled) setHasLoaded(true);
-            });
-        return () => { cancelled = true; };
+            } finally {
+                checking = false;
+                if (!cancelled) { setLoadedUserId(session.user.id); setHasLoaded(true); }
+            }
+        }
+        refresh();
+        const timer = setInterval(refresh, 15000);
+        window.addEventListener('focus', refresh);
+        return () => { cancelled = true; clearInterval(timer); window.removeEventListener('focus', refresh); };
     }, [session]);
 
     const clearRecovery = () => {
@@ -103,9 +113,14 @@ export const UserProvider = ({ children }) => {
         await auth.updatePassword(password);
     };
 
+    const accountReady = hasLoaded && (!session?.user || loadedUserId === session.user.id);
+    const restrictedAccount = currentUser?.id === session?.user?.id && currentUser?.isBanned ? currentUser : null;
+    const appealPage = pathname.replace(/\/$/, '') === '/submit-appeal';
+
     return (
         <UserContext.Provider value={{
-            currentUser: currentUser?.id === session?.user?.id ? currentUser : null,
+            currentUser: currentUser?.id === session?.user?.id && !currentUser?.isBanned ? currentUser : null,
+            restrictedAccount,
             signedInUserId: session?.user?.id || null,
             registerUser: auth.register,
             loginUser,
@@ -124,7 +139,12 @@ export const UserProvider = ({ children }) => {
                     <button onClick={logoutUser} className="underline">Sign out</button>
                 </div>
             )}
-            {hasLoaded ? children : <p role="status" className="p-6">Loading your account…</p>}
+            {!accountReady ? <p role="status" className="p-6">Loading your account…</p>
+                : restrictedAccount && !appealPage ? <BannedAccount account={restrictedAccount} onLogout={logoutUser} />
+                    : authError && session?.user && !appealPage ? <main className="space-y-3 p-6">
+                        <h1 className="text-xl font-semibold">Account access could not be checked</h1>
+                        <p>We’ll try again automatically. You can also <Link to="/submit-appeal" className="text-blue-700 underline">submit an appeal</Link>.</p>
+                    </main> : children}
         </UserContext.Provider>
     );
 };

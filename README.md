@@ -44,8 +44,20 @@ New accounts do not require SMTP.
 
 - [Outstanding work](ROADMAP.md)
 - [Database setup](supabase/README.md)
+- [Item catalog and automatic weekly updates](supabase/ITEM_CATALOG.md)
 - [Bot operation and troubleshooting](bot/README.md)
 - [Bot packaging and deployment](bot/DEPLOYMENT.md)
 
 Bot links work when the local `bot/` folder is present; it is intentionally absent
 from the website's GitHub repository.
+
+## For pushing changes to git from kolauction folder:
+
+From your project's terminal, run these one at a time:
+
+```bash
+git status
+git add .
+git commit -m "Brief description of your changes"
+git push origin main
+```

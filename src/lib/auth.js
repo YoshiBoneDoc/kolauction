@@ -72,16 +72,16 @@ export function createAuthService(client, { origin } = {}) {
         },
 
         async loadProfile(user) {
-            const { data, error } = await requireClient()
-                .from("profiles")
-                .select("id, khub_username, is_banned, account_method")
-                .eq("id", user.id)
-                .single();
-            if (error || !data) {
+            const { data, error } = await requireClient().rpc('read_my_account_access');
+            if (error || !data || data.id !== user.id || typeof data.is_banned !== 'boolean'
+                || !Number.isFinite(Date.parse(data.server_now))
+                || (data.ban_expires_at != null && !Number.isFinite(Date.parse(data.ban_expires_at)))) {
                 throw new Error("Your profile could not be loaded. Please sign out and sign in again. If this continues, contact support.");
             }
-            if (data.is_banned) throw new Error("This kHub account is restricted. Please contact support.");
-            return { id: data.id, khubUsername: data.khub_username, email: data.account_method === 'kmail' ? null : user.email, accountMethod: data.account_method };
+            return { id: data.id, khubUsername: data.khub_username, email: data.account_method === 'kmail' ? null : user.email,
+                accountMethod: data.account_method, isBanned: data.is_banned, banExpiresAt: data.ban_expires_at || null,
+                serverOffset: Date.parse(data.server_now) - Date.now() };
+
         },
     };
 }

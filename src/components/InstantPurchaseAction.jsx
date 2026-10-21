@@ -6,7 +6,7 @@ import { UserContext } from '../context/UserContext';
 import SettlementTerms from './SettlementTerms';
 import { formatCompactMeat } from '../lib/formatMeat';
 
-export default function InstantPurchaseAction({ auction, compact = false }) {
+export default function InstantPurchaseAction({ auction, compact = false, showTerms = true, dense = false }) {
     const { currentUser } = useContext(UserContext);
     const { purchaseAuction } = useContext(AuctionsContext);
     const [pending, setPending] = useState(false);
@@ -33,24 +33,26 @@ export default function InstantPurchaseAction({ auction, compact = false }) {
         }
     }
 
-    const buttonClass = 'inline-flex min-h-8 shrink-0 items-center justify-center rounded-md border border-green-700 bg-transparent px-4 py-1 text-sm font-semibold text-green-800 transition-colors hover:bg-green-700 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-700 disabled:opacity-50';
+    const buttonClass = dense
+        ? 'button-green inline-flex h-8 shrink-0 items-center justify-center rounded-[2px] border border-green-800 bg-green-800 px-3 text-xs font-semibold text-green-100 disabled:border-gray-300 disabled:bg-gray-100 disabled:text-gray-500'
+        : 'button-green inline-flex min-h-8 shrink-0 items-center justify-center rounded-md border border-green-800 bg-green-800 px-4 py-1 text-sm font-semibold text-green-100 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-700 disabled:opacity-50';
 
     return (
-        <section aria-label="Buyout" className="mb-4 w-full border-y border-gray-200 py-3 text-left">
+        <section aria-label="Buyout" className={`w-full text-left ${dense ? 'mb-3 border-b border-gray-200 pb-2' : 'mb-4 border-y border-gray-200 py-3'}`}>
             <div className={`flex flex-wrap items-center gap-x-3 gap-y-2 ${isSeller ? 'justify-center text-center' : 'justify-between'}`}>
                 <div className="min-w-0">
                     {compact ? <p title={`${price} Meat`} className="break-words text-sm font-medium text-green-800">Buyout Price: {displayedPrice}</p> : <>
                         <p className="text-xs font-medium text-green-800">Buyout Price</p>
-                        <p className="break-words text-lg font-semibold text-green-800">{displayedPrice} Meat</p>
+                        <p className={`break-words font-semibold text-green-800 ${dense ? 'text-sm' : 'text-lg'}`}>{displayedPrice} Meat</p>
                     </>}
                 </div>
-                {currentUser?.id === auction.sellerId ? null : auction.escrowMode ? (compact && <Link to={`/auction/${auction.id}`} title="View KMail buyout instructions" className={buttonClass}>Buy Now</Link>) : currentUser ? (
+                {currentUser?.isBanned || currentUser?.id === auction.sellerId ? null : auction.escrowMode ? (compact && <Link to={`/auction/${auction.id}`} title="View KMail buyout instructions" className={buttonClass}>Buy Now</Link>) : currentUser ? (
                     <button onClick={purchase} disabled={pending} title={`Buyout price: ${price} Meat`} className={buttonClass}>{pending ? 'Accepting…' : 'Buy Now'}</button>
-                ) : <Link to="/login" className={buttonClass}>{compact ? 'Buy Now' : 'Log in to buy'}</Link>}
+                ) : compact ? <Link to="/login" className={buttonClass}>Buy Now</Link> : null}
             </div>
             {!compact && <div className="mt-2 space-y-2 text-xs text-gray-600">
                 <p>For the entire listing. A bid reaching this amount ends bidding early at this price.</p>
-                {!auction.escrowMode && <SettlementTerms escrowMode={false} />}
+                {showTerms && !auction.escrowMode && <SettlementTerms escrowMode={false} />}
                 {auction.escrowMode && <p>Use the same BID command. Any excess Meat is returned.</p>}
                 {currentUser?.id === auction.sellerId && <p>Your optional buyout offer.</p>}
             </div>}
@@ -60,4 +62,4 @@ export default function InstantPurchaseAction({ auction, compact = false }) {
     );
 }
 
-InstantPurchaseAction.propTypes = { auction: PropTypes.object.isRequired, compact: PropTypes.bool };
+InstantPurchaseAction.propTypes = { auction: PropTypes.object.isRequired, compact: PropTypes.bool, showTerms: PropTypes.bool, dense: PropTypes.bool };

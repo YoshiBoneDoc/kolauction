@@ -1,14 +1,19 @@
 import { useContext } from 'react';
 import { useParams, useLocation, Link } from 'react-router-dom';
 import { AuctionsContext } from '../context/AuctionsContext';
+import { UserContext } from '../context/UserContext';
 import AuctionOutcome from '../components/AuctionOutcome';
+import AuctionItemImage from '../components/AuctionItemImage';
 import AuctionBidForm from '../components/AuctionBidForm';
 import InstantPurchaseAction from '../components/InstantPurchaseAction';
-import { getAuctionResult } from '../lib/auctionLifecycle';
+import { getAuctionResult, getAuctionDisplayStatus } from '../lib/auctionLifecycle';
 import { timeRemaining } from '../lib/auctionBrowsing';
 import { useNow } from '../hooks/useNow';
 import SellerLink from '../components/SellerLink';
-import SettlementTerms from '../components/SettlementTerms';
+import WinnerLink from '../components/WinnerLink';
+import DirectTradeHelp from '../components/DirectTradeHelp';
+import EscrowProtection from '../components/EscrowProtection';
+import { formatCompactMeat } from '../lib/formatMeat';
 
 export default function AuctionDetails() {
     const { id } = useParams();
@@ -16,15 +21,16 @@ export default function AuctionDetails() {
     const browseFrom = state?.browseFrom;
     const backTo = typeof browseFrom === 'string' && (browseFrom === '/auctions' || browseFrom.startsWith('/auctions?')) ? browseFrom : '/auctions';
     const { auctions, isLoading, error } = useContext(AuctionsContext);
+    const { currentUser } = useContext(UserContext);
     const now = useNow();
     const auction = auctions.find((listing) => String(listing.id) === id);
     const backLink = <div className="mx-auto mb-4 max-w-6xl">
         <Link to={backTo} className="inline-flex min-h-11 items-center text-sm text-blue-700 underline">Back to Auctions</Link>
     </div>;
 
-    if (isLoading) return <main className="min-h-screen bg-gray-50 px-4 py-6 sm:px-6">{backLink}<p role="status" className="mx-auto max-w-4xl">Loading auction…</p></main>;
+    if (isLoading) return <main className="min-h-screen bg-[#F1F3F5] px-4 py-6 sm:px-6">{backLink}<p role="status" className="mx-auto max-w-4xl">Loading auction…</p></main>;
     if (!auction) return (
-        <main className="min-h-screen bg-gray-50 px-4 py-6 sm:px-6">
+        <main className="min-h-screen bg-[#F1F3F5] px-4 py-6 sm:px-6">
             {backLink}
             <p className="mx-auto max-w-4xl text-xl font-bold text-red-700">{error ? 'Auction could not be loaded.' : 'Auction not found.'}</p>
         </main>
@@ -32,45 +38,72 @@ export default function AuctionDetails() {
 
     const result = getAuctionResult(auction, now);
     const active = result.status === 'active';
+    const ownsAuction = Boolean(currentUser && !currentUser.isBanned && currentUser.id === auction.sellerId);
+    const closedSale = result.hasWinner;
     const price = result.finalPrice ?? auction.currentBid;
+    const { reportedIncomplete, label: statusLabel, color: statusColor } = getAuctionDisplayStatus(auction, result);
     return (
-        <main className="min-h-screen bg-gray-50 px-4 py-6 sm:px-6">
+        <main className="min-h-screen bg-[#F1F3F5] px-4 py-6 sm:px-6">
             {backLink}
-            <div className="mx-auto max-w-4xl rounded-lg bg-white p-4 shadow-lg sm:p-6">
-                <div className="grid min-w-0 grid-cols-1 gap-6 md:grid-cols-2">
-                    <div className="min-w-0 space-y-4 text-center md:col-start-2 md:row-start-1">
-                        <h1 className="break-words text-3xl font-bold text-blue-600 sm:text-4xl">{auction.item} <span className="text-xl text-gray-600">×{auction.quantity.toLocaleString('en-US')}</span></h1>
-                        {auction.auctionNumber && <p className="text-sm text-gray-600">Auction #{auction.auctionNumber}</p>}
-                        <p className="text-sm text-gray-600">Minimum Bid (Meat): {auction.minBidMeat.toLocaleString('en-US')}</p>
-                        <div>
-                            <p className="text-sm text-gray-600">{active ? 'Current Bid' : result.hasWinner ? 'Final price' : 'Last Bid'}</p>
-                            <p className="break-words text-2xl font-extrabold text-gray-900 sm:text-3xl">{price ? `${price.toLocaleString('en-US')} Meat` : 'No bids yet'}</p>
+            <div className="mx-auto max-w-4xl rounded-lg border border-gray-200 bg-white p-4 shadow-lg sm:p-6">
+                <section aria-label="Auction overview" className="grid min-w-0 grid-cols-1 items-start gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:gap-6">
+                    <div className="flex min-w-0 items-center justify-center sm:pt-2">
+                        {auction.image ? <AuctionItemImage key={auction.id} src={auction.image} item={auction.item} /> : <p className="text-gray-500">No Image Available</p>}
+                    </div>
+                    <div className="min-w-0 space-y-3 text-left">
+                        <div className="space-y-1">
+                            <h1 className="break-words text-3xl font-bold text-blue-600 sm:text-4xl">{auction.item} <span className="text-xl text-gray-600">×{auction.quantity.toLocaleString('en-US')}</span></h1>
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-600">
+                                <p className="leading-6">{auction.auctionNumber && <>Auction #{auction.auctionNumber} · </>}Min Bid: <span title={`${auction.minBidMeat.toLocaleString('en-US')} Meat`}>{formatCompactMeat(auction.minBidMeat)}{auction.minBidMeat < 1000 ? ' Meat' : ''}</span></p>
+                                <span aria-hidden="true">·</span>
+                                <span className="inline-flex rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">{auction.escrowMode ? 'Escrow' : 'Direct trade'}</span>
+                            </div>
                         </div>
-                        {active && <InstantPurchaseAction key={`purchase-${auction.id}`} auction={auction} />}
-                        <p className="break-words text-sm text-gray-700">Sold by: <SellerLink auction={auction} /></p>
-                        <p className="text-sm text-gray-600">{auction.escrowMode ? 'Escrow' : 'Direct settlement'}</p>
-                        <div className="text-sm text-gray-600"><SettlementTerms escrowMode={auction.escrowMode} feeBps={auction.feeBps} /></div>
-                        <p className={`text-sm ${active && auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-600'}`}>
-                            {active ? <>Ends in <time dateTime={new Date(auction.endTime).toISOString()}>{timeRemaining(auction.endTime, now)}</time></> : result.label}
-                        </p>
+                        <div className={closedSale ? 'space-y-0.5 py-1' : 'space-y-1'}>
+                            <div className={closedSale ? 'flex flex-wrap items-baseline gap-x-3 gap-y-1' : undefined}>
+                                <p className="text-sm text-gray-600">{active ? 'Current Bid' : result.hasWinner ? 'Final price:' : 'Last Bid'}</p>
+                                <p className="break-words text-2xl font-extrabold text-gray-900 sm:text-3xl">{price ? `${price.toLocaleString('en-US')} Meat` : 'No bids yet'}</p>
+                            </div>
+                            {closedSale && auction.instantPurchasedAt && <p className="text-sm leading-6 text-green-700">Buyout accepted for {result.finalPrice.toLocaleString('en-US')} Meat on <span className="inline-block whitespace-nowrap">{new Date(auction.instantPurchasedAt).toLocaleString()}.</span></p>}
+                        </div>
+                        {active && <InstantPurchaseAction key={`purchase-${auction.id}`} auction={auction} showTerms={false} />}
+                        <div className="space-y-1 text-sm text-gray-700">
+                            <p className="break-words">Sold by: <SellerLink auction={auction} /></p>
+                            {closedSale && <p className="break-words">Winning bidder: <strong><WinnerLink auction={auction} /></strong></p>}
+                        </div>
+                        {closedSale ? <>
+                            <div className="space-y-0.5 border-t border-gray-200 pt-3">
+                                <p className={`text-lg font-bold ${statusColor}`}>{statusLabel}</p>
+                                {reportedIncomplete && <p className="text-xs leading-4 text-gray-500">At least one party reported the trade incomplete.</p>}
+                            </div>
+                        </> : active ? <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                            <span className="inline-flex rounded border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Live</span>
+                            <span aria-hidden="true" className="text-gray-400">·</span>
+                            <p className={auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-600'}>Ends in <time dateTime={new Date(auction.endTime).toISOString()}>{timeRemaining(auction.endTime, now)}</time></p>
+                        </div> : <p className={`text-lg font-bold ${statusColor}`}>{statusLabel}</p>}
                     </div>
-                    <div className="flex min-w-0 flex-col items-center gap-4 md:col-start-1 md:row-start-1">
-                        {auction.image ? <img src={auction.image} alt={auction.item} className="h-32 w-32 object-contain sm:h-48 sm:w-48" /> : <p className="text-gray-500">No Image Available</p>}
-                        {active && <div className="w-full"><AuctionBidForm key={auction.id} auction={auction} /></div>}
+                </section>
+                {active && <section aria-label="Auction bidding" className="mt-4 border-t border-gray-100 pt-4">
+                    <div className={`mx-auto w-full max-w-xl ${auction.escrowMode && !ownsAuction ? '' : 'rounded border border-gray-200 p-4'}`}>
+                        {ownsAuction ? <AuctionOutcome key={auction.id} auction={auction} now={now} />
+                            : <AuctionBidForm key={auction.id} auction={auction} showTerms={false} />}
                     </div>
+                </section>}
+                <div className="mt-5">
+                    {auction.escrowMode ? <EscrowProtection /> : <DirectTradeHelp />}
                 </div>
             </div>
-            <AuctionOutcome key={auction.id} auction={auction} now={now} />
-            <section aria-label="Bid history" className="mx-auto mt-6 max-w-4xl rounded-lg bg-white p-4 shadow sm:p-6">
+            {!active && <AuctionOutcome key={auction.id} auction={auction} now={now} />}
+            <section aria-label="Bid history" className="mx-auto mt-6 max-w-4xl rounded-lg border border-gray-200 bg-white p-4 shadow sm:p-6">
                 <h2 className="mb-4 text-2xl font-bold text-gray-800">Bid History</h2>
-                <p className="mb-3 text-sm text-gray-600">Bids use anonymous labels; your own bids appear as You. Seller names and closed-auction winner names require an unrestricted login.</p>
                 {auction.bids?.length ? <ul className="divide-y divide-gray-200">
                     {auction.bids.slice().reverse().map((bid, index) => (
                         <li key={bid.id || index} className="flex flex-col gap-1 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                             <span className="min-w-0 break-words font-medium text-gray-700">{bid.bidder}</span>
                             <div className="sm:text-right">
                                 <p className="font-bold text-gray-900">{bid.amount.toLocaleString('en-US')} Meat</p>
-                                {auction.instantPurchasedAt && bid.bidderId === auction.winnerId && bid.amount === auction.instantPurchasePrice && <p className="text-xs font-semibold text-green-800">Buyout</p>}
+                                {auction.instantPurchasedAt && bid.amount === auction.instantPurchasePrice && <p className="text-xs font-semibold text-green-700">Buyout</p>}
+                                {!auction.instantPurchasedAt && result.hasWinner && bid.amount === result.finalPrice && <p className="text-xs font-semibold text-green-700">Winning bid</p>}
                                 <p className="text-xs text-gray-600">{new Date(bid.timestamp).toLocaleString()}</p>
                             </div>
                         </li>

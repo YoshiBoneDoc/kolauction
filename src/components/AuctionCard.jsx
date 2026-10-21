@@ -2,7 +2,7 @@ import WinnerLink from './WinnerLink';
 import { useContext, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Link, useLocation } from 'react-router-dom';
-import { getAuctionResult } from '../lib/auctionLifecycle';
+import { getAuctionResult, getAuctionDisplayStatus } from '../lib/auctionLifecycle';
 import { timeRemaining } from '../lib/auctionBrowsing';
 import AuctionBidForm from './AuctionBidForm';
 import { UserContext } from '../context/UserContext';
@@ -17,6 +17,7 @@ export default function AuctionCard({ auction, now }) {
     const linkState = { browseFrom: `${location.pathname}${location.search}` };
     const result = getAuctionResult(auction, now);
     const active = result.status === 'active';
+    const displayStatus = getAuctionDisplayStatus(auction, result);
     return (
         <article className="flex min-w-0 flex-col rounded-lg border bg-[#F8F6F4] p-4 shadow">
             <Link to={`/auction/${auction.id}`} state={linkState} className="flex flex-col items-center gap-3 text-center">
@@ -25,7 +26,7 @@ export default function AuctionCard({ auction, now }) {
             </Link>
             {auction.auctionNumber && <p className="mt-2 text-center text-xs text-gray-600">Auction #{auction.auctionNumber}</p>}
             <p className="mt-2 break-words text-center text-sm">Sold by <SellerLink auction={auction} /></p>
-            <p className="mt-1 text-center text-xs text-gray-600">{auction.escrowMode ? 'Escrow' : 'Direct settlement'}</p>
+            <p className="mt-1 text-center"><span className="inline-flex rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">{auction.escrowMode ? 'Escrow' : 'Direct trade'}</span></p>
             <p className="mt-3 text-center text-sm text-gray-600">Minimum bid: {formatCompactMeat(auction.minBidMeat)} Meat</p>
             <div className="my-3 text-center">
                 <p className="text-sm text-gray-600">{active ? 'Current bid' : result.hasWinner ? 'Final price' : 'Last bid'}</p>
@@ -36,12 +37,11 @@ export default function AuctionCard({ auction, now }) {
                     Ends in <time dateTime={new Date(auction.endTime).toISOString()}>{timeRemaining(auction.endTime, now)}</time>
                 </p>
             ) : (
-                <div className="text-center text-sm">
-                    <p className="font-semibold">{result.label}</p>
+                <div className="space-y-1 text-center text-sm">
                     {result.hasWinner && <p className="break-words">Winner: <WinnerLink auction={auction} /></p>}
                 </div>
             )}
-            <div className="mt-auto pt-4">
+            <div className="mt-auto pt-3">
                 {active && <InstantPurchaseAction auction={auction} compact />}
                 {active && currentUser?.id === auction.sellerId && <p className="text-center text-sm text-gray-600">This is your listing.</p>}
                 {active && currentUser?.id !== auction.sellerId && (showBid ? (
@@ -52,6 +52,7 @@ export default function AuctionCard({ auction, now }) {
                 ) : (
                     <button onClick={() => setShowBid(true)} className="min-h-11 w-full rounded bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700">Place Bid</button>
                 ))}
+                {!active && <p className={`text-center text-lg font-bold ${displayStatus.color}`}>{displayStatus.label}</p>}
                 <Link to={`/auction/${auction.id}`} state={linkState} className="mt-2 flex min-h-11 items-center justify-center text-center text-sm text-blue-700 underline">
                     {active ? 'More Info' : 'View outcome and history'}
                 </Link>

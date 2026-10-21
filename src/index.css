@@ -74,6 +74,25 @@ button:focus-visible {
   }
 }
 
+/* Shared action colors; dimensions and shape remain with each control. */
+.button-green:hover:not(:disabled):not([aria-disabled="true"]) {
+  background-color: #DCFCE7;
+  border-color: #15803D;
+  color: #166534;
+}
+
+.button-red {
+  background-color: #991B1B;
+  border-color: #991B1B;
+  color: #FFFFFF;
+}
+
+.button-red:hover:not(:disabled):not([aria-disabled="true"]) {
+  background-color: #FEE2E2;
+  border-color: #991B1B;
+  color: #991B1B;
+}
+
 /* Wall of Shame: plaster wall, wooden frames, watercolor paper and brass labels. */
 .shame-page {
   min-height: 100vh;

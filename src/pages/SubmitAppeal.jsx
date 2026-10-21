@@ -1,5 +1,7 @@
-import { useContext, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { UserContext } from '../context/UserContext';
+import { Link } from 'react-router-dom';
+import { readImage, validateAppealImage } from '../lib/accountRestrictions';
 import AuctionNavigation from '../components/AuctionNavigation';
 import SiteFooter from '../components/SiteFooter';
 import { supabase } from '../lib/supabase';
@@ -43,6 +45,15 @@ function AppealForm() {
     const [error, setError] = useState('');
     const [reference, setReference] = useState('');
     const requestId = useRef(null);
+    const imageInput = useRef(null);
+    const [image, setImage] = useState(null);
+    const [preview, setPreview] = useState('');
+    useEffect(() => {
+        if (!image) { setPreview(''); return; }
+        const url = URL.createObjectURL(image);
+        setPreview(url);
+        return () => URL.revokeObjectURL(url);
+    }, [image]);
     async function submit(event) {
         event.preventDefault();
         if (pending) return;
@@ -50,7 +61,7 @@ function AppealForm() {
         setError('');
         try {
             requestId.current ||= crypto.randomUUID();
-            const result = await reports.submitAppeal(requestId.current, body);
+            const result = await reports.submitAppeal(requestId.current, body, image ? await readImage(image) : null);
             setReference(result.reference);
         } catch (failure) { setError(failure.message); }
         finally { setPending(false); }
@@ -66,16 +77,27 @@ function AppealForm() {
             value={body} onChange={event => { setBody(event.target.value); setError(''); requestId.current = null; }}
             aria-describedby="appeal-help appeal-length" className="block w-full min-w-0 rounded border border-gray-400 p-3 text-base text-gray-900" />
         <p id="appeal-length" className="text-right text-xs text-gray-600">{body.length.toLocaleString('en-US')} / 2,000 characters</p>
+        <label htmlFor="appeal-image" className="block text-sm font-semibold">Evidence image (optional)</label>
+        <input ref={imageInput} id="appeal-image" type="file" accept="image/png,image/jpeg,image/webp" disabled={pending} onChange={event => {
+            requestId.current = null; setError('');
+            const file = event.target.files?.[0];
+            if (!file) { setImage(null); return; }
+            try { validateAppealImage(file); setImage(file); }
+            catch (failure) { setImage(null); event.target.value = ''; setError(failure.message); }
+        }} className="block w-full text-sm" />
+        <p className="text-xs text-gray-500">One PNG, JPEG or WebP image, up to 2 MB. Only administrators can view submitted evidence.</p>
+        {image && <button type="button" disabled={pending} onClick={() => { setImage(null); imageInput.current.value = ''; requestId.current = null; setError(''); }} className="border-0 bg-transparent p-0 text-xs text-gray-600 underline">Remove image</button>}
+        {preview && <img src={preview} alt="Appeal evidence preview" className="max-h-64 max-w-full rounded border object-contain" />}
         {error && <p role="alert" className="break-words text-red-700">{error}</p>}
         <button disabled={pending} className="min-h-11 rounded bg-blue-600 px-5 py-3 font-semibold text-white disabled:opacity-50">{pending ? 'Saving…' : 'Submit appeal'}</button>
     </form>;
 }
 
 export default function SubmitAppeal() {
-    const { currentUser, signedInUserId } = useContext(UserContext);
+    const { currentUser, signedInUserId, restrictedAccount } = useContext(UserContext);
     const userId = signedInUserId || currentUser?.id;
     return <div className="flex min-h-screen flex-col bg-gray-50">
-        <div className="px-4 sm:px-6"><AuctionNavigation /></div>
+        <div className="px-4 py-4 sm:px-6">{restrictedAccount ? <Link to="/" className="text-sm text-blue-700 underline">Back to account status</Link> : <AuctionNavigation />}</div>
         <main className="mx-auto w-full max-w-2xl flex-1 space-y-5 px-4 py-6 sm:px-6">
             <h1 className="text-3xl font-bold text-blue-700">Submit an appeal</h1>
             <p className="text-sm text-gray-700">Appeals are private to administrators. A copy is sent to teres Minor (#3552305) by KMail.</p>

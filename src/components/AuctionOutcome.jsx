@@ -1,3 +1,5 @@
+import ConfirmTradeButton from './ConfirmTradeButton';
+import TradeFeedback from './TradeFeedback';
 import WithdrawTradeRating from './WithdrawTradeRating';
 import WinnerLink from './WinnerLink';
 import { useContext, useState } from "react";
@@ -7,112 +9,150 @@ import { AuctionsContext } from "../context/AuctionsContext";
 import { UserContext } from "../context/UserContext";
 import KmailInstructions from "./KmailInstructions";
 import { getAuctionResult } from "../lib/auctionLifecycle";
-import SellerLink from './SellerLink';
+import { tradeResponseStatus, tradeResponseSummary } from '../lib/tradeResponses';
+import TradeResponseBadge from './TradeResponseBadge';
 
 export default function AuctionOutcome({ auction, now }) {
     const { currentUser } = useContext(UserContext);
-    const { confirmTrade, cancelAuction } = useContext(AuctionsContext);
+    const { cancelAuction } = useContext(AuctionsContext);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState("");
     const [message, setMessage] = useState("");
     const result = getAuctionResult(auction, now);
-    const isSeller = currentUser?.id === auction.sellerId;
-    const isWinner = Boolean(currentUser && result.winnerId && currentUser.id === result.winnerId);
+    const canViewPrivateTrade = Boolean(currentUser && !currentUser.isBanned && auction.usernamesVisible !== false);
+    const isSeller = Boolean(canViewPrivateTrade && currentUser.id === auction.sellerId);
+    const isWinner = Boolean(canViewPrivateTrade && result.winnerId && currentUser.id === result.winnerId);
     const partner = auction.settlementContacts && (isSeller ? auction.settlementContacts.buyer : auction.settlementContacts.seller);
     const hasConfirmed = isSeller ? auction.sellerConfirmedAt : auction.buyerConfirmedAt;
+    const hasResolved = isSeller ? auction.sellerResolvedAt : auction.buyerResolvedAt;
+    const bothCompleted = Boolean((auction.sellerConfirmedAt || auction.sellerResolvedAt) && (auction.buyerConfirmedAt || auction.buyerResolvedAt));
+    const ownUnwithdrawnReport = Boolean(auction.ownTradeReport && !auction.ownTradeReportWithdrawn);
+    const ownIncompleteReport = ownUnwithdrawnReport && !auction.ownTradeReportExcluded;
+    const otherRole = isSeller ? 'buyer' : 'seller';
+    const otherReportedIncomplete = auction[`${otherRole}ReportedIncomplete`] ?? Boolean(auction.tradeReported && !ownIncompleteReport);
+    const responseSummary = tradeResponseSummary({
+        confirmedComplete: Boolean(hasConfirmed || hasResolved), reportedIncomplete: ownIncompleteReport,
+        resolvedIncomplete: Boolean(hasResolved), otherReportedIncomplete,
+        reportExcluded: ownUnwithdrawnReport && auction.ownTradeReportExcluded,
+        otherReportExcluded: auction[`${otherRole}ReportExcluded`],
+        otherConfirmedComplete: Boolean(auction[`${otherRole}ConfirmedAt`] || auction[`${otherRole}ResolvedAt`]),
+    });
+    function responseStatus(role) {
+        const ownRole = role === 'seller' ? isSeller : isWinner;
+        const status = tradeResponseStatus({
+            confirmedAt: auction[`${role}ConfirmedAt`], resolvedAt: auction[`${role}ResolvedAt`],
+            reportExcluded: auction[`${role}ReportExcluded`],
+            reportedIncomplete: Boolean(auction[`${role}ReportedIncomplete`] ?? (ownRole && ownIncompleteReport)),
+        });
+        const username = canViewPrivateTrade ? role === 'seller' ? auction.owner : result.winner : undefined;
+        return <TradeResponseBadge status={status} role={role} username={username} />;
+    }
     const canCancel = ['active','pending_escrow'].includes(result.status) && isSeller && !auction.highestBidderId && !auction.currentBid && !auction.bidCount;
 
-    async function act(action) {
-        if (pending) return;
-        const prompt = action === 'cancel'
-            ? 'Cancel this listing? It will remain in history and no longer accept bids.'
-            : 'Confirm that you have finished the in-game exchange and received the agreed items or Meat? Only confirm after the exchange is complete. This gives the other party a positive rating and notifies them by KMail.';
-        if (!window.confirm(prompt)) return;
+    async function cancelListing() {
+        if (pending || !window.confirm('Cancel this listing? It will remain in history and no longer accept bids.')) return;
         setPending(true);
         setError("");
         setMessage("");
         try {
-            if (action === 'cancel') {
-                await cancelAuction(auction.id);
-                setMessage('Cancellation saved.');
-            } else {
-                await confirmTrade(auction.id);
-                setMessage('Your trade confirmation was saved.');
-            }
-        } catch (failure) {
-            setError(failure.message);
-        } finally {
-            setPending(false);
-        }
+            await cancelAuction(auction.id);
+            setMessage('Cancellation saved.');
+        } catch (failure) { setError(failure.message); }
+        finally { setPending(false); }
     }
 
+    if (result.status === 'active') return isSeller ? <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <p className="text-sm text-gray-600">{canCancel ? 'This is your listing. You may cancel before the first bid.' : 'This is your listing.'}</p>
+        {canCancel && <button disabled={pending} onClick={cancelListing} className="button-red ml-auto min-h-9 rounded border px-3 py-1.5 text-xs font-medium disabled:opacity-50">{pending ? 'Saving…' : 'Cancel this listing'}</button>}
+        {message && <p role="status" className="w-full text-sm text-green-700">{message}</p>}
+        {error && <p role="alert" className="w-full text-sm text-red-700">{error}</p>}
+    </div> : null;
+
+    if (result.status === 'on_hold' || result.status === 'voided') return <section aria-label="Auction review" className="mx-auto mt-6 max-w-4xl space-y-2 rounded-lg border border-gray-200 bg-white p-4 sm:p-6">
+        <h2 className="text-xl font-bold text-slate-700">{result.label}</h2>
+        <p className="text-sm text-gray-600">{result.status === 'on_hold'
+            ? 'Bidding and automatic closing are paused while an administrator reviews an account restriction. No winner has been declared. Existing bids are preserved.'
+            : 'An administrator cancelled this held auction. No winner or completed trade was recorded. Existing bids remain in its history.'}</p>
+    </section>;
+
     if (auction.escrowMode) return (
-        <section aria-label="Auction escrow" className="mx-auto mt-6 max-w-4xl space-y-4 break-words rounded-lg bg-white p-4 shadow sm:p-6">
+        <section aria-label="Auction escrow" className="mx-auto mt-6 max-w-4xl space-y-4 break-words rounded-lg border border-gray-200 bg-white p-4 shadow sm:p-6">
             <h2 className="text-2xl font-bold">{result.label}</h2>
-            <p>Escrow middleman: <strong>kHub (#3888760)</strong>.</p>
+            <p>Handled by our bot, <strong>kHub (#3888760)</strong>.</p>
+            {result.status === 'bidding_closed' && <p className="text-sm text-gray-600">New bids are closed following an account restriction. Existing funded bids and escrow deliveries remain protected; the bot will settle the auction at its deadline.</p>}
             {result.status === 'pending_escrow' && isSeller && <KmailInstructions auction={auction} mode="list" />}
-            {result.status === 'active' && <p>The seller’s items are escrowed. Bids count only after kHub receives and accepts their attached Meat.</p>}
-            {result.status === 'settling' && <p>Bidding is closed. kHub is sending the escrowed items and Meat by KMail. The record completes after the deliveries are acknowledged.</p>}
+            {result.status === 'settling' && <p>Bidding has closed. The bot is delivering the items and payment via KMail. This trade will be marked complete once both deliveries are confirmed.</p>}
             {result.hasWinner && <p>Winner: <strong><WinnerLink auction={auction} /></strong> · Final price: <strong>{result.finalPrice.toLocaleString('en-US')} Meat</strong></p>}
             {auction.instantPurchasedAt && <p>The buyout price ended bidding early.</p>}
-            {(isSeller || isWinner) && auction.finalizedAt && ['awaiting_trade','completed'].includes(result.status) && <Link to={`/auction/${auction.id}/trade-query`} className="inline-flex min-h-11 items-center text-sm text-blue-700 underline">Ask an administrator about this trade</Link>}
-            {auction.ownTradeReportWithdrawn && (isSeller || isWinner) && <p className="mt-2 text-sm text-gray-600">Your earlier thumbs down was withdrawn.</p>}
-            {result.status === 'completed' && <p>kHub’s item delivery and payment were acknowledged. Seller fee: {auction.feeMeat.toLocaleString('en-US')} Meat.</p>}
-            {result.status === 'ended_no_bids' && <p>No winning bid. The escrowed items have been returned to the seller.</p>}
+            {result.status === 'completed' && <p>The items and payment have been delivered via KMail.{isSeller && <> Seller fee: {auction.feeMeat.toLocaleString('en-US')} Meat.</>}</p>}
+            {result.status === 'ended_no_bids' && <p>No bids were accepted. The bot has returned the items to the seller.</p>}
             {result.status === 'cancelled' && <p>This listing was cancelled. Any accepted item deposit has been returned.</p>}
-            {canCancel && <button disabled={pending} onClick={() => act('cancel')} className="min-h-11 rounded border border-red-600 bg-white px-4 py-3 text-red-700 disabled:opacity-50">{pending ? 'Saving…' : 'Cancel listing'}</button>}
+            {canCancel && <button disabled={pending} onClick={cancelListing} className="button-red min-h-11 rounded border px-4 py-3 disabled:opacity-50">{pending ? 'Saving…' : 'Cancel listing'}</button>}
             {message && <p role="status" className="text-green-700">{message}</p>}
             {error && <p role="alert" className="text-red-700">{error}</p>}
         </section>
     );
 
     return (
-        <section className="max-w-4xl mx-auto bg-white rounded-lg shadow p-4 sm:p-6 mt-6 break-words" aria-label="Auction outcome">
-            <h2 className="text-2xl font-bold mb-3">{result.label}</h2>
-            {auction.instantPurchasedAt && <p className="mb-3 text-green-800">Buyout accepted for {auction.finalPrice.toLocaleString('en-US')} Meat on {new Date(auction.instantPurchasedAt).toLocaleString()}. Bidding ended early.</p>}
-            {result.status === 'active' && <p>Bidding is open until {new Date(auction.endTime).toLocaleString()}.</p>}
+        <section className="max-w-4xl mx-auto bg-white rounded-lg border border-gray-200 shadow p-4 sm:p-6 mt-6 break-words" aria-label="Auction outcome">
+            <h2 className="text-2xl font-bold mb-3">{result.status === 'awaiting_trade' ? (isSeller || isWinner) ? 'Trade instructions' : 'Trade status:' : result.label}</h2>
+            {auction.banReviewRequired && result.status === 'awaiting_trade' && <p className="mb-4 rounded border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">An account restriction affects this trade. An administrator can review evidence of completion. Do not send further assets without administrator guidance. Existing responses are preserved.</p>}
             {result.status === 'ended_no_bids' && <p>This auction ended without bids. There is no winner or trade to complete.</p>}
             {result.status === 'cancelled' && <p>The seller cancelled this listing before any bids. Its history is preserved.</p>}
-            {result.hasWinner && (
-                <>
-                    <p>Winning bidder: <strong><WinnerLink auction={auction} /></strong></p>
-                    <p>Final price: <strong>{result.finalPrice.toLocaleString('en-US')} Meat</strong></p>
-                    <p>Seller: <SellerLink auction={auction} /></p>
-                </>
-            )}
-            {result.status === 'awaiting_trade' && (
-                <div className="mt-4 space-y-3">
-                    <p>The winning bid has been recorded. The in-game exchange is still pending. Both participants must confirm before this sale counts as completed.</p>
-                    {(isSeller || isWinner) && (
-                        <>
-                            <p>Arrange an exchange in KoL of <strong>{auction.quantity.toLocaleString('en-US')} × {auction.item}</strong> for <strong>{result.finalPrice.toLocaleString('en-US')} Meat</strong> with {isSeller ? result.winner : auction.owner}. Confirm the other party&apos;s KoL identity before trading.</p>
-                            {partner && <p>Your trading partner: <strong>{partner.kol_name || partner.username}</strong>{partner.kol_player_id && ` (#${partner.kol_player_id})`}</p>}
-                            <p>Use auction #{auction.auctionNumber || auction.id} in your KMail or trade discussion. Full reference: <span className="font-mono break-all">{auction.id}</span></p>
-                            {partner?.kol_player_id && <a href={`https://www.kingdomofloathing.com/sendmessage.php?towho=${partner.kol_player_id}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-blue-700 underline">KMail your trading partner</a>}
-                            <p>Arrange a secured in-game trade. Check the item, quantity, price and player number before accepting.</p>
-                            <p>This site records your confirmations; it does not transfer items or Meat. Confirm below only after you have received your side of the exchange.</p>
-                        </>
+            {['awaiting_trade', 'completed'].includes(result.status) && (
+                <div className="mt-4 space-y-6">
+                    {result.status === 'awaiting_trade' && !auction.banReviewRequired && (isSeller || isWinner) && (
+                        <div className="space-y-6">
+                            <div className="space-y-5">
+                            <p><span className="text-sm">Your trading partner:</span> <strong>{partner?.kol_name || partner?.username || (isSeller ? result.winner : auction.owner)}{partner?.kol_player_id && ` (#${partner.kol_player_id})`}</strong></p>
+                            <p>Arrange an {partner?.kol_player_id ? <a href={`https://www.kingdomofloathing.com/sendmessage.php?towho=${partner.kol_player_id}`} target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">in-game trade</a> : 'in-game trade'}: send <strong>{isSeller ? `${auction.quantity.toLocaleString('en-US')} × ${auction.item}` : `${result.finalPrice.toLocaleString('en-US')} Meat`}</strong> in exchange for <strong>{isSeller ? `${result.finalPrice.toLocaleString('en-US')} Meat` : `${auction.quantity.toLocaleString('en-US')} × ${auction.item}`}</strong>. Check the item, quantity, price and player name/number before accepting.</p>
+                            <div className="space-y-[10px] pt-3 text-sm leading-[1.4] text-[#5B6472]">
+                                <p>Both parties are responsible for completing this <strong>direct trade</strong> and <strong>confirming its completion on kHub</strong>. While we can assist with issues, we cannot guarantee delivery or cover any losses.</p>
+                                <p><strong>Failure to honor a trade is grounds for a temporary or permanent ban.</strong> We strictly enforce this policy to deter fraudulent listings, bids made in bad faith, and last-minute withdrawals.</p>
+                            </div>
+                            </div>
+                            {!hasConfirmed && !hasResolved && !ownUnwithdrawnReport && <p>Confirm below only after you have received your side of the exchange.</p>}
+                        </div>
                     )}
-                    {(isSeller || isWinner) && auction.tradeReported && <p className="rounded border border-amber-300 bg-amber-50 p-3 text-sm">A trade issue has been reported for administrator review. Thumbs-downs count on profiles unless excluded by an administrator.</p>}
-                    <p>Seller: {auction.sellerConfirmedAt ? 'confirmed' : 'not yet confirmed'} · Buyer: {auction.buyerConfirmedAt ? 'confirmed' : 'not yet confirmed'}</p>
-                    {(isSeller || isWinner) && (
-                        auction.ownTradeReport && !auction.ownTradeReportWithdrawn
-                            ? <div className="space-y-2"><p>Your thumbs-down response {auction.ownTradeReport} is saved.</p><WithdrawTradeRating auctionId={auction.id} /></div>
-                            : hasConfirmed
-                            ? <p>Your confirmation is saved. Waiting for the other party.</p>
-                            : <div className="flex flex-wrap gap-3"><button disabled={pending} onClick={() => act('confirm')} className="min-h-11 w-full sm:w-auto bg-blue-600 text-white rounded px-4 py-3 disabled:opacity-50">{pending ? 'Saving…' : '👍 Confirm my trade is complete'}</button>
-                                {!auction.ownTradeReport && <Link to={`/auction/${auction.id}/report-trade`} className="inline-flex min-h-11 items-center rounded border border-red-700 bg-white px-4 py-2 text-red-700">👎 No, report a problem</Link>}
+                    <div className={`space-y-2 ${result.status === 'awaiting_trade' && (isSeller || isWinner) ? 'pt-3' : ''}`}>
+                        {(isSeller || isWinner || result.status === 'completed') && <h3 className="mb-2 font-bold text-black">Trade status:</h3>}
+                        <p>{responseStatus('seller')}</p>
+                        <p>{responseStatus('buyer')}</p>
+                    </div>
+                    {result.status === 'awaiting_trade' && (isSeller || isWinner) && (
+                        ownUnwithdrawnReport
+                            ? <div className="space-y-2">
+                                <div className="space-y-0.5 text-sm text-gray-600">
+                                    <p>{responseSummary}</p>
+                                    <p>Reference: {auction.ownTradeReport}</p>
+                                </div>
+                                <TradeFeedback key={`${auction.id}:${currentUser.id}`} auctionId={auction.id} role={isSeller ? 'buyer' : 'seller'} rating={auction.ownFeedback} />
+                                <div className="flex flex-col items-start gap-2 pt-4">
+                                    <p className="whitespace-nowrap font-bold">Everything sorted out?</p>
+                                    <WithdrawTradeRating auctionId={auction.id} />
+                                </div>
+                            </div>
+                            : hasConfirmed || hasResolved
+                            ? <div><p>{responseSummary}</p><TradeFeedback key={`${auction.id}:${currentUser.id}`} auctionId={auction.id} role={isSeller ? 'buyer' : 'seller'} rating={auction.ownFeedback} /></div>
+                            : <div className="flex flex-wrap gap-3"><ConfirmTradeButton auctionId={auction.id} onConfirmed={() => setMessage('Your trade confirmation was saved.')} className="min-h-11 w-full sm:w-auto bg-blue-600 text-white rounded px-4 py-3 disabled:opacity-50" />
+                                {!auction.ownTradeReport && <Link to={`/auction/${auction.id}/report-trade`} className="button-red inline-flex min-h-11 items-center rounded border px-4 py-2">Report Incomplete</Link>}
                             </div>
                     )}
+                    {result.status === 'completed' && <div>
+                        <p>{auction.sellerResolvedAt || auction.buyerResolvedAt ? 'Both parties acknowledged completion of their in-game exchange' : 'Both parties confirmed their in-game exchange'}{auction.completedAt ? ` on ${new Date(auction.completedAt).toLocaleString()}` : ''}.</p>
+                        {(isSeller || isWinner) && (hasConfirmed || hasResolved || auction.ownTradeReport) && <TradeFeedback key={`${auction.id}:${currentUser.id}`} auctionId={auction.id} role={isSeller ? 'buyer' : 'seller'} rating={auction.ownFeedback} />}
+                    </div>}
                 </div>
             )}
-            {(isSeller || isWinner) && auction.finalizedAt && ['awaiting_trade','completed'].includes(result.status) && <Link to={`/auction/${auction.id}/trade-query`} className="inline-flex min-h-11 items-center text-sm text-blue-700 underline">Ask an administrator about this trade</Link>}
-            {auction.ownTradeReportWithdrawn && (isSeller || isWinner) && <p className="mt-2 text-sm text-gray-600">Your earlier thumbs down was withdrawn.</p>}
-            {result.status === 'completed' && <p className="mt-3">Both parties confirmed their in-game exchange{auction.completedAt ? ` on ${new Date(auction.completedAt).toLocaleString()}` : ''}.</p>}
+            {!bothCompleted && result.status !== 'completed' && (isSeller || isWinner) && auction.finalizedAt && ['awaiting_trade','completed'].includes(result.status) && <div className="mt-4 border-t border-gray-200 pt-4">
+                <p className="mb-1 text-sm text-gray-600">Need to clarify something?</p>
+                <Link to={`/auction/${auction.id}/trade-query`} className="inline-block text-sm text-blue-700 underline">Contact an Administrator</Link>
+            </div>}
+            {auction.ownTradeReportWithdrawn && (isSeller || isWinner) && (!hasResolved || result.status === 'completed') && <p className="mt-2 text-sm text-gray-600">{hasResolved ? 'Your incomplete report was withdrawn.' : 'Your earlier incomplete report was withdrawn.'}</p>}
             {canCancel && (
                 <div className="mt-4">
                     <p>You can cancel this listing while it is active and has no bids.</p>
-                    <button disabled={pending} onClick={() => act('cancel')} className="mt-2 min-h-11 w-full sm:w-auto border border-red-600 text-red-700 rounded px-4 py-3 disabled:opacity-50">{pending ? 'Saving…' : 'Cancel listing'}</button>
+                    <button disabled={pending} onClick={cancelListing} className="button-red mt-2 min-h-11 w-full sm:w-auto border rounded px-4 py-3 disabled:opacity-50">{pending ? 'Saving…' : 'Cancel listing'}</button>
                 </div>
             )}
             {message && <p role="status" className="text-green-700 mt-3">{message}</p>}
