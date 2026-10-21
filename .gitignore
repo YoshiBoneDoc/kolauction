@@ -50,3 +50,6 @@ amplifytools.xcconfig
 
 # Keep the bot separate from the website repository
 /bot/
+
+# Private database backups
+/khub-backup_10-21-2026/
