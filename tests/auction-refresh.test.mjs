@@ -73,3 +73,12 @@ test('new browse controls survive URL routing with pagination and My Auctions', 
     });
     for (const sort of ['bids-desc', 'bids-asc', 'price-desc', 'price-asc']) assert.equal(auctionReadRequest('/auctions', '?sort=' + sort).sort, sort);
 });
+
+
+test('Others requests exclude the authenticated viewer while preserving combined browse controls', () => {
+    assert.deepEqual(auctionReadRequest('/auctions','?mine=others&q=hat&status=all&sort=price-desc&trade=direct&page=3','viewer'),{
+        view:'browse',excludeOwn:true,search:'hat',status:'all',sort:'price-desc',trade:'direct',page:3,
+    });
+    assert.equal(auctionReadRequest('/auctions','?mine=others').excludeOwn,undefined);
+    assert.equal(auctionReadRequest('/seller/someone','?mine=others','viewer').excludeOwn,undefined);
+});

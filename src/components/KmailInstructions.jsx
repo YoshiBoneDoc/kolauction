@@ -19,7 +19,7 @@ export default function KmailInstructions({ auction, mode = 'bid', showHeading =
             {mode === 'list' ? <>
                 <p>Attach exactly <strong>{auction.quantity.toLocaleString('en-US')} × {auction.item}</strong>, with no Meat or extra items.</p>
                 <p>{auction.startOnDeposit ? `The ${auction.auctionTime}-hour timer starts when the bot accepts your deposit.` : `The deadline remains ${new Date(auction.endTime).toLocaleString()}.`}</p>
-                <p className="text-xs text-gray-500">The bot must accept your deposit within 24 hours of creating this listing. Unfunded listings are removed after that deadline; late deposits are returned.</p>
+                <p className="text-xs text-gray-500">{auction.customEndAt ? 'The bot must accept your deposit before the chosen ending time and within 24 hours of creating this listing. Late deposits are returned.' : 'The bot must accept your deposit within 24 hours of creating this listing. Unfunded listings are removed after that deadline; late deposits are returned.'}</p>
             </> : mode === 'bid' ? <>
                 <p>{minimum === null ? 'The maximum supported bid has been reached.' : <>Attach at least {minimum.toLocaleString('en-US')} Meat, with no items. <a href="https://www.kingdomofloathing.com/sendmessage.php?towho=3888760" target="_blank" rel="noopener noreferrer" className="ml-2 inline-block whitespace-nowrap text-blue-700 underline">Open KoL KMail →</a></>}</p>
                 <p className="text-xs leading-4 text-gray-500">{auction.receiptTimeBidding ? 'Outbid or rejected bids are automatically refunded.' : 'Bids are accepted only after the bot processes the KMail before the auction deadline. Outbid or rejected bids are automatically refunded.'}</p>

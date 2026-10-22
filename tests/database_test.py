@@ -3782,6 +3782,15 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         sql(migration_sql('202610220078_admin_bid_delivery_references.sql'))
         assert message_audit_snapshot()==before_bid_references
         print('PASS: admin bid references preserve existing financial and account history')
+        before_receipt_bidding=sql("select jsonb_build_object('deliveries',(select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d),'bids',(select jsonb_agg(to_jsonb(b) order by id) from public.bids b));")
+        sql(migration_sql('202610220079_receipt_time_escrow_bidding.sql'))
+        sql(migration_sql('202610220080_receipt_time_intake_guards.sql'))
+        sql(migration_sql('202610220081_custom_auction_ending_time.sql'))
+        sql(migration_sql('202610220082_other_sellers_filter.sql'))
+        sql(migration_sql('202610220083_multiple_active_poll_queue.sql'))
+        assert sql("select jsonb_build_object('deliveries',(select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d),'bids',(select jsonb_agg(to_jsonb(b) order by id) from public.bids b));")==before_receipt_bidding
+        assert json.loads(sql('select public.bot_inspect();',role='service_role'))['receiptTimeBiddingVersion']==1
+        print('PASS: receipt-time bidding migration preserves existing bids and payment obligations')
 
 
 

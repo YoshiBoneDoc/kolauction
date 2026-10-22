@@ -267,22 +267,28 @@ test('open Direct and Escrow card controls refresh their rounded minimum when li
     }
 });
 
-test('My Auctions toggles owned listings, preserves other filters, resets pagination, and hides for guests', () => {
+test('ownership button cycles mine, others and all, preserves other filters, resets pagination, and hides for guests', () => {
     const previousUser = user;
     const previousOwner = listings[1].sellerId;
     try {
         user = { id: 'seller' }; listings[1].sellerId = 'another-seller';
         params = new URLSearchParams('q=Item&status=active&sort=price-desc&page=3');
         const h = harness(AllAuctions);
-        const button = () => h.find(node => node.type === 'button' && node.props.children === 'My Auctions');
+        const button = () => h.find(node => node.type === 'button' && ['My Auctions','Others','View All'].includes(node.props.children));
         assert.equal(button().props['aria-pressed'], false);
+        const fixedSize=()=>{assert.match(button().props.className,/h-9 w-32 shrink-0/);};fixedSize();
         button().props.onClick(); h.render();
-        assert.equal(params.get('mine'), '1'); assert.equal(params.has('page'), false);
+        fixedSize();assert.equal(params.get('mine'), '1'); assert.equal(params.has('page'), false);
         assert.equal(params.get('q'), 'Item'); assert.equal(params.get('status'), 'active'); assert.equal(params.get('sort'), 'price-desc');
         assert.equal(button().props['aria-pressed'], true);
         assert.deepEqual(nodes(h.tree).filter(node => node.type === CompactAuctionCard).map(node => node.props.auction.id), ['first']);
         button().props.onClick(); h.render();
+        fixedSize();assert.equal(params.get('mine'), 'others');
+        assert.equal(button().props.children,'View All');
+        assert.deepEqual(nodes(h.tree).filter(node => node.type === CompactAuctionCard).map(node => node.props.auction.id),['second']);
+        button().props.onClick(); h.render();
         assert.equal(params.has('mine'), false);
+        fixedSize();assert.equal(button().props.children,'My Auctions');
         assert.equal(nodes(h.tree).filter(node => node.type === CompactAuctionCard).length, 2);
         user = null; h.render();
         assert.equal(nodes(h.tree).some(node => node.type === 'button' && node.props.children === 'My Auctions'), false);
@@ -300,7 +306,7 @@ test('browse toolbar keeps one sort active, toggles directions, combines methods
     click('Most Bids ▾'); assert.equal(params.get('sort'), 'bids-asc');
     click('Price ▴▾'); assert.equal(params.get('sort'), 'price-desc');
     click('Price ▾'); assert.equal(params.get('sort'), 'price-asc');
-    assert.equal(nodes(h.tree).filter(n => n.type === 'button' && n.props['aria-pressed'] === true && !['My Auctions','Escrow','Direct'].includes(n.props.children)).length, 1);
+    assert.equal(nodes(h.tree).filter(n => n.type === 'button' && n.props['aria-pressed'] === true && !['My Auctions','Others','View All','Escrow','Direct'].includes(n.props.children)).length, 1);
     const methods = () => nodes(h.tree).filter(n => n.type === 'button' && ['Escrow', 'Direct'].includes(n.props.children));
     methods()[1].props.onClick(); h.render(); assert.equal(params.get('trade'), 'escrow');
     methods()[0].props.onClick(); h.render(); assert.equal(params.get('trade'), 'none');

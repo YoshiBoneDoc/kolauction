@@ -11,7 +11,8 @@ export function auctionReadRequest(pathname, search = '', viewerId = null) {
     const params = new URLSearchParams(search);
     return {
         view: seller ? 'seller' : 'browse', ...(seller ? { id: seller[1] } : {}),
-        ...(!seller && viewerId && params.get('mine') === '1' ? { sellerId: viewerId } : {}), search: params.get('q') || '',
+        ...(!seller && viewerId && params.get('mine') === '1' ? { sellerId: viewerId } : {}),
+        ...(!seller && viewerId && params.get('mine') === 'others' ? { excludeOwn: true } : {}), search: params.get('q') || '',
         status: auctionFilters.some(([value]) => value === params.get('status')) ? params.get('status') : 'active',
         ...(['escrow', 'direct', 'none'].includes(params.get('trade')) ? { trade: params.get('trade') } : {}),
         sort: auctionSorts.some(([value]) => value === params.get('sort')) ? params.get('sort') : 'ending',

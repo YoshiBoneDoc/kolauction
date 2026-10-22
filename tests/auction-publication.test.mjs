@@ -47,7 +47,7 @@ function harness(addAuction) {
         find(predicate) { const found = nodes(result.tree).find(predicate); assert.ok(found, 'Expected page element'); return found; },
         input(id, value) { result.find(node => node.props?.id === id).props.onChange({ target: { value } }); return result.render(); },
         button(label) { return result.find(node => node.type === 'button' && node.props.children === label); },
-        preview(escrow, { quantity = '1', minimum = '100', buyout = '', duration = '24' } = {}) {
+        preview(escrow, { quantity = '1', minimum = '100', buyout = '', duration = '24', customEndTime = '' } = {}) {
             result.render();
             result.button(escrow ? 'Escrow' : 'Direct').props.onClick(); result.render();
             result.input('listing-item-search', 'asbestos ore').input('item', '364').input('quantity', quantity).input('minBidMeat', minimum).input('auctionTime', duration);
@@ -61,7 +61,12 @@ function harness(addAuction) {
             }
             const originalFrame = globalThis.requestAnimationFrame;
             globalThis.requestAnimationFrame = callback => callback();
-            try { result.find(node => node.type === 'form').props.onSubmit({ preventDefault() {} }); }
+            try {
+                if (customEndTime) {
+                    result.button('Custom').props.onClick(); result.render(); result.input('customEndTime', customEndTime);
+                }
+                result.find(node => node.type === 'form').props.onSubmit({ preventDefault() {} });
+            }
             finally { if (originalFrame) globalThis.requestAnimationFrame = originalFrame; else delete globalThis.requestAnimationFrame; }
             return result.render();
         },
@@ -175,5 +180,37 @@ test('escrow minimums above 1M cannot preview or publish until Direct is selecte
         assert.equal(writes.length, 1);
         assert.equal(writes[0].escrowMode, false);
         assert.ok(writes[0].minBidMeat > 1000000);
+    }
+});
+
+
+import {localDateTimeInput,customAuctionEnd} from '../src/lib/auctionSchedule.js';
+test('custom date/time is preserved through preview, editing, confirmation and both trading methods', async () => {
+    const ending=localDateTimeInput(Date.now()+7200000);
+    for(const escrow of [true,false]) {
+        const writes=[];
+        const page=harness(async listing=>{writes.push(listing);return 'custom-auction';}).preview(escrow,{customEndTime:ending});
+        assert.ok(nodes(page.tree).some(n=>n.type==='dt' && n.props.children==='Ending time'));
+        page.button('Back to Edit').props.onClick();page.render();
+        assert.equal(page.find(n=>n.props?.id==='customEndTime').props.value,ending);
+        assert.equal(page.find(n=>n.props?.id==='auctionTime').props.disabled,true);
+        page.button('Custom').props.onClick();page.render();
+        assert.equal(page.find(n=>n.props?.id==='auctionTime').props.disabled,false);
+        assert.ok(!nodes(page.tree).some(n=>n.props?.id==='customEndTime'));
+        const frame=globalThis.requestAnimationFrame;globalThis.requestAnimationFrame=fn=>fn();
+        try{page.button('Custom').props.onClick();}finally{if(frame)globalThis.requestAnimationFrame=frame;else delete globalThis.requestAnimationFrame;}
+        page.render();
+        assert.equal(page.find(n=>n.props?.id==='customEndTime').props.value,ending);
+        const original=globalThis.requestAnimationFrame;globalThis.requestAnimationFrame=fn=>fn();
+        try{page.find(n=>n.type==='form').props.onSubmit({preventDefault(){}});}finally{if(original)globalThis.requestAnimationFrame=original;else delete globalThis.requestAnimationFrame;}
+        page.render();page.button('Continue to Publish').props.onClick();page.render();await page.button('Publish Auction').props.onClick();
+        assert.equal(writes.length,1);assert.equal(writes[0].customEndAt,customAuctionEnd(ending));assert.equal(writes[0].escrowMode,escrow);
+    }
+});
+test('custom ending validation blocks stale and overly distant selections before preview', () => {
+    for(const ending of [localDateTimeInput(Date.now()-60000),localDateTimeInput(Date.now()+31*86400000)]) {
+        const page=harness(()=>assert.fail('must not publish')).preview(true,{customEndTime:ending});
+        assert.ok(nodes(page.tree).some(n=>n.props?.role==='alert'));
+        assert.ok(nodes(page.tree).some(n=>n.type==='form'));
     }
 });

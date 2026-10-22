@@ -26,6 +26,7 @@ export function mapAuction(row, bidRows) {
         itemId: row.item_id,
         escrowMode: row.escrow_mode === true,
         startOnDeposit: row.start_on_deposit !== false,
+        customEndAt: row.custom_end_at || null,
         itemEscrowedAt: row.item_escrowed_at,
         settledAt: row.settled_at,
         feeMeat: Number(row.fee_meat || 0),
@@ -89,7 +90,7 @@ export function createAuctionService(client) {
     }
 
     return {
-        async load({ view = 'browse', id = null, sellerId = null, search = '', status = 'active', sort = 'ending', trade = 'all', page = 1 } = {}) {
+        async load({ view = 'browse', id = null, sellerId = null, excludeOwn = false, search = '', status = 'active', sort = 'ending', trade = 'all', page = 1 } = {}) {
             const { error } = await requireClient().rpc('finalize_expired_auctions');
             if (error) throw databaseError(error);
             async function readPage(pageNumber, completed = false) {
@@ -97,7 +98,7 @@ export function createAuctionService(client) {
                 // existing privacy-filtered browse pages for the complete strip.
                 const requestStartedAt = auctionClockRequestStarted();
                 const { data, error: readError } = await requireClient().rpc('read_auction_page', {
-                    p_view: view === 'home' ? 'browse' : view === 'browse' && sellerId ? 'seller' : view,
+                    p_view: view === 'home' ? 'browse' : view === 'browse' && excludeOwn ? 'others' : view === 'browse' && sellerId ? 'seller' : view,
                     p_id: view === 'browse' && sellerId ? sellerId : id,
                     p_search: view === 'home' ? '' : search, p_status: view === 'home' ? (completed ? 'completed' : 'active') : status,
                     ...(['browse', 'seller'].includes(view) && ['escrow', 'direct', 'none'].includes(trade) ? { p_trade: trade } : {}),
@@ -142,6 +143,7 @@ export function createAuctionService(client) {
                 p_instant_purchase_price: auction.instantPurchasePrice ?? null,
                 p_item_id: auction.itemId ?? null,
                 p_escrow_mode: auction.escrowMode !== false,
+                ...(auction.customEndAt ? { p_custom_end_at: auction.customEndAt } : {}),
             });
             if (error) throw databaseError(error);
             return data;

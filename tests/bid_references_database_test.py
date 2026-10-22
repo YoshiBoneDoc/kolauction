@@ -46,6 +46,8 @@ with tempfile.TemporaryDirectory(prefix='khub-bid-refs-',dir='/tmp') as folder:
         ''')
         migrations=sorted([*ROOT.glob('supabase/migrations/*.sql'),*ROOT.glob('supabase/migrations/queue/*.sql')],key=lambda p:p.name)
         assert len({p.name for p in migrations})==len(migrations)
+        # Pre-batching upgrade fixture; receipt_time_database_test.py exercises 079.
+        migrations=[p for p in migrations if p.name<'202610220079_']
         for migration in migrations:
             if not migration.name.startswith('202610220078_'): sql(migration.read_text())
         catalog_path=ROOT/'src/data/items.json'

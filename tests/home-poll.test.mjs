@@ -9,6 +9,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { createPollService } from '../src/lib/polls.js';
 
 const { outputFiles } = buildSync({ stdin: { contents: `
+ export { PollManager } from './src/pages/AdminPolls.jsx';
  export { default as HomePoll, PollPanel } from './src/components/HomePoll.jsx';
 `, resolveDir: fileURLToPath(new URL('../', import.meta.url)), loader: 'jsx' }, bundle: true, write: false,
  platform: 'node', format: 'cjs', packages: 'external', jsx: 'automatic', define: { 'import.meta.env': '{}' } });
@@ -23,13 +24,13 @@ const require=createRequire(import.meta.url);
 new Function('require','module','exports',outputFiles[0].text)(name=>name==='react'?{
  ...React,useState:state,useRef:initial=>state({current:initial})[0],useEffect:fn=>active.effects.push(fn),useContext:()=>({currentUser:user}),
 }:require(name),compiled,compiled.exports);
-const {HomePoll,PollPanel}=compiled.exports;
+const {HomePoll,PollPanel,PollManager}=compiled.exports;
 function nodes(tree) {
  if(!tree || typeof tree!=='object')return [];
  return [tree,...React.Children.toArray(tree.props?.children).flatMap(nodes)];
 }
-function harness(service) {
- const h={slots:[],render(){active=h;h.cursor=0;h.effects=[];h.tree=PollPanel({service});return h;},
+function harness(service,component=PollPanel) {
+ const h={slots:[],render(){active=h;h.cursor=0;h.effects=[];h.tree=component({service});return h;},
   async load(){h.effects.forEach(fn=>fn());await new Promise(resolve=>setImmediate(resolve));h.render();},
   button(label){return nodes(h.tree).find(n=>n.type==='button'&&n.props.children===label);},
   html(){return h.tree?renderToStaticMarkup(React.createElement(StaticRouter,{location:'/'},h.tree)):'';}};
@@ -72,10 +73,10 @@ test('failed votes retain choices and offer retry instead of claiming a vote was
  assert.match(h.html(),/role="alert"/);assert.match(h.html(),/Try again later/);assert.ok(h.button('No'));assert.ok(h.button('Retry'));
 });
 
-test('administrator can see totals/percentages, refresh results, vote once and close the poll',async()=>{
+test('homepage administrators see totals only after answering; full management remains separate',async()=>{
  let current={...poll,can_manage:true,results:{yes:1,no:1,total:2}},closed=false;
  const h=harness({read:async()=>feed(current),vote:async()=>{current={...current,has_voted:true,results:{yes:2,no:1,total:3}};},close:async()=>{closed=true;current={...current,active:false};}});
- await h.load();assert.match(h.html(),/Admin results/);assert.match(h.html(),/50%/);assert.ok(h.button('Refresh results'));
+ await h.load();assert.doesNotMatch(h.html(),/Admin results|50%|View voters/);assert.equal(h.button('Refresh results'),undefined);
  await h.button('Yes').props.onClick();h.render();assert.equal(h.button('Yes'),undefined);assert.match(h.html(),/67%/);
  await h.button('Conclude poll').props.onClick();h.render();assert.equal(closed,true);assert.match(h.html(),/Closed/);assert.match(h.html(),/Admin results/);assert.equal(h.button('Conclude poll'),undefined);
 });
@@ -83,7 +84,7 @@ test('administrator can see totals/percentages, refresh results, vote once and c
 
 test('published past results remain visible beside a new poll and after the user votes',async()=>{
  let saved=false;
- const previous={id:'previous',question:'Our earlier question?',results:{yes:3,no:1,total:4}};
+ const previous={id:'previous',has_voted:true,question:'Our earlier question?',results:{yes:3,no:1,total:4}};
  const h=harness({read:async()=>({...feed(saved?{...poll,has_voted:true,results:{yes:0,no:1,total:1}}:poll),published_results:[previous]}),vote:async()=>{saved=true;}});
  await h.load();assert.match(h.html(),/Our earlier question/);assert.match(h.html(),/75%/);
  await h.button('No').props.onClick();h.render();assert.equal(h.button('Yes'),undefined);assert.match(h.html(),/Previous poll results/);
@@ -105,4 +106,29 @@ test('a failed post-vote results refresh keeps voting disabled and offers retry'
  const h=harness({read:async()=>{if(saved)throw new Error('Connection lost.');return feed(poll);},vote:async()=>{saved=true;}});
  await h.load();await h.button('Yes').props.onClick();h.render();
  assert.equal(h.button('Yes'),undefined);assert.match(h.html(),/Results unavailable/);assert.ok(h.button('Retry'));
+});
+
+
+test('multiple live polls advance one question at a time while answered results remain stacked',async()=>{
+ const polls=[poll,{...poll,id:'second',question:'Should we add a second feature?'},{...poll,id:'third',question:'Should we add a third feature?'}];
+ const answered=new Set();const calls=[];
+ const service={read:async()=>({poll:polls.find(p=>!answered.has(p.id))||null,answered_polls:polls.filter(p=>answered.has(p.id)).map(p=>({...p,has_voted:true,results:{yes:1,no:0,total:1}})),published_results:[],can_manage:false}),vote:async(id)=>{calls.push(id);answered.add(id);}};
+ const h=harness(service);await h.load();assert.match(h.html(),/current bid/);assert.doesNotMatch(h.html(),/second feature|third feature|Live poll results/);
+ await h.button('Yes').props.onClick();h.render();assert.match(h.html(),/second feature/);assert.match(h.html(),/Live poll results/);assert.doesNotMatch(h.html(),/third feature/);
+ await h.button('No').props.onClick();h.render();assert.match(h.html(),/third feature/);assert.equal((h.html().match(/Live poll results/g)||[]).length,2);
+ await h.button('Yes').props.onClick();h.render();assert.equal(h.button('Yes'),undefined);assert.equal((h.html().match(/Live poll results/g)||[]).length,3);
+ assert.deepEqual(calls,['poll','second','third']);
+});
+
+test('homepage hides unvoted live and archived result records even if supplied by a stale feed',async()=>{
+ const h=harness({read:async()=>({poll,answered_polls:[{...poll,results:{yes:99,no:0,total:99}}],published_results:[{id:'unvoted',question:'Do not show this summary?',results:{yes:99,no:0,total:99}}]})});
+ await h.load();assert.doesNotMatch(h.html(),/99|Do not show|Live poll results/);assert.ok(h.button('Yes'));
+});
+
+
+test('admin manager publishes an additional poll without concluding existing live polls',async()=>{
+ let records=[{id:'one',question:'First live question?',active:true,published_at:'2026-10-22T12:00:00Z',results:{yes:0,no:0,total:0}},{id:'two',question:'Second live question?',active:true,published_at:'2026-10-22T12:01:00Z',results:{yes:0,no:0,total:0}},{id:'draft',question:'A third live question?',active:false,published_at:null}];
+ const published=[];const service={list:async()=>records,publish:async(...args)=>{published.push(args);records=records.map(p=>p.id==='draft'?{...p,active:true,published_at:'2026-10-22T12:02:00Z',results:{yes:0,no:0,total:0}}:p);}};
+ const h=harness(service,PollManager);await h.load();assert.ok(h.button('Publish poll'));assert.doesNotMatch(h.html(),/Conclude current/);
+ await h.button('Publish poll').props.onClick();h.render();assert.deepEqual(published,[['draft']]);assert.equal(records.filter(p=>p.active).length,3);
 });

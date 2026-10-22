@@ -385,3 +385,25 @@ test('auction bid history labels server-authorized delivery references and their
     const publicListing={...listing,bids:listing.bids.map(b=>({...b,adminDeliveryReferences:[]}))};
     assert.doesNotMatch(render('/auction/active',[publicListing],{id:'ordinary'}), /D-1001|Administrator message references/);
 });
+
+
+test('receipt-time closing auctions show only a brief finalizing status and no premature winner or bid controls', () => {
+    const listing={...auctions[0],escrowMode:true,receiptTimeBidding:true,endTime:Date.now()-1000,currentBid:100,highestBidderId:'leader',highestBidder:'Leader'};
+    const html=render('/auction/active',[listing],{id:'viewer'});
+    assert.match(html,/Finalizing bids…/);
+    assert.doesNotMatch(html,/Winning bidder:|Final price:|You won|Place a Bid|KoL is unavailable|60 seconds/);
+});
+
+
+test('ownership action labels cycle from My Auctions to Others to View All and filter the right sellers', () => {
+    const listings=[{...auctions[0],id:'mine',item:'Own listing',sellerId:'viewer'},{...auctions[0],id:'other',item:'Other listing',sellerId:'someone'}];
+    const all=render('/auctions',listings,{id:'viewer'});
+    assert.match(all,/>My Auctions<\/button>/);assert.match(all,/Own listing/);assert.match(all,/Other listing/);
+    const mine=render('/auctions?mine=1',listings,{id:'viewer'});
+    assert.match(mine,/>Others<\/button>/);assert.match(mine,/Own listing/);assert.doesNotMatch(mine,/Other listing/);
+    const others=render('/auctions?mine=others',listings,{id:'viewer'});
+    assert.match(others,/>View All<\/button>/);assert.match(others,/Other listing/);assert.doesNotMatch(others,/Own listing/);
+    const guest=render('/auctions?mine=others',listings);
+    assert.doesNotMatch(guest,/>My Auctions<\/button>|>Others<\/button>|>View All<\/button>/);
+    assert.match(guest,/Own listing/);assert.match(guest,/Other listing/);
+});

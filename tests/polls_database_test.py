@@ -48,6 +48,8 @@ with tempfile.TemporaryDirectory(prefix='khub-polls-',dir='/tmp') as folder:
         ''')
         migrations=sorted([*ROOT.glob('supabase/migrations/*.sql'),*ROOT.glob('supabase/migrations/queue/*.sql')],key=lambda p:p.name)
         assert len({p.name for p in migrations})==len(migrations)
+        # Historical single-poll upgrades are covered here; poll_queue_database_test.py covers 083.
+        migrations=[p for p in migrations if not p.name.startswith('202610220083_')]
         poll_migration=next(path for path in migrations if path.name.startswith('202610220075_'))
         for migration in migrations:
             if migration!=poll_migration and not migration.name.startswith('202610220076_'): sql(migration.read_text())

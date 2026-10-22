@@ -34,3 +34,12 @@ test('current high bidder is not presented as a winner before expiry', () => {
     assert.equal(result.winnerId, null);
     assert.equal(result.finalPrice, null);
 });
+
+
+test('receipt-time escrow shows finalizing without naming a winner until the database settles', () => {
+    const auction = {status:'active',escrowMode:true,receiptTimeBidding:true,endTime:1000,currentBid:500,highestBidderId:'leader'};
+    const pending=getAuctionResult(auction,1001);
+    assert.equal(pending.status,'finalizing');assert.equal(pending.hasWinner,false);assert.equal(pending.winnerId,null);
+    assert.equal(getAuctionResult({...auction,status:'settling',winnerId:'leader',hasWinner:true,finalPrice:500},1001).hasWinner,true);
+    assert.equal(getAuctionResult({...auction,escrowMode:false},1001).status,'awaiting_trade');
+});

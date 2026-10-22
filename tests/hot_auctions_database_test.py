@@ -46,6 +46,8 @@ with tempfile.TemporaryDirectory(prefix='khub-hot-',dir='/tmp') as folder:
         ''')
         migrations=sorted([*ROOT.glob('supabase/migrations/*.sql'),*ROOT.glob('supabase/migrations/queue/*.sql')],key=lambda p:p.name)
         assert len({p.name for p in migrations})==len(migrations)
+        # Pre-batching upgrade fixture; receipt_time_database_test.py exercises 079.
+        migrations=[p for p in migrations if p.name<'202610220079_']
         hot_migration=next(path for path in migrations if path.name=='202610220072_hot_auction_cards.sql')
         for migration in migrations:
             if migration!=hot_migration and not migration.name.startswith(('202610220073_', '202610220077_', '202610220078_')): sql(migration.read_text())

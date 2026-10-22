@@ -222,3 +222,23 @@ test('bid mapping preserves server-authorized message references and defaults to
     assert.deepEqual(mapAuction(row,[{...bid,admin_delivery_references:references}]).bids[0].adminDeliveryReferences,references);
     assert.deepEqual(mapAuction(row,[bid]).bids[0].adminDeliveryReferences,[]);
 });
+
+
+test('only custom listings send the explicit ending timestamp to the custom creation overload', async () => {
+    const calls=[];
+    const service=createAuctionService({async rpc(name,args){calls.push({name,args});return {data:'custom',error:null};}});
+    const customEndAt=new Date(Date.now()+3600000).toISOString();
+    await service.create({item:'seal tooth',itemId:2,quantity:1,minBidMeat:100,auctionTime:'24',escrowMode:true,customEndAt});
+    assert.equal(calls[0].args.p_custom_end_at,customEndAt);
+    assert.equal(calls[0].args.p_duration_hours,24);
+    assert.equal(mapAuction({...row,custom_end_at:customEndAt,start_on_deposit:false},[]).customEndAt,customEndAt);
+});
+
+
+test('Others uses an authenticated server-side view before pagination, including trade filtering', async () => {
+    const requests=[];
+    const service=createAuctionService({async rpc(name,args){requests.push([name,args]);return {data:name==='read_auction_page'?{privacy_version:1,rows:[],bids:[],total:55}:null,error:null};}});
+    const result=await service.load({excludeOwn:true,search:'hat',status:'all',sort:'price-desc',trade:'escrow',page:3});
+    assert.deepEqual(requests[1],['read_auction_page',{p_view:'others',p_id:null,p_search:'hat',p_status:'all',p_trade:'escrow',p_sort:'price-desc',p_page:3}]);
+    assert.equal(result.total,55);
+});

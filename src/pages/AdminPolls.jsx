@@ -34,7 +34,6 @@ export function PollManager({ service = polls }) {
         event.preventDefault();
         await action(async () => { await service.saveDraft(question, editing); setQuestion(''); setEditing(null); });
     }
-    const active = records?.find(poll => poll.active);
     const button = 'min-h-9 rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-gray-100 disabled:opacity-50';
     return <>
         <div className="flex justify-end"><button type="button" disabled={pending} onClick={() => setAttempt(value => value + 1)} className="text-sm text-blue-700 underline disabled:opacity-50">Refresh results</button></div>
@@ -63,12 +62,12 @@ export function PollManager({ service = polls }) {
                 <div className="flex flex-wrap items-center gap-2">
                     {!poll.published_at && <>
                         <button type="button" disabled={pending} onClick={() => { setEditing(poll.id); setQuestion(poll.question); }} className={button}>Edit draft</button>
-                        <button type="button" disabled={pending || Boolean(editing)} onClick={() => action(() => service.publish(poll.id, Boolean(active)))}
-                            className="min-h-9 rounded border border-blue-700 bg-blue-700 px-3 py-1.5 text-sm text-white hover:bg-blue-800 disabled:opacity-50">{active ? 'Conclude current & publish' : 'Publish poll'}</button>
+                        <button type="button" disabled={pending || Boolean(editing)} onClick={() => action(() => service.publish(poll.id))}
+                            className="min-h-9 rounded border border-blue-700 bg-blue-700 px-3 py-1.5 text-sm text-white hover:bg-blue-800 disabled:opacity-50">Publish poll</button>
                     </>}
                     {poll.active && <button type="button" disabled={pending} onClick={() => action(() => service.close(poll.id))} className={button}>Conclude poll</button>}
                     {poll.closed_at && <button type="button" aria-pressed={poll.results_published} disabled={pending} onClick={() => action(() => service.publishResults(poll.id, !poll.results_published))} className={button}>{poll.results_published ? 'Hide homepage results' : 'Publish results on homepage'}</button>}
-                    {poll.results_published && <span className="text-xs text-green-700">Results visible on the homepage</span>}
+                    {poll.results_published && <span className="text-xs text-green-700">Results visible to voters on the homepage</span>}
                 </div>
             </article>)}</div>
         </>}
@@ -85,7 +84,7 @@ export default function AdminPolls() {
                 <h1 className="text-3xl font-bold text-blue-700">Manage polls</h1>
                 <Link to="/admin/inbox" className="text-sm text-blue-700 underline">Administrator inbox</Link>
             </div>
-            <p className="text-sm text-gray-600">One live poll at a time. Voters see live totals after voting. Voter names are admin-only; concluded results are saved here and can be published on the homepage.</p>
+            <p className="text-sm text-gray-600">Multiple polls can be live. Voters answer them in publication order and see results only after voting. Voter names are admin-only; concluded results remain saved here.</p>
             {currentUser ? <PollManager key={currentUser.id} /> : <p><Link to="/login" className="text-blue-700 underline">Log in</Link> with your administrator account to manage polls.</p>}
         </main>
         <SiteFooter showReportLink={false} />

@@ -11,6 +11,8 @@ import useKolIdentity from '../hooks/useKolIdentity';
 import EscrowProtection from '../components/EscrowProtection';
 import DirectTradeHelp from '../components/DirectTradeHelp';
 import { ESCROW_MIN_BID_LIMIT, ESCROW_MIN_BID_ERROR } from '../lib/escrowPolicy';
+import { auctionNow } from '../lib/auctionClock';
+import { customAuctionEnd, localDateTimeInput, formatAuctionEnd, MAX_AUCTION_DURATION_MS } from '../lib/auctionSchedule';
 
 const catalog = createItemCatalogService(supabase, items);
 const resultLimit = 100;
@@ -38,6 +40,9 @@ export default function AuctionAnItem() {
     const [showBuyout, setShowBuyout] = useState(false);
     const buyoutInput = useRef(null);
     const [auctionTime, setAuctionTime] = useState('24');
+    const [customDuration, setCustomDuration] = useState(false);
+    const [customEndTime, setCustomEndTime] = useState('');
+    const endingTimeInput = useRef(null);
     const [escrowMode, setEscrowMode] = useState(true);
     const [preview, setPreview] = useState(null);
     const [error, setError] = useState('');
@@ -78,7 +83,12 @@ export default function AuctionAnItem() {
         if (instantPrice.trim() && (purchasePrice === null || purchasePrice < minimum)) {
             setError('Buyout price must be a valid Meat amount at least as large as the minimum bid.'); return;
         }
-        setPreview({ item: item.name, itemId: item.id, quantity: count, minBidMeat: minimum, instantPurchasePrice: purchasePrice, auctionTime, escrowMode,
+        let customEndAt = null;
+        if (customDuration) {
+            try { customEndAt = customAuctionEnd(customEndTime); }
+            catch (failure) { setError(failure.message); return; }
+        }
+        setPreview({ item: item.name, itemId: item.id, quantity: count, minBidMeat: minimum, instantPurchasePrice: purchasePrice, auctionTime, escrowMode, ...(customEndAt ? { customEndAt } : {}),
             image: itemImageUrl(item.image) });
         setError('');
         requestAnimationFrame(() => previewHeading.current?.focus());
@@ -145,8 +155,8 @@ export default function AuctionAnItem() {
                             <dd className="min-w-0 break-words text-right font-medium tabular-nums text-gray-900">{preview.instantPurchasePrice ? `${preview.instantPurchasePrice.toLocaleString('en-US')} Meat` : 'Not offered'}</dd>
                         </div>
                         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] items-baseline gap-3 py-2.5">
-                            <dt className="text-gray-500">Duration</dt>
-                            <dd className="min-w-0 break-words text-right font-medium tabular-nums text-gray-900">{preview.auctionTime} hours</dd>
+                            <dt className="text-gray-500">{preview.customEndAt ? 'Ending time' : 'Duration'}</dt>
+                            <dd className="min-w-0 break-words text-right font-medium tabular-nums text-gray-900">{preview.customEndAt ? formatAuctionEnd(preview.customEndAt) : `${preview.auctionTime} hours`}</dd>
                         </div>
                     </dl>
                     <div className="mt-4 grid grid-cols-2 gap-3 border-t border-gray-100 pt-4">
@@ -237,12 +247,30 @@ export default function AuctionAnItem() {
                         requestAnimationFrame(() => buyoutInput.current?.focus());
                     }} className="mb-4 min-h-11 w-full rounded border border-blue-600 bg-white px-4 py-3 font-semibold text-blue-700 transition-colors hover:border-blue-700 hover:bg-blue-100 hover:text-blue-800">Set Buyout Price (optional)</button>}
                     <label htmlFor="auctionTime" className="mb-2 block text-sm font-bold">Auction Duration:</label>
-                    <select id="auctionTime" value={auctionTime} onChange={(event) => setAuctionTime(event.target.value)} className={fieldClass}>
-                        <option value="6">6 Hours</option><option value="12">12 Hours</option>
-                        <option value="24">1 Day</option><option value="72">3 Days</option>
-                        <option value="168">7 Days</option><option value="336">14 Days</option>
-                        <option value="720">1 Month</option>
-                    </select>
+                    <div className="mb-4 flex min-w-0 gap-2">
+                        <select id="auctionTime" value={auctionTime} disabled={customDuration} onChange={(event) => setAuctionTime(event.target.value)} className="block min-h-11 w-full min-w-0 flex-1 rounded border border-gray-400 bg-white p-3 text-base text-gray-900 disabled:bg-gray-100 disabled:text-gray-500">
+                            <option value="6">6 Hours</option><option value="12">12 Hours</option>
+                            <option value="24">1 Day</option><option value="72">3 Days</option>
+                            <option value="168">7 Days</option><option value="336">14 Days</option>
+                            <option value="720">1 Month</option>
+                        </select>
+                        <button type="button" aria-pressed={customDuration} aria-expanded={customDuration} aria-controls="custom-auction-end-fields" onClick={() => {
+                            if (!customDuration) {
+                                if (!customEndTime) setCustomEndTime(localDateTimeInput(auctionNow() + Number(auctionTime) * 3600000));
+                                requestAnimationFrame(() => endingTimeInput.current?.focus());
+                            }
+                            setCustomDuration(value => !value);
+                            setError('');
+                        }} className={`min-h-11 shrink-0 rounded border px-4 py-3 text-sm font-semibold transition-colors ${customDuration ? 'border-blue-300 bg-blue-50 text-blue-800 hover:bg-blue-100' : 'border-gray-400 bg-white text-gray-700 hover:bg-gray-50'}`}>Custom</button>
+                    </div>
+                    {customDuration && <section id="custom-auction-end-fields" className="mb-4 min-w-0">
+                        <label htmlFor="customEndTime" className="mb-2 block text-sm font-bold">Ending date and time:</label>
+                        <input ref={endingTimeInput} id="customEndTime" type="datetime-local" required step="60" value={customEndTime}
+                            min={localDateTimeInput(auctionNow() + 60000)} max={localDateTimeInput(auctionNow() + MAX_AUCTION_DURATION_MS)}
+                            onChange={event => setCustomEndTime(event.target.value)} aria-describedby="custom-ending-help"
+                            className="block min-h-11 w-full min-w-0 max-w-full rounded border border-gray-400 bg-white p-3 text-base text-gray-900" />
+                        <p id="custom-ending-help" className="mt-2 text-xs text-gray-500">Your timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}. Choose a time within 30 days.{escrowMode && ' This ending time stays fixed; deposit your items before it.'}</p>
+                    </section>}
                     <button type="submit" disabled={escrowLimitExceeded} className="min-h-11 w-full rounded bg-blue-600 px-4 py-3 font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">Preview Auction</button>
                 </form>}
             </div>

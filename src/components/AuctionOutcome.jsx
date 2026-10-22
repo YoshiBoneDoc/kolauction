@@ -76,7 +76,7 @@ export default function AuctionOutcome({ auction, now }) {
     if (result.status === 'on_hold' || result.status === 'voided') return <section aria-label="Auction review" className="mx-auto mt-6 max-w-4xl space-y-2 rounded-lg border border-gray-200 bg-white p-4 sm:p-6">
         <h2 className="text-xl font-bold text-slate-700">{result.label}</h2>
         <p className="text-sm text-gray-600">{result.status === 'on_hold'
-            ? auction.escrowTimingReview ? 'Mail arrived out of order. Bidding and settlement are on hold for administrator review. No winner has been declared; existing funds and items remain protected.' : 'Bidding and automatic closing are paused while an administrator reviews an account restriction. No winner has been declared. Existing bids are preserved.'
+            ? auction.escrowTimingReview ? 'This auction is on hold for administrator review.' : 'Bidding and automatic closing are paused while an administrator reviews an account restriction. No winner has been declared. Existing bids are preserved.'
             : 'An administrator cancelled this held auction. No winner or completed trade was recorded. Existing bids remain in its history.'}</p>
     </section>;
 

@@ -46,6 +46,8 @@ with tempfile.TemporaryDirectory(prefix='khub-fees-',dir='/tmp') as folder:
         ''')
         migrations=sorted([*ROOT.glob('supabase/migrations/*.sql'),*ROOT.glob('supabase/migrations/queue/*.sql')],key=lambda p:p.name)
         assert len({p.name for p in migrations})==len(migrations)
+        # Pre-batching upgrade fixture; receipt_time_database_test.py exercises 079.
+        migrations=[p for p in migrations if p.name<'202610220079_']
         fee_migration=next(p for p in migrations if p.name=='202610210069_tiered_escrow_fees.sql')
         for migration in migrations:
             if migration.name<fee_migration.name: sql(migration.read_text())

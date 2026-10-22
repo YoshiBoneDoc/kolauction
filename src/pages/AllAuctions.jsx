@@ -18,11 +18,14 @@ export default function AllAuctions() {
     const browseKey = params.toString();
     const search = params.get('q') || '';
     const mineOnly = Boolean(currentUser && params.get('mine') === '1');
+    const othersOnly = Boolean(currentUser && params.get('mine') === 'others');
+    const ownershipFiltered = mineOnly || othersOnly;
+    const ownershipAction = mineOnly ? 'Others' : othersOnly ? 'View All' : 'My Auctions';
     const status = auctionFilters.some(([value]) => value === params.get('status')) ? params.get('status') : 'active';
     const sort = auctionSorts.some(([value]) => value === params.get('sort')) ? params.get('sort') : 'ending';
     const trade = ['escrow', 'direct', 'none'].includes(params.get('trade')) ? params.get('trade') : 'all';
     const page = Math.min(1000000, Math.max(1, Number.parseInt(params.get('page'), 10) || 1));
-    const visible = useMemo(() => browseAuctions(mineOnly ? auctions.filter(auction => auction.sellerId === currentUser.id) : auctions, { search, status, sort, trade, now }), [auctions, mineOnly, currentUser?.id, search, status, sort, trade, now]);
+    const visible = useMemo(() => browseAuctions(ownershipFiltered ? auctions.filter(auction => mineOnly ? auction.sellerId === currentUser.id : auction.sellerId !== currentUser.id) : auctions, { search, status, sort, trade, now }), [auctions, mineOnly, ownershipFiltered, currentUser?.id, search, status, sort, trade, now]);
     const found = total ?? visible.length;
 
     function update(name, value) {
@@ -91,9 +94,9 @@ export default function AllAuctions() {
                                 {auctionFilters.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                             </select>
                         </div>
-                        {currentUser && <button type="button" aria-pressed={mineOnly} onClick={() => update('mine', mineOnly ? '' : '1')}
-                            title={mineOnly ? 'Show all auctions' : 'Show only your listings'}
-                            className={`h-9 whitespace-nowrap rounded border border-blue-700 px-3 text-sm font-semibold transition-colors ${mineOnly ? 'bg-blue-700 text-white hover:bg-blue-100 hover:text-blue-800' : 'bg-white text-blue-700 hover:bg-blue-50'}`}>My Auctions</button>}
+                        {currentUser && <button type="button" aria-pressed={ownershipFiltered} onClick={() => update('mine', mineOnly ? 'others' : othersOnly ? '' : '1')}
+                            title={mineOnly ? 'Show auctions from other sellers' : othersOnly ? 'Show all auctions' : 'Show only your listings'}
+                            className={`h-9 w-32 shrink-0 whitespace-nowrap rounded border border-blue-700 px-3 text-sm font-semibold transition-colors ${ownershipFiltered ? 'bg-blue-700 text-white hover:bg-blue-100 hover:text-blue-800' : 'bg-white text-blue-700 hover:bg-blue-50'}`}>{ownershipAction}</button>}
                     </div>
                 </section>
                 {isLoading ? <p role="status">Loading auctions…</p> : <>
