@@ -84,7 +84,7 @@ const InfoPage = () => {
                     <Link to="/auction-item" className="font-medium text-blue-600 hover:underline">
                         Create an auction here
                     </Link>
-                    . Minimum Bid and Buyout Prices are optional. All prices apply to the entire listing, not individual items.
+                    . Minimum Bid and Buyout Prices are optional. All prices apply to the entire listing, not individual items. You may not bid on your own auction.
                 </p>
 
                 <h3 className={`${subheadingClass} mb-2`}>
