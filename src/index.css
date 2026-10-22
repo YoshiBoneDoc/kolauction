@@ -213,3 +213,32 @@ button:focus-visible {
   .popular-auction-viewport { overflow-x: auto; }
   .popular-auction-viewport[data-moving] .popular-auction-track { animation: none; transform: none; }
 }
+
+/* Plain poll navigation arrows, clear of the shared button padding/background. */
+.poll-result-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #475569;
+}
+.poll-result-arrow svg {
+  flex-shrink: 0;
+}
+.poll-result-arrow:hover {
+  background: transparent;
+  color: #1e293b;
+}
+.poll-result-arrow:focus {
+  outline: none;
+}
+.poll-result-arrow:focus-visible {
+  outline: 2px solid #a16207;
+  outline-offset: 1px;
+}

@@ -32,7 +32,7 @@ function nodes(tree) {
 function harness(service,component=PollPanel) {
  const h={slots:[],render(){active=h;h.cursor=0;h.effects=[];h.tree=component({service});return h;},
   async load(){h.effects.forEach(fn=>fn());await new Promise(resolve=>setImmediate(resolve));h.render();},
-  button(label){return nodes(h.tree).find(n=>n.type==='button'&&n.props.children===label);},
+  button(label){return nodes(h.tree).find(n=>n.type==='button'&&(n.props['aria-label']||n.props.children)===label);},
   html(){return h.tree?renderToStaticMarkup(React.createElement(StaticRouter,{location:'/'},h.tree)):'';}};
  return h.render();
 }
@@ -78,7 +78,10 @@ test('homepage administrators see all live results without voting and can conclu
  let votes=0;const closed=[];
  const h=harness({read:async()=>({poll:null,can_manage:true,answered_polls:results,published_results:[{id:'past',question:'Archived admin summary?',has_voted:false,results:{yes:3,no:0,total:3}}]}),vote:async()=>{votes++;},close:async(id)=>{closed.push(id);results=results.filter(p=>p.id!==id);}});
  await h.load();assert.equal(h.button('Yes'),undefined);assert.equal(h.button('No'),undefined);
- assert.match(h.html(),/50%/);assert.match(h.html(),/Another active poll/);assert.match(h.html(),/0 votes/);assert.match(h.html(),/Archived admin summary/);assert.match(h.html(),/Admin results|View voters/);
+ assert.match(h.html(),/50%/);assert.doesNotMatch(h.html(),/Another active poll|Archived admin summary/);
+ h.button('Next poll results').props.onClick();h.render();assert.match(h.html(),/Another active poll/);assert.match(h.html(),/0 votes/);
+ h.button('Next poll results').props.onClick();h.render();assert.match(h.html(),/Archived admin summary/);
+ h.button('Next poll results').props.onClick();h.render();assert.match(h.html(),/Admin results|View voters/);
  await h.button('Conclude poll').props.onClick();h.render();assert.deepEqual(closed,['poll']);assert.doesNotMatch(h.html(),/current bid/);assert.match(h.html(),/Another active poll/);assert.equal(votes,0);
 });
 
@@ -88,12 +91,13 @@ test('an older admin feed never restores the Yes or No voting buttons',async()=>
 });
 
 
-test('published past results remain visible beside a new poll and after the user votes',async()=>{
+test('published past results share a results panel with answered live polls',async()=>{
  let saved=false;
  const previous={id:'previous',has_voted:true,question:'Our earlier question?',results:{yes:3,no:1,total:4}};
  const h=harness({read:async()=>({...feed(saved?{...poll,has_voted:true,results:{yes:0,no:1,total:1}}:poll),published_results:[previous]}),vote:async()=>{saved=true;}});
  await h.load();assert.match(h.html(),/Our earlier question/);assert.match(h.html(),/75%/);
- await h.button('No').props.onClick();h.render();assert.equal(h.button('Yes'),undefined);assert.match(h.html(),/Previous poll results/);
+ await h.button('No').props.onClick();h.render();assert.equal(h.button('Yes'),undefined);assert.match(h.html(),/Next poll results/);
+ h.button('Next poll results').props.onClick();h.render();assert.match(h.html(),/Our earlier question/);
  assert.doesNotMatch(h.html(),/Admin results|Manage polls/);
 });
 
@@ -115,14 +119,16 @@ test('a failed post-vote results refresh keeps voting disabled and offers retry'
 });
 
 
-test('multiple live polls advance one question at a time while answered results remain stacked',async()=>{
+test('multiple live polls advance one question at a time while answered results share one navigable panel',async()=>{
  const polls=[poll,{...poll,id:'second',question:'Should we add a second feature?'},{...poll,id:'third',question:'Should we add a third feature?'}];
  const answered=new Set();const calls=[];
  const service={read:async()=>({poll:polls.find(p=>!answered.has(p.id))||null,answered_polls:polls.filter(p=>answered.has(p.id)).map(p=>({...p,has_voted:true,results:{yes:1,no:0,total:1}})),published_results:[],can_manage:false}),vote:async(id)=>{calls.push(id);answered.add(id);}};
  const h=harness(service);await h.load();assert.match(h.html(),/current bid/);assert.doesNotMatch(h.html(),/second feature|third feature|Live poll results/);
  await h.button('Yes').props.onClick();h.render();assert.match(h.html(),/second feature/);assert.match(h.html(),/Live poll results/);assert.doesNotMatch(h.html(),/third feature/);
- await h.button('No').props.onClick();h.render();assert.match(h.html(),/third feature/);assert.equal((h.html().match(/Live poll results/g)||[]).length,2);
- await h.button('Yes').props.onClick();h.render();assert.equal(h.button('Yes'),undefined);assert.equal((h.html().match(/Live poll results/g)||[]).length,3);
+ await h.button('No').props.onClick();h.render();assert.match(h.html(),/third feature/);assert.equal((h.html().match(/<article/g)||[]).length,1);
+ await h.button('Yes').props.onClick();h.render();assert.equal(h.button('Yes'),undefined);assert.equal((h.html().match(/<article/g)||[]).length,1);assert.match(h.html(),/1 \/ 3/);
+ h.button('Previous poll results').props.onClick();h.render();assert.match(h.html(),/Results: Should we add a third feature/);
+ h.button('Next poll results').props.onClick();h.render();assert.match(h.html(),/Results: Should sellers/);
  assert.deepEqual(calls,['poll','second','third']);
 });
 

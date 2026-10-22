@@ -15,6 +15,7 @@ export function PollPanel({ service = polls }) {
     const [pending, setPending] = useState(false);
     const [error, setError] = useState('');
     const [attempt, setAttempt] = useState(0);
+    const [selectedResult, setSelectedResult] = useState(null);
     const writing = useRef(false);
     const generation = useRef(0);
     const poll = feed?.poll;
@@ -64,6 +65,12 @@ export function PollPanel({ service = polls }) {
         finally { writing.current = false; setPending(false); }
     }
     const answered = (feed?.answered_polls || (poll?.has_voted || isAdmin && poll?.results ? [poll] : [])).filter(item => isAdmin || item.has_voted);
+    const results = [...answered, ...published.filter(item => !answered.some(answer => answer.id === item.id))];
+    const resultIndex = Math.max(0, results.findIndex(item => item.id === selectedResult));
+    const result = results[resultIndex];
+    function navigateResults(direction) {
+        setSelectedResult(results[(resultIndex + direction + results.length) % results.length].id);
+    }
     const question = !isAdmin && poll?.active && !poll.has_voted ? poll : null;
     if (!question && !answered.length && !published.length && !feed?.can_manage && !error) return null;
     return <section aria-label="Community poll" className="mx-auto mb-6 w-full max-w-6xl space-y-3">
@@ -79,26 +86,30 @@ export function PollPanel({ service = polls }) {
                 </div>
             </div>
         </div>}
-        {answered.map(result => <article key={result.id} aria-label={`Results: ${result.question}`} className="max-w-sm rounded-md border border-yellow-200 bg-yellow-50 px-3 py-3 text-slate-800">
-            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-yellow-800">Live poll results{!result.active ? ' · Closed' : ''}</p>
+        {result && <article aria-label={`Results: ${result.question}`} className="max-w-sm rounded-md border border-yellow-200 bg-yellow-50 px-3 py-3 text-slate-800">
+            <div className="mb-1 flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-yellow-800">{result.active ? 'Live poll results' : 'Previous poll results'}</p>
+                {results.length > 1 && <div role="group" aria-label="Browse poll results" className="flex shrink-0 items-center gap-1">
+                    <button type="button" aria-label="Previous poll results" onClick={() => navigateResults(-1)} className="poll-result-arrow">
+                        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 12 12" fill="currentColor"><path d="M9 1 2 6l7 5Z" /></svg>
+                    </button>
+                    <span className="text-xs text-yellow-800" aria-live="polite">{resultIndex + 1} / {results.length}</span>
+                    <button type="button" aria-label="Next poll results" onClick={() => navigateResults(1)} className="poll-result-arrow">
+                        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 12 12" fill="currentColor"><path d="m3 1 7 5-7 5Z" /></svg>
+                    </button>
+                </div>}
+            </div>
             <h2 className="text-sm font-medium leading-5">{result.question}</h2>
             <div className="mt-2 space-y-2">
                 {result.can_manage && <p className="text-xs font-semibold">Admin results</p>}
                 {result.results ? <PollResults results={result.results} compact /> : <p className="text-xs text-gray-500">{error ? 'Results unavailable.' : 'Loading results…'}</p>}
-                {result.can_manage && <PollVoters pollId={result.id} service={service} />}
+                {result.can_manage && <PollVoters key={result.id} pollId={result.id} service={service} />}
                 {result.can_manage && <div className="flex flex-wrap gap-4 text-xs">
                     <button type="button" disabled={pending} onClick={() => setAttempt(value => value + 1)} className="text-blue-800 underline disabled:opacity-60">Refresh results</button>
                     {result.active && <button type="button" disabled={pending} onClick={() => close(result.id)} className="text-slate-700 underline disabled:opacity-60">Conclude poll</button>}
                 </div>}
             </div>
-        </article>)}
-        {published.length > 0 && <div className="max-w-sm space-y-4 rounded-md border border-yellow-200 bg-yellow-50 px-3 py-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-yellow-800">Previous poll results</h2>
-            {published.map(result => <div key={result.id}>
-                <h3 className="mb-2 text-sm font-semibold">{result.question}</h3>
-                <PollResults results={result.results} compact />
-            </div>)}
-        </div>}
+        </article>}
         {feed?.can_manage && <p className="text-sm"><Link to="/admin/polls" className="text-blue-800 underline">Manage polls &amp; view past results</Link></p>}
         {error && <p role="alert" className="text-sm text-red-800">{error}{' '}<button type="button" disabled={pending} onClick={() => setAttempt(value => value + 1)} className="underline">Retry</button></p>}
     </section>;
