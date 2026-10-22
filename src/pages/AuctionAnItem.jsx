@@ -1,4 +1,4 @@
-import BackHomeLinks from '../components/BackHomeLinks';
+import TradeTypeBadge from '../components/TradeTypeBadge';
 import { useState, useContext, useDeferredValue, useEffect, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuctionsContext } from '../context/AuctionsContext';
@@ -102,8 +102,7 @@ export default function AuctionAnItem() {
     }
 
     if (!currentUser) return (
-        <main className="min-h-screen bg-gray-50 p-4">
-            <BackHomeLinks />
+        <main className="flex-1 bg-gray-50 p-4">
             <div className="mx-auto mt-12 max-w-lg space-y-4 text-center">
                 <h1 className="text-2xl font-bold text-red-700">You must be logged in to auction an item.</h1>
                 <Link to="/login" className="inline-flex min-h-11 items-center text-lg text-blue-700 underline">Log In</Link>
@@ -113,8 +112,7 @@ export default function AuctionAnItem() {
     );
 
     return (
-        <main className="min-h-screen bg-gray-50 p-4 sm:p-6">
-            <BackHomeLinks className="mb-4" />
+        <main className="flex-1 bg-gray-50 p-4 sm:p-6">
             <h1 className="mb-6 text-center text-3xl font-bold text-blue-600 sm:text-4xl">Auction an Item</h1>
             {!preview && <p className="mx-auto mb-4 max-w-lg text-sm text-gray-700">{kolIdentity && !kolIdentity.kol_player_id && <>First <Link to="/profile" className="text-blue-700 underline">link your KoL account</Link>. </>}Choose how your sale will settle. The mode stays fixed after publishing.</p>}
             <div className="mx-auto max-w-lg rounded-lg bg-white p-4 shadow-md sm:p-8">
@@ -136,7 +134,7 @@ export default function AuctionAnItem() {
                         </div>
                         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] items-baseline gap-3 py-2.5">
                             <dt className="text-gray-500">Trading method</dt>
-                            <dd className="text-right"><span className={`inline-flex rounded border px-2 py-0.5 text-xs font-medium ${preview.escrowMode ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-slate-200 bg-slate-100 text-slate-700'}`}>{preview.escrowMode ? 'Escrow' : 'Direct'}</span></dd>
+                            <dd className="text-right"><TradeTypeBadge escrow={preview.escrowMode} short /></dd>
                         </div>
                         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] items-baseline gap-3 py-2.5">
                             <dt className="text-gray-500">Minimum bid</dt>

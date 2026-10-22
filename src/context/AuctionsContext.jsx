@@ -13,7 +13,7 @@ export const AuctionsProvider = ({ children }) => {
     const { currentUser, signedInUserId } = useContext(UserContext);
     const viewerId = signedInUserId === undefined ? currentUser?.id : signedInUserId;
     const { pathname, search } = useLocation();
-    const request = useMemo(() => auctionReadRequest(pathname, search), [pathname, search]);
+    const request = useMemo(() => auctionReadRequest(pathname, search, currentUser?.id), [pathname, search, currentUser?.id]);
     const [pendingPage, setPendingPage] = useState(1);
     const showPending = Boolean(currentUser?.id && ['home', 'browse'].includes(request?.view));
     const key = JSON.stringify([request, viewerId, showPending ? pendingPage : null]);
@@ -131,12 +131,6 @@ export const AuctionsProvider = ({ children }) => {
 
     return (
         <AuctionsContext.Provider value={{ auctions, total, seller, isLoading, error, pendingTrades, pendingTotal, pendingPage, setPendingPage, pendingError, addAuction, placeBid, purchaseAuction, confirmTrade, rateTrade, cancelAuction, refreshAuctions }}>
-            {error && (
-                <div role="alert" className="bg-red-50 text-red-700 p-4">
-                    {error}{" "}
-                    <button onClick={refreshAuctions} className="underline">Retry</button>
-                </div>
-            )}
             {children}
         </AuctionsContext.Provider>
     );

@@ -63,7 +63,9 @@ export function mapAuction(row, bidRows) {
         completedAt: row.completed_at,
         cancelledAt: row.cancelled_at,
         bids,
+        latestBidAt: row.latest_bid_at ? new Date(row.latest_bid_at).getTime() : null,
         bidCount: Number(row.bid_count ?? bids.length),
+        isHot: row.is_hot === true,
     };
 }
 
@@ -81,15 +83,37 @@ export function createAuctionService(client) {
     }
 
     return {
-        async load({ view = 'browse', id = null, search = '', status = 'active', sort = 'ending', page = 1 } = {}) {
+        async load({ view = 'browse', id = null, sellerId = null, search = '', status = 'active', sort = 'ending', trade = 'all', page = 1 } = {}) {
             const { error } = await requireClient().rpc('finalize_expired_auctions');
             if (error) throw databaseError(error);
-            const { data, error: readError } = await requireClient().rpc('read_auction_page', {
-                p_view: view, p_id: id, p_search: search, p_status: status, p_sort: sort, p_page: page,
-            });
-            if (readError) throw databaseError(readError);
-            if (data?.privacy_version !== 1) throw new Error('Auctions are temporarily unavailable while a privacy update is being completed. Please try again later.');
-            return { auctions: data.rows.map((row) => mapAuction(row, data.bids)), total: Number(data.total), seller: data.seller || null };
+            async function readPage(pageNumber) {
+                // The historical home endpoint returns only four rows. Use the
+                // existing privacy-filtered browse pages for the complete strip.
+                const { data, error: readError } = await requireClient().rpc('read_auction_page', {
+                    p_view: view === 'home' ? 'browse' : view === 'browse' && sellerId ? 'seller' : view,
+                    p_id: view === 'browse' && sellerId ? sellerId : id,
+                    p_search: view === 'home' ? '' : search, p_status: view === 'home' ? 'active' : status,
+                    ...(['browse', 'seller'].includes(view) && ['escrow', 'direct', 'none'].includes(trade) ? { p_trade: trade } : {}),
+                    p_sort: view === 'home' ? 'newest' : sort, p_page: pageNumber,
+                });
+                if (readError) throw databaseError(readError);
+                if (data?.privacy_version !== 1) throw new Error('Auctions are temporarily unavailable while a privacy update is being completed. Please try again later.');
+                return data;
+            }
+            const data = await readPage(view === 'home' ? 1 : page);
+            const rows = [...data.rows];
+            const bids = [...data.bids];
+            if (view === 'home') {
+                // Bound the scan to the first response's page count. New listings
+                // arriving mid-read are picked up by the next normal refresh.
+                const pages = Math.ceil(Number(data.total) / 24);
+                for (let next = 2; next <= pages; next++) {
+                    const more = await readPage(next);
+                    rows.push(...more.rows); bids.push(...more.bids);
+                }
+            }
+            const unique = [...new Map(rows.map(row => [row.id, row])).values()];
+            return { auctions: unique.map(row => mapAuction(row, bids)), total: Number(data.total), seller: data.seller || null };
         },
         async pendingTrades(page = 1) {
             const { data, error } = await requireClient().rpc('read_pending_trades', { p_page: page });

@@ -1,13 +1,9 @@
-import BackHomeLinks from '../components/BackHomeLinks';
 import { Link } from "react-router-dom";
 import CopyMessage from '../components/CopyMessage';
 
 const DonatePage = () => {
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6 pt-16">
-            {/* Link back to Home */}
-            <BackHomeLinks className="absolute top-4 left-4" />
-
+        <div className="flex-1 bg-gray-50 flex flex-col items-center justify-center p-6">
             {/* Donate Page Content */}
             <h1 className="text-3xl font-bold text-blue-600 mb-3">Support kHub</h1>
             <p className="text-[15px] leading-6 text-gray-700 text-center max-w-3xl mb-[18px]">

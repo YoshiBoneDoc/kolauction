@@ -2,7 +2,6 @@ import { useContext, useEffect, useRef, useState } from 'react';
 import { UserContext } from '../context/UserContext';
 import { Link } from 'react-router-dom';
 import { readImage, validateAppealImage } from '../lib/accountRestrictions';
-import AuctionNavigation from '../components/AuctionNavigation';
 import SiteFooter from '../components/SiteFooter';
 import { supabase } from '../lib/supabase';
 import { createAuthService } from '../lib/auth';
@@ -96,8 +95,8 @@ function AppealForm() {
 export default function SubmitAppeal() {
     const { currentUser, signedInUserId, restrictedAccount } = useContext(UserContext);
     const userId = signedInUserId || currentUser?.id;
-    return <div className="flex min-h-screen flex-col bg-gray-50">
-        <div className="px-4 py-4 sm:px-6">{restrictedAccount ? <Link to="/" className="text-sm text-blue-700 underline">Back to account status</Link> : <AuctionNavigation />}</div>
+    return <div className="flex flex-1 flex-col bg-gray-50">
+        {restrictedAccount && <div className="mx-auto w-full max-w-6xl px-4 sm:px-6"><Link to="/" className="inline-flex min-h-9 items-center text-sm text-blue-700 underline">Back to account status</Link></div>}
         <main className="mx-auto w-full max-w-2xl flex-1 space-y-5 px-4 py-6 sm:px-6">
             <h1 className="text-3xl font-bold text-blue-700">Submit an appeal</h1>
             <p className="text-sm text-gray-700">Appeals are private to administrators. A copy is sent to teres Minor (#3552305) by KMail.</p>

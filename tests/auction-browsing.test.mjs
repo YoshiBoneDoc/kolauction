@@ -80,3 +80,18 @@ test('blur normalization rounds quantities and Meat, expands shorthand and prese
     assert.equal(parseMeatAmount('9007199254740992'),null);
     assert.equal(parseAuctionAmount('0.0000005m'),1);
 });
+
+
+test('browse sorts by total accepted bids and latest bid with unbid auctions last', () => {
+    const lots = [
+        { ...base, id: 'older', bidCount: 10, latestBidAt: 200, escrowMode: false },
+        { ...base, id: 'recent', bidCount: 2, latestBidAt: 300, escrowMode: true },
+        { ...base, id: 'unbid', bidCount: 0, latestBidAt: null, createdAt: 500, escrowMode: true },
+    ];
+    assert.deepEqual(ids(browseAuctions(lots, { now, sort: 'bids-desc' })), ['older', 'recent', 'unbid']);
+    assert.deepEqual(ids(browseAuctions(lots, { now, sort: 'bids-asc' })), ['unbid', 'recent', 'older']);
+    assert.deepEqual(ids(browseAuctions(lots, { now, sort: 'activity' })), ['recent', 'older', 'unbid']);
+    assert.deepEqual(ids(browseAuctions(lots, { now, sort: 'activity', trade: 'escrow', search: 'Accessory' })), ['recent', 'unbid']);
+    assert.deepEqual(ids(browseAuctions(lots, { now, trade: 'direct' })), ['older']);
+    assert.deepEqual(browseAuctions(lots, { now, trade: 'none' }), []);
+});

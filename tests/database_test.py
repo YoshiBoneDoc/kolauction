@@ -3742,6 +3742,31 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
             sql(f"select public.create_auction('seal tooth',1,100,{invalid_duration},null,null,2,false);",owner_id,'authenticated',error='valid auction duration')
         sql(f"update public.auctions set duration_hours=337 where id='{fortnight_direct}';",error='auctions_duration_hours_check')
         print('PASS: 14-day Direct and Escrow creation, exact 336-hour timers and deposit-start timing, unsupported durations rejected, existing records unchanged')
+        before_hybrid=message_audit_snapshot()
+        sql(migration_sql('202610220071_hybrid_bid_increments.sql'))
+        assert message_audit_snapshot()==before_hybrid
+        assert sql('select khub_bot.bid_increment(1750000);')=='60000'
+        assert sql('select khub_bot.minimum_auction_bid(1,15000000000);')=='15075000000'
+        print('PASS: hybrid increments apply after the full migration chain without altering accepted bids, auctions, financial ledgers, frozen messages, or accounts')
+        before_hot=message_audit_snapshot()
+        sql(migration_sql('202610220072_hot_auction_cards.sql'))
+        assert message_audit_snapshot()==before_hot
+        hot_page=json.loads(sql("select public.read_auction_page(p_status=>'all');"))
+        assert all(isinstance(row['is_hot'],bool) for row in hot_page['rows'])
+        print('PASS: global hot-auction metadata preserves all auction/account/financial history and existing privacy-protected reads')
+        before_browse=message_audit_snapshot()
+        sql(migration_sql('202610220073_auction_browse_controls.sql'))
+        assert message_audit_snapshot()==before_browse
+        browse_page=json.loads(sql("select public.read_auction_page('browse',null,'','all','activity',1,'escrow');"))
+        assert all(row['escrow_mode'] and 'latest_bid_at' in row and 'is_hot' in row for row in browse_page['rows'])
+        print('PASS: extended paginated browsing preserves existing history, hot flags, and privacy metadata')
+        before_expiry_assets=sql("select jsonb_build_object('deliveries',(select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d),'bids',(select jsonb_agg(to_jsonb(b) order by id) from public.bids b));")
+        sql(migration_sql('202610220074_unfunded_escrow_expiry.sql'))
+        assert sql("select jsonb_build_object('deliveries',(select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d),'bids',(select jsonb_agg(to_jsonb(b) order by id) from public.bids b));")==before_expiry_assets
+        sql('select public.finalize_expired_auctions();')
+        print('PASS: 24-hour unfunded escrow cleanup preserves all existing bids and financial deliveries')
+
+
         print('PASS: service-only gift wrapping protects full player obligations and pending closet funds without changing the regular liability ledger')
         print('PASS: persistent account attempt reservations, two initial retries then five-minute cooldown on every later attempt, due-only bounded queue, finished-job and service-only guards')
         print('PASS: service-only Sent Mail recovery, attempt-stamped positive proof, idempotent isolation alerts and actual message IDs, retained full obligations with separate funded dispatch checks, unrelated payouts continue, manual release, no alert loops or blind resend')

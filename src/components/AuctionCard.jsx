@@ -1,3 +1,4 @@
+import TradeTypeBadge from './TradeTypeBadge';
 import WinnerLink from './WinnerLink';
 import { useContext, useState } from 'react';
 import PropTypes from 'prop-types';
@@ -26,7 +27,7 @@ export default function AuctionCard({ auction, now }) {
             </Link>
             {auction.auctionNumber && <p className="mt-2 text-center text-xs text-gray-600">Auction #{auction.auctionNumber}</p>}
             <p className="mt-2 break-words text-center text-sm">Sold by <SellerLink auction={auction} /></p>
-            <p className="mt-1 text-center"><span className="inline-flex rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">{auction.escrowMode ? 'Escrow' : 'Direct trade'}</span></p>
+            <p className="mt-1 text-center"><TradeTypeBadge escrow={auction.escrowMode} /></p>
             <p className="mt-3 text-center text-sm text-gray-600">Minimum bid: {formatCompactMeat(auction.minBidMeat)} Meat</p>
             <div className="my-3 text-center">
                 <p className="text-sm text-gray-600">{active ? 'Current bid' : result.hasWinner ? 'Final price' : 'Last bid'}</p>

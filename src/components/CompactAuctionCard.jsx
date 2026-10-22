@@ -1,3 +1,4 @@
+import TradeTypeBadge from './TradeTypeBadge';
 import { useContext, useId } from 'react';
 import PropTypes from 'prop-types';
 import { Link, useLocation } from 'react-router-dom';
@@ -19,6 +20,8 @@ export default function CompactAuctionCard({ auction, now, expanded = false, onT
     const price = result.finalPrice ?? (auction.currentBid || auction.minBidMeat);
     const priceLabel = result.hasWinner ? 'Final price' : auction.currentBid ? active ? 'Current bid' : 'Last bid' : 'Minimum bid';
     const shortPriceLabel = result.hasWinner ? 'Final' : auction.currentBid ? active ? 'Bid' : 'Last' : 'Min';
+    const bidCount = Math.max(auction.bidCount ?? auction.bids?.length ?? 0, auction.currentBid > 0 ? 1 : 0);
+    const hasBids = bidCount > 0;
     const canBid = active && !ownsAuction && !currentUser?.isBanned;
     const showForm = expanded && canBid;
     const itemLabel = `${auction.item} ×${auction.quantity.toLocaleString('en-US')}`;
@@ -36,24 +39,27 @@ export default function CompactAuctionCard({ auction, now, expanded = false, onT
                 {active ? <p className={`text-[11px] leading-3 tabular-nums ${auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-500'}`}>
                     <time dateTime={new Date(auction.endTime).toISOString()} title={`Ends ${new Date(auction.endTime).toLocaleString()}`}>{timeRemaining(auction.endTime, now)}</time> left
                 </p> : <p title={status.label} className={`max-w-full truncate leading-3 text-xs font-semibold ${status.color}`}>{status.label}</p>}
-                <span className="inline-flex rounded border border-gray-200 bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium leading-3 text-gray-600">{auction.escrowMode ? 'Escrow' : 'Direct'}</span>
+                <TradeTypeBadge escrow={auction.escrowMode} compact short />
             </div>
         </header>
         <Link to={`/auction/${auction.id}`} state={linkState} aria-label={`View ${itemLabel}`} className="col-start-1 row-start-2 row-span-2 flex h-[60px] w-[60px] self-center items-center justify-center rounded-md bg-white/70">
             {auction.image ? <img src={auction.image} alt="" loading="lazy" className="h-[60px] w-[60px] object-contain [image-rendering:pixelated]" /> : <span className="text-[10px] text-gray-400">No image</span>}
         </Link>
-        <div className="col-span-2 col-start-1 row-start-2 flex min-h-0 min-w-0 flex-col items-center justify-center text-center">
+        <div className="col-span-2 col-start-1 row-start-2 flex min-h-0 min-w-0 flex-col items-center justify-center text-center pt-2">
             <p title={`${priceLabel}: ${price.toLocaleString('en-US')} Meat`} className="w-full shrink-0 truncate text-[26px] font-bold leading-7 tracking-tight text-[#112D4E]">
-                <span className="text-[11px] font-normal tracking-normal text-gray-500">{shortPriceLabel}: </span>{formatCompactMeat(price)} Meat
+                {(!active || !hasBids) && <span className="text-[11px] font-normal tracking-normal text-gray-500">{shortPriceLabel}: </span>}{active && auction.isHot && <span role="img" aria-label="Top 10% of active auctions by total bids" title="Top 10% of active auctions by total bids" className="mr-1 inline-block text-lg">🔥</span>}{formatCompactMeat(price)} Meat
             </p>
-            {auction.instantPurchasePrice > 0 && <p title={`Buyout: ${auction.instantPurchasePrice.toLocaleString('en-US')} Meat`} className="w-full shrink-0 truncate text-xs font-medium leading-4 text-green-800">
-                Buyout: {formatCompactMeat(auction.instantPurchasePrice)}
-            </p>}
+            {(hasBids || auction.instantPurchasePrice > 0) && <div className="flex max-w-full shrink-0 items-baseline justify-center gap-2 text-xs leading-4">
+                {hasBids && <p className="shrink-0 text-gray-500">Bid ({bidCount.toLocaleString('en-US')} total)</p>}
+                {auction.instantPurchasePrice > 0 && <p title={`Buyout: ${auction.instantPurchasePrice.toLocaleString('en-US')} Meat`} className="min-w-0 truncate font-medium text-green-800">
+                    Buyout: {formatCompactMeat(auction.instantPurchasePrice)}
+                </p>}
+            </div>}
         </div>
         {showForm ? <section id={formId} aria-label={`Bidding for ${auction.item}`} className="col-start-2 row-start-3 min-h-0 min-w-0 [&_a]:relative [&_a]:z-10">
             {currentUser ? <AuctionBidForm auction={auction} inline showTerms={false} onClose={onToggleBid} /> : <div className="flex h-full min-w-0 items-end gap-1">
-                <div role="alert" className="relative z-10 min-w-0 flex-1 rounded-[2px] border border-red-200 bg-red-50 px-1 py-0.5 text-[11px] leading-[11px] text-red-800">
-                    <Link to="/register" className="font-semibold text-red-800 underline hover:text-red-900">Register</Link> or <Link to="/login" className="font-semibold text-red-800 underline hover:text-red-900">log in</Link> to bid on auctions.
+                <div role="alert" className="relative z-10 flex h-8 min-w-0 flex-1 items-center rounded-[2px] border border-red-200 bg-red-50 px-1 py-0 text-xs leading-[14px] text-red-800">
+                    <p><Link to="/register" className="font-semibold text-red-800 underline hover:text-red-900">Register</Link> or <Link to="/login" className="font-semibold text-red-800 underline hover:text-red-900">log in</Link> to bid on auctions.</p>
                 </div>
                 <button type="button" onClick={onToggleBid} aria-label="Close Bid Form" className="inline-flex h-8 min-w-24 shrink-0 items-center justify-center rounded-[2px] border border-gray-300 bg-white px-4 py-0 text-xs font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-500">Close</button>
             </div>}

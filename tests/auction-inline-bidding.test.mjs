@@ -66,7 +66,7 @@ test('All Auctions keeps exactly one inline form open and lets the user close or
     cards()[1].props.onToggleBid(); h.render();
     assert.equal(cards().filter(card => card.props.expanded).length, 0);
     cards()[0].props.onToggleBid(); h.render();
-    h.find(node => node.props?.id === 'auction-sort').props.onChange({ target: { value: 'price-desc' } }); h.render();
+    h.find(node => node.type === 'button' && node.props['aria-label'] === 'Price ▴▾').props.onClick(); h.render();
     assert.equal(cards().filter(card => card.props.expanded).length, 0);
 });
 
@@ -147,11 +147,11 @@ test('typed buyouts remain valid below the normal increment in both full and inl
     user = { id: 'buyer' };
     try {
         for (const inline of [false, true]) {
-            const h = harness(AuctionBidForm, { auction: { ...base, currentBid: 20000000, instantPurchasePrice: 20500000 }, inline });
+            const h = harness(AuctionBidForm, { auction: { ...base, currentBid: 20000000, instantPurchasePrice: 20200001 }, inline });
             h.find(node => node.type === 'input').props.onChange({ target: { value: '20000001' } }); h.render();
             await h.find(node => node.type === 'form').props.onSubmit({ preventDefault() {} }); h.render();
-            assert.match(h.find(node => node.props?.role === 'alert').props.children, /20,500,000 Meat/);
-            h.find(node => node.type === 'input').props.onChange({ target: { value: '20.5m' } }); h.render();
+            assert.match(h.find(node => node.props?.role === 'alert').props.children, /20,200,001 Meat/);
+            h.find(node => node.type === 'input').props.onChange({ target: { value: '20200001' } }); h.render();
             await h.find(node => node.type === 'form').props.onSubmit({ preventDefault() {} });
         }
         assert.deepEqual(bids, []);
@@ -220,4 +220,92 @@ test('logged-out bid clicks reveal a non-modal register/login warning and an ind
     } finally {
         user = { id: 'buyer' };
     }
+});
+
+// Exercise the actual input placeholders and submit handlers, not just the
+// arithmetic helper or the informational chart.
+test('full and inline bid forms display rounded hybrid minimums and accept exactly that amount', async () => {
+    const previousWindow = globalThis.window;
+    globalThis.window = { confirm: () => true };
+    user = { id: 'buyer' };
+    const cases = [[999,1009], [999999,1009999], [1000000,1030000], [1000001,1040001],
+        [1750000,1810000], [7500000,7730000], [9999999,10299999], [10000000,10200000],
+        [10000001,10300001], [15000000,15300000], [99999999,101999999],
+        [100000000,101000000], [100000001,101500001], [350000000,353500000],
+        [9999999999,10099999999], [10000000000,10050000000], [10000000001,10050500001],
+        [15000000000,15075000000], [8000000000000000,8040000000000000]];
+    try {
+        for (const inline of [false, true]) for (const [currentBid, expected] of cases) {
+            const bids = [];
+            trading = { placeBid: async (...args) => bids.push(args) };
+            const auction = { ...base, currentBid, instantPurchasePrice: null, escrowMode: false };
+            const h = harness(AuctionBidForm, { auction, inline });
+            const text = expected.toLocaleString('en-US');
+            const input = () => h.find(node => node.type === 'input');
+            assert.equal(input().props.placeholder, inline ? `Min: ${text} · k/m/b` : text);
+            input().props.onChange({ target: { value: String(expected - 1) } }); h.render();
+            await h.find(node => node.type === 'form').props.onSubmit({ preventDefault() {} }); h.render();
+            assert.equal(bids.length, 0);
+            assert.equal(h.find(node => node.props?.role === 'alert').props.children, `Enter a bid of at least ${text} Meat.`);
+            input().props.onChange({ target: { value: String(expected) } }); h.render();
+            await h.find(node => node.type === 'form').props.onSubmit({ preventDefault() {} });
+            assert.deepEqual(bids, [[base.id, expected]], `${inline ? 'inline' : 'full'} at ${currentBid}`);
+        }
+    } finally { globalThis.window = previousWindow; trading = {}; }
+});
+
+test('open Direct and Escrow card controls refresh their rounded minimum when live bids cross brackets', () => {
+    user = { id: 'buyer' };
+    for (const escrowMode of [false, true]) {
+        const props = currentBid => ({ auction: { ...base, escrowMode, currentBid, instantPurchasePrice: null }, inline: true });
+        const h = harness(AuctionBidForm, props(9999999));
+        for (const [currentBid, minimum] of [[9999999,'10,299,999'],[10000000,'10,200,000'],[10000001,'10,300,001'],[15000000000,'15,075,000,000']]) {
+            h.render(props(currentBid));
+            if (escrowMode) assert.ok(h.find(node => node.type === 'label').props.title.includes(`Attach at least ${minimum} Meat`));
+            else assert.equal(h.find(node => node.type === 'input').props.placeholder, `Min: ${minimum} · k/m/b`);
+        }
+    }
+});
+
+test('My Auctions toggles owned listings, preserves other filters, resets pagination, and hides for guests', () => {
+    const previousUser = user;
+    const previousOwner = listings[1].sellerId;
+    try {
+        user = { id: 'seller' }; listings[1].sellerId = 'another-seller';
+        params = new URLSearchParams('q=Item&status=active&sort=price-desc&page=3');
+        const h = harness(AllAuctions);
+        const button = () => h.find(node => node.type === 'button' && node.props.children === 'My Auctions');
+        assert.equal(button().props['aria-pressed'], false);
+        button().props.onClick(); h.render();
+        assert.equal(params.get('mine'), '1'); assert.equal(params.has('page'), false);
+        assert.equal(params.get('q'), 'Item'); assert.equal(params.get('status'), 'active'); assert.equal(params.get('sort'), 'price-desc');
+        assert.equal(button().props['aria-pressed'], true);
+        assert.deepEqual(nodes(h.tree).filter(node => node.type === CompactAuctionCard).map(node => node.props.auction.id), ['first']);
+        button().props.onClick(); h.render();
+        assert.equal(params.has('mine'), false);
+        assert.equal(nodes(h.tree).filter(node => node.type === CompactAuctionCard).length, 2);
+        user = null; h.render();
+        assert.equal(nodes(h.tree).some(node => node.type === 'button' && node.props.children === 'My Auctions'), false);
+    } finally { user = previousUser; listings[1].sellerId = previousOwner; params = new URLSearchParams(); }
+});
+
+
+test('browse toolbar keeps one sort active, toggles directions, combines methods and resets pagination', () => {
+    params = new URLSearchParams('q=fixture&status=all&page=3&mine=1');
+    const h = harness(AllAuctions);
+    const click = label => { h.find(node => node.type === 'button' && (node.props['aria-label'] || node.props.children) === label).props.onClick(); h.render(); };
+    click('Most Bids ▴▾');
+    assert.equal(params.get('sort'), 'bids-desc');
+    assert.equal(params.has('page'), false);
+    click('Most Bids ▾'); assert.equal(params.get('sort'), 'bids-asc');
+    click('Price ▴▾'); assert.equal(params.get('sort'), 'price-desc');
+    click('Price ▾'); assert.equal(params.get('sort'), 'price-asc');
+    assert.equal(nodes(h.tree).filter(n => n.type === 'button' && n.props['aria-pressed'] === true && !['My Auctions','Escrow','Direct'].includes(n.props.children)).length, 1);
+    const methods = () => nodes(h.tree).filter(n => n.type === 'button' && ['Escrow', 'Direct'].includes(n.props.children));
+    methods()[1].props.onClick(); h.render(); assert.equal(params.get('trade'), 'escrow');
+    methods()[0].props.onClick(); h.render(); assert.equal(params.get('trade'), 'none');
+    methods()[1].props.onClick(); h.render(); assert.equal(params.get('trade'), 'direct');
+    methods()[0].props.onClick(); h.render(); assert.equal(params.has('trade'), false);
+    assert.equal(params.get('q'), 'fixture'); assert.equal(params.get('status'), 'all'); assert.equal(params.get('mine'), '1');
+    click('Reset filters'); assert.equal(params.toString(), '');
 });

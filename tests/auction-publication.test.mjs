@@ -135,6 +135,7 @@ test('preview preserves listing values and editing choices in the compact summar
         function content(element) {
             if (element == null) return '';
             if (typeof element !== 'object') return String(element);
+            if (typeof element.type === 'function') return content(element.type(element.props));
             return React.Children.toArray(element.props?.children).map(content).join('');
         }
         assert.deepEqual(rows.map(row => React.Children.toArray(row.props.children).map(content)), [

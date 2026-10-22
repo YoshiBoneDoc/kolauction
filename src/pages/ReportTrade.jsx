@@ -4,7 +4,6 @@ import WithdrawTradeRating from '../components/WithdrawTradeRating';
 import PropTypes from 'prop-types';
 import { UserContext } from '../context/UserContext';
 import { AuctionsContext } from '../context/AuctionsContext';
-import AuctionNavigation from '../components/AuctionNavigation';
 import SiteFooter from '../components/SiteFooter';
 import { supabase } from '../lib/supabase';
 import { BUG_REPORT_MAX_LENGTH, createBugReportService } from '../lib/bugReports';
@@ -61,8 +60,7 @@ export default function ReportTrade() {
     const confirmed = isSeller ? auction?.sellerConfirmedAt || auction?.sellerResolvedAt : auction?.buyerConfirmedAt || auction?.buyerResolvedAt;
     const eligible = participant && !auction.escrowMode && auction.status === 'awaiting_trade' && auction.finalizedAt;
 
-    return <div className="flex min-h-screen flex-col bg-gray-50">
-        <div className="px-4 sm:px-6"><AuctionNavigation /></div>
+    return <div className="flex flex-1 flex-col bg-gray-50">
         <main className="mx-auto w-full max-w-2xl flex-1 space-y-5 px-4 py-6 sm:px-6">
             <Link to={`/auction/${id}`} className="inline-flex min-h-11 items-center text-blue-700 underline">Back to auction</Link>
             <h1 className="text-3xl font-bold text-blue-700">Report Incomplete Trade</h1>

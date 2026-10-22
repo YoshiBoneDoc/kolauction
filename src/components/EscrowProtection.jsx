@@ -9,7 +9,7 @@ export default function EscrowProtection({ forListing = false, feeBps = 500, fee
             <div className="mt-1 space-y-1 leading-[1.4]">
                 <p>{forListing ? 'Our bot, kHub (#3888760), holds your items and bid Meat and handles the sale automatically.' : 'Our bot, kHub (#3888760), holds the items and bid Meat and handles the exchange automatically.'}</p>
                 <ul className="list-disc space-y-0 pl-4">
-                    <li><strong>Secure Item Storage:</strong> {forListing ? 'Once we confirm your items have been safely deposited, bidding opens and your auction timer starts.' : 'Listed items must be held by the bot before bidding can begin.'}</li>
+                    <li><strong>Secure Item Storage:</strong> {forListing ? 'Once we confirm your items have been safely deposited, bidding opens and your auction timer starts. The bot must accept your deposit within 24 hours of creating the listing.' : 'Listed items must be held by the bot before bidding can begin.'}</li>
                     <li><strong>Funded Bids:</strong> Every accepted bid is backed by real Meat held while that bidder leads.</li>
                     <li><strong>Automatic Refunds:</strong> Outbid bidders receive their Meat back via KMail.</li>
                     <li><strong>Instant Settlement:</strong> {forListing ? 'When your auction ends, the bot sends the items to the winner and your payment to you via KMail.' : 'Items go to the winner and payment goes to the seller via KMail.'}</li>

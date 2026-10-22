@@ -87,7 +87,10 @@ test('seller links on auction cards and details navigate to the public profile',
 test('profile has distinct loading, unavailable, absent and empty-filter states', () => {
     assert.match(render({ isLoading: true }), /Loading seller/);
     assert.match(render({ error: 'database failure' }), /This seller could not be loaded/);
-    assert.doesNotMatch(render({ error: 'database failure' }), /Seller not found|database failure/);
+    // The shared layout retains the global error banner; the seller page itself
+    // must still show an unavailable state rather than a missing profile.
+    const unavailable = render({ error: 'database failure' }).match(/<main[\s\S]*?<\/main>/)[0];
+    assert.doesNotMatch(unavailable, /Seller not found|database failure/);
     assert.match(render({ seller: null }), /Seller not found/);
     assert.match(render({ seller, auctions: [], total: 0 }), /No auctions match these filters/);
 });

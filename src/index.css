@@ -108,7 +108,10 @@ button:focus-visible {
 
 /* Wall of Shame: plaster wall, wooden frames, watercolor paper and brass labels. */
 .shame-page {
-  min-height: 100vh;
+  flex: 1;
+  min-height: 0;
+}
+.shame-page, .shame-background {
   background: #eee9df;
   color: #42382e;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='paper'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%2389755a' opacity='.08' filter='url(%23paper)' d='M0 0h180v180H0z'/%3E%3C/svg%3E");
@@ -148,3 +151,65 @@ button:focus-visible {
 .shame-footer p { margin: 4px 0; }.shame-footer a { color: #744d34; text-decoration: underline; }
 @media (max-width: 900px) { .shame-wall { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 50px 32px; } }
 @media (max-width: 560px) { .shame-wall { grid-template-columns: minmax(0, 320px); justify-content: center; padding: 24px 8px 40px; }.shame-gallery { padding: 24px 20px 36px; }.shame-heading { margin-bottom: 16px; } }
+
+/* Darker red and a stronger glow distinguish the current navigation section. */
+.site-nav-link[aria-current="page"] {
+  color: #B91C1C;
+  font-weight: 500;
+  text-shadow: 0 0 5px rgba(220, 38, 38, 0.55),
+               0 0 12px rgba(239, 68, 68, 0.30);
+}
+
+/* Navbar focus uses text color/glow only, never an outline or box. */
+.site-navigation a:focus,
+.site-navigation a:focus-visible,
+.site-navigation button:focus,
+.site-navigation button:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.site-navigation a:focus-visible,
+.site-navigation button:focus-visible {
+  color: #B91C1C;
+  text-shadow: 0 0 7px rgba(220, 38, 38, 0.65);
+}
+
+.popular-auction-viewport {
+  --popular-columns: 1;
+  overflow: hidden;
+  padding: 4px 0 10px;
+}
+.popular-auction-track {
+  display: flex;
+  width: 100%;
+  gap: 1rem;
+  align-items: stretch;
+}
+.popular-auction-slot {
+  flex: 0 0 calc((100% - (var(--popular-columns) - 1) * 1rem) / var(--popular-columns));
+  min-width: 0;
+}
+.popular-auction-viewport[data-moving="true"] .popular-auction-track {
+  animation: popular-auction-scroll 9s linear infinite;
+}
+.popular-auction-viewport:is(:hover, :focus-within, [data-paused="true"]) .popular-auction-track {
+  animation-play-state: paused;
+}
+/* Keyboard users can reach every card in a stationary, scrollable strip. */
+.popular-auction-viewport:has(a:focus-visible) {
+  overflow-x: auto;
+}
+.popular-auction-viewport:has(a:focus-visible) .popular-auction-track {
+  animation: none;
+  transform: none;
+}
+@keyframes popular-auction-scroll {
+  from { transform: translateX(calc((-100% - 1rem) / var(--popular-columns))); }
+  to { transform: translateX(0); }
+}
+@media (min-width: 640px) { .popular-auction-viewport { --popular-columns: 2; } }
+@media (min-width: 1024px) { .popular-auction-viewport { --popular-columns: 4; } }
+@media (prefers-reduced-motion: reduce) {
+  .popular-auction-viewport { overflow-x: auto; }
+  .popular-auction-viewport[data-moving] .popular-auction-track { animation: none; transform: none; }
+}

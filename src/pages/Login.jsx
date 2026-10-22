@@ -1,4 +1,3 @@
-import BackHomeLinks from '../components/BackHomeLinks';
 import { useState, useContext } from "react";
 import { UserContext } from "../context/UserContext";
 import { Link, useNavigate } from "react-router-dom";
@@ -27,8 +26,7 @@ const Login = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 py-16">
-            <BackHomeLinks className="absolute top-4 left-4" />
+        <div className="flex-1 bg-gray-50 flex flex-col items-center justify-center px-4 py-16">
 
             <form
                 onSubmit={handleSubmit}

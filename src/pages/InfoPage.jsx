@@ -1,4 +1,3 @@
-import BackHomeLinks from '../components/BackHomeLinks';
 import { Link, useLocation } from "react-router-dom";
 import { useEffect } from 'react';
 import { BID_INCREMENT_TIERS } from '../lib/bidIncrements';
@@ -41,8 +40,7 @@ const InfoPage = () => {
         if (hash === '#escrow-fees-title') document.getElementById('escrow-fees-title')?.scrollIntoView({ block: 'start' });
     }, [hash]);
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6 pt-16">
-            <BackHomeLinks className="absolute top-4 left-4" />
+        <div className="flex-1 bg-gray-50 flex flex-col items-center justify-center p-6">
             <h1 className="text-4xl font-bold text-blue-600 mb-4">About KoL Auction Hub</h1>
             <p className="w-full max-w-3xl mb-6 text-sm leading-6 text-gray-700 text-justify">
                 Welcome to <span className="font-bold text-blue-500">kHub</span> (Kingdom of Loathing Auction Hub), a modern take on the old “kBay.”{' '}
@@ -214,19 +212,23 @@ const InfoPage = () => {
                         <div>
                             <div className="overflow-hidden rounded-md border border-gray-200">
                                 <table className="w-full text-xs leading-5">
-                                    <caption className="sr-only">Minimum increases based on the current highest bid, in Meat</caption>
+                                    <caption className="sr-only">Minimum increases and rounding units based on the current highest bid, in Meat</caption>
                                     <thead className="bg-gray-100 text-gray-700"><tr>
-                                        <th scope="col" className={`${subheadingClass} px-3 py-1.5 text-left`}>Current Highest Bid</th>
-                                        <th scope="col" className={`${subheadingClass} px-3 py-1.5 text-right`}>Required Increase</th>
+                                        <th scope="col" className={`${subheadingClass} whitespace-nowrap px-2 py-1.5 text-left`}>Current Bid</th>
+                                        <th scope="col" className={`${subheadingClass} whitespace-nowrap px-2 py-1.5 text-right`}>Increase By</th>
+                                        <th scope="col" className={`${subheadingClass} whitespace-nowrap px-2 py-1.5 text-right`}>Round To</th>
                                     </tr></thead>
                                     <tbody className="divide-y divide-gray-200">
                                         {BID_INCREMENT_TIERS.map(tier => <tr key={tier.label} className="bg-white odd:bg-gray-50">
-                                            <td className="whitespace-nowrap px-3 py-1">{tier.label}</td>
-                                            <td className="px-3 py-1 text-right font-medium text-gray-800">{tier.display}</td>
+                                            <td className="whitespace-nowrap px-2 py-1">{tier.label}</td>
+                                            <td className="px-2 py-1 text-right font-medium text-gray-800">{tier.display}</td>
+                                            <td className="px-2 py-1 text-right text-gray-600">{tier.roundingDisplay}</td>
                                         </tr>)}
                                     </tbody>
                                 </table>
                             </div>
+                            <p className="mt-2 text-xs leading-5">Percentage increases use the current highest bid and round up to a multiple of the amount shown. Add that increase to the current bid to find the minimum next bid.</p>
+                            <p className="mt-2 text-xs leading-5"><strong>Example:</strong> At 1.75M, 3% is 52,500 Meat, rounded up to 60k. The minimum next bid is <strong>1.81M Meat.</strong></p>
                             <p className="mt-2 text-xs leading-5">Buyouts can always be accepted at their listed price, even if below the next minimum bid.</p>
                         </div>
                     </section>

@@ -1,4 +1,3 @@
-import BackHomeLinks from '../components/BackHomeLinks';
 import { useContext, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { UserContext } from '../context/UserContext';
@@ -35,9 +34,8 @@ export default function ResetPassword() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+        <div className="flex-1 bg-gray-50 flex items-center justify-center p-6">
             <div className="w-full max-w-md bg-white rounded shadow p-6 space-y-4">
-                <BackHomeLinks />
                 <h1 className="text-2xl font-bold">Choose a new password</h1>
                 {updated ? (
                     <>

@@ -2,7 +2,6 @@ import { useContext, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { UserContext } from '../context/UserContext';
-import AuctionNavigation from '../components/AuctionNavigation';
 import { supabase } from '../lib/supabase';
 import { loadWallOfShame, WALL_PAGE_SIZE } from '../lib/wallOfShame';
 
@@ -52,7 +51,6 @@ export default function WallOfShame() {
 
     return (
         <div className="shame-page">
-            <div className="px-4 sm:px-6"><AuctionNavigation /></div>
             <main className="shame-gallery">
                 <header className="shame-heading">
                     <p className="shame-eyebrow">The kHub</p>

@@ -34,17 +34,21 @@ const requireModule = createRequire(import.meta.url);
 new Function('require', 'module', 'exports', outputFiles[0].text)((name) => name === 'react-router-dom' ? router : requireModule(name), compiled, compiled.exports);
 const { render } = compiled.exports;
 
-test('Info explains first bids, both trade modes and exact buyouts alongside all nine threshold rows', () => {
+test('Info explains first bids, both trade modes and exact buyouts alongside all eight hybrid threshold rows', () => {
     const html = render('/info', []);
     assert.match(html, /Minimum Bid Increases/);
     assert.match(html, /first bid must meet the seller/);
     assert.match(html, /both Escrow and Direct Trade/);
     assert.match(html, /Buyouts can always be accepted at their listed price, even if below the next minimum bid/);
     const table = html.match(/<table[^>]*>\s*<caption[^>]*>Minimum increases[\s\S]*?<\/table>/)[0];
-    assert.equal((table.match(/<tr/g) || []).length, 10);
-    assert.match(table, /10m–under 100m/);
-    assert.match(table, /10b and above/);
-    assert.match(table, /1% \(rounded up\)/);
+    assert.equal((table.match(/<tr/g) || []).length, 9);
+    assert.match(table, /10M–under 100M/);
+    assert.match(table, /10B and above/);
+    assert.match(table, /0\.5%/);
+    assert.match(table, /Round To/);
+    assert.match(table, /500k/);
+    assert.match(html, /round up to a multiple/);
+    assert.match(html, /1\.81M Meat/);
 });
 const base = { sellerId: 'seller', owner: 'Seller', quantity: 1, minBidMeat: 100, currentBid: 0, bids: [], createdAt: Date.now(), endTime: Date.now() + 3600000, status: 'active' };
 const auctions = [
@@ -179,6 +183,8 @@ test('pending item deposits display seller deposit instructions without internal
     const listing = { ...auctions[0], auctionNumber:'1001', escrowMode:true, status:'pending_escrow', itemId:1, auctionTime:24, startOnDeposit:true };
     const html = render('/auction/active', [listing], {id:'seller'});
     assert.match(html,/LIST 1001/);
+    assert.match(html,/accept your deposit within 24 hours of creating this listing/);
+    assert.match(html,/late deposits are returned/);
     assert.doesNotMatch(html,/item #\d+/);
     assert.match(html,/24-hour timer starts/);
     assert.doesNotMatch(html,/Your bid \(Meat\)/);
@@ -198,7 +204,8 @@ test('escrow settlement has no manual confirmation control and profile separates
 test('auction lists abbreviate prices while individual details keep exact amounts', () => {
     const listing={...auctions[0],currentBid:59600000,minBidMeat:1500,instantPurchasePrice:6200000000};
     const cards=render('/auctions',[listing],{id:'buyer'});
-    assert.match(cards,/Bid: <\/span>59.6m Meat/);
+    assert.match(cards,/>59.6m Meat<\/p>/);
+    assert.match(cards,/Bid \(1 total\)/);
     assert.match(cards,/>59.6m Meat<\/p>/);
     assert.match(cards,/>Place Bid<\/button>/);
     assert.match(cards,/Buyout: 6.2b/);
@@ -212,7 +219,7 @@ test('auction lists abbreviate prices while individual details keep exact amount
     assert.match(details,/>6,200,000,000 Meat<\/p>/);
     assert.match(details,/>Buy Now<\/button>/);
     const home=render('/',[listing]);
-    assert.match(home,/>59.6m Meat<\/p>/);
+    assert.match(home,/>59.6m Meat<\/span>/);
     assert.match(home,/Buyout Price: 6.2b/);
 });
 
@@ -287,4 +294,59 @@ test('Info explains marginal seller fees and displays the five agreed fee tiers'
     assert.match(html, /410k Meat total \(4.1%\)/);
     assert.match(html, /rounded down to whole Meat/);
     assert.doesNotMatch(html, /7\.5%/);
+});
+
+test('individual auction pages display the exact hybrid minimum in Direct inputs and Escrow KMail instructions', () => {
+    for (const [currentBid, minimum] of [[0,'100'],[1750000,'1,810,000'],[7500000,'7,730,000'],
+        [15000000,'15,300,000'],[350000000,'353,500,000'],[15000000000,'15,075,000,000'],
+        [100000001,'101,500,001']]) {
+        for (const escrowMode of [false, true]) {
+            const listing = { ...auctions[0], minBidMeat: 100, currentBid, escrowMode, instantPurchasePrice: null, highestBidderId: 'other-bidder' };
+            const html = render('/auction/active', [listing], { id: 'buyer' });
+            if (escrowMode) assert.ok(html.includes(`Attach at least ${minimum} Meat, with no items.`), `Escrow at ${currentBid}`);
+            else {
+                assert.ok(html.includes(`placeholder="${minimum}"`), `Direct at ${currentBid}`);
+                assert.ok(html.includes(`Next minimum bid: ${minimum} Meat.`));
+            }
+        }
+    }
+});
+
+test('homepage has one See all auctions link beside Popular Items and retains the entire open-auction strip', () => {
+    const listings = Array.from({ length: 31 }, (_, i) => ({ ...auctions[0], id: `carousel-${i}`, item: `Carousel item ${i}`, bidCount: 31-i }));
+    const html = render('/', listings);
+    assert.equal((html.match(/>See all auctions<\/a>/g) || []).length, 1);
+    assert.doesNotMatch(html, /Browse active auctions|See more active auctions/);
+    assert.match(html, /Popular Items<\/h2><span[^>]*aria-hidden="true"[^>]*>·<\/span>/);
+    assert.equal((html.match(/<li class="popular-auction-slot"/g) || []).length, 31);
+    assert.match(html, /Pause auction scrolling/);
+    for (const listing of listings) assert.equal((html.match(new RegExp(`>${listing.item} <span`, 'g')) || []).length, 1);
+});
+
+
+test('All Auctions cards put the total bid count below current prices and retain Min for unbid listings', () => {
+    const listing = { ...auctions[0], currentBid: 1100, bidCount: 40, bids: [{ amount: 1100 }] };
+    const html = render('/auctions', [listing]);
+    assert.match(html, />1.1k Meat<\/p>/);
+    assert.match(html, />Bid \(40 total\)<\/p>/);
+    assert.doesNotMatch(html, /Bid: <\/span>/);
+    assert.ok(html.indexOf('>1.1k Meat</p>') < html.indexOf('>Bid (40 total)</p>'));
+    const unbid = render('/auctions', [{ ...listing, currentBid: 0, bidCount: 0, bids: [] }]);
+    assert.match(unbid, /Min: <\/span>100 Meat/);
+    assert.doesNotMatch(unbid, /Bid \([0-9,]+ total\)/);
+    const buyout = render('/auctions', [{ ...listing, instantPurchasePrice: 50000 }]);
+    assert.match(buyout, /Bid \(40 total\)/);
+    assert.match(buyout, /Buyout: 50k/);
+    assert.match(buyout, /h-\[134px\]/);
+});
+
+test('only active cards with the global hot flag show a fire emoji immediately before the price', () => {
+    const hot = { ...auctions[0], currentBid: 1100, bidCount: 40, isHot: true };
+    const html = render('/auctions', [hot]);
+    assert.match(html, /Top 10% of active auctions by total bids/);
+    assert.match(html, /🔥<\/span>1.1k Meat/);
+    assert.equal((html.match(/🔥/g) || []).length, 1);
+    assert.doesNotMatch(render('/auctions', [{ ...hot, isHot: false, bidCount: 400 }]), /🔥/);
+    assert.doesNotMatch(render('/auctions?status=all', [{ ...hot, status: 'completed', finalPrice: 1100 }]), /🔥/);
+    assert.doesNotMatch(render('/auctions?status=all', [{ ...hot, endTime: Date.now()-1000 }]), /🔥/);
 });

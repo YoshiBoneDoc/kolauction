@@ -147,3 +147,66 @@ test('website bids above the former 20-billion limit retain their exact amount',
     await service.bid(row.id,50000000001);
     assert.deepEqual(calls,[['place_bid',{p_auction_id:row.id,p_amount:50000000001}]]);
 });
+
+test('homepage loads every active page beyond four and 24 cards using existing privacy-filtered reads', async () => {
+    const requests = [];
+    const service = createAuctionService({ async rpc(name, args) {
+        requests.push([name, args]);
+        if (name === 'finalize_expired_auctions') return { error: null };
+        assert.equal(args.p_view, 'browse'); assert.equal(args.p_status, 'active');
+        assert.equal(args.p_search, ''); assert.equal(args.p_sort, 'newest');
+        const offset = (args.p_page - 1) * 24;
+        return { data: { privacy_version: 1, rows: Array.from({ length: Math.min(24, 53-offset) }, (_, i) => ({ ...row, id: `active-${offset+i}` })), bids: [], total: 53 }, error: null };
+    } });
+    const data = await service.load({ view: 'home' });
+    assert.equal(data.auctions.length, 53);
+    assert.equal(data.total, 53);
+    assert.equal(new Set(data.auctions.map(auction => auction.id)).size, 53);
+    assert.deepEqual(requests.filter(([name]) => name === 'read_auction_page').map(([,args]) => args.p_page), [1,2,3]);
+    assert.equal(requests.filter(([name]) => name === 'finalize_expired_auctions').length, 1);
+});
+
+test('home page scans deduplicate shifting rows and reject a later failed or outdated privacy response', async () => {
+    for (const failure of [null, 'network', 'privacy']) {
+        const service = createAuctionService({ async rpc(name, args) {
+            if (name === 'finalize_expired_auctions') return { error: null };
+            if (args.p_page === 2 && failure === 'network') return { error: { message: 'Could not load page two' } };
+            return { error: null, data: { privacy_version: args.p_page === 2 && failure === 'privacy' ? 0 : 1,
+                rows: [{ ...row, id: 'same-row' }], bids: [], total: 25 } };
+        } });
+        if (failure) await assert.rejects(service.load({ view: 'home' }), failure === 'network' ? /page two/ : /privacy update/);
+        else assert.equal((await service.load({ view: 'home' })).auctions.length, 1);
+    }
+});
+
+test('My Auctions uses server-side seller filtering before pagination and preserves returned totals', async () => {
+    const requests = [];
+    const service = createAuctionService({ async rpc(name, args) {
+        requests.push([name,args]);
+        return { error: null, data: { privacy_version: 1, rows: [{ ...row, seller_id: 'owner' }], bids: [], total: 57 } };
+    } });
+    const result = await service.load({ view: 'browse', sellerId: 'owner', search: 'hat', status: 'all', sort: 'price-desc', page: 3 });
+    assert.deepEqual(requests[1], ['read_auction_page', { p_view: 'seller', p_id: 'owner', p_search: 'hat', p_status: 'all', p_sort: 'price-desc', p_page: 3 }]);
+    assert.equal(result.total, 57);
+    assert.equal(result.auctions[0].sellerId, 'owner');
+});
+
+test('hot-card eligibility comes from the global server ranking, never from the current page or bid amount', () => {
+    assert.equal(mapAuction({ ...row, is_hot: true, bid_count: 40 }, []).isHot, true);
+    assert.equal(mapAuction({ ...row, is_hot: false, bid_count: 400 }, []).isHot, false);
+    assert.equal(mapAuction(row, []).isHot, false);
+});
+
+
+test('method filtering and activity sort are sent to the paginated reader, mapping latest accepted bid metadata', async () => {
+    const requests = [];
+    const service = createAuctionService({ async rpc(name, args) {
+        requests.push([name,args]);
+        return { error: null, data: name === 'read_auction_page' ? { privacy_version: 1, total: 32, rows: [{ ...row, latest_bid_at: '2026-10-22T01:00:00Z' }], bids: [] } : null };
+    }});
+    const result = await service.load({ trade: 'escrow', sort: 'activity', page: 2, sellerId: 'owner' });
+    assert.equal(requests[1][1].p_trade, 'escrow'); assert.equal(requests[1][1].p_sort, 'activity');
+    assert.equal(requests[1][1].p_page, 2); assert.equal(requests[1][1].p_id, 'owner');
+    assert.equal(result.auctions[0].latestBidAt, Date.parse('2026-10-22T01:00:00Z'));
+    assert.equal(mapAuction(row, []).latestBidAt, null);
+});

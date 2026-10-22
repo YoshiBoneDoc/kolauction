@@ -756,21 +756,37 @@ minimum from 24 to 16; existing accounts, pending jobs and messages remain intac
 For fresh credentials, send CREDENTIALS after restart (subject to the five-minute
 cooldown). No website redeploy is needed.
 
-## Minimum bid increases (053)
+## Minimum bid increases (071)
 
-Apply `migrations/queue/202610210053_tiered_bid_increments.sql` after 052 and deploy
-the matching website. Both Direct bids and funded Escrow KMail use the same tiers
-shown on the Info page. The first bid meets the seller minimum; subsequent bids
-use the current accepted bid's tier. At 10b and above, the increase is 1%, rounded
-up to whole Meat. A bidder may exceed the required minimum by any whole amount.
+Apply `202610220071_hybrid_bid_increments.sql` after 070 and deploy the matching
+website. Both Direct bids and funded Escrow KMail use the current highest bid's
+bracket, never the proposed bid's bracket:
+
+| Current bid | Increase | Round increase up to |
+| --- | --- | --- |
+| Below 1k | 10 Meat | — |
+| 1k–under 10k | 100 Meat | — |
+| 10k–under 100k | 1k | — |
+| 100k–under 1M | 10k | — |
+| 1M–under 10M | 3% | 10k |
+| 10M–under 100M | 2% | 100k |
+| 100M–under 10B | 1% | 500k |
+| 10B+ | 0.5% | 500k |
+
+Round only the percentage increase, then add it to the current bid. For example,
+1.75M needs a 60k increase, making the next minimum 1.81M. Frontend BigInt and
+exact database integer division avoid floating-point errors. The first bid meets
+the seller minimum; bids exactly at the calculated minimum are accepted.
 
 Exact buyouts remain valid below the next ordinary bid. A larger bid reaching the
-buyout still closes at the saved buyout price, with excess funded Meat refunded.
+buyout closes at the saved buyout price, with excess funded Meat refunded.
 Low/stale funded bids receive their full refund and a reply naming the exact next
 minimum. Existing bids, prices, deadlines and frozen delivery messages are kept.
 
-The existing bot uses database RPCs, so these rules do not require another bot
-code deployment. Its matching SQL copy is included for future installations.
+The existing bot uses database RPCs, so these rules require no bot rebuild or
+restart. Its matching SQL copy is included for future installations. Run
+`python3 tests/hybrid_bid_increments_database_test.py` for isolated checks of
+brackets, rounding, large bids, exact acceptance, both bid paths and buyouts.
 
 
 ## Incomplete-profile grace period (055)
@@ -884,3 +900,50 @@ the exact recorded fee for the bot's closet.
 
 Run `python3 tests/tiered_fees_database_test.py` for isolated real settlement,
 permission, migration-preservation, buyout/refund, split-payment and fee tests.
+
+
+## Hot auction cards (072)
+
+Apply `202610220072_hot_auction_cards.sql` after 071, then deploy the website.
+The auction reader adds `is_hot` for the highest bid-count listings across the
+entire live auction pool, before search, seller/My Auctions filters or pagination.
+The number of slots is `ceil(active_count / 10)`. Zero-bid listings never qualify.
+Equal bid counts prefer older creation times, then auction UUID, keeping the
+selection deterministic. Only auctions still accepting bids qualify: expired,
+held, concluded and restricted-seller listings are excluded. Ranking is recomputed
+on reads and follows new bids and deadline transitions without a scheduled job.
+
+The existing identity/privacy projection, bid rules, fees, stored history and
+bot deliveries are unchanged. No bot rebuild or restart is needed. Test with
+`python3 tests/hot_auctions_database_test.py` against an isolated local database.
+
+## Compact auction browsing controls (073)
+
+Apply `queue/202610220073_auction_browse_controls.sql` after 072, before deploying
+this website update. The existing auction reader supports total-bid ascending /
+descending and latest accepted bid sorting (unbid auctions last), plus an explicit
+seven-argument overload for `p_trade` (`all`, `escrow`, `direct`, or `none`). Trade
+filters, search, status and seller/My Auctions constraints apply before totals,
+sorting and pagination. Both selected trade types use the existing six-argument
+API; deselecting both returns no results. Existing callers, identity protections,
+hot-auction flags and auction/financial data are preserved.
+
+No bot rebuild or restart is needed. `python3 tests/hot_auctions_database_test.py`
+checks the combined controls across multiple pages in an isolated database.
+
+## Unfunded escrow expiry (074)
+
+Apply `queue/202610220074_unfunded_escrow_expiry.sql` after 073. Escrow drafts
+without a deposit expire 24 hours after creation. Normal website finalization
+and bot ticks delete them; ingestion also checks expiry before accepting any
+new deposit. Acceptance uses processing time, not the KMail's sent timestamp.
+Late attachments follow the existing validated, deduplicated return path.
+
+Only `pending_escrow` listings without deposited items, current bid or bid records
+qualify. Active/funded auctions and their timers are untouched. Foreign-key-linked
+support, audit and financial history is retained: those drafts are cancelled
+instead of deleted. The migration immediately cleans up existing expired drafts.
+No commission or incomplete-trade mark is created. No bot rebuild/restart is needed.
+Run `python3 tests/escrow_expiry_database_test.py` for isolated expiry, timely/late
+deposits, exact boundary, replay, retained-history, unchanged-assets and permission
+checks.

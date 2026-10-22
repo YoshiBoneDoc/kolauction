@@ -54,3 +54,22 @@ test('slow requests cannot overlap and an initially hidden page waits until visi
     assert.equal([...f.queue.values()][0].ms,10000);
     stop();
 });
+
+test('My Auctions binds the listing filter to the signed-in viewer while retaining search, status, sort and page', () => {
+    const query = '?mine=1&q=hat&status=all&sort=price-desc&page=3';
+    assert.deepEqual(auctionReadRequest('/auctions', query, 'signed-in-owner'), {
+        view: 'browse', sellerId: 'signed-in-owner', search: 'hat', status: 'all', sort: 'price-desc', page: 3,
+    });
+    assert.equal(auctionReadRequest('/auctions', query, 'another-owner').sellerId, 'another-owner');
+    assert.equal(auctionReadRequest('/auctions', query).sellerId, undefined);
+    assert.equal(auctionReadRequest('/auctions', '?mine=0', 'signed-in-owner').sellerId, undefined);
+    assert.equal(auctionReadRequest('/seller/public-player', query, 'signed-in-owner').id, 'public-player');
+});
+
+
+test('new browse controls survive URL routing with pagination and My Auctions', () => {
+    assert.deepEqual(auctionReadRequest('/auctions', '?sort=activity&trade=escrow&q=hat&mine=1&page=2', 'owner'), {
+        view: 'browse', sellerId: 'owner', search: 'hat', status: 'active', sort: 'activity', trade: 'escrow', page: 2,
+    });
+    for (const sort of ['bids-desc', 'bids-asc', 'price-desc', 'price-asc']) assert.equal(auctionReadRequest('/auctions', '?sort=' + sort).sort, sort);
+});

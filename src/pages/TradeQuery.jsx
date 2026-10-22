@@ -3,7 +3,6 @@ import { Link, useParams } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { UserContext } from '../context/UserContext';
 import { AuctionsContext } from '../context/AuctionsContext';
-import AuctionNavigation from '../components/AuctionNavigation';
 import SiteFooter from '../components/SiteFooter';
 import { supabase } from '../lib/supabase';
 import { BUG_REPORT_MAX_LENGTH, createBugReportService } from '../lib/bugReports';
@@ -55,8 +54,7 @@ export default function TradeQuery() {
     const auction = auctions.find(entry => String(entry.id) === id);
     const eligible = canSendTradeQuery(auction, currentUser);
 
-    return <div className="flex min-h-screen flex-col bg-gray-50">
-        <div className="px-4 sm:px-6"><AuctionNavigation /></div>
+    return <div className="flex flex-1 flex-col bg-gray-50">
         <main className="mx-auto w-full max-w-2xl flex-1 space-y-5 px-4 py-6 sm:px-6">
             <Link to={`/auction/${id}`} className="inline-flex min-h-11 items-center text-blue-700 underline">Back to auction</Link>
             <h1 className="text-3xl font-bold text-blue-700">Trade query</h1>

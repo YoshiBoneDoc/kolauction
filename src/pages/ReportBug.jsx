@@ -2,7 +2,6 @@ import { useContext, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import { UserContext } from '../context/UserContext';
-import AuctionNavigation from '../components/AuctionNavigation';
 import SiteFooter from '../components/SiteFooter';
 import { supabase } from '../lib/supabase';
 import { BUG_REPORT_MAX_LENGTH, createBugReportService } from '../lib/bugReports';
@@ -55,8 +54,7 @@ ReportForm.propTypes = { support: PropTypes.bool.isRequired };
 
 export default function ReportBug({ support = false }) {
     const { currentUser } = useContext(UserContext);
-    return <div className="flex min-h-screen flex-col bg-gray-50">
-        <div className="px-4 sm:px-6"><AuctionNavigation /></div>
+    return <div className="flex flex-1 flex-col bg-gray-50">
         <main className="mx-auto w-full max-w-2xl flex-1 space-y-5 px-4 py-6 sm:px-6">
             <h1 className="text-3xl font-bold text-blue-700">{support ? 'Submit a Support Ticket' : 'Report a Bug'}</h1>
             <p className="text-sm text-gray-700">{support ? 'Support tickets' : 'Reports'} are private to administrators.</p>
