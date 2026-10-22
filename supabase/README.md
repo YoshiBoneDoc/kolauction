@@ -954,7 +954,7 @@ Apply `queue/202610220075_homepage_poll.sql` after 074, then deploy the website.
 No bot rebuild or restart is needed. The initial question is live on the homepage
 for unrestricted signed-in accounts. Each account gets one immutable vote **per
 poll**, enforced by a primary key and authenticated database RPCs. Guests cannot
-vote; restricted accounts are denied. Voting hides that question on later visits.
+vote; restricted accounts are denied. Migration 076 replaces the voting controls with live results after a vote.
 
 Open `/admin/polls` using **Manage polls** in the administrator inbox or the homepage
 poll banner. Administrators can save/edit private drafts, publish one when ready,
@@ -967,10 +967,29 @@ the admin archive with totals and percentages. Refresh Results reloads live coun
 Results stay private until the administrator selects **Publish results on
 homepage** for a concluded poll. Published summaries appear to signed-in users
 alongside the next poll and remain visible after voting. **Hide homepage results**
-removes that summary without deleting its archived results. Active counts, drafts,
-voter identities and unpublished results are never exposed to ordinary users.
+removes that summary without deleting its archived results. Drafts, voter identities and unpublished archived results are never exposed to
+ordinary users. With migration 076, active counts are available after voting.
 
 Run `python3 tests/polls_database_test.py` for lifecycle, one-vote/concurrent-vote,
 closure race, archived snapshot, publication, privacy and permission checks in an
 isolated PostgreSQL database. Frontend service/state tests are in
 `tests/home-poll.test.mjs`.
+
+## Live poll results and private voter names (076)
+
+Apply `queue/202610220076_live_poll_results.sql` after 075, then deploy the website.
+Existing votes, one-vote-per-account enforcement and frozen archived results are
+unchanged. After voting, a signed-in user sees a compact, left-aligned yellow
+results box at the bottom of the homepage, including on return visits. Aggregate
+results refresh every 30 seconds while the page is visible and when it regains
+focus. No active totals are returned before voting, except to administrators.
+Guests and restricted accounts remain excluded. Past results still require the
+administrator's explicit publication after conclusion.
+
+Administrators can expand **View voters** under each poll on `/admin/polls` or
+under the current homepage poll's admin totals. `read_poll_voters(uuid)` returns
+usernames grouped by Yes and No only after a database administrator check; no
+voter names or account IDs are included in any ordinary homepage/results response.
+Lists reflect votes/accounts still on file; frozen historical totals are retained
+independently. No bot rebuild or restart is required. The isolated poll database
+tests cover the 075-to-076 upgrade and permissions as well as the full lifecycle.

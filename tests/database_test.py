@@ -3770,6 +3770,11 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         assert message_audit_snapshot()==before_polls
         assert sql('select count(*) from khub_bot.site_polls where active;')=='1'
         print('PASS: homepage poll and management migration preserves all existing auctions, identities, bids, messages and financial records')
+        before_live_polls=message_audit_snapshot()
+        sql(migration_sql('202610220076_live_poll_results.sql'))
+        assert message_audit_snapshot()==before_live_polls
+        print('PASS: live post-vote results and private voter lookup preserve existing financial and account history')
+
 
 
 

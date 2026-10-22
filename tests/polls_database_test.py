@@ -50,7 +50,7 @@ with tempfile.TemporaryDirectory(prefix='khub-polls-',dir='/tmp') as folder:
         assert len({p.name for p in migrations})==len(migrations)
         poll_migration=next(path for path in migrations if path.name.startswith('202610220075_'))
         for migration in migrations:
-            if migration!=poll_migration: sql(migration.read_text())
+            if migration!=poll_migration and not migration.name.startswith('202610220076_'): sql(migration.read_text())
         catalog_path=ROOT/'src/data/items.json'
         if not catalog_path.exists(): catalog_path=ROOT/'catalog/items.json'
         catalog=json.loads(catalog_path.read_text())
@@ -163,5 +163,31 @@ with tempfile.TemporaryDirectory(prefix='khub-polls-',dir='/tmp') as folder:
             holding.result()
         assert next(p for p in archive() if p['id']==third)['final_results']=={'yes':1,'no':0,'total':1}
         print('PASS: concurrent conclusion includes the last committed vote in the permanent results snapshot')
+        before_live=sql("select jsonb_build_object('polls',(select jsonb_agg(to_jsonb(p) order by id) from khub_bot.site_polls p),'votes',(select jsonb_agg(to_jsonb(v) order by poll_id,voter_id) from khub_bot.site_poll_votes v));")
+        live_migration=next(path for path in migrations if path.name.startswith('202610220076_'))
+        sql(live_migration.read_text())
+        assert sql("select jsonb_build_object('polls',(select jsonb_agg(to_jsonb(p) order by id) from khub_bot.site_polls p),'votes',(select jsonb_agg(to_jsonb(v) order by poll_id,voter_id) from khub_bot.site_poll_votes v));")==before_live
+        fourth=admin_call("select public.save_poll_draft('Should we show live results?');")
+        admin_call(f"select public.publish_poll('{fourth}');")
+        assert 'results' not in read(first) and read(first)['has_voted'] is False
+        sql(f"set role authenticated; select public.vote_home_poll('{fourth}',true);",first)
+        result=read(first)
+        assert result['has_voted'] and result['results']=={'yes':1,'no':0,'total':1}
+        sql(f"set role authenticated; select public.vote_home_poll('{fourth}',false);",administrator)
+        assert read(first)['results']=={'yes':1,'no':1,'total':2}
+        assert 'Poll voter' not in json.dumps(feed(first)) and 'Poll administrator' not in json.dumps(feed(first))
+        names=json.loads(admin_call(f"select public.read_poll_voters('{fourth}');"))
+        assert names=={'yes':['Poll voter one'],'no':['Poll administrator']},names
+        for role,uid in [('anon',None),('authenticated',first)]:
+            sql(f"set role {role}; select public.read_poll_voters('{fourth}');",uid,error='permission denied' if role=='anon' else 'Administrator access required')
+        sql(f"set role authenticated; select public.read_poll_voters('{fourth}');",second,error='restricted')
+        sql('set role anon; select public.read_home_poll_feed();',error='permission denied')
+        assert json.loads(admin_call(f"select public.read_poll_voters('{third}');"))['yes']==['Poll voter one']
+        admin_call(f"select public.close_home_poll('{fourth}');")
+        assert read(first) is None
+        admin_call(f"select public.publish_poll_results('{fourth}',true);")
+        visible=feed(first)['published_results'][0]
+        assert visible['results']=={'yes':1,'no':1,'total':2} and 'Poll voter' not in json.dumps(visible)
+        print('PASS: live counts only after voting, refreshed totals, unchanged saved votes/results, admin-only per-answer usernames for live/archived polls and no identity leaks through public summaries')
     finally:
         if started: pg('-m','fast','-w','stop')

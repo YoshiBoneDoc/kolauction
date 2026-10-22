@@ -8,6 +8,7 @@ export function createPollService(client) {
     return {
         read: () => call('read_home_poll_feed'),
         list: () => call('read_admin_polls'),
+        voters: id => call('read_poll_voters', { p_poll_id: id }),
         saveDraft: (question, id = null) => call('save_poll_draft', { p_question: question, p_poll_id: id }),
         publish: (id, concludeCurrent = false) => call('publish_poll', { p_poll_id: id, p_conclude_current: concludeCurrent }),
         publishResults: (id, publish) => call('publish_poll_results', { p_poll_id: id, p_publish: publish }),

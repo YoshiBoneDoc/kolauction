@@ -21,7 +21,7 @@ function state(initial) {
 const compiled={exports:{}};
 const require=createRequire(import.meta.url);
 new Function('require','module','exports',outputFiles[0].text)(name=>name==='react'?{
- ...React,useState:state,useEffect:fn=>active.effects.push(fn),useContext:()=>({currentUser:user}),
+ ...React,useState:state,useRef:initial=>state({current:initial})[0],useEffect:fn=>active.effects.push(fn),useContext:()=>({currentUser:user}),
 }:require(name),compiled,compiled.exports);
 const {HomePoll,PollPanel}=compiled.exports;
 function nodes(tree) {
@@ -42,8 +42,8 @@ const feed = poll => ({poll,published_results:[],can_manage:poll?.can_manage || 
 test('poll service passes only the authenticated RPC arguments and surfaces failures',async()=>{
  const calls=[];
  const service=createPollService({async rpc(name,args){calls.push([name,args]);return {data:poll,error:null};}});
- assert.deepEqual(await service.read(),poll);await service.vote('poll',false);await service.close('poll');
- assert.deepEqual(calls,[['read_home_poll_feed',undefined],['vote_home_poll',{p_poll_id:'poll',p_answer:false}],['close_home_poll',{p_poll_id:'poll'}]]);
+ assert.deepEqual(await service.read(),poll);await service.vote('poll',false);await service.close('poll');await service.voters('poll');
+ assert.deepEqual(calls,[['read_home_poll_feed',undefined],['vote_home_poll',{p_poll_id:'poll',p_answer:false}],['close_home_poll',{p_poll_id:'poll'}],['read_poll_voters',{p_poll_id:'poll'}]]);
  await assert.rejects(createPollService(null).read(),/temporarily unavailable/);
  await assert.rejects(createPollService({rpc:async()=>({error:{message:'This poll is closed.'}})}).vote('poll',true),/closed/);
 });
@@ -55,13 +55,13 @@ test('homepage poll stays hidden for guests/restricted accounts and remounts per
  user={id:'second'};assert.equal(HomePoll().key,'second');
 });
 
-test('Yes and No each save the chosen boolean and hide the banner after success',async()=>{
+test('Yes and No save once and replace voting with a compact live-results box',async()=>{
  for(const answer of [true,false]){
-  const votes=[];const h=harness({read:async()=>feed(poll),vote:async(...args)=>votes.push(args)});
+  const votes=[];let saved=false;const h=harness({read:async()=>feed(saved?{...poll,has_voted:true,results:{yes:answer?1:0,no:answer?0:1,total:1}}:poll),vote:async(...args)=>{votes.push(args);saved=true;}});
   await h.load();assert.match(h.html(),/bg-yellow-100/);assert.match(h.html(),/current bid/);
   assert.doesNotMatch(h.html(),/Admin results|Conclude poll|Refresh results/);
   await h.button(answer?'Yes':'No').props.onClick();h.render();
-  assert.deepEqual(votes,[['poll',answer]]);assert.equal(h.tree,null);
+  assert.deepEqual(votes,[['poll',answer]]);assert.equal(h.button('Yes'),undefined);assert.match(h.html(),/bg-yellow-50/);assert.match(h.html(),/Live poll results/);assert.match(h.html(),/100%/);assert.doesNotMatch(h.html(),/View voters/);
  }
  const voted=harness({read:async()=>feed(null)});await voted.load();assert.equal(voted.tree,null);
 });
@@ -82,9 +82,27 @@ test('administrator can see totals/percentages, refresh results, vote once and c
 
 
 test('published past results remain visible beside a new poll and after the user votes',async()=>{
+ let saved=false;
  const previous={id:'previous',question:'Our earlier question?',results:{yes:3,no:1,total:4}};
- const h=harness({read:async()=>({...feed(poll),published_results:[previous]}),vote:async()=>{}});
+ const h=harness({read:async()=>({...feed(saved?{...poll,has_voted:true,results:{yes:0,no:1,total:1}}:poll),published_results:[previous]}),vote:async()=>{saved=true;}});
  await h.load();assert.match(h.html(),/Our earlier question/);assert.match(h.html(),/75%/);
  await h.button('No').props.onClick();h.render();assert.equal(h.button('Yes'),undefined);assert.match(h.html(),/Previous poll results/);
  assert.doesNotMatch(h.html(),/Admin results|Manage polls/);
+});
+
+
+test('an old background response cannot restore voting after a successful submission',async()=>{
+ let reads=0,release;
+ const h=harness({read:async()=>{reads++;if(reads===2)return new Promise(resolve=>{release=resolve;});return feed(reads>2?{...poll,has_voted:true,results:{yes:1,no:0,total:1}}:poll);},vote:async()=>{}});
+ await h.load();h.effects[0]();
+ await h.button('Yes').props.onClick();h.render();
+ release(feed(poll));await new Promise(resolve=>setImmediate(resolve));h.render();
+ assert.equal(h.button('Yes'),undefined);assert.match(h.html(),/Live poll results/);
+});
+
+test('a failed post-vote results refresh keeps voting disabled and offers retry',async()=>{
+ let saved=false;
+ const h=harness({read:async()=>{if(saved)throw new Error('Connection lost.');return feed(poll);},vote:async()=>{saved=true;}});
+ await h.load();await h.button('Yes').props.onClick();h.render();
+ assert.equal(h.button('Yes'),undefined);assert.match(h.html(),/Results unavailable/);assert.ok(h.button('Retry'));
 });

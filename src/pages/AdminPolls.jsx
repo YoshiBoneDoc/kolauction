@@ -5,6 +5,7 @@ import { UserContext } from '../context/UserContext';
 import { supabase } from '../lib/supabase';
 import { createPollService } from '../lib/polls';
 import PollResults from '../components/PollResults';
+import PollVoters from '../components/PollVoters';
 import SiteFooter from '../components/SiteFooter';
 
 const polls = createPollService(supabase);
@@ -55,7 +56,10 @@ export function PollManager({ service = polls }) {
                     <span>{poll.closed_at ? 'Concluded' : poll.published_at ? 'Published' : 'Created'} {new Date(poll.closed_at || poll.published_at || poll.created_at).toLocaleString()}</span>
                 </div>
                 <h2 className="text-base font-semibold text-slate-800">{poll.question}</h2>
-                {poll.published_at && <PollResults results={poll.results} />}
+                {poll.published_at && <>
+                    <PollResults results={poll.results} />
+                    <PollVoters pollId={poll.id} service={service} />
+                </>}
                 <div className="flex flex-wrap items-center gap-2">
                     {!poll.published_at && <>
                         <button type="button" disabled={pending} onClick={() => { setEditing(poll.id); setQuestion(poll.question); }} className={button}>Edit draft</button>
@@ -81,7 +85,7 @@ export default function AdminPolls() {
                 <h1 className="text-3xl font-bold text-blue-700">Manage polls</h1>
                 <Link to="/admin/inbox" className="text-sm text-blue-700 underline">Administrator inbox</Link>
             </div>
-            <p className="text-sm text-gray-600">One live poll at a time. Concluded results are saved here and stay private until you publish them.</p>
+            <p className="text-sm text-gray-600">One live poll at a time. Voters see live totals after voting. Voter names are admin-only; concluded results are saved here and can be published on the homepage.</p>
             {currentUser ? <PollManager key={currentUser.id} /> : <p><Link to="/login" className="text-blue-700 underline">Log in</Link> with your administrator account to manage polls.</p>}
         </main>
         <SiteFooter showReportLink={false} />
