@@ -303,9 +303,9 @@ test('browse toolbar keeps one sort active, toggles directions, combines methods
     click('Most Bids ▴▾');
     assert.equal(params.get('sort'), 'bids-desc');
     assert.equal(params.has('page'), false);
-    click('Most Bids ▾'); assert.equal(params.get('sort'), 'bids-asc');
+    click('Most Bids ▴'); assert.equal(params.get('sort'), 'bids-asc');
     click('Price ▴▾'); assert.equal(params.get('sort'), 'price-desc');
-    click('Price ▾'); assert.equal(params.get('sort'), 'price-asc');
+    click('Price ▴'); assert.equal(params.get('sort'), 'price-asc');
     assert.equal(nodes(h.tree).filter(n => n.type === 'button' && n.props['aria-pressed'] === true && !['My Auctions','Others','View All','Escrow','Direct'].includes(n.props.children)).length, 1);
     const methods = () => nodes(h.tree).filter(n => n.type === 'button' && ['Escrow', 'Direct'].includes(n.props.children));
     methods()[1].props.onClick(); h.render(); assert.equal(params.get('trade'), 'escrow');

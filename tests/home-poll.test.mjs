@@ -73,12 +73,18 @@ test('failed votes retain choices and offer retry instead of claiming a vote was
  assert.match(h.html(),/role="alert"/);assert.match(h.html(),/Try again later/);assert.ok(h.button('No'));assert.ok(h.button('Retry'));
 });
 
-test('homepage administrators see totals only after answering; full management remains separate',async()=>{
- let current={...poll,can_manage:true,results:{yes:1,no:1,total:2}},closed=false;
- const h=harness({read:async()=>feed(current),vote:async()=>{current={...current,has_voted:true,results:{yes:2,no:1,total:3}};},close:async()=>{closed=true;current={...current,active:false};}});
- await h.load();assert.doesNotMatch(h.html(),/Admin results|50%|View voters/);assert.equal(h.button('Refresh results'),undefined);
- await h.button('Yes').props.onClick();h.render();assert.equal(h.button('Yes'),undefined);assert.match(h.html(),/67%/);
- await h.button('Conclude poll').props.onClick();h.render();assert.equal(closed,true);assert.match(h.html(),/Closed/);assert.match(h.html(),/Admin results/);assert.equal(h.button('Conclude poll'),undefined);
+test('homepage administrators see all live results without voting and can conclude each poll',async()=>{
+ let results=[{...poll,can_manage:true,results:{yes:1,no:1,total:2}}, {...poll,id:'second',question:'Another active poll?',can_manage:true,results:{yes:0,no:0,total:0}}];
+ let votes=0;const closed=[];
+ const h=harness({read:async()=>({poll:null,can_manage:true,answered_polls:results,published_results:[{id:'past',question:'Archived admin summary?',has_voted:false,results:{yes:3,no:0,total:3}}]}),vote:async()=>{votes++;},close:async(id)=>{closed.push(id);results=results.filter(p=>p.id!==id);}});
+ await h.load();assert.equal(h.button('Yes'),undefined);assert.equal(h.button('No'),undefined);
+ assert.match(h.html(),/50%/);assert.match(h.html(),/Another active poll/);assert.match(h.html(),/0 votes/);assert.match(h.html(),/Archived admin summary/);assert.match(h.html(),/Admin results|View voters/);
+ await h.button('Conclude poll').props.onClick();h.render();assert.deepEqual(closed,['poll']);assert.doesNotMatch(h.html(),/current bid/);assert.match(h.html(),/Another active poll/);assert.equal(votes,0);
+});
+
+test('an older admin feed never restores the Yes or No voting buttons',async()=>{
+ const h=harness({read:async()=>feed({...poll,can_manage:true,results:{yes:1,no:1,total:2}})});
+ await h.load();assert.equal(h.button('Yes'),undefined);assert.equal(h.button('No'),undefined);assert.match(h.html(),/50%/);
 });
 
 

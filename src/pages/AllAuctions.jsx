@@ -56,8 +56,8 @@ export default function AllAuctions() {
                             {[
                                 [['ending', 'Ending Soon'], ['newest', 'Newest'], ['activity', 'Recent Activity']],
                                 [
-                                    [sort === 'bids-desc' ? 'bids-asc' : 'bids-desc', `Most Bids ${sort === 'bids-desc' ? '▾' : sort === 'bids-asc' ? '▴' : '▴▾'}`],
-                                    [sort === 'price-desc' ? 'price-asc' : 'price-desc', `Price ${sort === 'price-desc' ? '▾' : sort === 'price-asc' ? '▴' : '▴▾'}`],
+                                    [sort === 'bids-desc' ? 'bids-asc' : 'bids-desc', `Most Bids ${sort === 'bids-desc' ? '▴' : sort === 'bids-asc' ? '▾' : '▴▾'}`],
+                                    [sort === 'price-desc' ? 'price-asc' : 'price-desc', `Price ${sort === 'price-desc' ? '▴' : sort === 'price-asc' ? '▾' : '▴▾'}`],
                                 ],
                             ].map((options, group) => <div key={group} className={group === 0 ? 'flex h-9 overflow-hidden rounded border border-gray-200 bg-white' : 'flex gap-1'}>
                                 {options.map(([value, label]) => {
@@ -68,7 +68,7 @@ export default function AllAuctions() {
                                         {hasDirection ? <>
                                             <span>{value.startsWith('bids-') ? 'Most Bids' : 'Price'}</span>
                                             <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                                                {!selected ? <path d="m7 8 5-5 5 5M7 16l5 5 5-5" /> : <path d={sort.endsWith('-desc') ? 'm6 9 6 6 6-6' : 'm6 15 6-6 6 6'} />}
+                                                {!selected ? <path d="m7 8 5-5 5 5M7 16l5 5 5-5" /> : <path d={sort.endsWith('-desc') ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6'} />}
                                             </svg>
                                         </> : label}
                                     </button>;

@@ -18,7 +18,8 @@ export function PollPanel({ service = polls }) {
     const writing = useRef(false);
     const generation = useRef(0);
     const poll = feed?.poll;
-    const published = (feed?.published_results || []).filter(result => result.has_voted && result.id !== poll?.id);
+    const isAdmin = feed?.can_manage === true || poll?.can_manage === true;
+    const published = (feed?.published_results || []).filter(result => (isAdmin || result.has_voted) && result.id !== poll?.id);
     useEffect(() => {
         let cancelled = false;
         async function refresh() {
@@ -36,7 +37,7 @@ export function PollPanel({ service = polls }) {
     }, [service, attempt]);
 
     async function vote(answer) {
-        if (writing.current) return;
+        if (writing.current || isAdmin) return;
         writing.current = true;
         generation.current += 1;
         setPending(true); setError('');
@@ -62,8 +63,8 @@ export function PollPanel({ service = polls }) {
         } catch (failure) { setError(failure.message); }
         finally { writing.current = false; setPending(false); }
     }
-    const answered = (feed?.answered_polls || (poll?.has_voted ? [poll] : [])).filter(item => item.has_voted);
-    const question = poll?.active && !poll.has_voted ? poll : null;
+    const answered = (feed?.answered_polls || (poll?.has_voted || isAdmin && poll?.results ? [poll] : [])).filter(item => isAdmin || item.has_voted);
+    const question = !isAdmin && poll?.active && !poll.has_voted ? poll : null;
     if (!question && !answered.length && !published.length && !feed?.can_manage && !error) return null;
     return <section aria-label="Community poll" className="mx-auto mb-6 w-full max-w-6xl space-y-3">
         {question && <div className="rounded-md border border-yellow-300 bg-yellow-100 px-5 py-5 text-slate-800 sm:px-6">

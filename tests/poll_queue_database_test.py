@@ -47,7 +47,7 @@ with tempfile.TemporaryDirectory(prefix='khub-poll-queue-',dir='/tmp') as folder
         migrations=sorted([*ROOT.glob('supabase/migrations/*.sql'),*ROOT.glob('supabase/migrations/queue/*.sql')],key=lambda p:p.name)
         assert len({p.name for p in migrations})==len(migrations)
         for migration in migrations:
-            if not migration.name.startswith('202610220083_'): sql(migration.read_text())
+            if not migration.name.startswith(('202610220083_', '202610220084_')): sql(migration.read_text())
         catalog_path=ROOT/'src/data/items.json'
         if not catalog_path.exists(): catalog_path=ROOT/'catalog/items.json'
         catalog=json.loads(catalog_path.read_text())
@@ -82,13 +82,21 @@ with tempfile.TemporaryDirectory(prefix='khub-poll-queue-',dir='/tmp') as folder
         old=feed(first)['poll']['id'];vote(first,old);close(old)
         first_poll=draft('Should this be the first queued poll?');publish(first_poll)
         before=snapshot();migration=next(p for p in migrations if p.name.startswith('202610220083_'));sql(migration.read_text());assert snapshot()==before
+        before=snapshot();sql(next(p for p in migrations if p.name.startswith('202610220084_')).read_text());assert snapshot()==before
         last=draft('Should this be the third queued poll?')
         middle=draft('Should this be the second queued poll?')
         publish(middle);publish(last)
         assert sql('select count(*) from khub_bot.site_polls where active;')=='3'
-        for uid in [first,second,admin]:
+        for uid in [first,second]:
             feed_data=feed(uid);assert feed_data['poll']['id']==first_poll and feed_data['answered_polls']==[]
             assert 'results' not in feed_data['poll'] and feed_data['published_results']==[]
+        admin_feed=feed(admin)
+        assert admin_feed['poll'] is None and admin_feed['can_manage']
+        assert [p['id'] for p in admin_feed['answered_polls']]==[first_poll,middle,last]
+        assert all(not p['has_voted'] and p['can_manage'] and p['results']['total']==0 for p in admin_feed['answered_polls'])
+        assert json.loads(call("select coalesce(public.read_home_poll(),'null'::jsonb);")) is None
+        assert sql(f"select count(*) from khub_bot.site_poll_votes where voter_id='{admin}';")=='0'
+        print('PASS: admin sees all live results without voting; migrations preserve all existing votes and frozen totals')
         vote(first,last,error='preceding poll')
         call(f"select public.publish_poll('{last}',true);",error='independently')
         assert sql('select count(*) from khub_bot.site_polls where active;')=='3'
@@ -111,7 +119,10 @@ with tempfile.TemporaryDirectory(prefix='khub-poll-queue-',dir='/tmp') as folder
         print('PASS: per-user progression, immutable votes and opposite concurrent retries, live answered totals, no results for unvoted polls or voter identity leaks')
         close(first_poll);call(f"select public.publish_poll_results('{first_poll}',true);")
         assert [p['id'] for p in feed(first)['published_results']]==[first_poll]
-        assert feed(third)['published_results']==[] and feed(admin)['published_results']==[]
+        assert feed(third)['published_results']==[]
+        assert [p['id'] for p in feed(admin)['published_results']]==[first_poll]
+        assert [p['id'] for p in feed(admin)['answered_polls']]==[middle,last]
+        assert feed(admin)['answered_polls'][0]['results']=={'yes':0,'no':1,'total':1}
         assert feed(third)['poll']['id']==middle
         close(last);call(f"select public.publish_poll_results('{last}',true);")
         assert last in [p['id'] for p in feed(first)['published_results']]
@@ -123,7 +134,7 @@ with tempfile.TemporaryDirectory(prefix='khub-poll-queue-',dir='/tmp') as folder
         assert middle not in [p['id'] for p in feed(first)['published_results']]
         records=json.loads(call('select public.read_admin_polls();'))
         assert next(p for p in records if p['id']==middle)['results']=={'yes':0,'no':1,'total':1}
-        print('PASS: individual conclusion leaves other polls active; archived results require both publication and an actual vote, including homepage administrators')
+        print('PASS: individual conclusion leaves other polls active; archived results require publication and a vote for ordinary users; admins can see results without voting')
         concurrent=draft('Should the final vote be frozen correctly?');publish(concurrent)
         following=draft('Should this following poll stay open?');publish(following)
         with ThreadPoolExecutor(max_workers=1) as pool:
