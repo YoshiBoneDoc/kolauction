@@ -106,7 +106,10 @@ export default function BugReportInbox() {
     const { currentUser } = useContext(UserContext);
     return <div className="flex flex-1 flex-col bg-gray-50">
         <main className="mx-auto w-full max-w-6xl flex-1 space-y-5 px-4 py-6 sm:px-6">
-            <h1 className="text-3xl font-bold text-blue-700">Administrator inbox</h1>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <h1 className="text-3xl font-bold text-blue-700">Administrator inbox</h1>
+                <Link to="/admin/polls" className="text-sm text-blue-700 underline">Manage polls</Link>
+            </div>
             {currentUser ? <Inbox key={currentUser.id} /> : <p><Link to="/login" className="text-blue-700 underline">Log in</Link> with an administrator account to open this inbox.</p>}
         </main>
         <SiteFooter showReportLink={false} />

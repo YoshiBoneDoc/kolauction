@@ -23,6 +23,8 @@ import SubmitAppeal from './pages/SubmitAppeal';
 import NotFound from './pages/NotFound';
 import BugReportInbox from './pages/BugReportInbox';
 
+import AdminPolls from "./pages/AdminPolls";
+
 const App = () => {
     const { pathname } = useLocation();
     const { error, refreshAuctions } = useContext(AuctionsContext) || {};
@@ -38,6 +40,7 @@ const App = () => {
                 <Route path="/submit-appeal" element={<SubmitAppeal />} />
                 <Route path="/report-a-bug" element={<ReportBug />} />
                 <Route path="/support" element={<ReportBug support />} />
+                <Route path="/admin/polls" element={<AdminPolls />} />
                 <Route path="/admin/inbox" element={<BugReportInbox />} />
                 <Route path="/admin/bug-reports" element={<BugReportInbox />} />
                 <Route path="/donate" element={<DonatePage />} /> {/* Add route */}

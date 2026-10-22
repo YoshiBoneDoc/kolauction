@@ -6,6 +6,7 @@ import { popularActiveAuctions } from '../lib/auctionBrowsing';
 import { useNow } from '../hooks/useNow';
 import PendingTrades from '../components/PendingTrades';
 import SiteFooter from '../components/SiteFooter';
+import HomePoll from '../components/HomePoll';
 
 export default function Home() {
     const { auctions, isLoading, error } = useContext(AuctionsContext);
@@ -25,6 +26,7 @@ export default function Home() {
                     {!isLoading && !error && popular.length === 0 && <p>No active auctions right now. <Link to="/auctions?status=all" className="text-blue-700 underline">Browse auction history</Link> or <Link to="/auction-item" className="text-blue-700 underline">list an item</Link>.</p>}
                 </PopularAuctions>
             </main>
+            <HomePoll />
             <SiteFooter className="-mx-4 sm:-mx-6" />
         </div>
     );

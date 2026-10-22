@@ -3765,6 +3765,12 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         assert sql("select jsonb_build_object('deliveries',(select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d),'bids',(select jsonb_agg(to_jsonb(b) order by id) from public.bids b));")==before_expiry_assets
         sql('select public.finalize_expired_auctions();')
         print('PASS: 24-hour unfunded escrow cleanup preserves all existing bids and financial deliveries')
+        before_polls=message_audit_snapshot()
+        sql(migration_sql('202610220075_homepage_poll.sql'))
+        assert message_audit_snapshot()==before_polls
+        assert sql('select count(*) from khub_bot.site_polls where active;')=='1'
+        print('PASS: homepage poll and management migration preserves all existing auctions, identities, bids, messages and financial records')
+
 
 
         print('PASS: service-only gift wrapping protects full player obligations and pending closet funds without changing the regular liability ledger')

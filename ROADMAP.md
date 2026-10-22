@@ -10,7 +10,6 @@ Remaining work only. Updated October 21, 2026.
 
 
 ## 1. Outstanding audit fixes
-- if you make a escrow auction but dont deposit the item(s) in a certain period of time to actually start the auction, we should delete that created auctions after a certain point.
 - Show an unavailable/retry state on All Auctions after a failed initial load,
   rather than presenting missing data as “0 auctions found.”
 

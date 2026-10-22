@@ -947,3 +947,30 @@ No commission or incomplete-trade mark is created. No bot rebuild/restart is nee
 Run `python3 tests/escrow_expiry_database_test.py` for isolated expiry, timely/late
 deposits, exact boundary, replay, retained-history, unchanged-assets and permission
 checks.
+
+## Homepage polls and administration (075)
+
+Apply `queue/202610220075_homepage_poll.sql` after 074, then deploy the website.
+No bot rebuild or restart is needed. The initial question is live on the homepage
+for unrestricted signed-in accounts. Each account gets one immutable vote **per
+poll**, enforced by a primary key and authenticated database RPCs. Guests cannot
+vote; restricted accounts are denied. Voting hides that question on later visits.
+
+Open `/admin/polls` using **Manage polls** in the administrator inbox or the homepage
+poll banner. Administrators can save/edit private drafts, publish one when ready,
+conclude a live poll, or atomically conclude it and publish the next draft. Drafts
+are not scheduled automatically; use Publish whenever the next poll should go live.
+A concluded question cannot reopen or change. Closing freezes its Yes/No totals,
+so historical results survive later account or vote cleanup. All polls remain in
+the admin archive with totals and percentages. Refresh Results reloads live counts.
+
+Results stay private until the administrator selects **Publish results on
+homepage** for a concluded poll. Published summaries appear to signed-in users
+alongside the next poll and remain visible after voting. **Hide homepage results**
+removes that summary without deleting its archived results. Active counts, drafts,
+voter identities and unpublished results are never exposed to ordinary users.
+
+Run `python3 tests/polls_database_test.py` for lifecycle, one-vote/concurrent-vote,
+closure race, archived snapshot, publication, privacy and permission checks in an
+isolated PostgreSQL database. Frontend service/state tests are in
+`tests/home-poll.test.mjs`.
