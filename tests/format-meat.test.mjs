@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { formatCompactMeat } from '../src/lib/formatMeat.js';
+import { formatCompactMeat, formatPerItemMeat } from '../src/lib/formatMeat.js';
 
 test('list prices use lowercase k/m/b, one decimal at most, and no trailing .0', () => {
     for (const [amount, expected] of [[0,'0'],[506,'506'],[999,'999'],[1000,'1k'],[1500,'1.5k'],
@@ -19,4 +19,12 @@ test('large aggregate strings and BigInts stay exact until display-only rounding
     assert.equal(formatCompactMeat('9007199254740993'),'9,007,199.3b');
     assert.equal(formatCompactMeat(9007199254740993n),'9,007,199.3b');
     assert.equal(formatCompactMeat(-1500),'-1.5k');
+});
+
+
+test('per-item equivalents divide the exact total before compact rounding', () => {
+    for (const [total, quantity, expected] of [[1000000,20,'50k'],[1000000,50,'20k'],[100,3,'33.33'],
+        [1,2,'0.5'],[1,500,'<0.01'],[2099,2,'1k'],[2100,2,'1.1k'],[1999900,2,'1m']]) {
+        assert.equal(formatPerItemMeat(total,quantity),expected);
+    }
 });

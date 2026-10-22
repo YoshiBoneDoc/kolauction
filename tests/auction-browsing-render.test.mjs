@@ -207,9 +207,9 @@ test('escrow settlement has no manual confirmation control and profile separates
 test('auction lists abbreviate prices while individual details keep exact amounts', () => {
     const listing={...auctions[0],currentBid:59600000,minBidMeat:1500,instantPurchasePrice:6200000000};
     const cards=render('/auctions',[listing],{id:'buyer'});
-    assert.match(cards,/>59.6m Meat<\/p>/);
+    assert.match(cards,/>59.6m Meat</);
     assert.match(cards,/Bid \(1 total\)/);
-    assert.match(cards,/>59.6m Meat<\/p>/);
+    assert.match(cards,/>59.6m Meat</);
     assert.match(cards,/>Place Bid<\/button>/);
     assert.match(cards,/Buyout: 6.2b/);
     assert.doesNotMatch(cards,/>Buy Now<\/button>|<dialog/);

@@ -1,3 +1,4 @@
+import SellPrice from './SellPrice';
 import { useContext, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
@@ -43,7 +44,7 @@ export default function InstantPurchaseAction({ auction, compact = false, showTe
                 <div className="min-w-0">
                     {compact ? <p title={`${price} Meat`} className="break-words text-sm font-medium text-green-800">Buyout Price: {displayedPrice}</p> : <>
                         <p className="text-xs font-medium text-green-800">Buyout Price</p>
-                        <p className={`break-words font-semibold text-green-800 ${dense ? 'text-sm' : 'text-lg'}`}>{displayedPrice} Meat</p>
+                        <p className={`break-words font-semibold text-green-800 ${dense ? 'text-sm' : 'text-lg'}`}><SellPrice amount={auction.instantPurchasePrice} quantity={auction.quantity} compact={false} /></p>
                     </>}
                 </div>
                 {currentUser?.isBanned || currentUser?.id === auction.sellerId ? null : auction.escrowMode ? (compact && <Link to={`/auction/${auction.id}`} title="View KMail buyout instructions" className={buttonClass}>Buy Now</Link>) : currentUser ? (

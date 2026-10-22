@@ -55,12 +55,14 @@ const Profile = () => {
         return result.status === 'awaiting_trade'
             && (auction.sellerId === currentUser.id || result.winnerId === currentUser.id);
     });
-    const completedSales = selling.filter((auction) => auction.status === 'completed');
+    const completedSales = selling.filter((auction) => auction.status === 'completed' && auction.auctionKind !== 'buy');
     const completedPurchases = auctions.filter((auction) => auction.status === 'completed' && auction.winnerId === currentUser.id);
-    const totalMeatGain = completedSales.reduce((sum, auction) => sum + BigInt(auction.finalPrice ?? 0) - BigInt(auction.escrowMode ? (auction.feeMeat || 0) : 0), 0n);
+    const totalMeatGain = auctions.reduce((sum, auction) => sum + BigInt(auction.mySaleMeat || 0), 0n) + completedSales.reduce((sum, auction) => sum + BigInt(auction.finalPrice ?? 0) - BigInt(auction.escrowMode ? (auction.feeMeat || 0) : 0), 0n);
+    const buyMeatSpent = selling.filter(a => a.auctionKind === 'buy').reduce((sum,a) => sum + BigInt(a.purchaseMeat || 0) + BigInt(a.buyCommissionMeat || 0), 0n);
     const totalMeatSpent = completedPurchases.reduce((sum, auction) => sum + BigInt(auction.finalPrice ?? 0), 0n);
     const sections = [
-        { title: 'Awaiting item deposit', records: selling.filter((auction) => auction.status === 'pending_escrow') },
+        { title: 'Buy order fulfillments', records: auctions.filter(a => a.auctionKind === 'buy' && a.fulfilledByMe) },
+        { title: 'Awaiting escrow deposit', records: selling.filter((auction) => auction.status === 'pending_escrow') },
         { title: 'Sending escrow deliveries', records: auctions.filter((auction) => auction.status === 'settling' && (auction.sellerId === currentUser.id || auction.winnerId === currentUser.id)) },
         { title: 'Awaiting settlement', records: awaitingTrades },
         { title: 'Active listings', records: selling.filter((auction) => getAuctionStatus(auction, now) === 'active') },
@@ -84,6 +86,7 @@ const Profile = () => {
                     <h2 className="font-semibold">Completed purchases</h2>
                     <p>{formatCompactMeat(totalMeatSpent)} Meat spent</p>
                 </div>
+                {buyMeatSpent > 0n && <div className="bg-white rounded border border-gray-200 shadow p-4"><h2 className="font-semibold">Buy order purchases</h2><p>{formatCompactMeat(buyMeatSpent)} Meat committed, including fees</p><p className="text-xs text-gray-500">Includes secured purchases awaiting delivery.</p></div>}
             </div>
             <p className="text-sm text-gray-600 mb-6">Totals include completed bot deliveries (seller fees deducted) and direct trades confirmed by both parties. Pending deliveries are shown below.</p>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -110,7 +113,8 @@ const Profile = () => {
                                             )}
                                         </div>
                                         <p>{result.label} · {auction.escrowMode ? 'Escrow' : 'Direct settlement'}</p>
-                                        {result.status === 'active' && (
+                                        {auction.auctionKind === 'buy' && <p>Buy auction · {auction.pricePerItem.toLocaleString('en-US')} Meat / item · {auction.purchasedQuantity.toLocaleString('en-US')} / {auction.quantity.toLocaleString('en-US')} purchased</p>}
+                                        {auction.auctionKind !== 'buy' && result.status === 'active' && (
                                             <p>Current bid: {auction.currentBid > 0 ? `${formatCompactMeat(auction.currentBid)} Meat` : 'No bids yet'}</p>
                                         )}
                                         {result.hasWinner && <p>Winner: <WinnerLink auction={auction} /> · Final price: {formatCompactMeat(result.finalPrice)} Meat</p>}

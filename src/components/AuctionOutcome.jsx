@@ -1,3 +1,4 @@
+import { feeLabel } from '../lib/feeDisplay';
 import ConfirmTradeButton from './ConfirmTradeButton';
 import TradeFeedback from './TradeFeedback';
 import WithdrawTradeRating from './WithdrawTradeRating';
@@ -90,12 +91,15 @@ export default function AuctionOutcome({ auction, now }) {
                 ? 'Bidding has closed. The bot is sending the items to the winner and payment to the seller via KMail. Settlement finishes once all required deliveries are confirmed.'
                 : 'This auction did not result in a sale. The bot is returning the deposited items to the seller via KMail. The return finishes once all required deliveries are confirmed.'}</p>}
             {result.hasWinner && <p>Winner: <strong><WinnerLink auction={auction} /></strong> · Final price: <strong>{result.finalPrice.toLocaleString('en-US')} Meat</strong></p>}
+            {isSeller && result.hasWinner && <p>{feeLabel(auction.feeMeat, result.finalPrice, auction.feePolicy !== 'flat')}: {(auction.feeMeat || 0).toLocaleString('en-US')} Meat.</p>}
             {auction.instantPurchasedAt && <p>The buyout price ended bidding early.</p>}
-            {result.status === 'completed' && <p>The items and payment have been delivered via KMail.{isSeller && <> Seller fee: {auction.feeMeat.toLocaleString('en-US')} Meat.</>}</p>}
+            {result.status === 'completed' && <p>The items and payment have been delivered via KMail.</p>}
             {result.status === 'ended_no_bids' && <p>No bids were accepted. The bot has returned the items to the seller.</p>}
             {result.status === 'cancelled' && <p>This listing was cancelled. Any accepted item deposit has been returned.</p>}
-            {escrowContact}
-            {canCancel && <button disabled={pending} onClick={cancelListing} className="button-red min-h-11 rounded border px-4 py-3 disabled:opacity-50">{pending ? 'Saving…' : 'Cancel listing'}</button>}
+            {(escrowContact || canCancel) && <div className="flex flex-wrap items-center justify-between gap-3">
+                {escrowContact}
+                {canCancel && <button disabled={pending} onClick={cancelListing} className="button-red ml-auto min-h-11 rounded border px-4 py-3 disabled:opacity-50">{pending ? 'Saving…' : 'Cancel listing'}</button>}
+            </div>}
             {message && <p role="status" className="text-green-700">{message}</p>}
             {error && <p role="alert" className="text-red-700">{error}</p>}
         </section>

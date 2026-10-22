@@ -38,7 +38,7 @@ test('all routed pages render one shared navbar with every primary destination',
     const paths = ['/', '/auctions', '/auction/example', '/auction/example/trade-query', '/auction/example/report-trade',
         '/seller/example', '/auction-item', '/info', '/donate', '/wall-of-shame', '/login', '/register',
         '/forgot-password', '/resend-confirmation', '/reset-password', '/change-password', '/auth/confirm',
-        '/profile', '/support', '/report-a-bug', '/submit-appeal', '/admin/inbox', '/admin/bug-reports', '/unknown-page'];
+        '/profile', '/update-log', '/admin/banner', '/support', '/report-a-bug', '/submit-appeal', '/admin/inbox', '/admin/bug-reports', '/unknown-page'];
     for (const path of paths) {
         const html = render(path);
         assert.equal((html.match(/aria-label="Main navigation"/g) || []).length, 1, path);
@@ -95,4 +95,24 @@ test('load-error messages stay below the navbar and restricted appeals retain si
     assert.match(nav, /Log Out/);
     assert.doesNotMatch(nav, />Log In<|>Register</);
     assert.match(appeal, /Back to account status/);
+});
+
+
+test('update log explains completed bidder visibility and escrow-only Buy Auctions', () => {
+    const html = render('/update-log');
+    assert.match(html, /<h1[^>]*>Update Log<\/h1>/);
+    assert.match(html, /items have been exchanged/);
+    assert.match(html, /Buy Auctions are here/);
+    assert.match(html, /Escrow only/);
+    assert.match(html, /minimum bid required to raise/);
+    assert.match(html, /href="\/info#escrow-fees-title"[^>]*>fee table/);
+    assert.match(html, /href="\/info"[^>]*>Info page/);
+});
+
+
+test('What’s New links to the update log beside Beta on Home only', () => {
+    const html = render('/');
+    assert.match(html, /Beta<\/span>[\s\S]*?href="\/update-log"[^>]*>What’s New/);
+    assert.doesNotMatch(navigation(html), /update-log/);
+    assert.doesNotMatch(render('/auctions'), /href="\/update-log"/);
 });

@@ -23,9 +23,10 @@ export default function AllAuctions() {
     const ownershipAction = mineOnly ? 'Others' : othersOnly ? 'View All' : 'My Auctions';
     const status = auctionFilters.some(([value]) => value === params.get('status')) ? params.get('status') : 'active';
     const sort = auctionSorts.some(([value]) => value === params.get('sort')) ? params.get('sort') : 'ending';
+    const kind = ['buy', 'sell'].includes(params.get('kind')) ? params.get('kind') : 'all';
     const trade = ['escrow', 'direct', 'none'].includes(params.get('trade')) ? params.get('trade') : 'all';
     const page = Math.min(1000000, Math.max(1, Number.parseInt(params.get('page'), 10) || 1));
-    const visible = useMemo(() => browseAuctions(ownershipFiltered ? auctions.filter(auction => mineOnly ? auction.sellerId === currentUser.id : auction.sellerId !== currentUser.id) : auctions, { search, status, sort, trade, now }), [auctions, mineOnly, ownershipFiltered, currentUser?.id, search, status, sort, trade, now]);
+    const visible = useMemo(() => browseAuctions(ownershipFiltered ? auctions.filter(auction => mineOnly ? auction.sellerId === currentUser.id : auction.sellerId !== currentUser.id) : auctions, { search, status, sort, trade, kind, now }), [auctions, mineOnly, ownershipFiltered, currentUser?.id, search, status, sort, trade, kind, now]);
     const found = total ?? visible.length;
 
     function update(name, value) {
@@ -87,6 +88,10 @@ export default function AllAuctions() {
                                     {method === 'escrow' ? 'Escrow' : 'Direct'}
                                 </button>;
                             })}
+                        </div>
+                        <div>
+                            <label htmlFor="auction-kind" className="sr-only">Buy or sell auctions</label>
+                            <select id="auction-kind" value={kind} onChange={event => update('kind', event.target.value === 'all' ? '' : event.target.value)} className="h-9 rounded border border-gray-400 bg-white px-2 text-sm text-gray-900"><option value="all">Buy &amp; Sell</option><option value="sell">Sell Auctions</option><option value="buy">Buy Auctions</option></select>
                         </div>
                         <div>
                             <label htmlFor="auction-status" className="sr-only">Auction status</label>

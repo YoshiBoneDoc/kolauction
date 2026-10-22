@@ -1,8 +1,26 @@
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
+import { feeLabel } from '../lib/feeDisplay';
 import { escrowFee } from '../lib/escrowFees';
 
-export default function EscrowProtection({ forListing = false, feeBps = 500, feePolicy = 'tiered_v1', minimumPrice = null }) {
+export default function EscrowProtection({ forListing = false, buy = false, feeBps = 500, feePolicy = 'tiered_v1', minimumPrice = null }) {
+    if (buy) return <details className="text-left text-xs text-gray-600">
+        <summary className="w-fit cursor-pointer">Escrow Protection — Buy Auctions</summary>
+        <div className="mt-2 space-y-2 leading-[1.4]">
+            <p>Our bot, kHub (#3888760), securely holds your Meat and automatically purchases items as sellers fulfill your order.</p>
+            <ul className="list-disc space-y-1 pl-4">
+                <li><strong>Funded Offers:</strong> Deposit your Meat to activate your buy auction. The bot must accept your deposit within 24 hours of creating the listing.</li>
+                <li><strong>Partial Fills:</strong> Sellers reserve a quantity on the website for 10 minutes, then send exactly those items with their reservation command. Your auction remains active until fully filled, canceled, or expired.</li>
+                <li><strong>Gift Delivery:</strong> Hardcore/Ronin packages cost 50 Meat each from uncommitted buyer escrow, separate from commissions. Ordinary KMail has no packaging charge. Gift costs may reduce the unreserved order; purchased items and active reservations stay protected.</li>
+                <li><strong>Flexible Delivery:</strong> Receive purchased items as they’re acquired or all at once when your order ends.</li>
+                <li><strong>Cancel Anytime:</strong> Cancel your remaining order at any time. Unspent Meat is refunded, but completed purchases and their fees are final.</li>
+                <li><strong>Automatic Settlement:</strong> The bot handles payments, item deliveries, and refunds via KMail.</li>
+                <li><strong>Fast Delivery:</strong> Transactions usually process within seconds. Service disruptions may cause delays.</li>
+            </ul>
+            <p className="italic">Fees start at 5% and decrease for higher-priced items, with each rate applying only to its portion of the price per item, not the total order value. See the <Link to="/info#escrow-fees-title" className="text-blue-700 underline">fee chart</Link> for details. Fees are rounded down to whole Meat and deducted from your deposit. No purchase, no fee.</p>
+            <p>The buyer pays fees separately; sellers receive the full advertised price per item. Fractional per-item fees are multiplied by the quantity fulfilled before rounding down.</p>
+        </div>
+    </details>;
     return <details className={forListing ? 'text-left text-xs text-gray-600' : 'group w-full text-left text-xs text-gray-600'}>
         {forListing ? <summary className="w-fit cursor-pointer">Escrow Protection — How It Works</summary> : <summary className="cursor-pointer py-1 text-sm font-semibold text-[#334155] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Escrow Protection — How It Works</summary>}
         <div className={forListing ? undefined : 'pt-2'}>
@@ -18,7 +36,7 @@ export default function EscrowProtection({ forListing = false, feeBps = 500, fee
                 </ul>
                 {forListing && <p className="italic">{feePolicy === 'flat' ? <>Successful sales are subject to a {feeBps / 100}% seller commission.</> : <>Fees start at 5% and decrease for higher-value sales, with each rate applying only to its portion of the final price. See the <Link to="/info#escrow-fees-title" className="text-blue-700 underline">fee chart</Link> for details.</>} The total fee is rounded down to whole Meat and automatically deducted from your proceeds. No sale, no fee.</p>}
                 {forListing && feePolicy === 'tiered_v1' && Number.isSafeInteger(minimumPrice) && minimumPrice > 0 && <p>
-                    At your minimum bid: estimated fee {escrowFee(minimumPrice).toLocaleString('en-US')} Meat; seller proceeds {(minimumPrice - escrowFee(minimumPrice)).toLocaleString('en-US')} Meat. The actual fee uses the final sale price.
+                    At your minimum bid: estimated {feeLabel(escrowFee(minimumPrice), minimumPrice)}: {escrowFee(minimumPrice).toLocaleString('en-US')} Meat; seller proceeds {(minimumPrice - escrowFee(minimumPrice)).toLocaleString('en-US')} Meat. The actual fee uses the final sale price.
                 </p>}
             </div>
             {!forListing && <p className="mt-4 rounded-[6px] border-l-[3px] border-[#22C55E] bg-[#F0FDF4] px-4 py-3 text-[#334155]">
@@ -28,4 +46,4 @@ export default function EscrowProtection({ forListing = false, feeBps = 500, fee
     </details>;
 }
 
-EscrowProtection.propTypes = { forListing: PropTypes.bool, feeBps: PropTypes.number, feePolicy: PropTypes.oneOf(['flat', 'tiered_v1']), minimumPrice: PropTypes.number };
+EscrowProtection.propTypes = { forListing: PropTypes.bool, buy: PropTypes.bool, feeBps: PropTypes.number, feePolicy: PropTypes.oneOf(['flat', 'tiered_v1']), minimumPrice: PropTypes.number };

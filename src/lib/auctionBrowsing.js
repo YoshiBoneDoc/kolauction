@@ -18,16 +18,16 @@ export const auctionSorts = [
 ];
 
 export function auctionPrice(auction) {
-    return auction.finalPrice ?? (auction.currentBid || auction.minBidMeat);
+    return auction.auctionKind === 'buy' ? auction.pricePerItem : auction.finalPrice ?? (auction.currentBid || auction.minBidMeat);
 }
 
-export function browseAuctions(auctions, { search = '', status = 'active', sort = 'ending', trade = 'all', now = Date.now() } = {}) {
+export function browseAuctions(auctions, { search = '', status = 'active', sort = 'ending', trade = 'all', kind = 'all', now = Date.now() } = {}) {
     const query = search.trim().toLocaleLowerCase();
     return auctions.filter((auction) => {
         const lifecycle = getAuctionStatus(auction, now);
         const matchesStatus = status === 'all'
             || (status === 'ended' ? !['active', 'pending_escrow', 'on_hold', 'bidding_closed'].includes(lifecycle) : lifecycle === status);
-        return matchesStatus && (trade === 'all' || trade !== 'none' && auction.escrowMode === (trade === 'escrow')) && auction.item.toLocaleLowerCase().includes(query);
+        return matchesStatus && (kind === 'all' || (auction.auctionKind || 'sell') === kind) && (trade === 'all' || trade !== 'none' && auction.escrowMode === (trade === 'escrow')) && auction.item.toLocaleLowerCase().includes(query);
     }).sort((a, b) => {
         let comparison = 0;
         if (sort === 'bids-desc') comparison = (b.bidCount ?? b.bids?.length ?? 0) - (a.bidCount ?? a.bids?.length ?? 0);

@@ -23,6 +23,9 @@ import SubmitAppeal from './pages/SubmitAppeal';
 import NotFound from './pages/NotFound';
 import BugReportInbox from './pages/BugReportInbox';
 
+import SiteBanner from "./components/SiteBanner";
+import UpdateLog from "./pages/UpdateLog";
+import AdminBanner from "./pages/AdminBanner";
 import AdminPolls from "./pages/AdminPolls";
 
 const App = () => {
@@ -32,6 +35,7 @@ const App = () => {
     return (
         <div className={`flex min-h-screen flex-col ${isWallOfShame ? 'shame-background' : 'bg-[#F9F9F9]'}`}>
             <div className="px-4 sm:px-6"><AuctionNavigation /></div>
+            <SiteBanner />
             {error && <div role="alert" className="bg-red-50 p-4 text-red-700">
                 {error}{" "}<button onClick={refreshAuctions} className="underline">Retry</button>
             </div>}
@@ -40,6 +44,8 @@ const App = () => {
                 <Route path="/submit-appeal" element={<SubmitAppeal />} />
                 <Route path="/report-a-bug" element={<ReportBug />} />
                 <Route path="/support" element={<ReportBug support />} />
+                <Route path="/update-log" element={<UpdateLog />} />
+                <Route path="/admin/banner" element={<AdminBanner />} />
                 <Route path="/admin/polls" element={<AdminPolls />} />
                 <Route path="/admin/inbox" element={<BugReportInbox />} />
                 <Route path="/admin/bug-reports" element={<BugReportInbox />} />

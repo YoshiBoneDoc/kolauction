@@ -16,9 +16,32 @@ export function mapAuction(row, bidRows) {
     const latestBid = lastBid?.amount >= Number(row.current_bid) ? lastBid : null;
     return {
         id: row.id,
+        auctionKind: row.auction_kind || 'sell',
+        pricePerItem: Number(row.price_per_item || row.min_bid_meat),
+        purchasedQuantity: Number(row.purchased_quantity || 0),
+        remainingQuantity: Number(row.remaining_quantity ?? row.quantity),
+        availableQuantity: Number(row.available_quantity ?? row.remaining_quantity ?? row.quantity),
+        reservedQuantity: Number(row.reserved_quantity || 0),
+        reducedQuantity: Number(row.reduced_quantity || 0),
+        giftMeat: Number(row.gift_meat || 0),
+        giftFundingNeeded: row.gift_funding_needed === true,
+        buyClosingReason: row.buy_closing_reason || null,
+        myReservation: row.my_reservation || null,
+        reservationAudit: row.reservation_audit || [],
+        deliveryMode: row.delivery_mode || 'immediate',
+        fundingRequired: row.funding_required == null ? null : Number(row.funding_required),
+        balanceMeat: row.balance_meat == null ? null : Number(row.balance_meat),
+        heldQuantity: row.held_quantity == null ? null : Number(row.held_quantity),
+        purchaseMeat: Number(row.purchase_meat || 0),
+        buyCommissionMeat: Number(row.buy_commission_meat || 0),
+        refundedMeat: Number(row.refunded_meat || 0),
+        fulfillments: row.fulfillments || [],
+        buyAdmin: row.buy_admin === true,
+        fulfilledByMe: row.fulfilled_by_me === true,
+        mySaleMeat: Number(row.my_sale_meat || 0),
         auctionNumber: row.auction_number == null ? null : String(row.auction_number),
         sellerId: row.seller_id,
-        owner: row.usernames_visible === false ? 'Seller' : row.seller_username,
+        owner: row.usernames_visible === false ? (row.auction_kind === 'buy' ? 'Buyer' : 'Seller') : row.seller_username,
         usernamesVisible: row.usernames_visible !== false,
         item: row.item,
         quantity: Number(row.quantity),
@@ -90,7 +113,7 @@ export function createAuctionService(client) {
     }
 
     return {
-        async load({ view = 'browse', id = null, sellerId = null, excludeOwn = false, search = '', status = 'active', sort = 'ending', trade = 'all', page = 1 } = {}) {
+        async load({ view = 'browse', id = null, sellerId = null, excludeOwn = false, kind = 'all', search = '', status = 'active', sort = 'ending', trade = 'all', page = 1 } = {}) {
             const { error } = await requireClient().rpc('finalize_expired_auctions');
             if (error) throw databaseError(error);
             async function readPage(pageNumber, completed = false) {
@@ -102,6 +125,7 @@ export function createAuctionService(client) {
                     p_id: view === 'browse' && sellerId ? sellerId : id,
                     p_search: view === 'home' ? '' : search, p_status: view === 'home' ? (completed ? 'completed' : 'active') : status,
                     ...(['browse', 'seller'].includes(view) && ['escrow', 'direct', 'none'].includes(trade) ? { p_trade: trade } : {}),
+                    ...(['buy', 'sell'].includes(kind) ? { p_kind: kind, p_trade: trade } : {}),
                     p_sort: view === 'home' ? (completed ? 'completed' : 'newest') : sort, p_page: pageNumber,
                 });
                 if (readError) throw databaseError(readError);
@@ -133,6 +157,11 @@ export function createAuctionService(client) {
             return { auctions: data.rows.map((row) => mapAuction(row, [])), total: Number(data.total) };
         },
         async create(auction) {
+            if (auction.auctionKind === 'buy') {
+                const { data, error } = await requireClient().rpc('create_buy_auction', { p_item_id: auction.itemId, p_quantity: auction.quantity, p_price_per_item: auction.minBidMeat, p_duration_hours: Number(auction.auctionTime), p_delivery_mode: auction.deliveryMode });
+                if (error) throw databaseError(error);
+                return data;
+            }
             if (auction.escrowMode !== false && Number(auction.minBidMeat) > ESCROW_MIN_BID_LIMIT) throw new Error(ESCROW_MIN_BID_ERROR);
             const { data, error } = await requireClient().rpc('create_auction', {
                 p_item: auction.item,
@@ -156,6 +185,17 @@ export function createAuctionService(client) {
             if (![1, -1].includes(rating)) throw new Error('Choose thumbs up or thumbs down.');
             const { error } = await requireClient().rpc('rate_trade_partner', { p_auction_id: auctionId, p_rating: rating });
             if (error) throw databaseError(error);
+        },
+        async reserveBuy(auctionId, quantity) {
+            if (!Number.isSafeInteger(quantity) || quantity < 1) throw new Error('Enter a positive whole item quantity.');
+            const { data, error } = await requireClient().rpc('reserve_buy_quantity', { p_auction_id: auctionId, p_quantity: quantity });
+            if (error) throw databaseError(error);
+            return data;
+        },
+        async cancelBuyReservation(reservationId) {
+            const { data, error } = await requireClient().rpc('cancel_buy_reservation', { p_reservation_id: reservationId });
+            if (error) throw databaseError(error);
+            return data;
         },
         async cancel(auctionId) {
             const { error } = await requireClient().rpc('cancel_auction', { p_auction_id: auctionId });

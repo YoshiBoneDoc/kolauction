@@ -1,5 +1,6 @@
 export const auctionStatusLabels = {
     active: 'Active',
+    expired: 'Expired',
     on_hold: 'On hold — admin review',
     bidding_closed: 'Bidding closed',
     voided: 'Cancelled by administrator',
@@ -16,12 +17,14 @@ export function getAuctionStatus(auction, now = Date.now()) {
     if (auction.status && auction.status !== 'active') return auction.status;
     if (auction.biddingRestricted && auction.endTime > now) return 'bidding_closed';
     if (auction.endTime > now) return 'active';
+    if (auction.auctionKind === 'buy') return 'settling';
     if (auction.escrowMode) return auction.receiptTimeBidding ? 'finalizing' : 'settling';
     return auction.highestBidderId || auction.currentBid > 0 ? 'awaiting_trade' : 'ended_no_bids';
 }
 
 export function getAuctionResult(auction, now = Date.now()) {
     const status = getAuctionStatus(auction, now);
+    if (auction.auctionKind === 'buy') return { status, label: status === 'pending_escrow' ? 'Awaiting Meat deposit' : auctionStatusLabels[status], hasWinner: false, winnerId: null, winner: null, finalPrice: null };
     const hasWinner = ['awaiting_trade', 'completed', 'settling'].includes(status)
         && (auction.hasWinner ?? Boolean(auction.winnerId || auction.highestBidderId || auction.currentBid > 0));
     return {

@@ -119,6 +119,22 @@ export const AuctionsProvider = ({ children }) => {
         await refreshAuctions();
     };
 
+    const reserveBuyQuantity = async (auctionId, quantity) => {
+        try {
+            const reservation = await storage.reserveBuy(auctionId, quantity);
+            await refreshAuctions();
+            return reservation;
+        } catch (failure) { await refreshAuctions(); throw failure; }
+    };
+
+    const cancelBuyReservation = async (reservationId) => {
+        try {
+            const result = await storage.cancelBuyReservation(reservationId);
+            await refreshAuctions();
+            return result;
+        } catch (failure) { await refreshAuctions(); throw failure; }
+    };
+
     const cancelAuction = async (auctionId) => {
         try {
             await storage.cancel(auctionId);
@@ -130,7 +146,7 @@ export const AuctionsProvider = ({ children }) => {
     };
 
     return (
-        <AuctionsContext.Provider value={{ auctions, total, seller, isLoading, error, pendingTrades, pendingTotal, pendingPage, setPendingPage, pendingError, addAuction, placeBid, purchaseAuction, confirmTrade, rateTrade, cancelAuction, refreshAuctions }}>
+        <AuctionsContext.Provider value={{ auctions, total, seller, isLoading, error, pendingTrades, pendingTotal, pendingPage, setPendingPage, pendingError, addAuction, placeBid, purchaseAuction, confirmTrade, rateTrade, reserveBuyQuantity, cancelBuyReservation, cancelAuction, refreshAuctions }}>
             {children}
         </AuctionsContext.Provider>
     );

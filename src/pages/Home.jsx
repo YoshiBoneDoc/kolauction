@@ -18,7 +18,7 @@ export default function Home() {
     return (
         <div className="flex flex-1 w-full flex-col bg-[#F9F9F9] px-4 sm:px-6">
             <header className="mx-auto w-full max-w-6xl border-b border-gray-300 pb-6 text-center">
-                <h1 className="mt-4 text-4xl font-extrabold text-[#7695FF] sm:text-6xl">KoL Auction Hub <span className="text-sm">Beta</span></h1>
+                <h1 className="mt-4 text-4xl font-extrabold text-[#7695FF] sm:text-6xl">KoL Auction Hub <span className="inline-flex items-center gap-1.5 whitespace-nowrap align-middle text-sm font-normal"><span>Beta</span><span aria-hidden="true">·</span><Link to="/update-log" className="text-blue-700 hover:underline">What’s New <span aria-hidden="true">↗</span></Link></span></h1>
                 <p className="mt-4 text-lg text-gray-700 sm:text-xl">The best place to find and bid on rare treasures.</p>
             </header>
             <main className="mx-auto mt-6 w-full max-w-6xl flex-1 pb-8">

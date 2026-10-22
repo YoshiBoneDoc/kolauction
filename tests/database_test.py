@@ -3789,6 +3789,12 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         sql(migration_sql('202610220082_other_sellers_filter.sql'))
         sql(migration_sql('202610220083_multiple_active_poll_queue.sql'))
         sql(migration_sql('202610220084_admin_poll_results.sql'))
+        sql(migration_sql('202610220085_buy_auctions.sql'))
+        sql(migration_sql('202610220086_buy_reservations_and_gifts.sql'))
+        sql(migration_sql('202610220087_effective_fee_percentages.sql'))
+        sql(migration_sql('202610220088_completed_bidder_usernames.sql'))
+        sql(migration_sql('202610220089_site_banner.sql'))
+        sql(migration_sql('202610220090_cancel_buy_reservations.sql'))
         assert sql("select jsonb_build_object('deliveries',(select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d),'bids',(select jsonb_agg(to_jsonb(b) order by id) from public.bids b));")==before_receipt_bidding
         assert json.loads(sql('select public.bot_inspect();',role='service_role'))['receiptTimeBiddingVersion']==1
         print('PASS: receipt-time bidding migration preserves existing bids and payment obligations')

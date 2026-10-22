@@ -24,7 +24,7 @@ export default function AuctionNavigation() {
                 {separator}
                 <Link {...linkProps("/auctions")}>View All Auctions</Link>
                 {separator}
-                <Link {...linkProps("/auction-item")}>Auction an Item</Link>
+                <Link {...linkProps("/auction-item")}>Create Auction</Link>
                 {separator}
                 <Link {...linkProps("/info")}>Info</Link>
                 {separator}

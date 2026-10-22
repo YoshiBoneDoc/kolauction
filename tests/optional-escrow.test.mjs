@@ -420,10 +420,10 @@ test('buyout history labels do not depend on private bidder IDs', () => {
 
 test('completed escrow fees appear in seller settlement details rather than buyer or public views', () => {
     const settled = { ...auction, escrowMode: true, status: 'completed', feeMeat: 37 };
-    assert.match(render({ path: '/auction/direct', user: { id: 'seller' }, auctions: [settled] }), /Seller fee: 37 Meat/);
+    assert.match(render({ path: '/auction/direct', user: { id: 'seller' }, auctions: [settled] }), /Tiered Fee \([0-9.]+%\): 37 Meat/);
     for (const user of [{ id: 'buyer' }, { id: 'outsider' }, null]) {
         const html = render({ path: '/auction/direct', user, auctions: [settled] });
-        assert.doesNotMatch(html, /Seller fee:|seller commission|7.5%/);
+        assert.doesNotMatch(html, /Tiered Fee|Seller fee:|seller commission|7.5%/);
     }
 });
 

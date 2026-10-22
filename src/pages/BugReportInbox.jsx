@@ -108,7 +108,10 @@ export default function BugReportInbox() {
         <main className="mx-auto w-full max-w-6xl flex-1 space-y-5 px-4 py-6 sm:px-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <h1 className="text-3xl font-bold text-blue-700">Administrator inbox</h1>
-                <Link to="/admin/polls" className="text-sm text-blue-700 underline">Manage polls</Link>
+                <div className="flex flex-wrap gap-4">
+                    <Link to="/admin/polls" className="text-sm text-blue-700 underline">Manage polls</Link>
+                    <Link to="/admin/banner" className="text-sm text-blue-700 underline">Manage site banner</Link>
+                </div>
             </div>
             {currentUser ? <Inbox key={currentUser.id} /> : <p><Link to="/login" className="text-blue-700 underline">Log in</Link> with an administrator account to open this inbox.</p>}
         </main>

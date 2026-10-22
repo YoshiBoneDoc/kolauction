@@ -1,3 +1,5 @@
+import SellPrice from '../components/SellPrice';
+import BuyAuctionDetails from '../components/BuyAuctionDetails';
 import TradeTypeBadge from '../components/TradeTypeBadge';
 import { useContext } from 'react';
 import { useParams, useLocation, Link } from 'react-router-dom';
@@ -14,7 +16,7 @@ import SellerLink from '../components/SellerLink';
 import WinnerLink from '../components/WinnerLink';
 import DirectTradeHelp from '../components/DirectTradeHelp';
 import EscrowProtection from '../components/EscrowProtection';
-import { formatCompactMeat } from '../lib/formatMeat';
+import { formatCompactMeat, formatPerItemMeat } from '../lib/formatMeat';
 import TradeReportDismissals from '../components/TradeReportDismissals';
 
 export default function AuctionDetails() {
@@ -38,6 +40,8 @@ export default function AuctionDetails() {
         </main>
     );
 
+    if (auction.auctionKind === 'buy') return <BuyAuctionDetails auction={auction} now={now} backLink={backLink} />;
+
     const result = getAuctionResult(auction, now);
     const active = result.status === 'active';
     const ownsAuction = Boolean(currentUser && !currentUser.isBanned && currentUser.id === auction.sellerId);
@@ -56,15 +60,15 @@ export default function AuctionDetails() {
                         <div className="space-y-1">
                             <h1 className="break-words text-3xl font-bold text-blue-600 sm:text-4xl">{auction.item} <span className="text-xl text-gray-600">×{auction.quantity.toLocaleString('en-US')}</span></h1>
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-600">
-                                <p className="leading-6">{auction.auctionNumber && <>Auction #{auction.auctionNumber} · </>}Min Bid: <span title={`${auction.minBidMeat.toLocaleString('en-US')} Meat`}>{formatCompactMeat(auction.minBidMeat)}{auction.minBidMeat < 1000 ? ' Meat' : ''}</span></p>
+                                <p className="leading-6">{auction.auctionNumber && <>Auction #{auction.auctionNumber} · </>}Min Bid: <span title={`${auction.minBidMeat.toLocaleString('en-US')} Meat`}>{formatCompactMeat(auction.minBidMeat)}{auction.minBidMeat < 1000 ? ' Meat' : ''}{auction.quantity > 1 && <span className="text-xs text-gray-700"> · {formatPerItemMeat(auction.minBidMeat, auction.quantity)} each</span>}</span></p>
                                 <span aria-hidden="true">·</span>
                                 <TradeTypeBadge escrow={auction.escrowMode} />
                             </div>
                         </div>
                         <div className={closedSale ? 'space-y-0.5 py-1' : 'space-y-1'}>
                             <div className={closedSale ? 'flex flex-wrap items-baseline gap-x-3 gap-y-1' : undefined}>
-                                <p className="text-sm text-gray-600">{active ? 'Current Bid' : result.hasWinner ? 'Final price:' : 'Last Bid'}</p>
-                                <p className="break-words text-2xl font-extrabold text-gray-900 sm:text-3xl">{price ? `${price.toLocaleString('en-US')} Meat` : 'No bids yet'}</p>
+                                <p className="text-sm text-gray-600">{active ? 'Current Bid (whole listing)' : result.hasWinner ? 'Final price: (whole listing)' : 'Last Bid (whole listing)'}</p>
+                                <p className="break-words text-2xl font-extrabold text-gray-900 sm:text-3xl">{price ? <SellPrice amount={price} quantity={auction.quantity} compact={false} /> : 'No bids yet'}</p>
                             </div>
                             {closedSale && auction.instantPurchasedAt && <p className="text-sm leading-6 text-green-700">Buyout accepted for {result.finalPrice.toLocaleString('en-US')} Meat on <span className="inline-block whitespace-nowrap">{new Date(auction.instantPurchasedAt).toLocaleString()}.</span></p>}
                         </div>

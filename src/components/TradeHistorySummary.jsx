@@ -42,6 +42,7 @@ DetailedTradeValues.propTypes = { stats: PropTypes.object.isRequired };
 export default function TradeHistorySummary({ stats, detailed = false }) {
     const reputation = reputationSummary(stats);
     const feedback = reputation?.overall;
+    const buySales = BigInt(stats.buy_order_sales || 0) > 0n ? <section aria-label="Buy order sales" className="space-y-1 text-sm"><h3 className="font-bold">Sales to Buy Orders</h3><p>{count(stats.buy_order_sales)} fulfillments · {count(stats.buy_order_units)} items</p><p>{formatCompactMeat(BigInt(stats.buy_order_value || 0))} Meat paid to seller</p></section> : null;
     const directTrades = <section aria-label="Direct trades" className={detailed ? 'space-y-2 rounded-lg border border-gray-200 bg-gray-50/50 p-5' : 'space-y-2'}>
             <h3 className="text-base font-bold text-gray-900">Direct Trades</h3>
             {detailed ? <DetailedTradeValues stats={stats} /> : <>
@@ -95,7 +96,7 @@ export default function TradeHistorySummary({ stats, detailed = false }) {
         </section>;
     return <div className="space-y-6 text-center">
         <h2 className="text-xl font-bold text-gray-900">Trade History</h2>
-        {detailed ? <div className="grid items-start gap-5 md:grid-cols-2">{directTrades}{escrowTrades}</div> : <>{directTrades}{escrowTrades}</>}
+        {detailed ? <div className="grid items-start gap-5 md:grid-cols-2">{directTrades}{buySales}{escrowTrades}</div> : <>{directTrades}{buySales}{escrowTrades}</>}
     </div>;
 }
 TradeHistorySummary.propTypes = { stats: PropTypes.object.isRequired, detailed: PropTypes.bool };

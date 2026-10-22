@@ -84,7 +84,7 @@ const InfoPage = () => {
                     <Link to="/auction-item" className="font-medium text-blue-600 hover:underline">
                         Create an auction here
                     </Link>
-                    . Minimum Bid and Buyout Prices are optional. All prices apply to the entire listing, not individual items. You may not bid on your own auction.
+                    . Choose Buy Items or Sell Items. A Sell auction needs a minimum bid; its buyout is optional. A Buy auction needs a quantity and maximum price per item. For Sell auctions, bids and buyout prices apply to the whole listing. For Buy auctions, the advertised purchase price applies to each item; fees are added separately to the buyer’s deposit. You may not bid on your own auction.
                 </p>
 
                 <h3 className={`${subheadingClass} mb-2`}>
@@ -234,8 +234,8 @@ const InfoPage = () => {
                     </section>
 
                     <section aria-labelledby="escrow-fees-title" className="min-w-0 md:row-span-3 md:grid md:grid-rows-subgrid">
-                        <h2 id="escrow-fees-title" className={`${sectionHeadingClass} mb-2 scroll-mt-4`}>Escrow Seller Fees</h2>
-                        <p className="mb-3 leading-5">Fees are based on the final winning bid or accepted buyout. Each rate applies only to the portion within that tier, so higher-value sales have a lower overall fee percentage.</p>
+                        <h2 id="escrow-fees-title" className={`${sectionHeadingClass} mb-2 scroll-mt-4`}>Escrow Fees</h2>
+                        <p className="mb-3 leading-5">Sell auction fees are based on the whole listing’s final winning bid or accepted buyout and deducted from the seller’s proceeds. Each rate applies only to the portion within that tier, so higher-value sales have a lower overall fee percentage.</p>
                         <div>
                             <div className="overflow-hidden rounded-md border border-gray-200">
                                 <table className="w-full text-xs leading-5">
@@ -253,7 +253,9 @@ const InfoPage = () => {
                                 </table>
                             </div>
                             <p className="mt-2 text-xs leading-5"><strong>Example:</strong> A 10m sale costs 5% of the first 1m (50k), plus 4% of the remaining 9m (360k): <strong>410k Meat total (4.1%).</strong></p>
-                            <p className="mt-2 text-xs leading-5">The total fee is rounded down to whole Meat. No sale, no fee.</p>
+                            <p className="mt-2 text-xs leading-5">Sell auction fees are rounded down to whole Meat once per sale. No sale, no fee.</p>
+                            <p className="mt-3 text-xs leading-5"><strong>Buy auctions:</strong> Apply the same tiers to the price per item, multiply the unrounded fee by the quantity in each successful fulfillment, then round down to whole Meat. The buyer funds purchases and fees; sellers receive the full advertised price. Buying 1,000 items at 200 Meat each costs 200,000 Meat plus 10,000 Meat in fees. One item at 10M has a Tiered Fee (4.1%): 410,000 Meat. Even a 1B order at 200 Meat per item uses the 5% tier for each item.</p>
+                            <p className="mt-2 text-xs leading-5">Buy auctions are Escrow only. Fund within 24 hours; the timer starts when kHub accepts your Meat. Sellers first reserve a quantity on the website for 10 minutes, then copy the complete FILL command including its reservation code and send exactly those items. Expired reservations release automatically after incoming-mail checks; occasional missed reservations carry no penalty. Repeated abuse may prompt administrative action. Partial fills stay open; extra items are returned. Choose delivery as acquired or when the order ends. Cancel unfilled quantities anytime; expiration or cancellation delivers held items and refunds unused Meat and fee reserve. Completed purchases and fees are final. Hardcore/Ronin gifts cost 50 Meat per package from uncommitted buyer escrow; ordinary KMail is free. Active reservations and completed purchases are protected. Gift expenses can reduce the quantity still purchasable, and any funds left after delivery are refunded. If every remaining Meat is committed, item delivery safely waits for a buyer top-up.</p>
                         </div>
                     </section>
                 </div>

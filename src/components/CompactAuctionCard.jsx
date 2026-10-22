@@ -1,3 +1,6 @@
+import FittedPrice from './FittedPrice';
+import SellPrice from './SellPrice';
+import BuyAuctionCard from './BuyAuctionCard';
 import TradeTypeBadge from './TradeTypeBadge';
 import { useContext, useId } from 'react';
 import PropTypes from 'prop-types';
@@ -26,6 +29,7 @@ export default function CompactAuctionCard({ auction, now, expanded = false, onT
     const showForm = expanded && canBid;
     const itemLabel = `${auction.item} ×${auction.quantity.toLocaleString('en-US')}`;
 
+    if (auction.auctionKind === 'buy') return <BuyAuctionCard auction={auction} now={now} />;
     return <article className={`relative isolate grid h-[134px] min-w-0 self-start grid-cols-[60px_minmax(0,1fr)] grid-rows-[32px_44px_44px] gap-x-3 overflow-hidden rounded-lg border border-gray-200 ${result.status === 'completed' ? 'bg-green-50' : 'bg-[#F8F6F4]'} px-3 py-1.5 shadow-sm transition-shadow hover:border-gray-300 hover:shadow-md [&_button]:relative [&_button]:z-10 [&_input]:relative [&_input]:z-10 [&_label]:relative [&_label]:z-10`}>
         <header className="col-span-2 flex min-h-0 items-start justify-between gap-3">
             <Link to={`/auction/${auction.id}`} state={linkState} title={itemLabel}
@@ -46,9 +50,9 @@ export default function CompactAuctionCard({ auction, now, expanded = false, onT
             {auction.image ? <img src={auction.image} alt="" loading="lazy" className="h-[60px] w-[60px] object-contain [image-rendering:pixelated]" /> : <span className="text-[10px] text-gray-400">No image</span>}
         </Link>
         <div className="col-span-2 col-start-1 row-start-2 flex min-h-0 min-w-0 flex-col items-center justify-center text-center pt-2">
-            <p title={`${priceLabel}: ${price.toLocaleString('en-US')} Meat`} className="w-full shrink-0 truncate text-[26px] font-bold leading-7 tracking-tight text-[#112D4E]">
-                {(!active || !hasBids) && <span className="text-[11px] font-normal tracking-normal text-gray-500">{shortPriceLabel}: </span>}{active && auction.isHot && <span role="img" aria-label="Top 10% of active auctions by total bids" title="Top 10% of active auctions by total bids" className="mr-1 inline-block text-lg">🔥</span>}{formatCompactMeat(price)} Meat
-            </p>
+            <FittedPrice as="p" fitKey={`${price}:${auction.quantity}:${shortPriceLabel}:${active}:${hasBids}:${auction.isHot}`} title={`${priceLabel}: ${price.toLocaleString('en-US')} Meat`} className="w-full shrink-0 text-[26px] font-bold leading-7 tracking-tight text-[#112D4E]">
+                {(!active || !hasBids) && <span className="text-[11px] font-normal tracking-normal text-gray-500">{shortPriceLabel}: </span>}{active && auction.isHot && <span role="img" aria-label="Top 10% of active auctions by total bids" title="Top 10% of active auctions by total bids" className="mr-1 inline-block text-lg">🔥</span>}<SellPrice amount={price} quantity={auction.quantity} />
+            </FittedPrice>
             {(hasBids || auction.instantPurchasePrice > 0) && <div className="flex max-w-full shrink-0 items-baseline justify-center gap-2 text-xs leading-4">
                 {hasBids && <p className="shrink-0 text-gray-500">Bid ({bidCount.toLocaleString('en-US')} total)</p>}
                 {auction.instantPurchasePrice > 0 && <p title={`Buyout: ${auction.instantPurchasePrice.toLocaleString('en-US')} Meat`} className="min-w-0 truncate font-medium text-green-800">

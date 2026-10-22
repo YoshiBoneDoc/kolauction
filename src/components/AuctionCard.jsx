@@ -1,3 +1,6 @@
+import FittedPrice from './FittedPrice';
+import SellPrice from './SellPrice';
+import BuyAuctionCard from './BuyAuctionCard';
 import TradeTypeBadge from './TradeTypeBadge';
 import WinnerLink from './WinnerLink';
 import { useContext, useState } from 'react';
@@ -19,8 +22,9 @@ export default function AuctionCard({ auction, now }) {
     const result = getAuctionResult(auction, now);
     const active = result.status === 'active';
     const displayStatus = getAuctionDisplayStatus(auction, result);
+    if (auction.auctionKind === 'buy') return <BuyAuctionCard auction={auction} now={now} />;
     return (
-        <article className="flex min-w-0 flex-col rounded-lg border bg-[#F8F6F4] p-4 shadow">
+        <article className={`flex min-w-0 flex-col rounded-lg border ${result.status === 'completed' ? 'bg-green-50' : 'bg-[#F8F6F4]'} p-4 shadow`}>
             <Link to={`/auction/${auction.id}`} state={linkState} className="flex flex-col items-center gap-3 text-center">
                 {auction.image && <img src={auction.image} alt="" loading="lazy" className="h-24 w-24 object-contain" />}
                 <h2 className="w-full break-words text-xl font-bold text-[#14248A]">{auction.item} <span className="text-[#5365AB]">×{auction.quantity.toLocaleString('en-US')}</span></h2>
@@ -31,7 +35,7 @@ export default function AuctionCard({ auction, now }) {
             <p className="mt-3 text-center text-sm text-gray-600">Minimum bid: {formatCompactMeat(auction.minBidMeat)} Meat</p>
             <div className="my-3 text-center">
                 <p className="text-sm text-gray-600">{active ? 'Current bid' : result.hasWinner ? 'Final price' : 'Last bid'}</p>
-                <p className="break-words text-xl font-bold text-[#112D4E]">{(result.finalPrice ?? auction.currentBid) ? `${formatCompactMeat(result.finalPrice ?? auction.currentBid)} Meat` : 'No bids yet'}</p>
+                <FittedPrice as="p" fitKey={`${result.finalPrice}:${auction.currentBid}:${auction.quantity}`} className="text-xl font-bold text-[#112D4E]">{(result.finalPrice ?? auction.currentBid) ? <SellPrice amount={result.finalPrice ?? auction.currentBid} quantity={auction.quantity} /> : 'No bids yet'}</FittedPrice>
             </div>
             {active ? (
                 <p className={`text-center text-sm ${auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-600'}`}>

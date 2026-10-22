@@ -144,8 +144,9 @@ test('preview preserves listing values and editing choices in the compact summar
             return React.Children.toArray(element.props?.children).map(content).join('');
         }
         assert.deepEqual(rows.map(row => React.Children.toArray(row.props.children).map(content)), [
-            ['Quantity', '2,500'], ['Trading method', escrow ? 'Escrow' : 'Direct'], ['Minimum bid', '1,000,000 Meat'],
-            ['Buyout price', '2,000,000 Meat'], ['Duration', '72 hours'],
+            ['Quantity', '2,500'], ['Trading method', escrow ? 'Escrow' : 'Direct'], ['Minimum bid (whole listing)', '1,000,000 Meat'],
+            ['Buyout price (whole listing)', '2,000,000 Meat'], ['Duration', '72 hours'],
+            ...(escrow ? [['Estimated Tiered Fee (5%) at minimum bid','50,000 Meat']] : []),
         ]);
         const image = page.find(node => node.type === 'img');
         assert.equal(image.props.alt, 'asbestos ore');
@@ -213,4 +214,21 @@ test('custom ending validation blocks stale and overly distant selections before
         assert.ok(nodes(page.tree).some(n=>n.props?.role==='alert'));
         assert.ok(nodes(page.tree).some(n=>n.type==='form'));
     }
+});
+
+
+test('Buy mode defaults from Sell, disables Direct, removes sell terms and publishes per-item funded orders',async()=>{
+    const writes=[];const page=harness(async listing=>{writes.push(listing);return 'buy-order';}).render();
+    assert.equal(page.button('Sell Items').props['aria-pressed'],true);
+    page.button('Direct').props.onClick();page.render();
+    page.button('Buy Items').props.onClick();page.render();
+    assert.equal(page.button('Direct').props.disabled,true);assert.equal(page.button('Escrow').props['aria-pressed'],true);
+    assert.equal(nodes(page.tree).some(n=>n.props?.children==='Set Buyout Price (optional)'),false);
+    assert.equal(nodes(page.tree).some(n=>n.type==='strong'&&n.props.children==='Early Access:'),false);
+    page.input('listing-item-search','asbestos ore').input('item','364').input('quantity','20').input('minBidMeat','2m').input('deliveryMode','finished');
+    const original=globalThis.requestAnimationFrame;globalThis.requestAnimationFrame=fn=>fn();
+    try {page.find(n=>n.type==='form').props.onSubmit({preventDefault(){}});}finally{if(original)globalThis.requestAnimationFrame=original;else delete globalThis.requestAnimationFrame;}
+    page.render();assert.equal(nodes(page.tree).some(n=>n.type==='dt'&&n.props.children==='Price per item'),true);
+    await page.button('Publish Auction').props.onClick();page.render();
+    assert.equal(writes.length,1);assert.equal(writes[0].auctionKind,'buy');assert.equal(writes[0].deliveryMode,'finished');assert.equal(writes[0].escrowMode,true);assert.equal(writes[0].minBidMeat,2000000);assert.equal(writes[0].instantPurchasePrice,null);
 });
