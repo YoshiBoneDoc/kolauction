@@ -1,6 +1,8 @@
 import BackHomeLinks from '../components/BackHomeLinks';
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { useEffect } from 'react';
 import { BID_INCREMENT_TIERS } from '../lib/bidIncrements';
+import { ESCROW_FEE_TIERS } from '../lib/escrowFees';
 
 const sectionHeadingClass = 'text-lg font-semibold leading-7 text-gray-800';
 const subheadingClass = 'text-sm font-semibold leading-5 text-gray-700';
@@ -23,7 +25,7 @@ const auctionTypeComparison = [
     },
     {
         heading: 'FEES',
-        escrow: '7.5% seller commission on successful sales. No sale, no fee.',
+        escrow: 'Fees start at 5% and decrease for higher-value sales. See chart below for full details. No sale, no fee.',
         direct: 'No commission. Optional tips are appreciated.',
     },
     {
@@ -34,6 +36,10 @@ const auctionTypeComparison = [
 ];
 
 const InfoPage = () => {
+    const { hash } = useLocation();
+    useEffect(() => {
+        if (hash === '#escrow-fees-title') document.getElementById('escrow-fees-title')?.scrollIntoView({ block: 'start' });
+    }, [hash]);
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6 pt-16">
             <BackHomeLinks className="absolute top-4 left-4" />
@@ -45,7 +51,7 @@ const InfoPage = () => {
                 But here we are, and kHub is finally ready to launch!
             </p>
 
-            <div className="text-sm text-gray-600 text-left max-w-3xl">
+            <div className="w-full max-w-3xl text-left text-sm text-gray-600">
                 <h2 className={`${sectionHeadingClass} mb-2`}>Getting Started</h2>
                 <p className="mb-6">
                     <Link to="/register" className="font-medium text-blue-600 hover:underline">Register here</Link> to create your kHub account. Only one account is permitted per KoL player.
@@ -126,8 +132,8 @@ const InfoPage = () => {
                 <ul className="mb-3 list-disc space-y-2 pl-5">
                     <li>
                         <strong className={subheadingClass}>Escrow:</strong> The bot automatically sends the items to the winning bidder
-                        and the seller&apos;s proceeds by KMail. A 7.5% commission is deducted from
-                        the final sale price. If no bids were accepted, the items are returned to the seller.
+                        and the seller&apos;s proceeds by KMail. The seller commission is deducted from
+                        the final sale price (see the fee chart below). If no bids were accepted, the items are returned to the seller.
                     </li>
                     <li>
                         <strong className={subheadingClass}>Direct Trade:</strong> The seller and winning bidder have 48 hours to complete
@@ -201,26 +207,54 @@ const InfoPage = () => {
                     </table>
                 </div>
 
-                <section aria-labelledby="bid-increases-title" className="mb-6">
-                    <h2 id="bid-increases-title" className={`${sectionHeadingClass} mb-2`}>Minimum Bid Increases</h2>
-                    <p className="mb-3">The first bid must meet the seller’s minimum price. Each subsequent bid must exceed the current highest bid by at least the amount shown below. These rules apply to both Escrow and Direct Trade auctions.</p>
-                    <div className="max-w-md overflow-hidden rounded-md border border-gray-200">
-                        <table className="w-full text-xs leading-5">
-                            <caption className="sr-only">Minimum increases based on the current highest bid, in Meat</caption>
-                            <thead className="bg-gray-100 text-gray-700"><tr>
-                                <th scope="col" className={`${subheadingClass} px-3 py-1.5 text-left`}>Current Highest Bid</th>
-                                <th scope="col" className={`${subheadingClass} px-3 py-1.5 text-right`}>Required Increase</th>
-                            </tr></thead>
-                            <tbody className="divide-y divide-gray-200">
-                                {BID_INCREMENT_TIERS.map(tier => <tr key={tier.label} className="bg-white odd:bg-gray-50">
-                                    <td className="whitespace-nowrap px-3 py-1">{tier.label}</td>
-                                    <td className="px-3 py-1 text-right font-medium text-gray-800">{tier.display}</td>
-                                </tr>)}
-                            </tbody>
-                        </table>
-                    </div>
-                    <p className="mt-2 text-xs leading-5">Buyouts can always be accepted at their listed price, even if below the next minimum bid.</p>
-                </section>
+                <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-x-8 md:gap-y-0">
+                    <section aria-labelledby="bid-increases-title" className="min-w-0 md:row-span-3 md:grid md:grid-rows-subgrid">
+                        <h2 id="bid-increases-title" className={`${sectionHeadingClass} mb-2`}>Minimum Bid Increases</h2>
+                        <p className="mb-3 leading-5">The first bid must meet the seller’s minimum price. Later bids must exceed the current highest bid by at least the increase below. Applies to both Escrow and Direct Trade auctions.</p>
+                        <div>
+                            <div className="overflow-hidden rounded-md border border-gray-200">
+                                <table className="w-full text-xs leading-5">
+                                    <caption className="sr-only">Minimum increases based on the current highest bid, in Meat</caption>
+                                    <thead className="bg-gray-100 text-gray-700"><tr>
+                                        <th scope="col" className={`${subheadingClass} px-3 py-1.5 text-left`}>Current Highest Bid</th>
+                                        <th scope="col" className={`${subheadingClass} px-3 py-1.5 text-right`}>Required Increase</th>
+                                    </tr></thead>
+                                    <tbody className="divide-y divide-gray-200">
+                                        {BID_INCREMENT_TIERS.map(tier => <tr key={tier.label} className="bg-white odd:bg-gray-50">
+                                            <td className="whitespace-nowrap px-3 py-1">{tier.label}</td>
+                                            <td className="px-3 py-1 text-right font-medium text-gray-800">{tier.display}</td>
+                                        </tr>)}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p className="mt-2 text-xs leading-5">Buyouts can always be accepted at their listed price, even if below the next minimum bid.</p>
+                        </div>
+                    </section>
+
+                    <section aria-labelledby="escrow-fees-title" className="min-w-0 md:row-span-3 md:grid md:grid-rows-subgrid">
+                        <h2 id="escrow-fees-title" className={`${sectionHeadingClass} mb-2 scroll-mt-4`}>Escrow Seller Fees</h2>
+                        <p className="mb-3 leading-5">Fees are based on the final winning bid or accepted buyout. Each rate applies only to the portion within that tier, so higher-value sales have a lower overall fee percentage.</p>
+                        <div>
+                            <div className="overflow-hidden rounded-md border border-gray-200">
+                                <table className="w-full text-xs leading-5">
+                                    <caption className="sr-only">Tiered escrow seller commission on portions of the final sale price, in Meat</caption>
+                                    <thead className="bg-gray-100 text-gray-700"><tr>
+                                        <th scope="col" className={`${subheadingClass} px-3 py-1.5 text-left`}>Sale Price Portion</th>
+                                        <th scope="col" className={`${subheadingClass} px-3 py-1.5 text-right`}>Fee Rate</th>
+                                    </tr></thead>
+                                    <tbody className="divide-y divide-gray-200">
+                                        {ESCROW_FEE_TIERS.map(tier => <tr key={tier.portion} className="bg-white odd:bg-gray-50">
+                                            <td className="px-3 py-1">{tier.portion}</td>
+                                            <td className="px-3 py-1 text-right font-medium text-gray-800">{tier.rate}</td>
+                                        </tr>)}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p className="mt-2 text-xs leading-5"><strong>Example:</strong> A 10m sale costs 5% of the first 1m (50k), plus 4% of the remaining 9m (360k): <strong>410k Meat total (4.1%).</strong></p>
+                            <p className="mt-2 text-xs leading-5">The total fee is rounded down to whole Meat. No sale, no fee.</p>
+                        </div>
+                    </section>
+                </div>
 
                 <h2 className={`${sectionHeadingClass} mb-1 text-center`}>
                     Contact Us

@@ -18,7 +18,7 @@ create temporary table cleanup_options(scope text check(scope in ('all_prelaunch
 -- all_prelaunch: ALL current auctions and ALL Auth accounts except verified teres Minor (#3552305).
 -- seeded_only: explicitly registered seed accounts and auctions involving them.
 -- BOTH modes clear the entire administrator inbox, including trade reports.
-insert into cleanup_options values ('all_prelaunch',false);
+insert into cleanup_options values ('all_prelaunch',true);
 
 create temporary table cleanup_protected(id uuid primary key) on commit drop;
 insert into cleanup_protected
@@ -103,16 +103,23 @@ insert into cleanup_blockers select 'auction',a.auction_number::text,a.status,'E
 insert into cleanup_blockers select 'receipt',r.receipt_id,'review','A legacy donation refund still needs review.'
     from khub_bot.mail_policy_reviews r where not r.refund_queued and r.receipt_id in (select mail_id from cleanup_receipts);
 
--- PREVIEW: no passwords, emails or request bodies are printed.
-select scope,apply_changes,(select count(*) from cleanup_users) as accounts_to_remove,
+-- One result table for Supabase SQL Editor. Keep mode and blockers first so
+-- they are visible without switching result sets. Lists are included as JSON.
+-- No passwords, emails or request bodies are printed.
+select case when apply_changes then 'APPLY' else 'PREVIEW ONLY' end as mode,
+    (select count(*) from cleanup_blockers) as blockers,
+    (select p.khub_username||' (#'||p.kol_player_id||')'
+        from public.profiles p join cleanup_protected k on k.id=p.id) as account_to_keep,
+    (select count(*) from cleanup_users) as accounts_to_remove,
     (select count(*) from cleanup_auctions) as auctions_to_remove,
     (select count(*) from cleanup_reports) as inbox_messages_to_remove,
-    (select count(*) from cleanup_bans) as test_bans_to_remove,
-    (select count(*) from cleanup_blockers) as blockers from cleanup_options;
-select p.khub_username as preserved_account,p.kol_player_id from public.profiles p join cleanup_protected k on k.id=p.id;
-select id,username,kol_player_id from cleanup_users order by username nulls last;
-select a.auction_number,a.item,a.status,a.escrow_mode from public.auctions a join cleanup_auctions t on t.id=a.id order by a.auction_number;
-select * from cleanup_blockers order by kind,reference;
+    coalesce((select jsonb_agg(to_jsonb(b) order by b.kind,b.reference) from cleanup_blockers b),'[]'::jsonb) as blocker_details,
+    coalesce((select jsonb_agg(jsonb_build_object('id',id,'username',username,'kol_player_id',kol_player_id)
+        order by username nulls last) from cleanup_users),'[]'::jsonb) as account_details,
+    coalesce((select jsonb_agg(jsonb_build_object('auction_number',a.auction_number,'item',a.item,
+        'status',a.status,'escrow_mode',a.escrow_mode) order by a.auction_number)
+        from public.auctions a join cleanup_auctions t on t.id=a.id),'[]'::jsonb) as auction_details
+from cleanup_options;
 
 do $$ begin
     if not (select apply_changes from cleanup_options) then

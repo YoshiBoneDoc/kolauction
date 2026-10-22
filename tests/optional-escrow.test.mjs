@@ -37,7 +37,10 @@ test('listing form defaults to escrow and offers direct settlement before publis
     assert.match(html, /type="button" aria-pressed="false"[^>]*>Direct<\/button>/);
     assert.doesNotMatch(html, /id="settlement-mode"/);
     assert.match(html, /mode stays fixed after publishing/);
-    assert.match(html, /7.5%/);
+    assert.match(html, /Fees start at 5%/);
+    assert.match(html, /each rate applying only to its portion of the final price/);
+    assert.match(html, /rounded down to whole Meat/);
+    assert.doesNotMatch(html, /7\.5%/);
     assert.match(html, /Set Buyout Price \(optional\)/);
     assert.doesNotMatch(html, /id="instantPurchasePrice"|20 billion Meat/);
     assert.match(html, /placeholder="e.g. 1000, 10b, 4.53m, 50k"/);

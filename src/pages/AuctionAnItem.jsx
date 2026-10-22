@@ -185,7 +185,7 @@ export default function AuctionAnItem() {
                         </div>
                     </fieldset>
                     <div className="mb-5">
-                        {escrowMode ? <EscrowProtection forListing /> : <DirectTradeHelp forListing />}
+                        {escrowMode ? <EscrowProtection forListing minimumPrice={minimumValue} /> : <DirectTradeHelp forListing />}
                         {escrowMode && <p className="my-4 rounded-[6px] border-l-[3px] border-[#22C55E] bg-[#F0FDF4] px-4 py-3 text-xs leading-[1.4] text-[#334155]"><strong className="font-bold text-[#15803D]">Early Access:</strong> While kHub is in its early stages, escrow is available only for auctions with a minimum bid of 1,000,000 Meat or less. In the unlikely event of a verified loss caused by our escrow system, we guarantee reimbursement of the actual loss, up to 1,000,000 Meat per affected user.</p>}
                         {!escrowMode && <p className="mt-2 text-xs leading-[1.4] text-red-600">Failure to honor a valid, completed auction is a violation of kHub policy and will likely get you banned. We take these very seriously.</p>}
                     </div>

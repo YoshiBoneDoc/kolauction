@@ -27,6 +27,7 @@ export function mapAuction(row, bidRows) {
         settledAt: row.settled_at,
         feeMeat: Number(row.fee_meat || 0),
         feeBps: Number(row.fee_bps || 0),
+        feePolicy: row.fee_policy || 'flat',
         instantPurchasePrice: row.instant_purchase_price == null ? null : Number(row.instant_purchase_price),
         instantPurchasedAt: row.instant_purchased_at,
         auctionTime: row.duration_hours,

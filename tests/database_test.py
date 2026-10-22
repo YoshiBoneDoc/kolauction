@@ -3503,6 +3503,238 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         sql(f"update khub_bot.account_bans set active=false where active and kol_player_id={owner_number};")
         for role in ['anon','authenticated']:
             sql('select khub_bot.public_auction(null::public.auctions,0,null,null);',owner_id if role=='authenticated' else None,role,error='permission denied')
+        # Ban-review/decision notices from 051 used to block the sender before
+        # settlement deliveries could run. Exercise the actual claim RPC without
+        # contacting KoL; the fixture state changes below are rolled back.
+        before_ban_templates=message_audit_snapshot()
+        sql(migration_sql('202610210063_ban_notice_delivery_templates.sql'))
+        assert message_audit_snapshot()==before_ban_templates
+        for prefix in ['ban-review:','ban-decision:']:
+            notice_id=sql(f"select id from khub_bot.deliveries where dedupe_key like '{prefix}%' order by created_at,id limit 1;")
+            assert notice_id, prefix
+            body=sql(f"select message from khub_bot.deliveries where id='{notice_id}';")
+            assert sql(f"select khub_bot.friendly_message(d) from khub_bot.deliveries d where id='{notice_id}';")==body
+            # Seed fixtures redirect notifications to teres Minor while retaining
+            # the original dedupe key. Render the actual overridden recipient too.
+            assert sql(f"select khub_bot.friendly_message(jsonb_populate_record(d,jsonb_build_object('recipient_id',3552305))) from khub_bot.deliveries d where id='{notice_id}';")==body
+            # Calls in one SQL session make rollback restore every prior state.
+            claimed=sql(f"""begin;
+                update khub_bot.deliveries set state='sent',sent_at=now(),evidence='Isolated fixture only; rolled back without sending' where state in ('pending','sending','unknown');
+                update khub_bot.closet_transfers set state='cancelled' where state in ('moving','unknown');
+                update khub_bot.deliveries set state='pending',display_message=null where id='{notice_id}';
+                select public.bot_claim_delivery(2)->>'id';
+                rollback;""")
+            assert claimed==notice_id,claimed
+            assert sql(f"select khub_bot.friendly_message(jsonb_populate_record(d,jsonb_build_object('meat',1))) from khub_bot.deliveries d where id='{notice_id}';",error='Unrecognized delivery template') is not None
+            sql(f"select khub_bot.friendly_message(jsonb_populate_record(d,jsonb_build_object('dedupe_key','{prefix}999999999:3552305:notice'))) from khub_bot.deliveries d where id='{notice_id}';",error='Unrecognized delivery template')
+        sql("select khub_bot.friendly_message(jsonb_populate_record(null::khub_bot.deliveries,'{\"kind\":\"notice\",\"dedupe_key\":\"unknown:fixture\",\"message\":\"Do not send\"}'::jsonb));",error='Unrecognized delivery template')
+        assert message_audit_snapshot()==before_ban_templates
+        before_inspection=message_audit_snapshot()
+        sql(migration_sql('202610210064_pending_delivery_inspection.sql'))
+        assert message_audit_snapshot()==before_inspection
+        for role in ['anon','authenticated']:
+            sql('select public.bot_inspect();',owner_id if role=='authenticated' else None,role,error='permission denied')
+        # Isolate a tiny queue in a rolled-back transaction. These are database
+        # fixtures only: no worker/transport runs and no live states are changed.
+        def inspect_queue(broken_first=True):
+            return json.loads(sql(f"""begin;
+                update khub_bot.deliveries set state='sent',sent_at=now() where state in ('pending','sending','unknown');
+                select khub_bot.queue('inspection-unknown',null,null,3552305,'notice',0,'[]','Secret fixture password: never print this');
+                select khub_bot.queue('inspection-frozen',null,null,3552305,'notice',0,'[]','Other private body');
+                update khub_bot.deliveries set created_at=now()-interval '2 minutes' where dedupe_key='inspection-unknown:notice';
+                update khub_bot.deliveries set display_message='Saved credential: never print this',created_at=now()-interval '{3 if not broken_first else 1} minutes'
+                    where dedupe_key='inspection-frozen:notice';
+                set local role service_role;
+                select public.bot_inspect();
+                rollback;"""))
+        # Fixture setup needs operator writes; inspection itself must work under
+        # service_role. Grant no private-table privileges beyond existing grants.
+        for broken_first in [True,False]:
+            result=inspect_queue(broken_first)
+            assert result['pendingDeliveryChecks']==2,result
+            assert len(result['pendingDeliveryAttention'])==1,result
+            failure=result['pendingDeliveryAttention'][0]
+            assert failure['delivery_reference'].startswith('D-') and failure['id']
+            assert failure['reason']=='Unrecognized delivery template; inspect delivery before sending.'
+            assert failure['blocksQueue']==broken_first
+            assert result['pendingQueueBlocked']==broken_first
+            assert 'never print this' not in json.dumps(result) and 'Secret fixture password' not in json.dumps(result)
+        assert message_audit_snapshot()==before_inspection
+        before_delivery_holds=message_audit_snapshot()
+        sql(migration_sql('202610210065_isolate_delivery_preparation_failures.sql'))
+        assert message_audit_snapshot()==before_delivery_holds
+        for role in ['anon','authenticated']:
+            sql(f"select public.bot_retry_held_delivery('{uuid4()}','Reviewed the preparation failure.');",owner_id if role=='authenticated' else None,role,error='permission denied')
+            sql('select * from khub_bot.delivery_preparation_reviews;',owner_id if role=='authenticated' else None,role,error='permission denied')
+        sql(f"""begin;
+            -- Test fixtures only: isolate queue without touching any live game.
+            update khub_bot.deliveries set state='sent',sent_at=now() where state in ('pending','sending','unknown');
+            update khub_bot.closet_transfers set state='cancelled' where state in ('moving','unknown');
+            update public.auctions set status='settling',settled_at=null,completed_at=null,settlement_outcome='completed' where id='{split_sale}';
+            select khub_bot.queue('hold-item-fixture','{split_sale}',null,3552305,'refund',0,'[{{"id":2,"quantity":3}}]','Secret fixture body; do not print');
+            select khub_bot.queue('hold-meat-fixture','{split_sale}',null,3552305,'refund',5,'[]','Private fixture credentials; do not print');
+            select khub_bot.queue('sale-item:ready-fixture','{split_sale}',null,3552305,'sale_item',0,'[{{"id":2,"quantity":1}}]','Ready item');
+            select khub_bot.queue('frozen-fixture',null,null,3552305,'notice',0,'[]','Private frozen body');
+            update khub_bot.deliveries set created_at=now()-interval '3 minutes' where dedupe_key like 'hold-item-fixture:%';
+            update khub_bot.deliveries set created_at=now()-interval '2 minutes' where dedupe_key like 'hold-meat-fixture:%';
+            update khub_bot.deliveries set created_at=now()-interval '1 minute' where dedupe_key like 'sale-item:ready-fixture:%';
+            update khub_bot.deliveries set display_message='Private frozen body' where dedupe_key='frozen-fixture:notice';
+            do $test$ declare
+                claimed jsonb; info jsonb; reserved jsonb; saved_item jsonb; saved_meat jsonb;
+                item_delivery uuid; meat_delivery uuid; frozen_delivery uuid; rejected boolean; alerts bigint;
+            begin
+                select id,to_jsonb(d) into item_delivery,saved_item from khub_bot.deliveries d where dedupe_key like 'hold-item-fixture:%';
+                select id,to_jsonb(d) into meat_delivery,saved_meat from khub_bot.deliveries d where dedupe_key like 'hold-meat-fixture:%';
+                select id into frozen_delivery from khub_bot.deliveries where dedupe_key='frozen-fixture:notice';
+                reserved:=public.bot_liabilities();
+                claimed:=public.bot_claim_delivery(2);
+                assert claimed->>'kind'='sale_item','Unrelated item delivery did not proceed';
+                assert (select to_jsonb(d)=saved_item from khub_bot.deliveries d where id=item_delivery),'Held item ledger changed';
+                assert (select to_jsonb(d)=saved_meat from khub_bot.deliveries d where id=meat_delivery),'Held Meat ledger changed';
+                assert public.bot_liabilities()=reserved,'Held assets stopped being reserved';
+                info:=public.bot_inspect();
+                assert info->>'heldDeliveryCount'='2';
+                assert jsonb_array_length(info->'heldDeliveryAttention')=2;
+                assert jsonb_array_length(info->'pendingDeliveryAttention')=0;
+                assert info->>'pendingQueueBlocked'='false';
+                assert strpos(info::text,'Secret fixture body')=0 and strpos(info::text,'Private fixture credentials')=0;
+                assert (select count(*)=2 from khub_bot.delivery_preparation_reviews h join khub_bot.bug_reports r on r.id=h.report_id where h.released_at is null and r.is_system and r.category='other');
+                perform public.bot_ack_delivery((claimed->>'id')::uuid,(claimed->>'attempt')::uuid,true,'Isolated fixture acknowledgment; no real transfer');
+                perform public.bot_tick();
+                assert (select status='settling' from public.auctions where id='{split_sale}'),'Held assets falsely settled auction';
+                -- After the good item, the frozen notice and both operator alerts
+                -- send normally. Repeated claims never duplicate the two holds.
+                for i in 1..3 loop
+                    claimed:=public.bot_claim_delivery(2);
+                    assert claimed is not null;
+                    if i=1 then assert (claimed->>'id')::uuid=frozen_delivery; end if;
+                    perform public.bot_ack_delivery((claimed->>'id')::uuid,(claimed->>'attempt')::uuid,true,'Isolated fixture acknowledgment; no real transfer');
+                end loop;
+                assert public.bot_claim_delivery(2) is null;
+                assert (select count(*)=2 from khub_bot.delivery_preparation_reviews where released_at is null);
+                assert (select count(*)=2 from khub_bot.deliveries where dedupe_key like 'delivery-preparation-review:%');
+                rejected:=false;
+                begin perform public.bot_retry_held_delivery(item_delivery,'Attempt retry before fixing its template.'); exception when others then rejected:=true; end;
+                assert rejected,'Unfixed hold was released';
+                assert (select released_at is null from khub_bot.delivery_preparation_reviews where delivery_id=item_delivery);
+                -- Correct only this isolated fixture, then explicitly release it.
+                update khub_bot.deliveries set display_message='Corrected fixture text' where id=item_delivery;
+                perform public.bot_retry_held_delivery(item_delivery,'Corrected the isolated message template.');
+                assert (select release_evidence='Corrected the isolated message template.' from khub_bot.delivery_preparation_reviews where delivery_id=item_delivery);
+                claimed:=public.bot_claim_delivery(2);
+                assert (claimed->>'id')::uuid=item_delivery and claimed->>'quantity'='3';
+                -- An interrupted actual send still blocks; never treat it as a
+                -- definitely-unsent preparation error or automatically send twice.
+                rejected:=false;
+                begin perform public.bot_claim_delivery(2); exception when others then rejected:=true; end;
+                assert rejected,'Sending delivery uncertainty was ignored';
+                assert (select count(*)=1 from khub_bot.delivery_preparation_reviews where released_at is null);
+            end; $test$;
+            rollback;""")
+        assert message_audit_snapshot()==before_delivery_holds
+        before_mailbox=message_audit_snapshot()
+        sql(migration_sql('202610210066_automatic_sent_mail_recovery.sql'))
+        assert message_audit_snapshot()==before_mailbox
+        for role in ['anon','authenticated']:
+            actor=owner_id if role=='authenticated' else None
+            for query in ['select public.bot_mailbox_check_deliveries();', 'select public.bot_dispatch_liabilities();',
+                f"select public.bot_record_mailbox_check('{uuid4()}',null,'{{}}');", 'select * from khub_bot.delivery_mailbox_reviews;']:
+                sql(query,actor,role,error='permission denied')
+        sql("""begin;
+            update khub_bot.deliveries set state='sent',sent_at=now() where state in ('pending','sending','unknown');
+            update khub_bot.closet_transfers set state='cancelled' where state in ('moving','unknown');
+            select khub_bot.queue('mailbox-uncertain',null,null,3552305,'refund',10,'[]','Frozen sensitive body');
+            select khub_bot.queue('mailbox-ready',null,null,3552305,'refund',20,'[]','Ready delivery');
+            update khub_bot.deliveries set display_message=message where dedupe_key like 'mailbox-%';
+            update khub_bot.deliveries set state='unknown',attempt=gen_random_uuid() where dedupe_key like 'mailbox-uncertain:%';
+            do $test$ declare
+                d khub_bot.deliveries%rowtype; claimed jsonb; result jsonb; total jsonb; dispatch jsonb;
+                ticket_count bigint; alert_count bigint; rejected boolean; ready_id uuid;
+            begin
+                select * into d from khub_bot.deliveries where dedupe_key like 'mailbox-uncertain:%';
+                select id into ready_id from khub_bot.deliveries where dedupe_key like 'mailbox-ready:%';
+                total:=public.bot_liabilities();
+                assert exists(select 1 from jsonb_array_elements(public.bot_mailbox_check_deliveries()) x where x->>'id'=d.id::text and strpos(x->>'expected_message','Frozen sensitive body')>0);
+                rejected:=false;
+                begin perform public.bot_claim_delivery(2); exception when others then rejected:=true; end;
+                assert rejected,'Unreviewed send uncertainty must stop dispatch';
+                result:=public.bot_record_mailbox_check(d.id,d.attempt,'{"status":"not_found","candidate_ids":[]}');
+                assert result->>'status'='isolated';
+                assert (select state='unknown' and attempt=d.attempt from khub_bot.deliveries where id=d.id);
+                assert public.bot_liabilities()=total,'Uncertain obligation was erased';
+                dispatch:=public.bot_dispatch_liabilities();
+                assert (dispatch->>'meat')::numeric=(total->>'meat')::numeric-10,'Dispatch must reserve all known-unsent obligations';
+                select count(*) into ticket_count from khub_bot.delivery_mailbox_reviews;
+                select count(*) into alert_count from khub_bot.deliveries where dedupe_key like 'mailbox-review-admin:%';
+                assert alert_count=1;
+                assert (select r.is_system and r.category='other' and strpos(r.body,d.id::text)>0 and strpos(r.body,'No confirmed matching sent-message ID')>0 and strpos(r.body,'Frozen sensitive body')=0
+                    from khub_bot.delivery_mailbox_reviews h join khub_bot.bug_reports r on r.id=h.report_id where h.delivery_id=d.id);
+                perform public.bot_record_mailbox_check(d.id,d.attempt,'{"status":"ambiguous","candidate_ids":["998877"]}');
+                assert (select count(*)=ticket_count from khub_bot.delivery_mailbox_reviews),'Repeated check duplicated review';
+                assert (select count(*)=alert_count from khub_bot.deliveries where dedupe_key like 'mailbox-review-admin:%'),'Repeated check duplicated alert';
+                assert public.bot_inspect()->>'mailboxRecoveryEnabled'='true';
+                assert jsonb_array_length(public.bot_inspect()->'isolatedDeliveryAttention')=1;
+                claimed:=public.bot_claim_delivery(2);
+                assert (claimed->>'id')::uuid=ready_id,'Unrelated funded delivery stayed blocked';
+                perform public.bot_ack_delivery((claimed->>'id')::uuid,(claimed->>'attempt')::uuid,true,'Isolated fixture only; no live message sent');
+                rejected:=false;
+                begin perform public.bot_record_mailbox_check(d.id,gen_random_uuid(),jsonb_build_object('status','verified','message_id','998877','candidate_ids',jsonb_build_array('998877'),'message_hash',repeat('a',64))); exception when others then rejected:=true; end;
+                assert rejected,'A stale attempt must not confirm another send';
+                result:=public.bot_record_mailbox_check(d.id,d.attempt,jsonb_build_object('status','verified','message_id','998877','candidate_ids',jsonb_build_array('998877'),'message_hash',repeat('a',64)));
+                assert result->>'status'='sent';
+                assert (select state='sent' from khub_bot.deliveries where id=d.id);
+                assert (select resolved_at is not null and sent_message_id='998877' from khub_bot.delivery_mailbox_reviews where delivery_id=d.id);
+                assert (select strpos(evidence,'Sent Mail ID 998877')>0 from khub_bot.reconciliations where delivery_id=d.id);
+                assert public.bot_record_mailbox_check(d.id,d.attempt,'{"status":"not_found","candidate_ids":[]}')->>'status'='already_sent';
+                -- A failed administrator alert cannot create endless alert mail.
+                select * into d from khub_bot.deliveries where dedupe_key like 'mailbox-review-admin:%' limit 1;
+                update khub_bot.deliveries set state='unknown',attempt=gen_random_uuid() where id=d.id returning * into d;
+                perform public.bot_record_mailbox_check(d.id,d.attempt,'{"status":"check_failed","candidate_ids":[]}');
+                assert (select count(*)=alert_count from khub_bot.deliveries where dedupe_key like 'mailbox-review-admin:%');
+                perform public.bot_reconcile_delivery(d.id,false,'Manually checked this isolated fixture was not sent.');
+                assert (select state='pending' from khub_bot.deliveries where id=d.id);
+                assert not exists(select 1 from khub_bot.delivery_mailbox_reviews where delivery_id=d.id and resolved_at is null);
+            end; $test$;
+            rollback;""")
+        assert message_audit_snapshot()==before_mailbox
+        sql(migration_sql('202610210067_account_retry_schedule.sql'))
+        retry_job=prepare_account(account_mail(997067,sid=997067,name='Retry Schedule'))
+        for attempt in range(3):
+            assert sql("select public.bot_begin_account_attempt('997067');",role='service_role')=='t'
+        assert sql("select public.bot_begin_account_attempt('997067');",role='service_role')=='f'
+        assert sql("select attempt_count=3 and next_attempt_at>now()+interval '4 minutes' from khub_bot.account_jobs where mail_id='997067';")=='t'
+        due=json.loads(sql("select public.bot_pending_account_requests();",role='service_role'))
+        assert len(due)<=2 and all(row['id']!='997067' for row in due)
+        sql("update khub_bot.account_jobs set next_attempt_at=now()-interval '1 second' where mail_id='997067';")
+        assert sql("select public.bot_begin_account_attempt('997067');",role='service_role')=='t'
+        assert sql("select public.bot_begin_account_attempt('997067');",role='service_role')=='f'
+        assert sql("select attempt_count=4 and next_attempt_at>now()+interval '4 minutes' from khub_bot.account_jobs where mail_id='997067';")=='t'
+        assert sql("select has_function_privilege('anon','public.bot_begin_account_attempt(text)','execute') or has_function_privilege('authenticated','public.bot_begin_account_attempt(text)','execute');")=='f'
+        sql("update khub_bot.account_jobs set state='done',temporary_password=null,next_attempt_at=now()-interval '1 second' where mail_id='997067';")
+        assert sql("select public.bot_begin_account_attempt('997067');",role='service_role')=='f'
+        sql(migration_sql('202610210068_gift_wrapping_funds.sql'))
+        gift_held=json.loads(sql("select public.bot_gift_wrapping_liabilities();",role='service_role'))
+        regular_held=json.loads(sql("select public.bot_liabilities();",role='service_role'))
+        pending_closet=int(sql("select coalesce(sum(meat),0) from khub_bot.closet_transfers where state in ('pending','moving','unknown');"))
+        assert int(gift_held['meat'])==int(regular_held['meat'])+pending_closet
+        assert gift_held['items']==regular_held['items']
+        assert sql("select has_function_privilege('anon','public.bot_gift_wrapping_liabilities()','execute') or has_function_privilege('authenticated','public.bot_gift_wrapping_liabilities()','execute');")=='f'
+        before_fee_migration=message_audit_snapshot()
+        closed_fees=sql("select coalesce(jsonb_agg(jsonb_build_array(id,fee_meat,fee_bps,final_price,status) order by id),'[]') from public.auctions where finalized_at is not null;")
+        sql(migration_sql('202610210069_tiered_escrow_fees.sql'))
+        for table in ['khub_bot.deliveries','public.bids','khub_bot.receipts','khub_bot.account_jobs','khub_bot.reconciliations']:
+            assert message_audit_snapshot()[table]==before_fee_migration[table]
+        assert sql("select coalesce(jsonb_agg(jsonb_build_array(id,fee_meat,fee_bps,final_price,status) order by id),'[]') from public.auctions where finalized_at is not null;")==closed_fees
+        assert sql("select khub_bot.tiered_escrow_fee(10000000);")=='410000'
+        assert json.loads(sql('select public.bot_inspect();',role='service_role'))['escrowFeePolicy']['name']=='tiered_v1'
+        assert read_page('detail',id=split_sale)['rows'][0]['fee_policy']=='flat'
+        print('PASS: fee migration after the full audit suite preserves all existing finalized financial records, frozen deliveries, identities and queued account jobs; private service inspection reports the marginal schedule')
+        print('PASS: service-only gift wrapping protects full player obligations and pending closet funds without changing the regular liability ledger')
+        print('PASS: persistent account attempt reservations, two initial retries then five-minute cooldown on every later attempt, due-only bounded queue, finished-job and service-only guards')
+        print('PASS: service-only Sent Mail recovery, attempt-stamped positive proof, idempotent isolation alerts and actual message IDs, retained full obligations with separate funded dispatch checks, unrelated payouts continue, manual release, no alert loops or blind resend')
+        print('PASS: broken item and Meat messages set aside; unrelated asset delivery and frozen notices continue; reservations, settlement, no-send state and uncertain-send guards preserved; one Other inbox/KMail alert per failure; explicit validated audited retry; inspection remains secret-free')
+        print('PASS: read-only service-only pending message diagnostics, frozen-message handling, queue-head distinction, safe references/reasons without secret bodies, per-message errors and unchanged delivery state')
+        print('PASS: audited ban-review and ban-decision notices render and claim without blocking settlement; unknown/unaudited/funded templates still rejected; existing messages and ledger state unchanged')
         print('PASS: server-verified administrator names/IDs for all bids and auction parties, pending/closed/held listings and seller pages, unchanged ordinary/guest/banned privacy, metadata spoof rejection, explicit grants and restricted-admin revocation, no financial/contact-data expansion')
         print('PASS: participant-only Escrow queries before deposit/during bidding/settlement/after completion/cancellation, leading/outsider/banned/anonymous protection, grouped auction context, stable retries and unchanged financial/feedback state')
         print('PASS: audited message templates, split item/Meat returns, self-raised bids, delayed event wording, buyout/restriction guidance, account navigation/escaping, conditional refund copy and unchanged saved messages/financial records')

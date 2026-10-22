@@ -669,8 +669,8 @@ completion, and durable refund/payout obligations. The website requires this
 migration and catalog sync before new listings can be created. Existing rows are
 kept. Only the server bot gets a service-role key; never set one in browser env.
 
-After migration `013`, new listings charge 7.5% and duration begins on exact item-deposit acceptance. Existing listing fees stay fixed.
-`bot/README.md` documents optional fee/fixed-deadline settings, startup, supported
+After migration `069`, standard escrow listings use marginal 5/4/3/2/1% fee tiers, rounded down once, replacing the historical flat 7.5% default from `013`. The timer begins on exact item-deposit acceptance. Existing finalized payouts and free/sub-5% flat discounts stay intact.
+`bot/README.md` documents tiered fees/deposit timing settings, startup, supported
 KMail commands, and the operator reconciliation process. Hosted migration and
 real KoL credentials/delivery have not been applied or tested by local changes.
 # Auction page reads and refresh timing
@@ -700,7 +700,8 @@ For mail retention and tracked manual-review notices, stop every bot, apply
 `migrations/202610190012_bot_mail_review.sql` once after `011`,
 then restart/deploy the matching worker. See `bot/OPERATIONS.md` for the outage and backup plan.
 
-For the 7.5% fee and donation/commission closet queue, stop all workers, apply
+For the historical flat-fee and donation/commission closet setup (superseded by
+069 for new fees), stop all workers, apply
 `migrations/202610190013_closet_income.sql` after `012`, then restart/deploy
 the updated worker. This affects future listing fees and newly recorded income;
 existing fee terms and old donation receipts are preserved. Closet moves protect
@@ -863,3 +864,23 @@ administrator revokes this access. Ordinary users, guests and restricted viewers
 keep their existing aliases and visibility rules. Trading contacts, private reports,
 financial records and participant controls are not broadened. No bot restart or
 frontend bundle change is required; refresh to fetch the newly authorized data.
+
+## Tiered escrow commission (069)
+
+Stop all workers, apply `migrations/queue/202610210069_tiered_escrow_fees.sql` after
+068, then restart and deploy the updated website. The script moves to the parent
+migration directory after manual application. Matching standalone copies live in
+`bot/supabase/migrations/`.
+
+The database is authoritative: 5% of the first 1m, 4% of the next 9m, 3% of the next
+90m, 2% of the next 900m, and 1% above 1b; floor the aggregate fee once. Final
+winning/buyout price minus the recorded fee is the seller payment. Excess buyout
+Meat is refunded in full. Unsold, canceled and Direct listings have no fee.
+`fee_policy` is fixed at publication; `fee_bps` describes legacy flat terms only.
+The setting cannot disable or override new tiered listings. Open standard-rate
+escrow listings adopt the lower fee; finalized rows/deliveries/frozen messages and
+existing free/sub-5% flat discounts remain untouched. Only completed sales queue
+the exact recorded fee for the bot's closet.
+
+Run `python3 tests/tiered_fees_database_test.py` for isolated real settlement,
+permission, migration-preservation, buyout/refund, split-payment and fee tests.

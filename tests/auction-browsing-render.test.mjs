@@ -276,3 +276,15 @@ test('compact browse cards show minimums, private owner indicators and inline bi
         assert.match(withoutBids, />Place Bid<\/button>/);
     }
 });
+
+
+test('Info explains marginal seller fees and displays the five agreed fee tiers', () => {
+    const html = render('/info', []);
+    const table = html.match(/<table[^>]*>\s*<caption[^>]*>Tiered escrow seller commission[\s\S]*?<\/table>/)[0];
+    assert.equal((table.match(/<tr/g) || []).length, 6);
+    for (const rate of ['5%', '4%', '3%', '2%', '1%']) assert.ok(table.includes(rate));
+    assert.match(html, /Each rate applies only to the portion within that tier/);
+    assert.match(html, /410k Meat total \(4.1%\)/);
+    assert.match(html, /rounded down to whole Meat/);
+    assert.doesNotMatch(html, /7\.5%/);
+});

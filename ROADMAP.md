@@ -2,8 +2,11 @@
 
 Remaining work only. Updated October 21, 2026.
 
-## 1. Outstanding audit fixes
+# BUGS TO ADDRESS ASAP:
+- if you search and item, and you click on it, but then change your mind and watch to pick another item from the dropdown, the dropdown gets stuck on the first item.
 
+## 1. Outstanding audit fixes
+- if you make a escrow action but dont deposit the item(s) in a certain period of time, we should delete that created auctions after a certain point.
 - Show an unavailable/retry state on All Auctions after a failed initial load,
   rather than presenting missing data as “0 auctions found.”
 

@@ -80,7 +80,8 @@ with tempfile.TemporaryDirectory(prefix='khub-cleanup-',dir='/tmp') as folder:
             return {t:sql(f"select coalesce(jsonb_agg(to_jsonb(x) order by to_jsonb(x)::text),'[]') from {t} x;")
                 for t in ['auth.users','auth.sessions','public.profiles','public.auctions','public.bids','khub_bot.deliveries',
                     'khub_bot.account_jobs','khub_bot.receipts','khub_bot.bug_reports','khub_bot.account_bans']}
-        original=fingerprint();run_cleanup();assert fingerprint()==original
+        original=fingerprint();preview=run_cleanup();assert fingerprint()==original
+        assert preview.split('|',2)[:2]==['PREVIEW ONLY','0'],preview
         assert sql("select to_regclass('khub_bot.prelaunch_auction_archive') is null;")=='t'
         # Uncertain zero-asset messages must block, not just uncertain Meat.
         uncertain=sql(f"select id from khub_bot.deliveries where receipt_id='81001' limit 1;")
