@@ -123,7 +123,6 @@ export default function BuyAuctionDetails({ auction, now, backLink }) {
             {canCancel && <button disabled={pending} onClick={cancel} className="button-red rounded border px-4 py-2 disabled:opacity-50">{pending ? 'Canceling…' : 'Cancel remaining order'}</button>}
             {error && <p role="alert" className="text-red-700">{error}</p>}
             {(owns || auction.fulfilledByMe) && currentUser && !currentUser.isBanned && <p><Link to={`/auction/${auction.id}/trade-query`} className="text-sm text-blue-700 underline">Contact an administrator about this order</Link></p>}
-            <p className="text-xs text-gray-600">Hardcore/Ronin buyers receive gifts at 50 Meat per package, paid from uncommitted escrow separately from commission. Ordinary KMail has no packaging charge. Gift costs can reduce the unreserved order; reductions never count as purchases.</p>
             <EscrowProtection buy />
             {auction.buyAdmin && auction.reservationAudit?.length > 0 && <details className="text-xs"><summary className="cursor-pointer">Reservation and gift audit</summary><ul>{auction.reservationAudit.map(event => <li key={event.id} className="py-1">{new Date(event.created_at).toLocaleString()} · {event.kind} · {JSON.stringify(event.details)}</li>)}</ul></details>}
             <section aria-label="Fulfillment history" className="space-y-2"><h2 className="text-xl font-bold">Fulfillment history</h2><p className="text-xs text-gray-500">Latest 100 accepted fulfillments. Completed purchases cannot be reversed.</p>
