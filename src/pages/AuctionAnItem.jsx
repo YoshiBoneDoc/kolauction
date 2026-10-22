@@ -242,7 +242,8 @@ export default function AuctionAnItem() {
                     <select id="auctionTime" value={auctionTime} onChange={(event) => setAuctionTime(event.target.value)} className={fieldClass}>
                         <option value="6">6 Hours</option><option value="12">12 Hours</option>
                         <option value="24">1 Day</option><option value="72">3 Days</option>
-                        <option value="168">7 Days</option><option value="720">1 Month</option>
+                        <option value="168">7 Days</option><option value="336">14 Days</option>
+                        <option value="720">1 Month</option>
                     </select>
                     <button type="submit" disabled={escrowLimitExceeded} className="min-h-11 w-full rounded bg-blue-600 px-4 py-3 font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">Preview Auction</button>
                 </form>}

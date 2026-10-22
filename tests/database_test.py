@@ -3729,6 +3729,19 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         assert json.loads(sql('select public.bot_inspect();',role='service_role'))['escrowFeePolicy']['name']=='tiered_v1'
         assert read_page('detail',id=split_sale)['rows'][0]['fee_policy']=='flat'
         print('PASS: fee migration after the full audit suite preserves all existing finalized financial records, frozen deliveries, identities and queued account jobs; private service inspection reports the marginal schedule')
+        before_duration_migration=message_audit_snapshot()
+        sql(migration_sql('202610220070_fourteen_day_auctions.sql'))
+        assert message_audit_snapshot()==before_duration_migration
+        fortnight_direct=sql("select public.create_auction('seal tooth',1,100,336,null,null,2,false);",owner_id,'authenticated')
+        fortnight_escrow=sql("select public.create_auction('seal tooth',1,100,336,null,null,2,true);",owner_id,'authenticated')
+        for ident in [fortnight_direct,fortnight_escrow]:
+            assert sql(f"select duration_hours=336 and end_time-created_at=interval '336 hours' from public.auctions where id='{ident}';")=='t'
+        assert ingest(mail(next(serial),int(sql(f"select kol_player_id from public.profiles where id='{owner_id}';")),{'type':'list','auction_id':fortnight_escrow},items=[{'id':2,'quantity':1}]))=='accepted'
+        assert sql(f"select status='active' and abs(extract(epoch from end_time-item_escrowed_at)-336*3600)<1 from public.auctions where id='{fortnight_escrow}';")=='t'
+        for invalid_duration in [335,337]:
+            sql(f"select public.create_auction('seal tooth',1,100,{invalid_duration},null,null,2,false);",owner_id,'authenticated',error='valid auction duration')
+        sql(f"update public.auctions set duration_hours=337 where id='{fortnight_direct}';",error='auctions_duration_hours_check')
+        print('PASS: 14-day Direct and Escrow creation, exact 336-hour timers and deposit-start timing, unsupported durations rejected, existing records unchanged')
         print('PASS: service-only gift wrapping protects full player obligations and pending closet funds without changing the regular liability ledger')
         print('PASS: persistent account attempt reservations, two initial retries then five-minute cooldown on every later attempt, due-only bounded queue, finished-job and service-only guards')
         print('PASS: service-only Sent Mail recovery, attempt-stamped positive proof, idempotent isolation alerts and actual message IDs, retained full obligations with separate funded dispatch checks, unrelated payouts continue, manual release, no alert loops or blind resend')

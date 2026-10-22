@@ -48,7 +48,7 @@ with tempfile.TemporaryDirectory(prefix='khub-fees-',dir='/tmp') as folder:
         assert len({p.name for p in migrations})==len(migrations)
         fee_migration=next(p for p in migrations if p.name=='202610210069_tiered_escrow_fees.sql')
         for migration in migrations:
-            if migration!=fee_migration: sql(migration.read_text())
+            if migration.name<fee_migration.name: sql(migration.read_text())
         catalog_path=ROOT/'src/data/items.json'
         if not catalog_path.exists(): catalog_path=ROOT/'catalog/items.json'
         catalog=json.loads(catalog_path.read_text())
@@ -108,12 +108,24 @@ with tempfile.TemporaryDirectory(prefix='khub-fees-',dir='/tmp') as folder:
         sql('update khub_bot.settings set fee_bps=750;')
         before=fingerprint();historical_before=row(historical);finalized_before=row(finalized)
         sql(fee_migration.read_text())
+        for migration in migrations:
+            if migration.name>fee_migration.name: sql(migration.read_text())
         assert fingerprint()==before,'Migration rewrote existing assets/messages/fees'
         assert {k:v for k,v in row(historical).items() if k!='fee_policy'}==historical_before
         assert {k:v for k,v in row(finalized).items() if k!='fee_policy'}==finalized_before
         assert row(historical)['fee_policy']==row(finalized)['fee_policy']=='flat'
         assert row(open_standard)['fee_policy']=='tiered_v1'
         assert row(discounted)['fee_policy']==row(free)['fee_policy']=='flat'
+        duration_direct=sql("select public.create_auction('seal tooth',3,100,336,null,null,2,false);",seller)
+        duration_escrow=sql("select public.create_auction('seal tooth',3,100,336,null,null,2,true);",seller)
+        for ident in [duration_direct,duration_escrow]:
+            assert sql(f"select duration_hours=336 and end_time-created_at=interval '336 hours' from public.auctions where id='{ident}';")=='t'
+        assert send(duration_escrow,'list')=='accepted'
+        assert sql(f"select status='active' and abs(extract(epoch from end_time-item_escrowed_at)-336*3600)<1 from public.auctions where id='{duration_escrow}';")=='t'
+        for invalid in [335,337]:
+            sql(f"select public.create_auction('seal tooth',3,100,{invalid},null,null,2,false);",seller,error='valid auction duration')
+        sql(f"update public.auctions set duration_hours=337 where id='{duration_direct}';",error='auctions_duration_hours_check')
+        print('PASS: 14-day Direct/Escrow auctions and exact 336-hour deposit-start timing; unsupported durations rejected by RPC and table constraint')
         print('PASS: migration preserves historical/finalized ledgers and frozen messages; open standard auctions switch to lower tiers; existing free/discounted terms stay intact')
 
         from fractions import Fraction
