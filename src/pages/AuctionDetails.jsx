@@ -102,7 +102,14 @@ export default function AuctionDetails() {
                 {auction.bids?.length ? <ul className="divide-y divide-gray-200">
                     {auction.bids.slice().reverse().map((bid, index) => (
                         <li key={bid.id || index} className="flex flex-col gap-1 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                            <span className="min-w-0 break-words font-medium text-gray-700">{bid.bidder}</span>
+                            <div className="min-w-0">
+                                <span className="break-words font-medium text-gray-700">{bid.bidder}</span>
+                                {currentUser && bid.adminDeliveryReferences?.length > 0 && <ul aria-label="Administrator message references" className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
+                                    {bid.adminDeliveryReferences.map(delivery => <li key={delivery.reference}>
+                                        {delivery.label}: <span className="font-mono">{delivery.reference}</span> ({delivery.state})
+                                    </li>)}
+                                </ul>}
+                            </div>
                             <div className="sm:text-right">
                                 <p className="font-bold text-gray-900">{bid.amount.toLocaleString('en-US')} Meat</p>
                                 {auction.instantPurchasedAt && bid.amount === auction.instantPurchasePrice && <p className="text-xs font-semibold text-green-700">Buyout</p>}

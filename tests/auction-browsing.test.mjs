@@ -95,3 +95,13 @@ test('browse sorts by total accepted bids and latest bid with unbid auctions las
     assert.deepEqual(ids(browseAuctions(lots, { now, trade: 'direct' })), ['older']);
     assert.deepEqual(browseAuctions(lots, { now, trade: 'none' }), []);
 });
+
+
+import { recentCompletedAuctions } from '../src/lib/auctionBrowsing.js';
+test('recent completed trades exclude other outcomes and order by completion rather than listing time', () => {
+    const rows = Array.from({ length: 30 }, (_, i) => ({ id: String(i), status: 'completed', completedAt: new Date(100000 + i * 1000).toISOString(), createdAt: 30000 - i }));
+    rows.push(...['active', 'awaiting_trade', 'settling', 'cancelled', 'voided', 'ended_no_bids'].map(status => ({ id: status, status, completedAt: new Date(9999999).toISOString() })));
+    const recent = recentCompletedAuctions(rows);
+    assert.equal(recent.length, 24);
+    assert.deepEqual(recent.map(a => a.id), Array.from({ length: 24 }, (_, i) => String(29-i)));
+});

@@ -1,285 +1,322 @@
-# kHub project handoff
+# kHub handoff for the next chat
 
-Updated October 19, 2026. Read this before making changes in a new chat.
-This is a development project, not a finished public launch. Separate what is
-implemented locally from what the user has actually deployed/applied.
+Updated October 22, 2026. Start here, then inspect the relevant code before editing.
+**The website is live and the bot handles real players' assets.** Older chat history
+and historical setup notes are not reliable descriptions of current behavior.
 
-## Background and the three pieces
+## Read this first
 
-**kHub / KoL Auction Hub** is an auction website for Kingdom of Loathing (KoL),
-inspired by the original kBay. Players trade items for the game's currency, Meat.
-The middleman is the user's KoL bot account **kHub (#3888760)**. The owner's/main
-support account is **teres minor (#3552305)**.
+- The user prefers direct action and short explanations in plain language. Explain
+  where commands run: **Mac/IntelliJ terminal** versus **Ubuntu/Oracle terminal**.
+  Avoid jargon and repeated permission questions for already-authorized work.
+- Preserve small, precise design/copy requests. Do not redesign unrelated sections.
+- **Do not update ROADMAP.md unless the user explicitly asks.** It is user-maintained
+  and can contain completed or outdated tasks; confirm against code before acting.
+- Use descriptive, project-relative IDE links, for example
+  `[poll controls](src/components/HomePoll.jsx:1)`. Absolute paths reportedly do not
+  navigate correctly in IntelliJ. Do not claim navigation was verified.
+- Preserve existing edits and untracked files. Never reset, auto-commit, push,
+  deploy, apply hosted SQL, or start a live bot merely as a verification step.
+- New chats must distinguish **implemented locally**, **SQL applied by the user**,
+  **website deployed**, and **Oracle bot upgraded**. These are separate operations.
 
-| Piece | Location | Runtime / hosting |
+## What runs where
+
+Project: `/Users/adityayadav/Desktop/IntelliJ Projects/kolauction`.
+
+| Piece | Location / reference | Hosting |
 | --- | --- | --- |
-| Website | `src/`, `public/`, root `package.json` | React 18, React Router, Vite; Cloudflare |
-| Persistent accounts, auctions and bot ledger | `supabase/` | Supabase Auth + PostgreSQL |
-| Middleman worker | **`bot/`** | Node **24+**; local Mac during testing, Docker on Oracle Ubuntu for hosting |
+| Website | [React/Vite app](src/App.jsx:1), [root package scripts](package.json:1) | Cloudflare |
+| Accounts, auction transactions and financial ledger | [database documentation](supabase/README.md:1) | Supabase Auth + PostgreSQL |
+| KoL middleman worker | [bot commands and operations](bot/README.md:1) | Oracle Ubuntu, Docker |
 
-Project directory: `/Users/adityayadav/Desktop/IntelliJ Projects/kolauction`.
-The website is not Next.js. Use `VITE_` browser variables, not `NEXT_PUBLIC_`.
-The website's Cloudflare deployment **does not run the bot**. SQL functions implement
-most auction/ledger transactions; the worker coordinates KoL and Supabase.
+The bot is **kHub (#3888760)**. The owner/admin is **teres Minor (#3552305)**.
+The server has been referred to as `khub-bot-network`; deployment directory is
+`~/khub-bot`, Compose service `bot`, container `khub-bot`, login user `ubuntu`.
+Confirm the current host/IP privately when needed; do not reuse an old chat's IP.
 
-**The entire `bot/` folder is deliberately ignored by the website Git repository.**
-A fresh website clone does not contain it. Do not force-add it, credentials or SSH
-keys to Git. Local bot edits do not update Oracle. Build/upload the separate bundle
-and rebuild the Oracle container; website Git pushes only update the website when
-Cloudflare Git deployment is configured.
+The whole **bot directory is deliberately gitignored**. Website Git pushes do not
+update Oracle. A fresh website clone will not contain the bot. Do not force-add it.
+Local bot changes require a separate bundle/upload/container rebuild for deployment.
+The hosted website and Docker bot keep running when the laptop is off or SSH closes.
+Only one KoL-connected bot instance may run: Oracle OR Mac, even in read-only mode.
 
-## Read these documents rather than guessing
+## Documentation and migration workflow
 
-- [Root README](README.md): project locations, bot reminder, deployment separation.
-- [ROADMAP](ROADMAP.md): **remaining work only**. Some rollout items can lag behind
-  manual application; confirm status rather than assuming every listed task is undone.
-- [Supabase README](supabase/README.md): database setup, RPCs, migration rollout,
-  accounts and historical implementation notes. Later corrections supersede earlier text.
-- [Migration instructions](supabase/migrations/AGENTS.md) and
-  [queue README](supabase/migrations/queue/README.md): mandatory migration workflow.
-- [Bot README](bot/README.md): local/Oracle start-stop commands, live/read-only,
-  commands, request lookup, reconciliation, statistics and troubleshooting.
-- [Bot deployment guide](bot/DEPLOYMENT.md): packaging, Oracle Docker setup,
-  transferring updates and restarting the hosted copy.
-- [Bot operations guide](bot/OPERATIONS.md): outages, uncertain sends, asset
-  checks, rollover, donation/closet behavior, recovery and backups.
-- [Bot message previews](bot/MESSAGES.md): outgoing KMail examples and reference IDs.
-  Some historical examples predate newer password/template changes; check current code.
-- [Standalone bot database README](bot/supabase/README.md): migration copies for deployment.
-- [Wall of Shame operations](supabase/WALL_OF_SHAME.md): reviewed publication,
-  correction/removal and public-versus-private ban information.
-- [Artwork notes](public/art/README.md): generated portrait/frame assets and prompts.
-- [Email setup notes](supabase/EMAIL_SETUP.md): **mostly historical**. New signup
-  and recovery use KMail, not SMTP. Do not bring back email registration accidentally.
+- [Root orientation](README.md:1).
+- [Website/database operations and migration notes](supabase/README.md:1).
+- [Mandatory migration instructions](supabase/migrations/AGENTS.md:1) and
+  [queue instructions](supabase/migrations/queue/README.md:1).
+- [Bot command cheat sheet](bot/README.md:1), [deployment](bot/DEPLOYMENT.md:1),
+  [recovery/operations](bot/OPERATIONS.md:1), [message examples](bot/MESSAGES.md:1).
+- [Live item catalog](supabase/ITEM_CATALOG.md:1),
+  [standalone catalog operations](bot/ITEM_CATALOG.md:1).
 
-## Current registration and login
+**New website migrations go in `supabase/migrations/queue/`.** The user runs SQL
+manually, then moves successful scripts to the parent directory without renaming.
+Do not move them for the user or rerun historical scripts indiscriminately.
+Keep matching standalone copies directly in `bot/supabase/migrations/` (no queue).
+Tests must resolve scripts from either website location.
 
-New users send normal KMail with **no Meat/items** to kHub:
+At this handoff, scripts **through 076 are physically in the parent directory**;
+the queue contains only its README. Under the user's convention this suggests they
+were applied, but **this is not independent verification of hosted database state**.
+The assistant has not run hosted migrations or deployed the website/bot.
 
-```text
-REGISTER
-```
+Current local Git status still contains the latest poll changes, the new voter-list
+component and untracked migration 076. Inspect `git status` before continuing; do
+not assume the newest work was committed or deployed. Generated `build/index.html`
+can also be modified; some build files were historically tracked despite ignores.
 
-The actual KoL sender ID/name authenticates the request. The bot creates one
-Supabase Auth account and automatically links/verifies the player. The website
-username is the verified KoL name; **no custom usernames or user-controlled renames**.
-Duplicate linked accounts and banned identities are rejected.
+## Latest work: polls (075–076)
 
-The bot sends the username and generated temporary password back through KMail.
-`CREDENTIALS` (alias `FORGOT LOGIN`) from the same linked KoL player issues a **new**
-password. It cannot retrieve an old password or recover somebody else's account
-from a typed name. There is a five-minute account-request cooldown. Users can change
-password after login via their account page; user-chosen passwords have a 12-character
-minimum. New registration/recovery requires no real email address or SMTP.
+The current seeded question is exactly:
 
-Internally, Auth uses `account-<UUID>@login.khub.invalid`. The website resolves a
-KoL username through `khub_login_address`, then uses Supabase password login.
-Do not expose a legacy user's real email through the public lookup.
+> Should sellers have the option to end auctions early if they’re happy with the current bid?
 
-Relevant files: `src/pages/Register.jsx`, `Login.jsx`, `AuthEmailPage.jsx`,
-`ResetPassword.jsx`, `src/lib/auth.js`, `src/context/UserContext.jsx`,
-`bot/src/accounts.mjs`, `bot/src/store.mjs` and migrations `019`, `021`, `022`.
+- Logged-in, unrestricted users see a large yellow banner at the homepage bottom
+  before voting. **One immutable vote per account per poll** is enforced in SQL,
+  including opposite simultaneous submissions and retries. New polls allow new votes.
+- **Latest requirement supersedes the original disappear-after-voting behavior.**
+  After voting, show live Yes/No totals and percentages in a subtle yellow box,
+  aligned bottom-left within the homepage content, including on return visits.
+- Refresh while visible every 30 seconds and on focus; do not restore voting from
+  an older background response. Failed results refresh must not enable voting again.
+- Guests see no poll/results. Ordinary users never receive voter identities and do
+  not receive active totals until they have voted.
+- Admins see live totals and can expand **View voters** for usernames grouped by
+  Yes and No, both on the homepage and in the poll manager. This uses a separate
+  database-authorized endpoint; hiding a frontend control is not authorization.
+- `/admin/polls` is linked from the admin inbox and homepage banner. It supports
+  private editable drafts, publishing later by button, concluding a poll, and an
+  atomic **Conclude current & publish** action. Only one poll can be live.
+- Drafts are not scheduled automatically. The admin publishes when ready.
+- Concluding freezes totals in a permanent snapshot. Previous polls/results remain
+  in the admin archive; closed polls cannot reopen and live questions cannot change.
+- Admins can publish/hide concluded aggregate results alongside the next homepage
+  poll. Ordinary viewers only see those archived results if explicitly published.
+  Concluding an unpublished poll removes its ordinary live-results box.
+- Archived totals survive later account/vote cleanup. Voter lists reflect accounts
+  and vote records still on file; names are not part of published summaries.
 
-Account operations are durable private jobs. Keep the reserved account UUID,
-request stamp and password unchanged across retries. Finish requires confirmation
-from Auth before queuing the credentials. Generated secrets are removed from jobs
-once queued and from delivery bodies after confirmed sending. Routine inspect/
-lookup output hides credential bodies. Saved KoL Inbox/Sent messages still contain
-passwords: never print those messages or include them in a handoff.
+Relevant implementation:
+[homepage banner](src/components/HomePoll.jsx:1),
+[aggregate display](src/components/PollResults.jsx:1),
+[private voter lists](src/components/PollVoters.jsx:1),
+[admin manager](src/pages/AdminPolls.jsx:1),
+[RPC service](src/lib/polls.js:1),
+[poll schema/management](supabase/migrations/202610220075_homepage_poll.sql:1),
+[live totals and private voter RPC](supabase/migrations/202610220076_live_poll_results.sql:1).
+Migrations 075/076 do not require a bot rebuild or restart.
 
-### Latest bugs and fixes: pick up here if login is still failing
+## Recent auction/UI work to preserve
 
-1. **Account creation failed after migration 019.** Supabase Admin API initially
-   inserts `auth.users`, then attaches `app_metadata` within its transaction. Our
-   original trigger incorrectly required the final metadata at INSERT. Migration
-   **021** fixes this: the exact private job's generated UUID/internal address
-   authorize the INSERT; finalization still requires the server-controlled stamp.
-   The regression test reproduces the old failure and real insertion order.
-2. **KMail added spaces inside temporary passwords.** The original long base64url
-   token failed, and a longer hyphen-separated format was also visibly split.
-   The current generator produces **16 characters**, `Kh9!` plus 12 uniformly
-   random letters/digits using `crypto.randomInt` (about 71 random bits). No spaces,
-   hyphens or underscores. Migration **022** lowers the private job/function minimum
-   from 24 to 16. It does not change existing passwords or pending jobs.
-3. The last user-facing instruction was: stop bot, apply `022`, restart `npm start`,
-   then send `CREDENTIALS`. **No successful login with the new 16-character format
-   has been confirmed yet.** Previously issued bot passwords never contained
-   spaces, so remove KMail-inserted spaces while retaining genuine hyphens if
-   trying an older password. Do not normalize every website password: users may
-   intentionally choose passwords containing spaces.
+- [Shared navigation](src/components/AuctionNavigation.jsx:1) appears across pages.
+  No duplicate Back/Home headers. Active links are darker red with glow, **not bold**.
+  Navbar links/buttons have **no outline in any focus state**; keyboard focus uses
+  text color/glow. Wall of Shame retains its own background behind the navbar.
+- [Homepage carousel](src/components/PopularAuctions.jsx:1) cycles left-to-right
+  through every active listing before repeating, with no duplicate DOM cards.
+  Pause/hover/keyboard/reduced-motion behavior and saved position on return matter.
+  Session storage contains only carousel IDs/progress, not private auction data.
+- Homepage cards have larger sprites, **Bid/Min above the largest price text**, a
+  trade badge centered between the price section and aligned countdown, and uniform
+  dimensions. Do not turn them into All Auctions cards again.
+- [All Auctions](src/pages/AllAuctions.jsx:1) has a three-column compact grid,
+  two columns on tablets, one on mobile. Keep fixed card geometry when bidding opens;
+  only one inline form opens at a time. No modal bidding.
+- The toolbar uses **36px-high** controls. Search/status labels are visually hidden
+  but retained for accessibility. Ending Soon / Newest / Recent Activity share one
+  segmented outline; Most Bids and Price sit beside them with 20px, 2.5px-stroke
+  chevrons, 8px label gap, both directions when neutral and one when selected.
+- Sorts are mutually exclusive; Escrow/Direct are independent persistent toggles.
+  Their final selected color is **light blue**, off is neutral white. My Auctions,
+  status, search and trade filters combine and reset pagination. Ending Soon is default.
+- Sorting/filtering runs **before database pagination**. Recent Activity means latest
+  accepted bid, not creation time; unbid auctions come last. Bid count is total valid
+  bids, not unique people. Do not sort/filter only the loaded page.
+- Trade badges use shared styling via
+  [TradeTypeBadge](src/components/TradeTypeBadge.jsx:1). Avoid page-specific palette drift.
+- Hot 🔥 markers on compact cards use top `ceil(10% × active_count)` bid-count ranking
+  across the entire live pool, independent of filtering/pages. Zero-bid auctions do
+  not qualify; expired/held/restricted-seller listings do not enter the live pool.
 
-A read-only hosted check confirmed that the tested username resolved, the Auth
-account existed/was confirmed, the internal address matched, the request stamp
-existed, no Auth ban was active, and website/bot used the same Supabase project.
-It did not log into KoL, sign into the user's website account, or reset a password.
-Do not assume this remains current after the user's subsequent manual changes.
+References: [card layout](src/components/CompactAuctionCard.jsx:1),
+[browsing helpers](src/lib/auctionBrowsing.js:1),
+[route-backed reads](src/lib/auctionRefresh.js:1),
+[storage/mapping](src/lib/auctions.js:1),
+[global styling](src/index.css:1).
 
-All accounts so far were the user's test accounts. The user explicitly said no
-legacy-account migration was needed. They requested reset SQL, which was supplied
-and validated on a disposable database. **The assistant did not execute the reset
-against hosted Supabase.** The user may have done so manually; verify if relevant.
+## Auction rules and financial behavior
 
-## Auction workflow implemented now
+### Escrow
 
-1. Seller creates a website listing with item/quantity, starting bid, optional
-   **Instant Purchase Price**, and duration. It waits for the item deposit.
-2. Seller KMail: `LIST <auction number>` + exact items, no extra Meat/items.
-   Bot acceptance activates the auction and normally starts its duration.
-3. Bidder KMail: `BID <auction number>` + **full new bid amount** in Meat, no items.
-   The bot holds the leading bid and returns the previous leading bid in full.
-4. The same BID command handles instant purchase: reaching the instant price ends
-   bidding; excess is refunded. Do not show duplicate bid instructions for this.
-5. At expiry, send items to winner and net payment to seller. New listings charge
-   **7.5% commission, rounded down to whole Meat**. No-bid auctions return items
-   without commission. Existing listing fees stay fixed.
-6. Completion means all required deliveries were acknowledged, not merely that a
-   timer expired. Historical auction/bid records remain in the database.
+Seller sends `LIST <auction number>` with exact items. Accepted deposits start the
+full auction timer. Bidders send `BID <auction number>` with their **full** bid in
+Meat. Prior leading bids and rejected/excess attachments are returned. Buyouts end
+bidding; payout/item deliveries are separate recorded obligations.
 
-Short auction numbers are shared by everyone for a listing, not per-user secrets.
-Full UUID commands remain supported for compatibility. Delivery references are
-`D-...`; closet references are `C-...`. Operator logs retain both short references
-and UUIDs. Users should not see internal item numbers in messages.
+[Migration 074](supabase/migrations/202610220074_unfunded_escrow_expiry.sql:1) expires
+unfunded drafts **24 hours after creation**. Bot ticks, website finalization and
+intake clean them up; late deposits are returned exactly once. Processing time,
+not KMail sent time, decides acceptance. Active/funded auctions are untouched.
+If a draft has linked support/audit/ledger history, cancel it instead of deleting
+those records. Seller-facing deposit instructions explain the deadline.
 
-## Bot safety and mail policies
+Early access limits the **starting/minimum bid** for new escrow listings to 1M
+Meat; do not accidentally cap subsequent bids/final prices at 1M. Displayed early
+access loss protection is up to 1M per affected user for verified system-caused loss.
 
-- **Only one KoL-connected copy at a time, even read-only.** Two copies replace
-  each other's sessions. Stop Oracle before local testing; a manual KoL login can
-  also replace a session. Do not casually start a worker as a diagnostic tool.
-- Supabase is the authoritative ledger; local SQLite/cache is not accepted auction
-  state. Receipt intake, escrow changes and obligations commit transactionally.
-  Duplicate mail cannot repeat a committed transaction.
-- Claim sends/moves durably before making an external write. A timeout or uncertain
-  acknowledgment stays blocked across restarts. Never retry or mark sent/moved
-  just to clear an error. Reconcile using actual sent-copy markers/attachments or
-  exact inventory/closet evidence. Use documented resolve commands, not row edits.
-- Check actual assets against escrow, refunds and outstanding obligations. Do not
-  spend held funds or bypass deficits. Optional owner-funded reserve defaults to 0.
-- Normal `DONATE` mail and **all gift packages** count as donations, regardless of
-  gift text. Gift packages remain unopened; opening one manually can invalidate a
-  pending wrapper closet move. Normal blank/invalid mail with attachments is refunded;
-  unknown unfunded/system/unsupported messages stay in the inbox for review.
-- Donations and confirmed sale commission are queued into the closet without using
-  protected escrow funds. After an acknowledged move, the owner can withdraw those
-  closet assets without creating a historical deficit obligation.
-- Rollover uses the game timestamp/maintenance detection, pauses transfers near
-  rollover, then resumes. A scheduled reboot is not the fix.
-- Auction clocks currently continue through outages. Funded bids count only if
-  processed before the deadline; late-processed ones are refunded. Extensions are
-  not implemented. Accepted obligations survive downtime.
+Current fees are **marginal tiers**, not the old flat 7.5%:
 
-## Website state and planned work
+| Portion of final sale price | Commission |
+| --- | --- |
+| First 1m | 5% |
+| Next 9m | 4% |
+| Next 90m | 3% |
+| Next 900m | 2% |
+| Above 1b | 1% |
 
-Implemented locally: persistent auctions, lifecycle/instant purchase, catalog search,
-browsing filters/sorting, active homepage prioritization, account timers/current bids,
-clipboard buttons, and reduced/visibility-aware refresh behavior. Read current
-contexts/hooks before changing refreshes; server/bot validation remains authoritative.
+Sum tier charges with integer arithmetic, then round down once. A 10m sale costs
+410k and pays the seller 9.59m. Direct/unsold/cancelled sales have no commission.
+Preserve historical/frozen fees and special discounts; never retroactively rewrite
+queued payments. PostgreSQL computes actual settlement; frontend helpers estimate.
+See [fee helper](src/lib/escrowFees.js:1) and
+[fee migration](supabase/migrations/202610210069_tiered_escrow_fees.sql:1).
 
-**Wall of Shame:** `/wall-of-shame`, main navigation link, wall texture, separate
-watercolor-painted frame and portrait assets, responsive layout, nameplates,
-pagination and empty/error/retry states. Public RPC exposes only explicitly published,
-reviewed active bans. Private reasons are not public. Banning alone does not publish.
-Expired/overturned entries disappear; publication expiry itself does not lift the
-underlying account restriction. No browser admin publication form exists yet.
-Current text: “The kHub”; “A permanent tribute to exceptionally poor judgment.”;
-“No portraits yet. We’d prefer to keep it that way.”
+### Minimum bid increases — both trade types
 
-Optional escrow/direct settlement, anonymous identities, seller profiles/search,
-reputation/feedback, and a completed-sales gallery/public lifetime stats are
-**roadmap proposals, not implemented behavior**. Older alias/anonymity proposals
-must not override the user's newer no-custom-registration-name decision silently.
-Private bot financial summaries/history already exist (`npm run stats`).
+| Current highest bid | Required increase | Round increase up to |
+| --- | --- | --- |
+| Below 1k | 10 | — |
+| 1k–under 10k | 100 | — |
+| 10k–under 100k | 1k | — |
+| 100k–under 1m | 10k | — |
+| 1m–under 10m | 3% | 10k |
+| 10m–under 100m | 2% | 100k |
+| 100m–under 10b | 1% | 500k |
+| 10b+ | 0.5% | 500k |
 
-The user wants short, readable product copy. Avoid expanding registration back
-into a wall of text. Preserve their Info page's typography/look and personal writing
-unless asked to change it. Current registration has a red ban-evasion warning,
-plain-text My Account (no quotes or link), and bold “Never reuse your KoL password.”
+Bracket comes from the **existing highest bid**. Round the required increase up,
+then add it. Use exact integer/BigInt/numeric math across UI, SQL and bot replies.
+First bid meets the seller floor; exact calculated minima are valid; buyouts are
+exempt and may be below an ordinary next increment. Example: 1.75m → minimum 1.81m.
+See [shared frontend calculation](src/lib/bidIncrements.js:1) and
+[SQL rules](supabase/migrations/202610220071_hybrid_bid_increments.sql:1).
 
-## Migrations, deployment status and Git
+### Direct trades, reports and feedback
 
-**New website migrations go in `supabase/migrations/queue/`.** The user manually
-runs them in SQL Editor, then moves them into `supabase/migrations/` under the
-same name. Never move them for the user. Standalone bot copies go directly in
-`bot/supabase/migrations/`, without queue. Do not rerun old scripts indiscriminately.
+Direct auctions are implemented, not a proposal. Bids happen on the website;
+players exchange in-game within 48 hours unless they agree otherwise. Both submit
+completion/incomplete responses. **Trade completion and optional thumbs feedback
+are separate systems.** Do not turn negative feedback into an incomplete trade.
 
-At handoff, website migrations through **022 are physically in the parent folder**,
-with only the queue README left below `queue/`. This is a useful hint under the
-user's convention, **not independent verification that every migration succeeded**.
-The assistant has not applied hosted migrations. Earlier ROADMAP/README references
-may still say “queued.” Resolve a script in either location.
+Completed profile counts wait for both parties' completion/resolution. Incomplete
+marks count only after the 48-hour grace period; administrator-excluded reports
+must not count against the target. Dismissing a report or resolving a support ticket
+alone does not prove the trade happened or grant a completed-trade point. Inspect
+current SQL before changing these rules; multiple migrations refine them.
 
-There are many uncommitted/untracked changes from this session. Inspect `git status`
-and preserve them. Do not reset, overwrite, auto-commit or auto-push on handoff.
-The bot changes will not appear in normal Git status because it is ignored.
+Support queries work for Direct and Escrow participants, with grouped admin threads.
+Banned users get a restricted login/appeal screen, optional image evidence, and
+server-side permission checks. Admin ban controls account for existing auction
+obligations; hiding a page is not a substitute for database ban enforcement.
+The admin can view bidder/seller identities; regular users retain active-bid anonymity,
+and guests/restricted users do not get player names. See the
+[Info page](src/pages/InfoPage.jsx:1) for current user-facing rules.
 
-Oracle previously ran successfully as container `khub-bot`, folder `~/khub-bot`,
-user `ubuntu`. The historical public IP was `157.151.227.17`; verify in Oracle
-before relying on it. Recent troubleshooting used the **local Mac bot**, not Oracle;
-the hosted copy may be stopped or outdated. Never assume it has the latest bundle.
-Read-only mode still logs into KoL, so it is not safe beside a local live copy.
+## Accounts, catalog and bot gotchas
 
-## Useful commands and checks
+- New accounts/recovery use **REGISTER** and **CREDENTIALS** / **FORGOT LOGIN** KMail,
+  not public email signup. One linked account per KoL player; temporary credentials
+  arrive by KMail.
+- **Legacy email/username code is retained for reference only**, potentially for a
+  different future project. Do not enable, extend, migrate or repair those old
+  flows for kHub. The owner confirmed that **all legacy accounts were testing
+  accounts and were deleted before launch**. There are no remaining legacy users
+  to support, migrate or recover. Do not flag legacy email password recovery or
+  confirmation-email resend as outstanding work or a launch risk.
+- Account requests are durable. One initial attempt + two immediate retries, then
+  five-minute spacing for later attempts. Account work is time-bounded and must not
+  permanently block auction finalization/deliveries. See the bot README for current
+  failure notices and retry details; do not reset reserved account secrets on retries.
+- The maintained KoLmafia catalog supplies items/images and tradeability. Bot refreshes
+  weekly, keeps the last valid snapshot on failure, and retries later. Both UI and
+  SQL reject untradeable listings. Catalog sync does not require weekly redeploys.
+- Delivery IDs (`D-…`), closet IDs (`C-…`), auction numbers and full UUIDs are different.
+  Use lookup to find a specific message's recipient, assets and actual reference.
+- A blocked/preparation-failed message is set aside; unrelated funded messages continue.
+  Interrupted/uncertain sends use automatic Sent Mail checks when possible, then
+  isolate and alert the admin rather than blindly resend. Closet transfers can defer
+  while uncertainty remains. Never mark a delivery sent just to silence logs.
+- `resolve ... sent` records success; **it does not send/check anything**. Require
+  actual matching evidence or a genuinely confirmed manual refund. Missing Sent Mail
+  alone is not proof of failure, especially for gifts. Never reuse example IDs/evidence.
+- Hardcore/Ronin recipients receive gift-shop packages, using a fresh recipient check
+  or an explicit normal-mail restriction rejection. Unknown failures/timeouts do not
+  justify another send. Wrapping uses spare bot funds, not held player obligations.
+- Gift notes use ` | ` instead of newlines to avoid the game's stray `nn` rendering.
+  Regular KMail keeps normal paragraph formatting. All incoming gift packages are
+  donations; normal invalid funded mail is refunded. Unsupported unfunded/system
+  mail may remain untouched for manual review; that log is not itself a stopped bot.
+- Historical log lines persist across restarts. Use fresh logs and current inspection
+  before claiming an old incident is still active. Some earlier incidents were fake
+  prelaunch trades; **current live transactions must not be treated as disposable**.
 
-From project root, website:
+## Verification and operating commands
+
+From the **project root**:
 
 ```bash
-npm run dev
 node --test tests/*.test.mjs
 npm run build
+python3 tests/database_test.py
+python3 tests/polls_database_test.py
 ```
 
-From `bot/` (Node 24+):
+Other focused SQL suites cover escrow expiry, hot ranking, hybrid increments and
+fees. They create disposable **local PostgreSQL** databases via `pg_config`, `initdb`,
+`pg_ctl`, `psql`; they never apply hosted SQL or send KoL messages. Local server/socket
+and Chrome tests may need sandbox escalation. Start long commands with a 10-second
+yield and poll their session; do not start a real bot to test frontend/SQL changes.
+
+Latest completed verification: **233 frontend tests**, production build, full local
+DB regression, focused poll lifecycle/privacy/concurrency/upgrade tests, and mocked
+Chrome tests for post-vote geometry, refresh, admin names, archives and guest privacy.
+The bot JavaScript suite was last reported at 136 passing tests in earlier work;
+it was not rerun for these UI/poll-only changes. Use Node **24+** for bot tests/runtime.
+Targeted ESLint passes; the repo emits an existing `.eslintignore` deprecation warning.
+Temporary browser harness/logs may still exist under `/private/tmp/kolauction-browser-check/`
+and `/private/tmp/khub-live-polls-*`; they are disposable, not tracked project assets.
+
+On **Ubuntu**, from `~/khub-bot`:
 
 ```bash
-npm start                     # connects to KoL; check other copies first
-npm run inspect               # Supabase ledger only, no KoL login
-npm run lookup -- D-1042
-node --env-file=.env src/cli.mjs lookup-closet C-1001
-npm run stats
-npm test
-npm run bundle                # exports/khub-bot.tar.gz; excludes secrets
+sudo docker compose ps
+sudo docker compose logs --since=1m -f
+sudo docker compose exec bot npm run inspect
+sudo docker compose exec bot npm run health
 ```
 
-Read reconciliation examples in the bot README before using `resolve`,
-`resolve-closet` or `cancel-opened-package`. Evidence and eligibility matter.
+Ctrl+C in the **Docker log viewer** only exits viewing. Ctrl+C in a **local foreground
+`npm start`** stops that local bot. `inspect` checks the shared ledger; `health` checks
+that runtime's supervisor. Neither is proof that every delivery succeeded.
 
-On Oracle from `~/khub-bot` (may need `sudo`):
+For a deliberate server restart use `sudo docker compose restart`; source updates
+need upload/extraction then `sudo docker compose up -d --build`. Environment changes
+need recreation, following the bot deployment guide. Do not rebuild/restart for
+migration 075/076 alone. The top of the bot README contains lookup/reconciliation
+and bundle commands; prefer it over improvising financial corrections.
 
-```bash
-sudo docker compose stop
-sudo docker compose up -d --force-recreate
-sudo docker compose logs --tail=50 -f
-```
+## Credentials, backups and remaining uncertainty
 
-Set `BOT_LIVE=true`/`false` privately in the bot `.env`, then recreate the container
-for an environment change. Ctrl+C in a Docker log viewer only exits the viewer;
-it does not stop the container. Local Ctrl+C stops the foreground worker.
+Never print or copy secrets from website environment files, `bot/.env`, `bot/keys/`,
+SQL dumps or private mail. Browser publishable configuration is not a service-role
+key. Keep the ignored bot and credentials in separate private backups. The ignored
+`khub-backup_10-21-2026` directory contains private database backup material.
 
-Database verification: `python3 tests/database_test.py` requires PostgreSQL tools
-(`pg_config`, `initdb`, `pg_ctl`) and uses a disposable local database, not Supabase.
-It covers actual SQL, permissions, races, restart persistence and latest account
-migrations. Auth is a minimal test stub, not a complete hosted GoTrue instance.
-The 021 test now models insertion before app metadata; still verify real KMail/login.
-
-Latest completed checks: **71 bot tests**, **63 website tests** (the website suite
-last ran before the final password-only changes), isolated database tests through
-022, website production build and mocked desktop/mobile gallery checks. No real
-successful 16-character login has been confirmed. No bots are started by tests.
-
-Prior agent environment had default Node 22; Node 24 was temporarily available at
-`/tmp/khub-node/node_modules/node/bin/node`. Do not assume that temporary installation
-survives. Bot runtime needs Node 24 for its SQLite dependency. The SQLite experimental
-warning alone is not the account-creation/login failure.
-
-## Credentials and working preferences
-
-- Browser configuration is root `.env.local`; bot secrets are `bot/.env`; SSH keys
-  may be under `bot/keys/`. Never print, commit, bundle or copy secret values into
-  documentation/chat. Publishable key and service-role key are not interchangeable.
-- No database reset, real Auth creation/password reset, or KoL send should be done
-  just to run a test. Use mocks/disposable DBs; live testing needs the user's context.
-- A backup archive listing is not a restore test. Off-device backups, restore drills,
-  health alerts and hosted rollout verification remain open work in ROADMAP.
-- Keep updates/final answers concise and actionable. The user often makes small,
-  precise copy/style edits; implement those without unrelated redesigns or policy text.
-- Link to relevant code/docs when useful. The user prefers project-relative IDE
-  links, but navigation has not been verified; don't claim it works without evidence.
+Do not assume the current Oracle container has every local worker change or that
+the last website build is deployed. Check status without disturbing the live worker.
+No remote deployment, hosted SQL execution, live sends or financial reconciliation
+was performed as part of this handoff. Remaining feature/audit items belong to the
+user's roadmap; verify each against code before proposing it as unfinished work.

@@ -3774,6 +3774,14 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         sql(migration_sql('202610220076_live_poll_results.sql'))
         assert message_audit_snapshot()==before_live_polls
         print('PASS: live post-vote results and private voter lookup preserve existing financial and account history')
+        before_completed_carousel=message_audit_snapshot()
+        sql(migration_sql('202610220077_recent_completed_trades.sql'))
+        assert message_audit_snapshot()==before_completed_carousel
+        print('PASS: recent completed-trade ordering preserves existing auction, financial and account history')
+        before_bid_references=message_audit_snapshot()
+        sql(migration_sql('202610220078_admin_bid_delivery_references.sql'))
+        assert message_audit_snapshot()==before_bid_references
+        print('PASS: admin bid references preserve existing financial and account history')
 
 
 

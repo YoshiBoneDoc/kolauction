@@ -153,16 +153,20 @@ test('homepage loads every active page beyond four and 24 cards using existing p
     const service = createAuctionService({ async rpc(name, args) {
         requests.push([name, args]);
         if (name === 'finalize_expired_auctions') return { error: null };
+        if (args.p_status === 'completed') {
+            assert.equal(args.p_sort, 'completed'); assert.equal(args.p_page, 1);
+            return { data: { privacy_version: 1, rows: [{ ...row, id: 'completed', status: 'completed', completed_at: '2026-10-22T12:00:00Z' }], bids: [], total: 99 }, error: null };
+        }
         assert.equal(args.p_view, 'browse'); assert.equal(args.p_status, 'active');
         assert.equal(args.p_search, ''); assert.equal(args.p_sort, 'newest');
         const offset = (args.p_page - 1) * 24;
         return { data: { privacy_version: 1, rows: Array.from({ length: Math.min(24, 53-offset) }, (_, i) => ({ ...row, id: `active-${offset+i}` })), bids: [], total: 53 }, error: null };
     } });
     const data = await service.load({ view: 'home' });
-    assert.equal(data.auctions.length, 53);
+    assert.equal(data.auctions.length, 54);
     assert.equal(data.total, 53);
-    assert.equal(new Set(data.auctions.map(auction => auction.id)).size, 53);
-    assert.deepEqual(requests.filter(([name]) => name === 'read_auction_page').map(([,args]) => args.p_page), [1,2,3]);
+    assert.equal(new Set(data.auctions.map(auction => auction.id)).size, 54);
+    assert.deepEqual(requests.filter(([name]) => name === 'read_auction_page').map(([,args]) => args.p_page), [1,2,3,1]);
     assert.equal(requests.filter(([name]) => name === 'finalize_expired_auctions').length, 1);
 });
 
@@ -209,4 +213,12 @@ test('method filtering and activity sort are sent to the paginated reader, mappi
     assert.equal(requests[1][1].p_page, 2); assert.equal(requests[1][1].p_id, 'owner');
     assert.equal(result.auctions[0].latestBidAt, Date.parse('2026-10-22T01:00:00Z'));
     assert.equal(mapAuction(row, []).latestBidAt, null);
+});
+
+
+test('bid mapping preserves server-authorized message references and defaults to none for public reads', () => {
+    const bid = {id:'b',auction_id:row.id,amount:100,created_at:'2026-10-22T12:00:00Z'};
+    const references = [{reference:'D-1001',label:'Accepted',state:'sent'}, {reference:'D-1002',label:'Bid refund',state:'pending'}];
+    assert.deepEqual(mapAuction(row,[{...bid,admin_delivery_references:references}]).bids[0].adminDeliveryReferences,references);
+    assert.deepEqual(mapAuction(row,[bid]).bids[0].adminDeliveryReferences,[]);
 });

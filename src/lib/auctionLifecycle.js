@@ -4,6 +4,7 @@ export const auctionStatusLabels = {
     bidding_closed: 'Bidding closed',
     voided: 'Cancelled by administrator',
     pending_escrow: 'Awaiting item deposit',
+    finalizing: 'Finalizing bids…',
     settling: 'Sending escrow deliveries',
     awaiting_trade: 'Awaiting settlement',
     ended_no_bids: 'Ended without bids',
@@ -15,7 +16,7 @@ export function getAuctionStatus(auction, now = Date.now()) {
     if (auction.status && auction.status !== 'active') return auction.status;
     if (auction.biddingRestricted && auction.endTime > now) return 'bidding_closed';
     if (auction.endTime > now) return 'active';
-    if (auction.escrowMode) return 'settling';
+    if (auction.escrowMode) return auction.receiptTimeBidding ? 'finalizing' : 'settling';
     return auction.highestBidderId || auction.currentBid > 0 ? 'awaiting_trade' : 'ended_no_bids';
 }
 
@@ -45,6 +46,7 @@ export function getAuctionDisplayStatus(auction, result = getAuctionResult(aucti
             awaiting_trade: 'text-[#476A91]',
             pending_escrow: 'text-[#476A91]',
             settling: 'text-[#476A91]',
+            finalizing: 'text-[#476A91]',
             completed: 'text-[#15803D]',
             cancelled: 'text-[#64748B]',
         }[result.status] || 'text-[#64748B]',

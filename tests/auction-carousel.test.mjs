@@ -44,3 +44,15 @@ test('carousel position preserves card order, partial scroll progress and pause 
     assert.equal(readCarouselPosition(blocked), null);
     assert.doesNotThrow(() => saveCarouselPosition(blocked, position));
 });
+
+
+test('popular and completed strips save their positions independently', () => {
+    const memory = new Map();
+    const storage = { getItem: key => memory.get(key), setItem: (key, value) => memory.set(key, value) };
+    const active = { order: ['active'], elapsed: 2000, paused: true };
+    const completed = { order: ['completed'], elapsed: 4000, paused: false };
+    saveCarouselPosition(storage, active);
+    saveCarouselPosition(storage, completed, 'khub.completedAuctions.v1');
+    assert.deepEqual(readCarouselPosition(storage), active);
+    assert.deepEqual(readCarouselPosition(storage, 'khub.completedAuctions.v1'), completed);
+});

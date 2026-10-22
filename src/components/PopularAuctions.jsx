@@ -11,9 +11,10 @@ import { formatCompactMeat } from '../lib/formatMeat';
 // layout effects during server rendering and browser-free component tests.
 const useBrowserLayoutEffect = typeof document === 'undefined' ? useEffect : useLayoutEffect;
 
-export default function PopularAuctions({ auctions, now, children }) {
+export default function PopularAuctions({ auctions, now, children, completed = false }) {
+    const storageKey = completed ? 'khub.completedAuctions.v1' : 'khub.popularAuctions.v1';
     const [restored] = useState(() => {
-        try { return readCarouselPosition(window.sessionStorage); }
+        try { return readCarouselPosition(window.sessionStorage, storageKey); }
         catch { return null; }
     });
     const [order, setOrder] = useState(() => restored?.order || rotateAuctionQueue(auctions.map(auction => auction.id)));
@@ -47,7 +48,7 @@ export default function PopularAuctions({ auctions, now, children }) {
             const animation = trackRef.current?.getAnimations()[0];
             const progress = animation?.effect?.getComputedTiming().progress;
             const elapsed = typeof progress === 'number' ? (progress * CAROUSEL_STEP_MS) % CAROUSEL_STEP_MS : latest.current.elapsed;
-            try { saveCarouselPosition(window.sessionStorage, { ...latest.current, elapsed }); }
+            try { saveCarouselPosition(window.sessionStorage, { ...latest.current, elapsed }, storageKey); }
             catch { /* Storage may be unavailable. */ }
         }
         window.addEventListener('pagehide', rememberPosition);
@@ -55,7 +56,7 @@ export default function PopularAuctions({ auctions, now, children }) {
             rememberPosition();
             window.removeEventListener('pagehide', rememberPosition);
         };
-    }, []);
+    }, [storageKey]);
     function advance(event) {
         if (event.target !== event.currentTarget) return;
         // Commit the queue rotation at the animation boundary so the next card
@@ -73,44 +74,45 @@ export default function PopularAuctions({ auctions, now, children }) {
     function resetKeyboardScroll(event) {
         if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.scrollLeft = 0;
     }
-    return <section aria-label="Popular auctions" className="min-w-0">
+    return <section aria-label={completed ? 'Recently completed trades' : 'Popular auctions'} className="min-w-0">
         <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <h2 className="text-2xl font-bold text-gray-700">Popular Items</h2>
+                <h2 className="text-2xl font-bold text-gray-700">{completed ? 'Recently Completed Trades' : 'Popular Items'}</h2>
                 <span aria-hidden="true" className="text-base text-slate-500">·</span>
-                <Link to="/auctions" className="inline-flex min-h-9 items-center text-sm text-blue-700 underline">See all auctions</Link>
+                <Link to={completed ? "/auctions?status=completed" : "/auctions"} className="inline-flex min-h-9 items-center text-sm text-blue-700 underline">{completed ? 'See completed trades' : 'See all auctions'}</Link>
             </div>
             {moving && <button type="button" onClick={() => setPaused(value => !value)}
-                aria-label={paused ? 'Resume auction scrolling' : 'Pause auction scrolling'} aria-pressed={paused}
+                aria-label={completed ? (paused ? 'Resume completed trade scrolling' : 'Pause completed trade scrolling') : (paused ? 'Resume auction scrolling' : 'Pause auction scrolling')} aria-pressed={paused}
                 className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border border-gray-300 bg-transparent p-0 text-gray-500 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600">
                 <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
                     {paused ? <path d="M4 2v12l10-6z" /> : <path d="M4 2h3v12H4zm5 0h3v12H9z" />}
                 </svg>
             </button>}
         </div>
-        <p className="mb-3 text-sm text-gray-600">Active listings, ranked by number of bids.</p>
+        <p className="mb-3 text-sm text-gray-600">{completed ? 'Successful trades, most recently completed first.' : 'Active listings, ranked by number of bids.'}</p>
         {children}
         {auctions.length > 0 && <div className="popular-auction-viewport" onFocusCapture={revealKeyboardFocus} onBlurCapture={resetKeyboardScroll} data-moving={moving} data-paused={paused}>
             <ul ref={trackRef} className="popular-auction-track" style={{ animationDelay: `-${resumeElapsed}ms` }} onAnimationIteration={advance}>
                 {displayed.map(auction => <li key={auction.id} className="popular-auction-slot">
-                    <Link to={`/auction/${auction.id}`} className="grid h-[192px] min-w-0 grid-cols-[64px_minmax(0,1fr)] grid-rows-[44px_minmax(0,1fr)_18px] gap-x-3 gap-y-1 rounded-md border bg-[#F8F6F4] p-3 shadow transition-shadow hover:shadow-lg">
+                    <Link to={`/auction/${auction.id}`} className={`grid h-[192px] min-w-0 grid-cols-[64px_minmax(0,1fr)] grid-rows-[44px_minmax(0,1fr)_18px] gap-x-3 gap-y-1 rounded-md border ${completed ? 'bg-green-50' : 'bg-[#F8F6F4]'} p-3 shadow transition-shadow hover:shadow-lg`}>
                         <div className="col-start-1 row-span-3 row-start-1 flex items-center justify-center">
                             {auction.image && <img src={auction.image} alt="" loading="lazy" className="h-16 w-16 shrink-0 object-contain [image-rendering:pixelated]" />}
                         </div>
                         <h3 title={`${auction.item} ×${auction.quantity.toLocaleString('en-US')}`} className="col-start-2 row-start-1 line-clamp-2 break-words text-center text-lg font-bold leading-[22px] text-[#14248A]">{auction.item} <span className="text-[#5365AB]">×{auction.quantity.toLocaleString('en-US')}</span></h3>
                         <div className="col-start-2 row-start-2 flex min-h-0 min-w-0 flex-col items-center text-center">
-                            <p title={`${auction.currentBid ? 'Bid' : 'Minimum bid'}: ${(auction.currentBid || auction.minBidMeat).toLocaleString('en-US')} Meat`} className="w-full min-w-0 text-[#112D4E]">
-                                <span className="block text-xs font-medium leading-[14px] text-gray-500">{auction.currentBid ? 'Bid' : 'Min'}</span>
-                                <span className="block truncate text-[30px] font-bold leading-[34px] tracking-tight">{formatCompactMeat(auction.currentBid || auction.minBidMeat)} Meat</span>
+                            <p title={`${completed ? 'Final price' : auction.currentBid ? 'Bid' : 'Minimum bid'}: ${(completed ? auction.finalPrice ?? auction.currentBid : auction.currentBid || auction.minBidMeat).toLocaleString('en-US')} Meat`} className="w-full min-w-0 text-[#112D4E]">
+                                <span className="block text-xs font-medium leading-[14px] text-gray-500">{completed ? 'Final' : auction.currentBid ? 'Bid' : 'Min'}</span>
+                                <span className="block truncate text-[30px] font-bold leading-[34px] tracking-tight">{formatCompactMeat(completed ? auction.finalPrice ?? auction.currentBid : auction.currentBid || auction.minBidMeat)} Meat</span>
                             </p>
-                            <p className="h-4 w-full truncate text-xs font-semibold leading-4 text-green-800">{auction.instantPurchasePrice ? `Buyout Price: ${formatCompactMeat(auction.instantPurchasePrice)}` : null}</p>
+                            <p className="h-4 w-full truncate text-xs font-semibold leading-4 text-green-800">{!completed && auction.instantPurchasePrice ? `Buyout Price: ${formatCompactMeat(auction.instantPurchasePrice)}` : null}</p>
                             <div className="flex w-full flex-1 items-center justify-center"><TradeTypeBadge escrow={auction.escrowMode} short /></div>
                         </div>
-                        <p className={`col-start-2 row-start-3 whitespace-nowrap text-center text-[11px] leading-[18px] ${auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-600'}`}>Ends in <time dateTime={new Date(auction.endTime).toISOString()}>{timeRemaining(auction.endTime, now)}</time></p>
+                        {completed ? <p className="col-start-2 row-start-3 whitespace-nowrap text-center text-[11px] leading-[18px] text-green-700">Trade completed{auction.completedAt && <> · <time dateTime={new Date(auction.completedAt).toISOString()}>{new Date(auction.completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</time></>}</p>
+                            : <p className={`col-start-2 row-start-3 whitespace-nowrap text-center text-[11px] leading-[18px] ${auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-600'}`}>Ends in <time dateTime={new Date(auction.endTime).toISOString()}>{timeRemaining(auction.endTime, now)}</time></p>}
                     </Link>
                 </li>)}
             </ul>
         </div>}
     </section>;
 }
-PopularAuctions.propTypes = { auctions: PropTypes.arrayOf(PropTypes.object).isRequired, now: PropTypes.number.isRequired, children: PropTypes.node };
+PopularAuctions.propTypes = { auctions: PropTypes.arrayOf(PropTypes.object).isRequired, now: PropTypes.number.isRequired, children: PropTypes.node, completed: PropTypes.bool };

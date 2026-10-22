@@ -57,3 +57,9 @@ export function timeRemaining(endTime, now) {
     const minutes = Math.floor(remaining % 3600 / 60);
     return days > 0 ? `${days}d ${hours}h ${minutes}m` : `${hours}h ${minutes}m ${remaining % 60}s`;
 }
+
+export function recentCompletedAuctions(auctions) {
+    return auctions.filter(auction => auction.status === 'completed')
+        .sort((a, b) => (Date.parse(b.completedAt) || 0) - (Date.parse(a.completedAt) || 0)
+            || String(a.id).localeCompare(String(b.id))).slice(0, 24);
+}

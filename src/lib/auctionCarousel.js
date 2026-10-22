@@ -17,9 +17,9 @@ export function rotateAuctionQueue(ids) {
 export const CAROUSEL_POSITION_KEY = 'khub.popularAuctions.v1';
 export const CAROUSEL_STEP_MS = 9000;
 
-export function readCarouselPosition(storage) {
+export function readCarouselPosition(storage, key = CAROUSEL_POSITION_KEY) {
     try {
-        const saved = JSON.parse(storage.getItem(CAROUSEL_POSITION_KEY));
+        const saved = JSON.parse(storage.getItem(key));
         if (!Array.isArray(saved?.order) || saved.order.some(id => typeof id !== 'string')
             || !Number.isFinite(saved.elapsed) || saved.elapsed < 0 || saved.elapsed >= CAROUSEL_STEP_MS
             || typeof saved.paused !== 'boolean') return null;
@@ -27,7 +27,7 @@ export function readCarouselPosition(storage) {
     } catch { return null; }
 }
 
-export function saveCarouselPosition(storage, position) {
-    try { storage.setItem(CAROUSEL_POSITION_KEY, JSON.stringify(position)); }
+export function saveCarouselPosition(storage, position, key = CAROUSEL_POSITION_KEY) {
+    try { storage.setItem(key, JSON.stringify(position)); }
     catch { /* Blocked/full browser storage must never interfere with navigation. */ }
 }

@@ -1,3 +1,4 @@
+import { observeAuctionServerTime, auctionClockRequestStarted } from './auctionClock.js';
 import { ESCROW_MIN_BID_LIMIT, ESCROW_MIN_BID_ERROR } from './escrowPolicy.js';
 export function mapAuction(row, bidRows) {
     const bids = bidRows.filter((bid) => bid.auction_id === row.id)
@@ -8,6 +9,8 @@ export function mapAuction(row, bidRows) {
             bidder: bid.bidder_username,
             amount: Number(bid.amount),
             timestamp: new Date(bid.created_at).getTime(),
+            // The database omits this field unless the viewer is an administrator.
+            adminDeliveryReferences: Array.isArray(bid.admin_delivery_references) ? bid.admin_delivery_references : [],
         }));
     const lastBid = bids.at(-1);
     const latestBid = lastBid?.amount >= Number(row.current_bid) ? lastBid : null;
@@ -33,7 +36,10 @@ export function mapAuction(row, bidRows) {
         auctionTime: row.duration_hours,
         image: row.image,
         createdAt: new Date(row.created_at).getTime(),
-        endTime: new Date(row.end_time).getTime(),
+        endTime: new Date(row.bid_deadline || row.end_time).getTime(),
+        receiptTimeBidding: row.receipt_time_bidding === true,
+        escrowTimingReview: row.escrow_timing_review === true,
+        finalizationNotBefore: row.finalization_not_before ? new Date(row.finalization_not_before).getTime() : null,
         currentBid: Math.max(Number(row.current_bid), lastBid?.amount || 0),
         highestBidderId: latestBid?.bidderId || row.highest_bidder_id,
         highestBidder: latestBid?.bidder || row.highest_bidder_username,
@@ -86,18 +92,20 @@ export function createAuctionService(client) {
         async load({ view = 'browse', id = null, sellerId = null, search = '', status = 'active', sort = 'ending', trade = 'all', page = 1 } = {}) {
             const { error } = await requireClient().rpc('finalize_expired_auctions');
             if (error) throw databaseError(error);
-            async function readPage(pageNumber) {
+            async function readPage(pageNumber, completed = false) {
                 // The historical home endpoint returns only four rows. Use the
                 // existing privacy-filtered browse pages for the complete strip.
+                const requestStartedAt = auctionClockRequestStarted();
                 const { data, error: readError } = await requireClient().rpc('read_auction_page', {
                     p_view: view === 'home' ? 'browse' : view === 'browse' && sellerId ? 'seller' : view,
                     p_id: view === 'browse' && sellerId ? sellerId : id,
-                    p_search: view === 'home' ? '' : search, p_status: view === 'home' ? 'active' : status,
+                    p_search: view === 'home' ? '' : search, p_status: view === 'home' ? (completed ? 'completed' : 'active') : status,
                     ...(['browse', 'seller'].includes(view) && ['escrow', 'direct', 'none'].includes(trade) ? { p_trade: trade } : {}),
-                    p_sort: view === 'home' ? 'newest' : sort, p_page: pageNumber,
+                    p_sort: view === 'home' ? (completed ? 'completed' : 'newest') : sort, p_page: pageNumber,
                 });
                 if (readError) throw databaseError(readError);
                 if (data?.privacy_version !== 1) throw new Error('Auctions are temporarily unavailable while a privacy update is being completed. Please try again later.');
+                observeAuctionServerTime(data.server_time, requestStartedAt);
                 return data;
             }
             const data = await readPage(view === 'home' ? 1 : page);
@@ -111,6 +119,8 @@ export function createAuctionService(client) {
                     const more = await readPage(next);
                     rows.push(...more.rows); bids.push(...more.bids);
                 }
+                const recent = await readPage(1, true);
+                rows.push(...recent.rows); bids.push(...recent.bids);
             }
             const unique = [...new Map(rows.map(row => [row.id, row])).values()];
             return { auctions: unique.map(row => mapAuction(row, bids)), total: Number(data.total), seller: data.seller || null };

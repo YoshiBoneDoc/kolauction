@@ -48,7 +48,7 @@ with tempfile.TemporaryDirectory(prefix='khub-hot-',dir='/tmp') as folder:
         assert len({p.name for p in migrations})==len(migrations)
         hot_migration=next(path for path in migrations if path.name=='202610220072_hot_auction_cards.sql')
         for migration in migrations:
-            if migration!=hot_migration and not migration.name.startswith('202610220073_'): sql(migration.read_text())
+            if migration!=hot_migration and not migration.name.startswith(('202610220073_', '202610220077_', '202610220078_')): sql(migration.read_text())
         catalog_path=ROOT/'src/data/items.json'
         if not catalog_path.exists(): catalog_path=ROOT/'catalog/items.json'
         catalog=json.loads(catalog_path.read_text())

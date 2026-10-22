@@ -103,10 +103,13 @@ test('browse cards and detail summaries show the same trade status for every vie
     }
 });
 
-test('homepage highlights only open listings even when expired auctions have more bids', () => {
+test('homepage separates active listings from successful completed trades', () => {
     const html = render('/', auctions);
     assert.match(html, /Active accessory/);
-    for (const name of ['Completed accessory', 'Pending accessory', 'Expired accessory']) assert.doesNotMatch(html, new RegExp(name));
+    assert.match(html, /Recently Completed Trades/);
+    assert.match(html, /Completed accessory/);
+    assert.match(html, /bg-green-50/);
+    for (const name of ['Pending accessory', 'Expired accessory']) assert.doesNotMatch(html, new RegExp(name));
     assert.match(render('/', auctions.slice(1)), /No active auctions right now/);
 });
 
@@ -349,4 +352,36 @@ test('only active cards with the global hot flag show a fire emoji immediately b
     assert.doesNotMatch(render('/auctions', [{ ...hot, isHot: false, bidCount: 400 }]), /🔥/);
     assert.doesNotMatch(render('/auctions?status=all', [{ ...hot, status: 'completed', finalPrice: 1100 }]), /🔥/);
     assert.doesNotMatch(render('/auctions?status=all', [{ ...hot, endTime: Date.now()-1000 }]), /🔥/);
+});
+
+
+test('completed card shading excludes every pending and unsuccessful outcome in both trade modes', () => {
+    for (const escrowMode of [true, false]) {
+        for (const status of ['completed', 'awaiting_trade', 'settling', 'cancelled', 'voided', 'ended_no_bids', 'pending_escrow', 'on_hold']) {
+            const listing = {...auctions[0], escrowMode, status, finalPrice: 5000, currentBid: 6000};
+            const card = render('/auctions?status=all', [listing]);
+            assert.equal(card.includes('bg-green-50'), status === 'completed', `${escrowMode}: ${status}`);
+            const home = render('/', [listing]);
+            const recent = home.slice(home.indexOf('aria-label="Recently completed trades"'));
+            assert.equal(recent.includes('Active accessory'), status === 'completed');
+            if (status === 'completed') {
+                assert.match(recent, /Final price: 5,000 Meat/);
+                assert.doesNotMatch(recent, /Ends in|Buyout Price|Winner:|Sold by/);
+            }
+        }
+    }
+});
+
+
+test('auction bid history labels server-authorized delivery references and their actual states', () => {
+    const listing = {...auctions[0], bids:[{id:'bid-ref',bidder:'Actual Bidder',amount:100,timestamp:Date.now(),adminDeliveryReferences:[
+        {reference:'D-1001',label:'Accepted',state:'sent'}, {reference:'D-1002',label:'Bid refund',state:'pending'},
+    ]}]};
+    const admin = render('/auction/active',[listing],{id:'administrator'});
+    assert.match(admin, /Administrator message references/);
+    assert.match(admin, /Accepted: <span[^>]*>D-1001<\/span> \(sent\)/);
+    assert.match(admin, /Bid refund: <span[^>]*>D-1002<\/span> \(pending\)/);
+    assert.doesNotMatch(render('/auction/active',[listing]), /D-1001|Administrator message references/);
+    const publicListing={...listing,bids:listing.bids.map(b=>({...b,adminDeliveryReferences:[]}))};
+    assert.doesNotMatch(render('/auction/active',[publicListing],{id:'ordinary'}), /D-1001|Administrator message references/);
 });
