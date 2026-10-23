@@ -147,7 +147,7 @@ export default function AuctionOutcome({ auction, now }) {
                             </div>
                             : hasConfirmed || hasResolved
                             ? <div><p>{responseSummary}</p><TradeFeedback key={`${auction.id}:${currentUser.id}`} auctionId={auction.id} role={isSeller ? 'buyer' : 'seller'} rating={auction.ownFeedback} /></div>
-                            : <div className="flex flex-wrap gap-3"><ConfirmTradeButton auctionId={auction.id} onConfirmed={() => setMessage('Your trade confirmation was saved.')} className="min-h-11 w-full sm:w-auto bg-blue-600 text-white rounded px-4 py-3 disabled:opacity-50" />
+                            : <div className="flex flex-wrap gap-3"><ConfirmTradeButton auctionId={auction.id} onConfirmed={() => setMessage('Your trade confirmation was saved.')} className="button-green min-h-11 w-full sm:w-auto rounded border border-green-700 bg-green-700 px-4 py-3 text-white disabled:opacity-50" />
                                 {!auction.ownTradeReport && <Link to={`/auction/${auction.id}/report-trade`} className="button-red inline-flex min-h-11 items-center rounded border px-4 py-2">Report Incomplete</Link>}
                             </div>
                     )}
