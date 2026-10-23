@@ -266,11 +266,21 @@ test('escrow shows completed sales and winning bids in both views with values un
             assert.match(escrow, /Sales: 2<\/p><span[^>]*title="1,200,000,000 Meat">1.2b Meat/);
             assert.match(escrow, /Winning bids: 3<\/p><span[^>]*title="34,000,000 Meat">34m Meat/);
             assert.doesNotMatch(escrow, /Meat Totals/);
-            assert.match(html, /title="Cancelled before receiving a valid bid"[^>]*>Canceled \(before bids\)/);
+            assert.doesNotMatch(html, /Canceled \(before bids\)|Cancelled before receiving a valid bid/);
         } else {
             assert.match(escrow, /Meat Totals/);
             assert.match(escrow, /1.2b Sold/);
             assert.match(escrow, /Bought 34m/);
         }
     }
+});
+
+
+test('Buy item images appear on browse, home, both seller views and personal auction histories',()=>{
+ const buy={...auction,auctionKind:'buy',pricePerItem:100,purchasedQuantity:2,remainingQuantity:0,availableQuantity:0,reservedQuantity:0,reducedQuantity:0,fulfilledByMe:true,mySaleMeat:200,image:'https://images.kingdomofloathing.com/itemimages/tooth.gif',completedAt:'2026-10-23T12:00:00Z'};
+ for(const path of ['/', '/auctions?status=all', '/seller/seller', '/seller/seller?view=stats', '/profile']){
+  const html=render({path,user:{id:'seller'},seller,auctions:[buy],total:1});
+  assert.match(html,/<img[^>]*src="https:\/\/images.kingdomofloathing.com\/itemimages\/tooth.gif"[^>]*loading="lazy"/);
+  assert.match(html,/Test lot/);
+ }
 });

@@ -62,15 +62,15 @@ test('personal trade cards appear above auctions on home and browse, including a
     }
 });
 
-test('a saved response hides the reminder only for the participant who confirmed', () => {
+test('a saved response switches the reminder to experience feedback only for that participant', () => {
     const html = render({pendingTrades:[{...auction,sellerConfirmedAt:'2026-10-20'}],pendingTotal:1});
-    assert.doesNotMatch(html, /Your pending trades|You confirmed this trade complete. Awaiting the other party’s response/);
+    assert.match(html, /Your pending trades/);assert.match(html,/How was your experience trading with this player/);assert.match(html,/Thumbs up for this buyer/);
     assert.doesNotMatch(html, /Confirm Complete/);
     const buyer = render({user:{id:'buyer'},pendingTrades:[{...auction,sellerConfirmedAt:'2026-10-20'}],pendingTotal:1});
     assert.match(buyer, /#1234 · Buyer ·/);
     assert.match(buyer, /Confirm Complete/);
     const confirmedBuyer=render({user:{id:'buyer'},pendingTrades:[{...auction,buyerConfirmedAt:'2026-10-20'}],pendingTotal:1});
-    assert.doesNotMatch(confirmedBuyer,/Your pending trades/);
+    assert.match(confirmedBuyer,/How was your experience trading with this player/);assert.doesNotMatch(confirmedBuyer,/Confirm Complete/);
     const waitingSeller=render({pendingTrades:[{...auction,buyerConfirmedAt:'2026-10-20'}],pendingTotal:1});
     assert.match(waitingSeller,/Confirm Complete/);
 });
@@ -232,7 +232,7 @@ test('unconfirmed participants can open a trade-problem form, while reported and
     assert.doesNotMatch(form,/<textarea[^>]*(?:required|minLength)/);
     assert.doesNotMatch(render({path:'/auction/direct/report-trade',user:{id:'stranger'},auctions:[closed]}),/<textarea/);
     assert.doesNotMatch(render({path:'/auction/direct/report-trade',auctions:[{...closed,sellerConfirmedAt:'2026-10-20'}]}),/<textarea/);
-    assert.doesNotMatch(render({pendingTrades:[{...closed,ownTradeReport:'B-1234'}],pendingTotal:1}),/Your pending trades/);
+    assert.match(render({pendingTrades:[{...closed,ownTradeReport:'B-1234'}],pendingTotal:1}),/How was your experience trading with this player/);
     const reported=render({path:'/auction/direct',auctions:[{...closed,ownTradeReport:'B-1234',tradeReported:true}]});
     assert.match(reported,/Reported Incomplete/);
     assert.doesNotMatch(reported,/Negative Feedback Submitted/);
@@ -346,7 +346,7 @@ test('neutral completion never offers another confirmation or pending reminder',
     assert.doesNotMatch(html,/no positive rating was added/i);
     assert.doesNotMatch(html,/>Confirm Complete<|Withdraw Incomplete Report|Confirm below only after/);
     const pending=render({pendingTrades:[neutral],pendingTotal:1});
-    assert.doesNotMatch(pending,/Your pending trades|>Confirm Complete</);
+    assert.match(pending,/How was your experience trading with this player/);assert.doesNotMatch(pending,/>Confirm Complete</);
 });
 
 test('a confirmed participant is not told to wait after the other party responded', () => {
@@ -441,4 +441,32 @@ test('creation rejects escrow minimums over 1M before sending a request but acce
     assert.equal(calls[0].args.p_escrow_mode, false);
     assert.equal(calls[1].args.p_min_bid_meat, 1000000);
     assert.equal(calls[1].args.p_instant_purchase_price, 2000000);
+});
+
+
+test('experience reminders follow either completion response and disappear after a saved vote',()=>{
+ for(const path of ['/', '/auctions'])for(const userId of ['seller','buyer']){
+  for(const response of [{[`${userId}ConfirmedAt`]:'2026-10-23'},{ownTradeReport:'B-1'},{[`${userId}ResolvedAt`]:'2026-10-23',ownTradeReport:'B-1',ownTradeReportWithdrawn:true}]){
+   const trade={...auction,...response};
+   const html=render({path,user:{id:userId},pendingTrades:[trade],pendingTotal:1});
+   assert.match(html,/bg-amber-50/);assert.match(html,/How was your experience trading with this player\?/);
+   assert.match(html,/Thumbs up for/);assert.match(html,/Thumbs down for/);
+   assert.doesNotMatch(html,/Was this trade completed|Confirm Complete|Report Incomplete|Rate This/);
+   for(const ownFeedback of [1,-1])assert.doesNotMatch(render({path,user:{id:userId},pendingTrades:[{...trade,ownFeedback}],pendingTotal:1}),/Your pending trades/);
+  }
+ }
+ const complete={...auction,status:'completed',sellerConfirmedAt:'2026-10-23',buyerConfirmedAt:'2026-10-23'};
+ assert.match(render({pendingTrades:[complete],pendingTotal:1}),/How was your experience/);
+ for(const user of [null,{id:'other'},{id:'seller',isBanned:true}])assert.doesNotMatch(render({user,pendingTrades:[complete],pendingTotal:1}),/How was your experience/);
+});
+
+test('concluded auction overview shows actual bidding end time, including early buyouts',()=>{
+    const endTime=Date.parse('2026-10-20T18:00:00Z');
+    const closed={...auction,endTime,finalizedAt:'2026-10-21T19:00:00Z'};
+    const regular=render({path:'/auction/direct',auctions:[closed]});
+    assert.match(regular,/Auction ended: <time dateTime="2026-10-20T18:00:00\.000Z"/);
+    const buyout=render({path:'/auction/direct',auctions:[{...closed,instantPurchasedAt:'2026-10-20T17:00:00Z'}]});
+    assert.match(buyout,/Auction ended: <time dateTime="2026-10-20T17:00:00\.000Z"/);
+    const live=render({path:'/auction/direct',auctions:[{...auction,status:'active',endTime:Date.now()+3600000}]});
+    assert.doesNotMatch(live,/Auction ended:/);
 });

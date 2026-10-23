@@ -48,7 +48,7 @@ with tempfile.TemporaryDirectory(prefix='khub-cancel-reservations-',dir='/tmp') 
         assert len({p.name for p in migrations})==len(migrations)
         # Historical 085 behavior; reservation/gift upgrades have their own suite.
         for migration in migrations:
-            if not migration.name.startswith('202610220090_'): sql(migration.read_text())
+            if migration.name<'202610220090_': sql(migration.read_text())
         catalog_path=ROOT/'src/data/items.json'
         if not catalog_path.exists(): catalog_path=ROOT/'catalog/items.json'
         catalog=json.loads(catalog_path.read_text())

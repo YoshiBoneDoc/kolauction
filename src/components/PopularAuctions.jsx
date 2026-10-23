@@ -1,3 +1,4 @@
+import { attachCarouselDrag } from '../lib/carouselDrag';
 import FittedPrice from './FittedPrice';
 import SellPrice from './SellPrice';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -5,7 +6,7 @@ import { flushSync } from 'react-dom';
 import { Link } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import TradeTypeBadge from './TradeTypeBadge';
-import { reconcileAuctionQueue, rotateAuctionQueue, readCarouselPosition, saveCarouselPosition, CAROUSEL_STEP_MS } from '../lib/auctionCarousel';
+import { reconcileAuctionQueue, rotateAuctionQueue, readCarouselPosition, saveCarouselPosition, rotateAuctionQueueBySteps, CAROUSEL_STEP_MS } from '../lib/auctionCarousel';
 import { timeRemaining } from '../lib/auctionBrowsing';
 import { formatCompactMeat } from '../lib/formatMeat';
 
@@ -21,6 +22,7 @@ export default function PopularAuctions({ auctions, now, children, completed = f
     });
     const [order, setOrder] = useState(() => restored?.order || rotateAuctionQueue(auctions.map(auction => auction.id)));
     const trackRef = useRef(null);
+    const viewportRef = useRef(null);
     const latest = useRef(null);
     const [columns, setColumns] = useState(4);
     const [paused, setPaused] = useState(restored?.paused || false);
@@ -40,17 +42,25 @@ export default function PopularAuctions({ auctions, now, children, completed = f
     const ids = auctions.map(auction => auction.id);
     const queue = reconcileAuctionQueue(order.length ? order : rotateAuctionQueue(ids), ids);
     const byId = new Map(auctions.map(auction => [auction.id, auction]));
+    const hasAuctions = auctions.length > 0;
     const moving = auctions.length > columns && !reducedMotion;
     const displayed = moving ? queue.map(id => byId.get(id)) : auctions;
     const resumeElapsed = restored?.elapsed || 0;
-    latest.current = { order: queue, elapsed: resumeElapsed, paused };
+    latest.current = { order: queue, ids, elapsed: latest.current?.elapsed ?? resumeElapsed, paused };
+    useEffect(() => {
+        if (!viewportRef.current || !trackRef.current) return;
+        return attachCarouselDrag({ viewport: viewportRef.current, track: trackRef.current, moving, reducedMotion,
+            rotate: steps => flushSync(() => setOrder(previous => rotateAuctionQueueBySteps(reconcileAuctionQueue(previous, latest.current.ids), steps))),
+            onElapsed: elapsed => { latest.current.elapsed = elapsed; },
+        });
+    }, [hasAuctions, moving, reducedMotion, paused, storageKey]);
     useBrowserLayoutEffect(() => {
         function rememberPosition() {
             if (!latest.current.order.length) return; // Don't overwrite while loading.
             const animation = trackRef.current?.getAnimations()[0];
             const progress = animation?.effect?.getComputedTiming().progress;
             const elapsed = typeof progress === 'number' ? (progress * CAROUSEL_STEP_MS) % CAROUSEL_STEP_MS : latest.current.elapsed;
-            try { saveCarouselPosition(window.sessionStorage, { ...latest.current, elapsed }, storageKey); }
+            try { saveCarouselPosition(window.sessionStorage, { order: latest.current.order, paused: latest.current.paused, elapsed }, storageKey); }
             catch { /* Storage may be unavailable. */ }
         }
         window.addEventListener('pagehide', rememberPosition);
@@ -60,7 +70,7 @@ export default function PopularAuctions({ auctions, now, children, completed = f
         };
     }, [storageKey]);
     function advance(event) {
-        if (event.target !== event.currentTarget) return;
+        if (event.target !== event.currentTarget || event.currentTarget.style.animation === 'none') return;
         // Commit the queue rotation at the animation boundary so the next card
         // enters without a jump. Each auction exists in the strip exactly once.
         flushSync(() => setOrder(previous => rotateAuctionQueue(reconcileAuctionQueue(previous.length ? previous : rotateAuctionQueue(ids), ids))));
@@ -93,7 +103,7 @@ export default function PopularAuctions({ auctions, now, children, completed = f
         </div>
         <p className="mb-3 text-sm text-gray-600">{completed ? 'Successful trades, most recently completed first.' : 'Active listings, ranked by number of bids.'}</p>
         {children}
-        {auctions.length > 0 && <div className="popular-auction-viewport" onFocusCapture={revealKeyboardFocus} onBlurCapture={resetKeyboardScroll} data-moving={moving} data-paused={paused}>
+        {auctions.length > 0 && <div ref={viewportRef} className="popular-auction-viewport" onFocusCapture={revealKeyboardFocus} onBlurCapture={resetKeyboardScroll} data-moving={moving} data-paused={paused}>
             <ul ref={trackRef} className="popular-auction-track" style={{ animationDelay: `-${resumeElapsed}ms` }} onAnimationIteration={advance}>
                 {displayed.map(auction => <li key={auction.id} className="popular-auction-slot">
                     <Link to={`/auction/${auction.id}`} className={`grid h-[192px] min-w-0 grid-cols-[64px_minmax(0,1fr)] grid-rows-[44px_minmax(0,1fr)_18px] gap-x-3 gap-y-1 rounded-md border ${completed ? 'bg-green-50' : 'bg-[#F8F6F4]'} p-3 shadow transition-shadow hover:shadow-lg`}>

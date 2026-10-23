@@ -1,0 +1,78 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { attachCarouselDrag } from '../src/lib/carouselDrag.js';
+import { rotateAuctionQueueBySteps } from '../src/lib/auctionCarousel.js';
+
+function fixture(options = {}) {
+    function target() {
+        const handlers = new Map();
+        return { handlers, addEventListener: (name, run) => handlers.set(name, run), removeEventListener: name => handlers.delete(name) };
+    }
+    let clock = 0, frameId = 0;
+    const frames = new Map(), captures = new Set();
+    const view = { ...target(), performance: { now: () => clock }, getComputedStyle: () => ({ columnGap: '16px' }),
+        requestAnimationFrame(run) { frames.set(++frameId, run); return frameId; }, cancelAnimationFrame(id) { frames.delete(id); } };
+    const viewport = { ...target(), ownerDocument: { defaultView: view }, dataset: {}, clientWidth: 600, scrollWidth: 1200, scrollLeft: 0,
+        setPointerCapture: id => captures.add(id), hasPointerCapture: id => captures.has(id), releasePointerCapture: id => captures.delete(id) };
+    const track = { style: {}, firstElementChild: { getBoundingClientRect: () => ({ width: 284 }) },
+        getAnimations: () => [{ effect: { getComputedTiming: () => ({ progress: 0.5 }) } }] };
+    const state = { order: ['a', 'b', 'c', 'd'], elapsed: 0 };
+    const stop = attachCarouselDrag({ viewport, track, moving: true, reducedMotion: false,
+        rotate: steps => { state.order = rotateAuctionQueueBySteps(state.order, steps); }, onElapsed: elapsed => { state.elapsed = elapsed; }, ...options });
+    function emit(where, type, props = {}) {
+        const event = { type, isPrimary: true, pointerType: 'mouse', button: 0, pointerId: 1, clientX: 0, clientY: 0,
+            timeStamp: clock, detail: 1, prevented: false, stopped: false,
+            preventDefault() { this.prevented = true; }, stopPropagation() { this.stopped = true; }, ...props };
+        where.handlers.get(type)?.(event); return event;
+    }
+    return { viewport, track, view, state, frames, stop, emit,
+        tick(ms) { clock += ms; const pending = [...frames.values()]; frames.clear(); pending.forEach(run => run(clock)); } };
+}
+
+test('horizontal dragging wraps multiple tiles in both directions without duplicate cards', () => {
+    const h = fixture();
+    h.emit(h.viewport, 'pointerdown');
+    h.emit(h.viewport, 'pointermove', { clientX: 750, timeStamp: 100 });
+    assert.equal(h.viewport.dataset.dragging, 'true');
+    assert.deepEqual(h.state.order, ['b', 'c', 'd', 'a']);
+    assert.equal(h.state.elapsed, 0);
+    assert.equal(h.track.style.animation, 'none');
+    h.emit(h.viewport, 'pointermove', { clientX: 0, timeStamp: 200 });
+    assert.deepEqual(h.state.order, ['a', 'b', 'c', 'd']);
+    assert.equal(new Set(h.state.order).size, 4);
+    h.emit(h.view, 'pointercancel', { timeStamp: 210 });
+    assert.equal(h.track.style.animation, '');
+    assert.equal(h.frames.size, 0);
+    h.stop();
+});
+
+test('ordinary taps and vertical gestures keep native behavior; horizontal drags suppress only pointer clicks', () => {
+    const h = fixture();
+    h.emit(h.viewport, 'pointerdown'); h.emit(h.view, 'pointerup');
+    assert.equal(h.emit(h.viewport, 'click').prevented, false);
+    h.emit(h.viewport, 'pointerdown');
+    assert.equal(h.emit(h.viewport, 'pointermove', { clientX: 2, clientY: 30 }).prevented, false);
+    h.emit(h.view, 'pointerup'); assert.equal(h.emit(h.viewport, 'click').prevented, false);
+    h.emit(h.viewport, 'pointerdown'); h.emit(h.viewport, 'pointermove', { clientX: 80, timeStamp: 20 });
+    h.emit(h.view, 'pointerup', { timeStamp: 21 });
+    assert.equal(h.emit(h.viewport, 'click').prevented, true);
+    assert.equal(h.emit(h.viewport, 'click', { detail: 0 }).prevented, false);
+    h.emit(h.viewport, 'pointerdown'); h.emit(h.view, 'pointerup');
+    assert.equal(h.emit(h.viewport, 'click').prevented, false);
+    h.tick(500); assert.equal(h.emit(h.viewport, 'click').prevented, false);
+    h.stop(); assert.equal(h.frames.size, 0); assert.equal(h.viewport.handlers.size, 0); assert.equal(h.view.handlers.size, 0);
+});
+
+test('quick drags coast and settle back to automatic motion; reduced-motion dragging remains stationary after release', () => {
+    const h = fixture();
+    h.emit(h.viewport, 'pointerdown'); h.emit(h.viewport, 'pointermove', { clientX: 100, timeStamp: 20 });
+    h.emit(h.view, 'pointerup', { timeStamp: 21 });
+    const released = h.state.elapsed;
+    h.tick(16); assert.notEqual(h.state.elapsed, released);
+    for (let i = 0; i < 75; i++) h.tick(16);
+    assert.equal(h.frames.size, 0); assert.equal(h.track.style.animation, ''); h.stop();
+    const reduced = fixture({ moving: false, reducedMotion: true });
+    reduced.emit(reduced.viewport, 'pointerdown'); reduced.emit(reduced.viewport, 'pointermove', { clientX: -100, timeStamp: 20 });
+    reduced.emit(reduced.view, 'pointerup', { timeStamp: 21 });
+    assert.equal(reduced.viewport.scrollLeft, 100); assert.equal(reduced.frames.size, 0); reduced.stop();
+});

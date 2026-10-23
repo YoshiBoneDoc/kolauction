@@ -101,7 +101,10 @@ const Profile = () => {
                                 return (
                                     <article key={auction.id} className="block rounded shadow border border-gray-200 bg-white p-4">
                                         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                                            <h3 className="font-bold"><Link to={`/auction/${auction.id}`} className="text-gray-900 hover:underline">{auction.item} × {formatNumber(auction.quantity)}</Link></h3>
+                                            <div className="flex min-w-0 items-center gap-3">
+                                                {auction.auctionKind === 'buy' && auction.image && <img src={auction.image} alt="" loading="lazy" className="h-12 w-12 shrink-0 object-contain [image-rendering:pixelated]" />}
+                                                <h3 className="min-w-0 break-words font-bold"><Link to={`/auction/${auction.id}`} className="text-gray-900 hover:underline">{auction.item} × {formatNumber(auction.quantity)}</Link></h3>
+                                            </div>
                                             {result.status === 'active' && (
                                                 <time
                                                     dateTime={new Date(auction.endTime).toISOString()}

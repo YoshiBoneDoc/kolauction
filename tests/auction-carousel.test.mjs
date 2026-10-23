@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { reconcileAuctionQueue, rotateAuctionQueue } from '../src/lib/auctionCarousel.js';
+import { reconcileAuctionQueue, rotateAuctionQueue, rotateAuctionQueueBySteps } from '../src/lib/auctionCarousel.js';
 
 test('a full rightward lap shows each auction exactly once before repeating without cloning cards', () => {
     const ids = Array.from({ length: 31 }, (_, i) => `auction-${i}`);
@@ -55,4 +55,15 @@ test('popular and completed strips save their positions independently', () => {
     saveCarouselPosition(storage, completed, 'khub.completedAuctions.v1');
     assert.deepEqual(readCarouselPosition(storage), active);
     assert.deepEqual(readCarouselPosition(storage, 'khub.completedAuctions.v1'), completed);
+});
+
+
+test('drag rotation handles both directions and multiple laps without losing or duplicating tiles', () => {
+    const ids = ['a', 'b', 'c', 'd'];
+    assert.deepEqual(rotateAuctionQueueBySteps(ids, 1), rotateAuctionQueue(ids));
+    assert.deepEqual(rotateAuctionQueueBySteps(ids, -1), ['b', 'c', 'd', 'a']);
+    assert.deepEqual(rotateAuctionQueueBySteps(ids, 10), ['c', 'd', 'a', 'b']);
+    assert.deepEqual(rotateAuctionQueueBySteps(rotateAuctionQueueBySteps(ids, -17), 17), ids);
+    assert.deepEqual(rotateAuctionQueueBySteps([], 7), []);
+    assert.deepEqual(rotateAuctionQueueBySteps(['only'], -4), ['only']);
 });

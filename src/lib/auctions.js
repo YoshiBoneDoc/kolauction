@@ -92,6 +92,8 @@ export function mapAuction(row, bidRows) {
         buyerReportedIncomplete: row.buyer_reported_incomplete ?? null,
         completedAt: row.completed_at,
         cancelledAt: row.cancelled_at,
+        closureReason: row.closure_reason || null,
+        expiredAt: row.expired_at || null,
         bids,
         latestBidAt: row.latest_bid_at ? new Date(row.latest_bid_at).getTime() : null,
         bidCount: Number(row.bid_count ?? bids.length),

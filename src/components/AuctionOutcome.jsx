@@ -9,7 +9,7 @@ import PropTypes from "prop-types";
 import { AuctionsContext } from "../context/AuctionsContext";
 import { UserContext } from "../context/UserContext";
 import KmailInstructions from "./KmailInstructions";
-import { getAuctionResult } from "../lib/auctionLifecycle";
+import { getAuctionResult, isUnclassifiedDepositClosure } from "../lib/auctionLifecycle";
 import { tradeResponseStatus, tradeResponseSummary } from '../lib/tradeResponses';
 import TradeResponseBadge from './TradeResponseBadge';
 import { canSendTradeQuery } from '../lib/tradeQueries';
@@ -95,7 +95,10 @@ export default function AuctionOutcome({ auction, now }) {
             {auction.instantPurchasedAt && <p>The buyout price ended bidding early.</p>}
             {result.status === 'completed' && <p>The items and payment have been delivered via KMail.</p>}
             {result.status === 'ended_no_bids' && <p>No bids were accepted. The bot has returned the items to the seller.</p>}
-            {result.status === 'cancelled' && <p>This listing was cancelled. Any accepted item deposit has been returned.</p>}
+            {result.status === 'expired' && <p>The deposit deadline passed before kHub accepted the items. This listing expired automatically.</p>}
+            {result.status === 'cancelled' && <p>{isUnclassifiedDepositClosure(auction)
+                ? 'This listing closed before a deposit was accepted. It may have been canceled or reached its deposit deadline.'
+                : 'This listing was cancelled. Any accepted item deposit has been returned.'}</p>}
             {(escrowContact || canCancel) && <div className="flex flex-wrap items-center justify-between gap-3">
                 {escrowContact}
                 {canCancel && <button disabled={pending} onClick={cancelListing} className="button-red ml-auto min-h-11 rounded border px-4 py-3 disabled:opacity-50">{pending ? 'Saving…' : 'Cancel listing'}</button>}
@@ -110,7 +113,7 @@ export default function AuctionOutcome({ auction, now }) {
             <h2 className="text-2xl font-bold mb-3">{result.status === 'awaiting_trade' ? (isSeller || isWinner) ? 'Trade instructions' : 'Trade status:' : result.label}</h2>
             {auction.banReviewRequired && result.status === 'awaiting_trade' && <p className="mb-4 rounded border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">An account restriction affects this trade. An administrator can review evidence of completion. Do not send further assets without administrator guidance. Existing responses are preserved.</p>}
             {result.status === 'ended_no_bids' && <p>This auction ended without bids. There is no winner or trade to complete.</p>}
-            {result.status === 'cancelled' && <p>The seller cancelled this listing before any bids. Its history is preserved.</p>}
+            {result.status === 'cancelled' && <p>{auction.closureReason === 'seller_cancelled' ? 'The seller cancelled this listing before any bids.' : 'This listing was cancelled before any bids.'} Its history is preserved.</p>}
             {['awaiting_trade', 'completed'].includes(result.status) && (
                 <div className="mt-4 space-y-6">
                     {result.status === 'awaiting_trade' && !auction.banReviewRequired && (isSeller || isWinner) && (

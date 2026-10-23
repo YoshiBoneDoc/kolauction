@@ -46,6 +46,9 @@ export default function AuctionDetails() {
     const active = result.status === 'active';
     const ownsAuction = Boolean(currentUser && !currentUser.isBanned && currentUser.id === auction.sellerId);
     const closedSale = result.hasWinner;
+    const endedAt = auction.instantPurchasedAt || auction.cancelledAt || auction.expiredAt || auction.endTime;
+    const endedDate = new Date(endedAt);
+    const endedTime = ['awaiting_trade', 'completed', 'settling', 'ended_no_bids', 'cancelled', 'expired'].includes(result.status) && Number.isFinite(endedDate.getTime()) && endedDate.getTime() <= now ? <p className="text-sm leading-6 text-gray-600">Auction ended: <time dateTime={endedDate.toISOString()}>{endedDate.toLocaleString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}</time></p> : null;
     const price = result.finalPrice ?? auction.currentBid;
     const { reportedIncomplete, label: statusLabel, color: statusColor } = getAuctionDisplayStatus(auction, result);
     return (
@@ -80,6 +83,7 @@ export default function AuctionDetails() {
                         {closedSale ? <>
                             <div className="space-y-0.5 border-t border-gray-200 pt-3">
                                 <p className={`text-lg font-bold ${statusColor}`}>{statusLabel}</p>
+                                {endedTime}
                                 {reportedIncomplete && <p className="text-xs leading-4 text-gray-500">At least one party reported the trade incomplete.</p>}
                                 <TradeReportDismissals auction={auction} compact />
                             </div>
@@ -87,7 +91,8 @@ export default function AuctionDetails() {
                             <span className="inline-flex rounded border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Live</span>
                             <span aria-hidden="true" className="text-gray-400">·</span>
                             <p className={auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-600'}>Ends in <time dateTime={new Date(auction.endTime).toISOString()}>{timeRemaining(auction.endTime, now)}</time></p>
-                        </div> : <p className={`text-lg font-bold ${statusColor}`}>{statusLabel}</p>}
+                            <p className="w-full text-xs text-gray-500">Last-minute bids reset the countdown to 1 minute.</p>
+                        </div> : <div className="space-y-0.5"><p className={`text-lg font-bold ${statusColor}`}>{statusLabel}</p>{endedTime}</div>}
                     </div>
                 </section>
                 {active && <section aria-label="Auction bidding" className="mt-4 border-t border-gray-100 pt-4">

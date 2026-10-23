@@ -7,9 +7,9 @@
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  color-scheme: light;
+  color: #1a202c;
+  background-color: #f9fafb;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -49,7 +49,7 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: #f9f9f9;
   cursor: pointer;
   transition: border-color 0.25s;
 }
@@ -176,6 +176,8 @@ button:focus-visible {
 
 .popular-auction-viewport {
   --popular-columns: 1;
+  touch-action: pan-y pinch-zoom;
+  user-select: none;
   overflow: hidden;
   padding: 4px 0 10px;
 }
@@ -192,9 +194,15 @@ button:focus-visible {
 .popular-auction-viewport[data-moving="true"] .popular-auction-track {
   animation: popular-auction-scroll 9s linear infinite;
 }
-.popular-auction-viewport:is(:hover, :focus-within, [data-paused="true"]) .popular-auction-track {
+.popular-auction-viewport[data-paused="true"] .popular-auction-track {
   animation-play-state: paused;
 }
+@media (hover: hover) and (pointer: fine) {
+  .popular-auction-viewport:hover .popular-auction-track { animation-play-state: paused; }
+}
+.popular-auction-viewport[data-moving="true"] { cursor: grab; }
+.popular-auction-viewport[data-dragging="true"],
+.popular-auction-viewport[data-dragging="true"] a { cursor: grabbing; }
 /* Keyboard users can reach every card in a stationary, scrollable strip. */
 .popular-auction-viewport:has(a:focus-visible) {
   overflow-x: auto;
@@ -228,6 +236,11 @@ button:focus-visible {
   background: transparent;
   color: #475569;
 }
+/* Temporary upside-down joke; removing the toggle and this rule restores normal layout. */
+html.upside-down #root {
+  transform: rotate(180deg);
+}
+
 .poll-result-arrow svg {
   flex-shrink: 0;
 }

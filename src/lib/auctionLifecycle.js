@@ -22,14 +22,23 @@ export function getAuctionStatus(auction, now = Date.now()) {
     return auction.highestBidderId || auction.currentBid > 0 ? 'awaiting_trade' : 'ended_no_bids';
 }
 
+export function isUnclassifiedDepositClosure(auction) {
+    return auction.status === 'cancelled' && auction.escrowMode && auction.itemEscrowedAt === null && !auction.closureReason;
+}
+
 export function getAuctionResult(auction, now = Date.now()) {
     const status = getAuctionStatus(auction, now);
-    if (auction.auctionKind === 'buy') return { status, label: status === 'pending_escrow' ? 'Awaiting Meat deposit' : auctionStatusLabels[status], hasWinner: false, winnerId: null, winner: null, finalPrice: null };
+    if (auction.auctionKind === 'buy') {
+        const closing = auction.buyClosingReason && ['active', 'pending_escrow', 'settling'].includes(status);
+        const label = closing ? { cancel: 'Closing — cancelled', deadline: 'Closing — expired', filled: 'Closing — fully filled' }[auction.buyClosingReason]
+            : status === 'pending_escrow' ? 'Awaiting Meat deposit' : auctionStatusLabels[status];
+        return { status, label, hasWinner: false, winnerId: null, winner: null, finalPrice: null };
+    }
     const hasWinner = ['awaiting_trade', 'completed', 'settling'].includes(status)
         && (auction.hasWinner ?? Boolean(auction.winnerId || auction.highestBidderId || auction.currentBid > 0));
     return {
         status,
-        label: auctionStatusLabels[status],
+        label: isUnclassifiedDepositClosure(auction) ? 'Closed before deposit' : auctionStatusLabels[status],
         hasWinner,
         // Until the next server refresh finalizes a just-expired listing,
         // display its latest saved bid. Confirmations always recheck on server.

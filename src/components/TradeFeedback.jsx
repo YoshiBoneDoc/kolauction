@@ -25,8 +25,8 @@ export default function TradeFeedback({ auctionId, role, rating = null }) {
         finally { submitting.current = false; setPending(false); }
     }
     if (selected != null) return savedThisVisit ? <p role="status" className="pt-5 text-xs text-gray-500">Rating saved</p> : null;
-    return <div className="pt-5" aria-label={`Rate this ${role}`}>
-        <p className="mb-2 text-xs font-bold text-gray-500">Rate This {role === 'buyer' ? 'Buyer' : 'Seller'}</p>
+    return <div className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3" aria-label={`Rate this ${role}`}>
+        <p className="text-sm font-semibold text-gray-900">How was your experience trading with this player?</p>
         <div className="flex items-center gap-3">
             {[1, -1].map(value => <button key={value} type="button" aria-label={`Thumbs ${value === 1 ? 'up' : 'down'} for this ${role}`} aria-pressed={selected === value} disabled={pending}
                 onClick={() => rate(value)} className={`inline-flex h-16 w-16 items-center justify-center rounded border !p-1.5 !outline-none transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 ${value === 1 ? `text-green-600 hover:!border-green-200 hover:!bg-green-50 focus-visible:ring-green-500 ${selected === value ? 'border-green-300 !bg-green-50' : 'border-transparent !bg-transparent'}` : `text-red-600 hover:!border-red-200 hover:!bg-red-50 focus-visible:ring-red-500 ${selected === value ? 'border-red-300 !bg-red-50' : 'border-transparent !bg-transparent'}`}`}>

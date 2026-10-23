@@ -1,7 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { useEffect } from 'react';
 import { BID_INCREMENT_TIERS } from '../lib/bidIncrements';
-import { ESCROW_FEE_TIERS } from '../lib/escrowFees';
+import { ESCROW_FEE_TIERS, escrowFee } from '../lib/escrowFees';
 
 const sectionHeadingClass = 'text-lg font-semibold leading-7 text-gray-800';
 const subheadingClass = 'text-sm font-semibold leading-5 text-gray-700';
@@ -37,7 +37,7 @@ const auctionTypeComparison = [
 const InfoPage = () => {
     const { hash } = useLocation();
     useEffect(() => {
-        if (hash === '#escrow-fees-title') document.getElementById('escrow-fees-title')?.scrollIntoView({ block: 'start' });
+        if (['#escrow-fees-title', '#buy-gift-delivery', '#buy-auctions-title', '#gift-packages', '#anti-sniping', '#bid-increases-title'].includes(hash)) document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
     }, [hash]);
     return (
         <div className="flex-1 bg-gray-50 flex flex-col items-center justify-center p-6">
@@ -71,8 +71,8 @@ const InfoPage = () => {
                     Items or Meat sent without the required KMail message will be automatically returned.
                 </p>
 
-                <p className="mb-6">
-                    The only exceptions are <Link to="/donate" className="text-blue-600 hover:underline">donations</Link> and gift packages, which are treated as donations.
+                <p id="gift-packages" className="mb-6 scroll-mt-4">
+                    <strong>Gift packages:</strong> Packages sent without a valid auction command are treated as <Link to="/donate" className="text-blue-600 hover:underline">donations</Link>. To place a bid or deposit items using a gift package, include the exact command provided on the auction page in the package’s outside message.
                 </p>
 
 
@@ -84,7 +84,7 @@ const InfoPage = () => {
                     <Link to="/auction-item" className="font-medium text-blue-600 hover:underline">
                         Create an auction here
                     </Link>
-                    . Choose Buy Items or Sell Items. A Sell auction needs a minimum bid; its buyout is optional. A Buy auction needs a quantity and maximum price per item. For Sell auctions, bids and buyout prices apply to the whole listing. For Buy auctions, the advertised purchase price applies to each item; fees are added separately to the buyer’s deposit. You may not bid on your own auction.
+                    . Choose Buy Items or Sell Items. A Sell auction needs a minimum bid; its buyout is optional. A <Link to="/info#buy-auctions-title" className="font-medium text-blue-600 hover:underline">Buy auction</Link> needs a quantity and maximum price per item. For Sell auctions, bids and buyout prices apply to the whole listing. For Buy auctions, the advertised purchase price applies to each item; fees are added separately to the buyer’s deposit. You may not bid on your own auction.
                 </p>
 
                 <h3 className={`${subheadingClass} mb-2`}>
@@ -104,8 +104,24 @@ const InfoPage = () => {
                     </li>
                 </ul>
 
-                <h2 className={`${sectionHeadingClass} mb-4`}>Bidding Privacy</h2>
-                <p className="mb-6">Bidders remain anonymous while an auction is active, with your own bids labeled as “You.” Seller identities are visible to help buyers make informed decisions, while winning bidders are revealed only after the auction ends. All player identities are hidden from guests and banned users.</p>
+                <h2 className={`${sectionHeadingClass} mb-2`}>How to Bid</h2>
+                <ul className="mb-3 list-disc space-y-1 pl-5">
+                    <li>
+                        <strong>Escrow:</strong> KMail kHub (#3888760) the auction’s bid command{' '}
+                        <span className="inline-flex items-center gap-1 whitespace-nowrap align-middle">ex. <img src="/art/auction-bid-command.svg" alt="BID 1234" width="93" height="25" className="inline-block h-auto w-[93px] align-middle" /></span>{' '}
+                        with your full bid in Meat attached.
+                    </li>
+                    <li><strong>Direct Trade:</strong> Bid on the website. If you win, arrange an in-game trade with the seller after the auction ends.</li>
+                    <li><strong>Hardcore/Ronin:</strong> Use a gift package to send your bid. Include the exact bid command as the package’s outside message.</li>
+                    <li><strong>Bid amounts:</strong> Bids cover the entire listing. Minimum bids and buyout instructions are shown on each auction page.</li>
+                    <li><strong>Outbid?</strong> Escrow bids are automatically refunded. New bids require the full amount.</li>
+                </ul>
+
+                <h3 id="anti-sniping" className={`${subheadingClass} mb-2 scroll-mt-4`}>Anti-sniping</h3>
+                <p className="mb-3">Accepted bids in the final minute reset the countdown to 1 minute, including subsequent last-minute bids. Applies to Escrow and Direct Trade. Buyouts end bidding immediately.</p>
+
+                <h3 className={`${subheadingClass} mb-2`}>Privacy</h3>
+                <p className="mb-6">Bidders remain anonymous until the auction ends, with your own bids labeled “You.” Sellers are visible; winning bidders are revealed afterward. Player identities are hidden from guests and banned users.</p>
 
                 <h2 className={`${sectionHeadingClass} mb-2`}>
                     Canceling Bids or Auctions
@@ -205,10 +221,25 @@ const InfoPage = () => {
                     </table>
                 </div>
 
+                <section aria-labelledby="buy-auctions-title" className="mb-6">
+                    <h2 id="buy-auctions-title" className={`${sectionHeadingClass} mb-2`}>Auctions for Buying Items</h2>
+                    <ul className="list-disc space-y-2 pl-5">
+                        <li><strong>Getting started:</strong> Create a Buy Auction and deposit enough Meat to cover the full order plus fees within 24 hours. Your auction begins once kHub verifies your deposit.</li>
+                        <li><strong>Fulfilling orders:</strong> Sellers reserve their desired quantity on the website, then KMail the exact items using the provided message. Reservations automatically expire after 10 minutes if unfulfilled.</li>
+                        <li><strong>Partial fills:</strong> Multiple sellers can contribute toward an order. Remaining quantities stay available until the auction ends or is canceled.</li>
+                        <li><strong>Delivery options:</strong> Choose to receive items as they’re purchased or all at once when your auction ends.</li>
+                        <li><strong>Cancellations &amp; refunds:</strong> Cancel any unfilled portion of your order at any time, without penalty. Unused Meat and fee reserves are refunded. Completed purchases and their fees are final.</li>
+                        <li id="buy-gift-delivery" className="scroll-mt-4"><strong>Hardcore/Ronin:</strong> Gift packaging is free. Immediate deliveries are batched by item price: under 50 Meat (1,000 items), 50–999 (100 items), 1,000–49,999 (10 items), and 50,000+ (immediate). Once a threshold is reached, all accumulated items are sent.</li>
+                    </ul>
+                </section>
+
                 <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-x-8 md:gap-y-0">
                     <section aria-labelledby="bid-increases-title" className="min-w-0 md:row-span-3 md:grid md:grid-rows-subgrid">
-                        <h2 id="bid-increases-title" className={`${sectionHeadingClass} mb-2`}>Minimum Bid Increases</h2>
-                        <p className="mb-3 leading-5">The first bid must meet the seller’s minimum price. Later bids must exceed the current highest bid by at least the increase below. Applies to both Escrow and Direct Trade auctions.</p>
+                        <h2 id="bid-increases-title" className={`${sectionHeadingClass} mb-2 scroll-mt-4`}>Minimum Bid Increases</h2>
+                        <div className="mb-3 space-y-1.5 leading-5">
+                            <p>The first bid must meet the seller’s minimum price. Later bids must exceed the current highest bid by at least the increase below. Applies to both Escrow and Direct Trade auctions.</p>
+                            <p>Buyouts can always be accepted at their listed price, even if below the next minimum bid.</p>
+                        </div>
                         <div>
                             <div className="overflow-hidden rounded-md border border-gray-200">
                                 <table className="w-full text-xs leading-5">
@@ -227,15 +258,17 @@ const InfoPage = () => {
                                     </tbody>
                                 </table>
                             </div>
-                            <p className="mt-2 text-xs leading-5">Percentage increases use the current highest bid and round up to a multiple of the amount shown. Add that increase to the current bid to find the minimum next bid.</p>
-                            <p className="mt-2 text-xs leading-5"><strong>Example:</strong> At 1.75M, 3% is 52,500 Meat, rounded up to 60k. The minimum next bid is <strong>1.81M Meat.</strong></p>
-                            <p className="mt-2 text-xs leading-5">Buyouts can always be accepted at their listed price, even if below the next minimum bid.</p>
+                            <p className="mt-2 text-xs italic leading-5">Percentage increases are rounded up to the nearest multiple shown in the “Round To” column.</p>
+                            <p className="mt-2 text-xs leading-4"><strong>Example:</strong> A 3% increase on 1.75M is 52,500 Meat, rounded up to 60,000 Meat (nearest 10k). The next minimum bid is <strong>1.81M Meat.</strong></p>
                         </div>
                     </section>
 
                     <section aria-labelledby="escrow-fees-title" className="min-w-0 md:row-span-3 md:grid md:grid-rows-subgrid">
                         <h2 id="escrow-fees-title" className={`${sectionHeadingClass} mb-2 scroll-mt-4`}>Escrow Fees</h2>
-                        <p className="mb-3 leading-5">Sell auction fees are based on the whole listing’s final winning bid or accepted buyout and deducted from the seller’s proceeds. Each rate applies only to the portion within that tier, so higher-value sales have a lower overall fee percentage.</p>
+                        <div className="mb-3 space-y-1.5 leading-5">
+                            <p><strong>When Selling:</strong> Commission is deducted from your proceeds based on the final sale price. Each rate applies only to the portion within that tier.</p>
+                            <p><strong>When Buying:</strong> Commission is calculated per item, not on the total order value. Buyers pay the fee; sellers receive the full listed price.</p>
+                        </div>
                         <div>
                             <div className="overflow-hidden rounded-md border border-gray-200">
                                 <table className="w-full text-xs leading-5">
@@ -243,19 +276,38 @@ const InfoPage = () => {
                                     <thead className="bg-gray-100 text-gray-700"><tr>
                                         <th scope="col" className={`${subheadingClass} px-3 py-1.5 text-left`}>Sale Price Portion</th>
                                         <th scope="col" className={`${subheadingClass} px-3 py-1.5 text-right`}>Fee Rate</th>
+                                        <th scope="col" className={`${subheadingClass} px-3 py-1.5 text-right`}>Effective Rate<sup>1</sup></th>
                                     </tr></thead>
                                     <tbody className="divide-y divide-gray-200">
                                         {ESCROW_FEE_TIERS.map(tier => <tr key={tier.portion} className="bg-white odd:bg-gray-50">
-                                            <td className="px-3 py-1">{tier.portion}</td>
+                                            <td className="px-3 py-1">{tier.portion.replace(/(\d)([mb])/g, (_, amount, unit) => amount + unit.toUpperCase())}</td>
                                             <td className="px-3 py-1 text-right font-medium text-gray-800">{tier.rate}</td>
+                                            <td className="px-3 py-1 text-right text-gray-800">{tier.upTo === null ? 'Approaches 1%' : `${(escrowFee(tier.upTo) / tier.upTo * 100).toFixed(2)}%`}</td>
                                         </tr>)}
                                     </tbody>
                                 </table>
                             </div>
-                            <p className="mt-2 text-xs leading-5"><strong>Example:</strong> A 10m sale costs 5% of the first 1m (50k), plus 4% of the remaining 9m (360k): <strong>410k Meat total (4.1%).</strong></p>
-                            <p className="mt-2 text-xs leading-5">Sell auction fees are rounded down to whole Meat once per sale. No sale, no fee.</p>
-                            <p className="mt-3 text-xs leading-5"><strong>Buy auctions:</strong> Apply the same tiers to the price per item, multiply the unrounded fee by the quantity in each successful fulfillment, then round down to whole Meat. The buyer funds purchases and fees; sellers receive the full advertised price. Buying 1,000 items at 200 Meat each costs 200,000 Meat plus 10,000 Meat in fees. One item at 10M has a Tiered Fee (4.1%): 410,000 Meat. Even a 1B order at 200 Meat per item uses the 5% tier for each item.</p>
-                            <p className="mt-2 text-xs leading-5">Buy auctions are Escrow only. Fund within 24 hours; the timer starts when kHub accepts your Meat. Sellers first reserve a quantity on the website for 10 minutes, then copy the complete FILL command including its reservation code and send exactly those items. Expired reservations release automatically after incoming-mail checks; occasional missed reservations carry no penalty. Repeated abuse may prompt administrative action. Partial fills stay open; extra items are returned. Choose delivery as acquired or when the order ends. Cancel unfilled quantities anytime; expiration or cancellation delivers held items and refunds unused Meat and fee reserve. Completed purchases and fees are final. Hardcore/Ronin gifts cost 50 Meat per package from uncommitted buyer escrow; ordinary KMail is free. Active reservations and completed purchases are protected. Gift expenses can reduce the quantity still purchasable, and any funds left after delivery are refunded. If every remaining Meat is committed, item delivery safely waits for a buyer top-up.</p>
+                            <p className="mt-2 text-xs italic leading-5"><sup>1</sup> At the upper end of each price range.</p>
+                            <p className="text-xs italic leading-5">Commissions are rounded down to whole Meat. <strong>No sale, no fee.</strong></p>
+                            <div className="mt-2 divide-y divide-gray-200 rounded-md bg-blue-50/70 text-xs leading-4">
+                                <div className="px-3 py-2">
+                                    <h3 className="font-semibold text-gray-800">Example: Selling an Item</h3>
+                                    <p>A 10M Meat sale incurs:</p>
+                                    <ul className="list-disc pl-4">
+                                        <li>First 1M at 5% → 50,000 Meat</li>
+                                        <li>Remaining 9M at 4% → 360,000 Meat</li>
+                                    </ul>
+                                    <p>Total commission: 410,000 Meat (4.1%)</p>
+                                </div>
+                                <div className="px-3 py-2">
+                                    <h3 className="font-semibold text-gray-800">Example: Buying Items</h3>
+                                    <p>Two orders totaling 10M Meat:</p>
+                                    <ul className="list-disc pl-4">
+                                        <li>1,000 items × 10,000 Meat → 500,000 Meat fee (5%)</li>
+                                        <li>1 item × 10M Meat → 410,000 Meat fee (4.1%)</li>
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
                     </section>
                 </div>

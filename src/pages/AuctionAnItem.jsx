@@ -269,7 +269,7 @@ export default function AuctionAnItem() {
                             <p>You may cancel the unfilled portion of your order at any time without penalty. Unspent Meat, including unused commission reserves, is refunded when your auction ends or is canceled.</p>
                             <details>
                                 <summary className="w-fit cursor-pointer font-medium">A Note for Hardcore/Ronin Players</summary>
-                                <p className="mt-2">Players in Hardcore/Ronin may require gift packaging to receive items. With immediate delivery, packaging costs are deducted from your deposit only when necessary. One-time gift packaging is complimentary if you choose delivery when finished.</p>
+                                <p className="mt-2">Gift packaging for Hardcore/Ronin players is covered by kHub. Immediate deliveries are combined until at least 1,000 items below 50 Meat each, 100 items at 50–999 Meat, or 10 items at 1,000–49,999 Meat have accumulated. Items priced at 50,000 Meat or more are sent immediately. Each delivery includes all accumulated items, and any remainder is delivered when your order ends.</p>
                             </details>
                         </div></>}
                     <label htmlFor="auctionTime" className="mb-2 block text-sm font-bold">Auction Duration:</label>
@@ -295,8 +295,9 @@ export default function AuctionAnItem() {
                             min={localDateTimeInput(auctionNow() + 60000)} max={localDateTimeInput(auctionNow() + MAX_AUCTION_DURATION_MS)}
                             onChange={event => setCustomEndTime(event.target.value)} aria-describedby="custom-ending-help"
                             className="block min-h-11 w-full min-w-0 max-w-full rounded border border-gray-400 bg-white p-3 text-base text-gray-900" />
-                        <p id="custom-ending-help" className="mt-2 text-xs text-gray-500">Your timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}. Choose a time within 30 days.{escrowMode && ' This ending time stays fixed; deposit your items before it.'}</p>
+                        <p id="custom-ending-help" className="mt-2 text-xs text-gray-500">Your timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}. Choose a time within 30 days.{escrowMode && ' Deposit your items before the chosen ending time.'}</p>
                     </section>}
+                    {!isBuy && <p className="-mt-2 mb-4 text-xs text-gray-500">Last-minute bids reset the countdown to 1 minute.</p>}
                     <button type="submit" disabled={escrowLimitExceeded} className="min-h-11 w-full rounded bg-blue-600 px-4 py-3 font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">Preview Auction</button>
                 </form>}
             </div>

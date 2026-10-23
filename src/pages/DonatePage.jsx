@@ -26,7 +26,7 @@ const DonatePage = () => {
                     </li>
                 </ol>
                 <p className="text-left text-[15px] leading-6 text-gray-700 mt-3">
-                    <span className="font-bold">Gift packages:</span> All gift packages sent to kHub are treated as donations, regardless of their contents or message. Auction deposits and bids must be sent through regular KMail with the appropriate command.
+                    <span className="font-bold">Gift packages:</span> Packages without an auction command in their outside message are treated as donations. kHub opens them, identifies the sender from the updated KMail, and stores the donated contents in its closet. For an auction deposit or bid, use the exact command from the auction page as the outside message and include the required items or Meat.
                 </p>
                 <p className="text-[15px] leading-6 text-gray-700 mt-[18px]">The bot will confirm your donation with a short thank-you message. Sending <span className="font-mono">DONATE</span> without attachments returns donation instructions. Items or Meat sent through regular KMail without a valid command will be returned.</p>
             </div>

@@ -43,3 +43,20 @@ test('receipt-time escrow shows finalizing without naming a winner until the dat
     assert.equal(getAuctionResult({...auction,status:'settling',winnerId:'leader',hasWinner:true,finalPrice:500},1001).hasWinner,true);
     assert.equal(getAuctionResult({...auction,escrowMode:false},1001).status,'awaiting_trade');
 });
+
+test('missed deposit deadlines, explicit cancellations and ambiguous older closures have distinct labels', () => {
+    const base = { ...auction, escrowMode: true, itemEscrowedAt: null, currentBid: 0, highestBidderId: null };
+    assert.equal(getAuctionResult({ ...base, status: 'expired', closureReason: 'deposit_expired' }, now).label, 'Expired');
+    assert.equal(getAuctionResult({ ...base, status: 'cancelled', closureReason: 'seller_cancelled' }, now).label, 'Cancelled');
+    assert.equal(getAuctionResult({ ...base, status: 'cancelled' }, now).label, 'Closed before deposit');
+    assert.equal(getAuctionResult({ ...base, status: 'cancelled', itemEscrowedAt: '2026-10-22T12:00:00Z' }, now).label, 'Cancelled');
+});
+
+test('buy orders stop showing Closing once completed, canceled or expired', () => {
+    const base = { ...auction, auctionKind: 'buy', escrowMode: true };
+    for (const [status, reason, label] of [['completed', 'filled', 'Trade completed'], ['cancelled', 'cancel', 'Cancelled'], ['expired', 'deadline', 'Expired']]) {
+        assert.equal(getAuctionResult({ ...base, status, buyClosingReason: reason }, now).label, label);
+    }
+    assert.equal(getAuctionResult({ ...base, status: 'active', buyClosingReason: 'cancel' }, now).label, 'Closing — cancelled');
+    assert.equal(getAuctionResult({ ...base, status: 'active', buyClosingReason: 'deadline' }, now).label, 'Closing — expired');
+});

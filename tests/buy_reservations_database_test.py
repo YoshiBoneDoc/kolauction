@@ -48,7 +48,7 @@ with tempfile.TemporaryDirectory(prefix='khub-buy-reservations-',dir='/tmp') as 
         assert len({p.name for p in migrations})==len(migrations)
         # Historical 085 behavior; reservation/gift upgrades have their own suite.
         for migration in migrations:
-            sql(migration.read_text())
+            if migration.name<'202610230096_': sql(migration.read_text())
         catalog_path=ROOT/'src/data/items.json'
         if not catalog_path.exists(): catalog_path=ROOT/'catalog/items.json'
         catalog=json.loads(catalog_path.read_text())
@@ -82,9 +82,10 @@ with tempfile.TemporaryDirectory(prefix='khub-buy-reservations-',dir='/tmp') as 
         def mail(ident,cmd,uid=buyer,meat=0,quantity=0,item_id=None):
             global mid
             mid+=1
+            stamp=json.loads(sql("select jsonb_build_object('received_at',date_trunc('second',t),'epoch',floor(extract(epoch from t))::bigint) from (select clock_timestamp() t) clock;"))
             return {'id':str(mid),'sender_id':int(sql(f"select kol_player_id from public.profiles where id='{uid}';")),
-                'sender_name':'Fixture sender','received_at':sql("select date_trunc('second',clock_timestamp());"),'meat':meat,
-                'command':{'type':cmd,'auction_id':ident},'items':([{'id':item_id or item,'quantity':quantity}] if quantity else []),'raw':{'type':'normal','azunixtime':sql("select floor(extract(epoch from clock_timestamp()))::bigint;")}}
+                'sender_name':'Fixture sender','received_at':stamp['received_at'],'meat':meat,
+                'command':{'type':cmd,'auction_id':ident},'items':([{'id':item_id or item,'quantity':quantity}] if quantity else []),'raw':{'type':'normal','azunixtime':str(stamp['epoch'])}}
         def ingest(payload,error=None):
             if payload['command']['type']=='fill':
                 scan=json.loads(sql('select public.bot_begin_inbox_scan();'))

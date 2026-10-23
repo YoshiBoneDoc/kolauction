@@ -993,3 +993,18 @@ voter names or account IDs are included in any ordinary homepage/results respons
 Lists reflect votes/accounts still on file; frozen historical totals are retained
 independently. No bot rebuild or restart is required. The isolated poll database
 tests cover the 075-to-076 upgrade and permissions as well as the full lifecycle.
+
+### Sell auction anti-sniping (099)
+
+Apply `migrations/queue/202610230099_sell_auction_anti_sniping.sql` after 098, then
+deploy the website. Accepted bids in the last minute reset a Sell auction's end
+time to the bid's time plus 60 seconds. Escrow uses the original KoL receipt time;
+Direct uses the server clock after locking the auction. Repeated last-minute bids
+reset it again. Buyouts stay immediate; Buy orders keep their original expiry.
+
+The private `khub_bot.auction_bid_extensions` audit preserves each old/new deadline
+and the accepted bid/receipt. This applies prospectively to future bids on active
+listings, including custom ending times. No old bids or financial records are
+rewritten. No additional bot rebuild is needed for this SQL rule.
+
+Verify locally with `python3 tests/anti_sniping_database_test.py`.

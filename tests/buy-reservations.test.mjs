@@ -37,9 +37,10 @@ test('expired reservations await safe release, closing orders honor existing res
  const unavailable=harness({...order,availableQuantity:0});assert.match(unavailable.html(),/No quantity is currently available/);assert.doesNotMatch(unavailable.html(),/reserve-quantity/);
 });
 
-test('gift reductions are separate from purchases and buyers can see an explicit safe top-up instruction',()=>{
- const h=harness({...order,purchasedQuantity:8,quantity:10,reducedQuantity:2,remainingQuantity:0,availableQuantity:0,giftFundingNeeded:true,giftMeat:50},{id:'buyer'});
- const html=h.html();assert.match(html,/Originally requested/);assert.match(html,/Reduced for delivery expenses/);assert.match(html,/value="8" max="8"/);assert.match(html,/FUND 1200/);assert.match(html,/funds reserved for sellers cannot be used/i);
+test('Buy details never ask for packaging top-ups or show packaging deductions',()=>{
+ const html=harness({...order,giftFundingNeeded:true,giftMeat:50},{id:'buyer'}).html();
+ assert.doesNotMatch(html,/Gift delivery funding|FUND 1200|Reduced for delivery expenses|Quantity removed from order|Gift expenses|50 Meat|top-up/i);
+ assert.match(html,/Free gift packaging is used only while in Hardcore\/Ronin/);
  assert.doesNotMatch(harness(order,null).html(),/FILL 1200|Reserve for 10 minutes/);
 });
 
@@ -77,4 +78,73 @@ test('reservation cancellation service uses the ownership-checked RPC and propag
  assert.deepEqual(calls,[['cancel_buy_reservation',{p_reservation_id:'reservation'}]]);
  client.rpc=async()=>({error:{message:'Reservation not found for your account.'}});
  await assert.rejects(service.cancelBuyReservation('other'),/not found for your account/);
+});
+
+test('Buy fees and cost explanations are private to the creator and administrator',()=>{
+ const listing={...order,status:'completed',buyClosingReason:'filled',balanceMeat:0,purchaseMeat:2000,buyCommissionMeat:100,giftMeat:50,refundedMeat:0,heldQuantity:0,
+  fulfillments:[{seller:'Vendor',quantity:10,price_per_item:200,payment_meat:2000,commission_meat:100,payment_sent:true,created_at:'2026-10-22T12:00:00Z'}]};
+ for(const user of [null,{id:'other'},{id:'seller'},{id:'buyer',isBanned:true}]){
+  const html=harness(listing,user).html();
+  assert.doesNotMatch(html,/Tiered Fee|commission|Remaining escrow|Gift expenses|Fees start|Gift Delivery:|>Delivery:/i);
+  assert.doesNotMatch(html,/The price applies to each item/);assert.match(html,/2,000 Meat received/);
+ }
+ for(const [user,auction] of [[{id:'buyer'},listing],[{id:'admin'},{...listing,buyAdmin:true}]]){
+  const html=harness(auction,user).html();assert.match(html,/Tiered Fee \(5%\): 100 Meat/);assert.match(html,/Remaining escrow/);assert.match(html,/Fees range from 1–5%/);
+  if(user.id==='buyer')assert.match(html,/Delivery: As items are acquired/);
+  else assert.doesNotMatch(html,/>Delivery:/);
+ }
+ assert.doesNotMatch(harness({...listing,buyAdmin:true},null).html(),/Tiered Fee|Remaining escrow|Gift expenses|>Delivery:/);
+ const finished={...listing,deliveryMode:'finished'};
+ assert.match(harness(finished,{id:'buyer'}).html(),/Delivery: When the order is fully filled, expires, or is canceled/);
+ assert.doesNotMatch(harness(finished,{id:'seller'}).html(),/>Delivery:/);
+});
+
+
+test('closed Buy orders show the actual outcome and concise sales without claiming queued payments were received',()=>{
+ const fill={seller:'Anrath1',quantity:15,price_per_item:100,payment_meat:1500,payment_sent:true,created_at:'2026-10-22T23:17:58Z'};
+ for(const [status,reason,label] of [['completed','filled','Trade completed'],['cancelled','cancel','Canceled early'],['expired','deadline','Expired'],['voided',null,'Cancelled by administrator'],['settling','cancel','Closing — cancelled']]){
+  const html=harness({...order,status,buyClosingReason:reason,purchasedQuantity:15,quantity:15,fulfillments:[fill]}).html();
+  assert.match(html,/100% filled/);assert.match(html,new RegExp(`>${label}</span>`));
+  assert.match(html,/Anrath1 · Sold 15 items · 1,500 Meat received/);
+  assert.match(html,/dateTime="2026-10-22T23:17:58Z"/i);
+  assert.doesNotMatch(html,/The price applies to each item|Completed purchases cannot be reversed|items ×/);
+  if(status!=='completed')assert.doesNotMatch(html,/Trade completed/);
+ }
+ const pending=harness({...order,status:'settling',buyClosingReason:'deadline',fulfillments:[{...fill,payment_sent:false}]}).html();
+ assert.match(pending,/Sold 15 items · 1,500 Meat payment queued/);assert.doesNotMatch(pending,/Meat received/);
+ const live=harness({...order,fulfillments:[fill]}).html();
+ assert.match(live,/The price applies to each item/);assert.match(live,/15 items × 100 Meat \/ item · 1,500 Meat paid/);
+});
+
+
+test('Buy summary distinguishes partial purchases, final outcomes and active reservation availability',()=>{
+ for(const [status,label,color] of [['completed','Trade completed','text-green-700'],['cancelled','Canceled early','text-purple-700'],['expired','Expired','text-amber-700']]){
+  const h=harness({...order,status,quantity:20,purchasedQuantity:5,remainingQuantity:15});
+  const html=h.html();assert.match(html,/Purchased: <strong>5\/20<\/strong>/);
+  const outcome=h.find(n=>n.props?.['aria-label']==='Auction status');
+  assert.equal(outcome.props.children,label);assert.match(outcome.props.className,new RegExp(color));
+  const progress=h.find(n=>n.type==='progress');assert.match(progress.props.className,new RegExp(color.replace('text-', 'accent-')));
+  assert.doesNotMatch(html,/Still requested:|Available to reserve:|Reserved:|Adjusted quantity:|Quantity removed from order:/);
+ }
+ const full=harness({...order,status:'completed',quantity:20,purchasedQuantity:20}).html();
+ assert.match(full,/Purchased: <strong>20<\/strong>/);assert.doesNotMatch(full,/20\/20/);
+ const activeOrder=harness({...order,reducedQuantity:2});
+ const live=activeOrder.html();
+ assert.equal(activeOrder.find(n=>n.props?.['aria-label']==='Auction status').props.children,'In Progress');
+ assert.match(activeOrder.find(n=>n.props?.['aria-label']==='Auction status').props.className,/text-yellow-700/);
+ assert.match(activeOrder.find(n=>n.type==='progress').props.className,/accent-yellow-500/);
+ assert.match(live,/Available to reserve:/);assert.match(live,/Reserved:/);assert.doesNotMatch(live,/Quantity removed from order|Reduced for delivery expenses/);
+ assert.doesNotMatch(live,/Adjusted quantity/);
+ assert.doesNotMatch(harness({...order,buyClosingReason:'cancel'}).html(),/Available to reserve:/);
+});
+
+
+test('Buy support link is available only to the creator or a verified fulfillment seller',()=>{
+ for(const status of ['active','completed','cancelled','expired']){
+  const listing={...order,status};
+  assert.match(harness(listing,{id:'buyer'}).html(),/Contact an administrator about this order/);
+  assert.match(harness({...listing,fulfilledByMe:true},{id:'seller'}).html(),/Contact an administrator about this order/);
+  for(const [auction,user] of [[listing,null],[listing,{id:'other'}],[{...listing,buyAdmin:true},{id:'admin'}],[{...listing,myReservation:{id:'r',quantity:1,expires_at:'2026-10-22T12:10:00Z'}},{id:'seller'}],[{...listing,fulfilledByMe:true},{id:'seller',isBanned:true}],[{...listing,usernamesVisible:false},{id:'buyer'}],[{...listing,fulfilledByMe:'false'},{id:'other'}]])
+   assert.doesNotMatch(harness(auction,user).html(),/Contact an administrator about this order/);
+ }
 });

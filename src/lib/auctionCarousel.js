@@ -14,6 +14,14 @@ export function rotateAuctionQueue(ids) {
     return ids.length > 1 ? [ids.at(-1), ...ids.slice(0, -1)] : ids;
 }
 
+// Positive steps follow the existing rightward automatic rotation; negative
+// steps let a user drag back through the same queue without cloning tiles.
+export function rotateAuctionQueueBySteps(ids, steps) {
+    if (ids.length < 2) return ids;
+    const shift = ((steps % ids.length) + ids.length) % ids.length;
+    return shift ? [...ids.slice(-shift), ...ids.slice(0, -shift)] : ids;
+}
+
 export const CAROUSEL_POSITION_KEY = 'khub.popularAuctions.v1';
 export const CAROUSEL_STEP_MS = 9000;
 

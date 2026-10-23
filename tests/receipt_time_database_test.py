@@ -1,4 +1,5 @@
 """Exercise receipt-time escrow bidding and safe settlement against an isolated PostgreSQL database.
+Pre-099 fixed-deadline regression; anti_sniping_database_test.py covers current extensions.
 No live Supabase, KoL, credentials or network are used.
 Run: python3 tests/receipt_time_database_test.py
 """
@@ -46,7 +47,9 @@ with tempfile.TemporaryDirectory(prefix='khub-receipt-time-',dir='/tmp') as fold
         ''')
         migrations=sorted([*ROOT.glob('supabase/migrations/*.sql'),*ROOT.glob('supabase/migrations/queue/*.sql')],key=lambda p:p.name)
         assert len({p.name for p in migrations})==len(migrations)
-        for migration in migrations: sql(migration.read_text())
+        # Preserve the pre-anti-sniping deadline regression; the 099 suite covers extensions.
+        for migration in migrations:
+            if migration.name<'202610230099_':sql(migration.read_text())
         catalog_path=ROOT/'src/data/items.json'
         if not catalog_path.exists(): catalog_path=ROOT/'catalog/items.json'
         catalog=json.loads(catalog_path.read_text())

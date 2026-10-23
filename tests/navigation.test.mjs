@@ -116,3 +116,11 @@ test('What’s New links to the update log beside Beta on Home only', () => {
     assert.doesNotMatch(navigation(html), /update-log/);
     assert.doesNotMatch(render('/auctions'), /href="\/update-log"/);
 });
+
+test('theme switch is available to guests and signed-in users across routes', () => {
+    for (const user of [null, { id: 'member', khubUsername: 'Member' }]) for (const path of ['/', '/auctions', '/auction-item', '/profile', '/login', '/info', '/wall-of-shame']) {
+        const html = navigation(render(path, user));
+        assert.match(html, /aria-label="Switch to dark mode" aria-pressed="false"/);
+        assert.match(html, /Dark<\/span>|Dark mode/);
+    }
+});

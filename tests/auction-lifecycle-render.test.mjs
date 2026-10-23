@@ -149,10 +149,10 @@ test('optional feedback appears only after the viewer responds, independently of
         assert.doesNotMatch(render({ auction, userId }), /Rate This|Thumbs up for/);
         for (const response of [{ [`${userId}ConfirmedAt`]: '2026-10-20' }, { ownTradeReport: 'B-1001' }, { [`${userId}ResolvedAt`]: '2026-10-20', ownTradeReportWithdrawn: true }]) {
             const html = render({ auction: { ...auction, ...response }, userId });
-            assert.match(html, new RegExp(`Rate This ${role === 'buyer' ? 'Buyer' : 'Seller'}`));
+            assert.match(html, /How was your experience trading with this player\?/);
             assert.match(html, new RegExp(`aria-label="Thumbs up for this ${role}" aria-pressed="false"`));
             assert.match(html, new RegExp(`aria-label="Thumbs down for this ${role}" aria-pressed="false"`));
-            assert.ok(html.indexOf('You confirmed this trade') < html.indexOf('Rate This') || html.indexOf('You reported this trade') < html.indexOf('Rate This'));
+            assert.ok(html.indexOf('You confirmed this trade') < html.indexOf('How was your experience') || html.indexOf('You reported this trade') < html.indexOf('How was your experience'));
         }
         const completed = render({ auction: { ...auction, status: 'completed', sellerConfirmedAt: '2026-10-20', buyerConfirmedAt: '2026-10-20', ownFeedback: -1 }, userId });
         assert.doesNotMatch(completed, /Rate This|Thumbs up for|Thumbs down for/);
@@ -215,4 +215,15 @@ test('My Account auction links and winner-profile links are independent anchors'
         assert.ok(depth >= 0 && depth <= 1, `Nested or unbalanced anchor: ${tag}`);
     }
     assert.equal(depth, 0);
+});
+
+test('escrow outcomes explain automatic deposit expiry without claiming a seller cancellation or completed return', () => {
+    const base = { ...auction, escrowMode: true, itemEscrowedAt: null, currentBid: 0, highestBidderId: null, winnerId: null, finalPrice: null };
+    const expired = render({ auction: { ...base, status: 'expired', closureReason: 'deposit_expired' }, userId: 'seller' });
+    assert.match(expired, /expired automatically/);
+    assert.doesNotMatch(expired, /listing was cancelled|deposit has been returned|Confirm Complete/);
+    const legacy = render({ auction: { ...base, status: 'cancelled' }, userId: 'seller' });
+    assert.match(legacy, /Closed before deposit/);
+    assert.match(legacy, /may have been canceled or reached its deposit deadline/);
+    assert.doesNotMatch(legacy, /deposit has been returned/);
 });

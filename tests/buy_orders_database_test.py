@@ -48,7 +48,7 @@ with tempfile.TemporaryDirectory(prefix='khub-buy-orders-',dir='/tmp') as folder
         assert len({p.name for p in migrations})==len(migrations)
         # Historical 085 behavior; reservation/gift upgrades have their own suite.
         for migration in migrations:
-            if not migration.name.startswith(('202610220086_', '202610220087_')): sql(migration.read_text())
+            if migration.name<'202610220086_': sql(migration.read_text())
         catalog_path=ROOT/'src/data/items.json'
         if not catalog_path.exists(): catalog_path=ROOT/'catalog/items.json'
         catalog=json.loads(catalog_path.read_text())
@@ -181,6 +181,10 @@ with tempfile.TemporaryDirectory(prefix='khub-buy-orders-',dir='/tmp') as folder
         assert all(r['auction_kind']=='buy' for r in filtered['rows'])
         report=call(f"select public.submit_trade_query('{uuid4()}','{first}','Please inspect this buy order payment and delivery.');",seller)
         assert 'B-' in report
+        unfilled=create()
+        assert 'B-' in call(f"select public.submit_trade_query('{uuid4()}','{unfilled}','Please inspect my pending buy order.');",buyer)
+        for outsider in [seller,seller2,admin]:
+            call(f"select public.submit_trade_query('{uuid4()}','{unfilled}','Please inspect someone else buy order.');",outsider,error='Only the seller')
         for table in ['buy_orders','buy_fulfillments']:
             call(f'select * from khub_bot.{table};',seller,error='permission denied')
         sql(f"set role anon;select public.create_buy_auction({item},1,200,24,'immediate');",error='permission denied')

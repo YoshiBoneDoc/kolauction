@@ -57,9 +57,9 @@ export default function SellerProfile() {
                         <TradeHistorySummary stats={stats} detailed={detailed} />
                         {detailed && <section aria-label="Listing activity" className="border-t border-gray-200 pt-5">
                             <h2 className="mb-3 font-bold text-gray-900">Listing activity</h2>
-                            <dl className="grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
-                                {[[stats.active, 'Active'], [stats.pending, 'Awaiting settlement'], [stats.unsold, 'Ended without bids'], [stats.cancelled, 'Canceled (before bids)']].map(([value, label]) => <div key={label} className="rounded-md bg-gray-50 px-3 py-2">
-                                    <dt title={label === 'Canceled (before bids)' ? 'Cancelled before receiving a valid bid' : undefined} className="text-xs text-gray-500">{label}</dt>
+                            <dl className="grid grid-cols-2 gap-3 text-center sm:grid-cols-3">
+                                {[[stats.active, 'Active'], [stats.pending, 'Awaiting settlement'], [stats.unsold, 'Ended without bids']].map(([value, label]) => <div key={label} className="rounded-md bg-gray-50 px-3 py-2">
+                                    <dt className="text-xs text-gray-500">{label}</dt>
                                     <dd className="mt-1 text-lg font-semibold text-gray-700">{number(value)}</dd>
                                 </div>)}
                             </dl>

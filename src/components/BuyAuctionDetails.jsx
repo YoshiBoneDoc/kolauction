@@ -8,6 +8,7 @@ import { AuctionsContext } from '../context/AuctionsContext';
 import { getAuctionResult } from '../lib/auctionLifecycle';
 import { parseAuctionAmount } from '../lib/auctionInputs';
 import { timeRemaining } from '../lib/auctionBrowsing';
+import { canSendTradeQuery } from '../lib/tradeQueries';
 import EscrowProtection from './EscrowProtection';
 import CopyMessage from './CopyMessage';
 import SellerLink from './SellerLink';
@@ -33,10 +34,14 @@ export default function BuyAuctionDetails({ auction, now, backLink }) {
     }
     const target = Math.max(auction.purchasedQuantity || 0, auction.quantity - (auction.reducedQuantity || 0));
     const owns = currentUser?.id === auction.sellerId;
+    const canViewFees = Boolean(currentUser && !currentUser.isBanned && auction.usernamesVisible !== false && (owns || auction.buyAdmin));
     const result = getAuctionResult(auction, now);
     const active = result.status === 'active';
+    const closed = Boolean(auction.buyClosingReason) || ['completed', 'cancelled', 'expired', 'voided', 'settling'].includes(result.status);
     const canCancel = owns && !currentUser.isBanned && !auction.buyClosingReason && ['active','pending_escrow'].includes(auction.status);
     const purchased = auction.purchasedQuantity || 0;
+    const outcomeLabel = active && !closed ? 'In Progress' : result.status === 'cancelled' ? 'Canceled early' : result.label;
+    const outcomeColor = active && !closed ? 'text-yellow-700 accent-yellow-500' : { completed: 'text-green-700 accent-green-700', cancelled: 'text-purple-700 accent-purple-700', expired: 'text-amber-700 accent-amber-700', voided: 'text-red-700 accent-red-700' }[result.status] || 'text-blue-700 accent-blue-700';
     async function reserve(event) {
         event.preventDefault();
         if (pending) return;
@@ -65,14 +70,14 @@ export default function BuyAuctionDetails({ auction, now, backLink }) {
             <header className="flex items-center gap-4">{auction.image && <img src={auction.image} alt="" className="h-20 w-20 shrink-0 object-contain" />}<div className="min-w-0"><p className="text-sm font-semibold text-blue-700">Buy Auction · Escrow · #{auction.auctionNumber}</p><h1 className="break-words text-3xl font-bold text-blue-600">{auction.item}</h1><p className="text-sm">Requested by <SellerLink auction={auction} /></p></div></header>
             <section aria-label="Buy order overview" className="space-y-2">
                 <p className="text-3xl font-bold">{auction.pricePerItem.toLocaleString('en-US')} Meat <span className="text-sm font-normal">per item</span></p>
-                <p>Originally requested: <strong>{auction.quantity.toLocaleString('en-US')}</strong> · Purchased: <strong>{purchased.toLocaleString('en-US')}</strong> · Still requested: <strong>{auction.remainingQuantity.toLocaleString('en-US')}</strong></p>
-                <p className="text-sm">Available to reserve: <strong>{available.toLocaleString('en-US')}</strong> · Reserved: <strong>{(auction.reservedQuantity || 0).toLocaleString('en-US')}</strong> · Reduced for delivery expenses: <strong>{(auction.reducedQuantity || 0).toLocaleString('en-US')}</strong></p>
-                <progress aria-label="Order fulfillment" value={purchased} max={target || 1} className="h-3 w-full accent-blue-600" />
-                <p className="text-sm">{target ? Math.floor(purchased / target * 100) : 0}% filled · {auction.buyClosingReason ? 'Closing — honoring existing reservations' : result.label}{active && <> · Ends in {timeRemaining(auction.endTime, now)}</>}</p>
-                <p className="text-sm text-gray-600">The price applies to each item. Sellers receive the full price; the buyer pays commission separately.</p>
-                <p className="text-sm">Delivery: {auction.deliveryMode === 'finished' ? 'When the order is fully filled, expires, or is canceled.' : 'As items are acquired.'}</p>
+                <p>Originally requested: <strong>{auction.quantity.toLocaleString('en-US')}</strong> · Purchased: <strong>{purchased.toLocaleString('en-US')}{purchased < auction.quantity && `/${auction.quantity.toLocaleString('en-US')}`}</strong> · <span aria-label="Auction status" className={`font-semibold ${outcomeColor}`}>{outcomeLabel}</span></p>
+                {active && !closed && <p className="text-sm">Available to reserve: <strong>{available.toLocaleString('en-US')}</strong> · Reserved: <strong>{(auction.reservedQuantity || 0).toLocaleString('en-US')}</strong></p>}
+                <progress aria-label="Order fulfillment" value={purchased} max={target || 1} className={`h-3 w-full ${outcomeColor}`} />
+                <p className="text-sm">{target ? Math.floor(purchased / target * 100) : 0}% filled{auction.buyClosingReason && auction.reservedQuantity > 0 && ['active', 'settling'].includes(result.status) && ' — honoring existing reservations'}{active && !closed && <> · Ends in {timeRemaining(auction.endTime, now)}</>}</p>
+                {!closed && <p className="text-sm text-gray-600">The price applies to each item. Sellers receive the full advertised price.{canViewFees && ' The buyer pays commission separately.'}</p>}
+                {owns && canViewFees && <p className="text-sm">Delivery: {auction.deliveryMode === 'finished' ? 'When the order is fully filled, expires, or is canceled.' : 'As items are acquired.'}</p>}
             </section>
-            {owns && result.status === 'pending_escrow' && <section aria-label="Fund buy auction" className="space-y-2 rounded border border-blue-200 bg-blue-50 p-4">
+            {owns && canViewFees && result.status === 'pending_escrow' && <section aria-label="Fund buy auction" className="space-y-2 rounded border border-blue-200 bg-blue-50 p-4">
                 <h2 className="font-semibold">Fund your order</h2><p>Send <strong>{auction.fundingRequired?.toLocaleString('en-US')} Meat</strong> (purchase funds plus fee reserve) to <strong>kHub (#3888760)</strong>, with no items.</p>
                 <p className="text-sm">Purchase funds: {buyFunding(auction.pricePerItem, auction.quantity).purchase.toLocaleString('en-US')} Meat · Estimated {feeLabel(buyFee(auction.pricePerItem, auction.quantity), BigInt(auction.pricePerItem) * BigInt(auction.quantity))}: {buyFee(auction.pricePerItem, auction.quantity).toLocaleString('en-US')} Meat · Commission reserve ({effectiveFeePercent(buyFunding(auction.pricePerItem, auction.quantity).feeReserve, BigInt(auction.pricePerItem) * BigInt(auction.quantity))}): {buyFunding(auction.pricePerItem, auction.quantity).feeReserve.toLocaleString('en-US')} Meat</p>
                 <CopyMessage text={`FUND ${auction.auctionNumber || auction.id}`} label="funding command" />
@@ -117,16 +122,16 @@ export default function BuyAuctionDetails({ auction, now, backLink }) {
                 </form> : <p className="text-sm">{auction.buyClosingReason ? 'This order is closing. Existing reservations remain protected.' : 'No quantity is currently available. Reservations or pending delivery checks may release more shortly.'}</p> : <p><Link to="/login" className="text-blue-700 underline">Log in</Link> with your linked account to reserve a quantity.</p>}
             </section>}
             {notice && <p role="status" className="text-sm text-green-700">{notice}</p>}
-            {owns && auction.giftFundingNeeded && <section aria-label="Gift delivery funding" className="space-y-2 rounded border border-amber-300 bg-amber-50 p-3 text-sm"><p>Purchased items are safely held. A required gift package needs 50 Meat of uncommitted funds; funds reserved for sellers cannot be used. Add Meat to resume delivery:</p><CopyMessage text={`FUND ${auction.auctionNumber || auction.id}`} label="gift funding command" /></section>}
+
             {auction.status === 'settling' && <p>The order has closed. Payments, purchased items, and unused funds are being delivered. Settlement completes once all deliveries are confirmed.</p>}
-            {(owns || auction.buyAdmin) && auction.balanceMeat != null && <section aria-label="Your buy escrow" className="text-sm"><p>Remaining escrow: {auction.balanceMeat.toLocaleString('en-US')} Meat · Purchased: {auction.purchaseMeat.toLocaleString('en-US')} Meat · {feeLabel(auction.buyCommissionMeat, auction.purchaseMeat)}: {auction.buyCommissionMeat.toLocaleString('en-US')} Meat · Gift expenses: {(auction.giftMeat || 0).toLocaleString('en-US')} Meat · Refund queued/returned: {auction.refundedMeat.toLocaleString('en-US')} Meat</p><p>Purchased items still held before delivery: {auction.heldQuantity.toLocaleString('en-US')}. Queued deliveries are tracked separately.</p></section>}
+            {canViewFees && auction.balanceMeat != null && <section aria-label="Your buy escrow" className="text-sm"><p>Remaining escrow: {auction.balanceMeat.toLocaleString('en-US')} Meat · Purchased: {auction.purchaseMeat.toLocaleString('en-US')} Meat · {feeLabel(auction.buyCommissionMeat, auction.purchaseMeat)}: {auction.buyCommissionMeat.toLocaleString('en-US')} Meat · Refund queued/returned: {auction.refundedMeat.toLocaleString('en-US')} Meat</p><p>Purchased items still held before delivery: {auction.heldQuantity.toLocaleString('en-US')}. Queued deliveries are tracked separately.</p></section>}
             {canCancel && <button disabled={pending} onClick={cancel} className="button-red rounded border px-4 py-2 disabled:opacity-50">{pending ? 'Canceling…' : 'Cancel remaining order'}</button>}
             {error && <p role="alert" className="text-red-700">{error}</p>}
-            {(owns || auction.fulfilledByMe) && currentUser && !currentUser.isBanned && <p><Link to={`/auction/${auction.id}/trade-query`} className="text-sm text-blue-700 underline">Contact an administrator about this order</Link></p>}
-            <EscrowProtection buy />
-            {auction.buyAdmin && auction.reservationAudit?.length > 0 && <details className="text-xs"><summary className="cursor-pointer">Reservation and gift audit</summary><ul>{auction.reservationAudit.map(event => <li key={event.id} className="py-1">{new Date(event.created_at).toLocaleString()} · {event.kind} · {JSON.stringify(event.details)}</li>)}</ul></details>}
-            <section aria-label="Fulfillment history" className="space-y-2"><h2 className="text-xl font-bold">Fulfillment history</h2><p className="text-xs text-gray-500">Latest 100 accepted fulfillments. Completed purchases cannot be reversed.</p>
-                {auction.fulfillments.length ? <ul className="divide-y">{auction.fulfillments.map((fill,index) => <li key={fill.receipt_id || index} className="py-3 text-sm"><p>{fill.seller} · {Number(fill.quantity).toLocaleString('en-US')} items × {Number(fill.price_per_item).toLocaleString('en-US')} Meat / item · {Number(fill.payment_meat).toLocaleString('en-US')} Meat {fill.payment_sent ? 'paid' : 'payment queued'}</p>{fill.commission_meat != null && <p>{feeLabel(fill.commission_meat, fill.payment_meat)}: {Number(fill.commission_meat).toLocaleString('en-US')} Meat</p>}<time dateTime={fill.created_at} className="text-xs text-gray-500">{new Date(fill.created_at).toLocaleString()}</time>{fill.delivery_references && <p className="text-xs text-gray-500">{fill.delivery_references.map(d => `${d.reference} (${d.state})`).join(' · ')}</p>}</li>)}</ul> : <p className="text-sm text-gray-600">No purchases yet.</p>}
+            {canSendTradeQuery(auction, currentUser) && <p><Link to={`/auction/${auction.id}/trade-query`} className="text-sm text-blue-700 underline">Contact an administrator about this order</Link></p>}
+            <EscrowProtection buy showFees={canViewFees} />
+            {canViewFees && auction.buyAdmin && auction.reservationAudit?.length > 0 && <details className="text-xs"><summary className="cursor-pointer">Reservation and gift audit</summary><ul>{auction.reservationAudit.map(event => <li key={event.id} className="py-1">{new Date(event.created_at).toLocaleString()} · {event.kind} · {JSON.stringify(event.details)}</li>)}</ul></details>}
+            <section aria-label="Fulfillment history" className="space-y-2"><h2 className="text-xl font-bold">Fulfillment history</h2><p className="text-xs text-gray-500">Latest 100 accepted fulfillments.</p>
+                {auction.fulfillments.length ? <ul className="divide-y">{auction.fulfillments.map((fill,index) => <li key={fill.receipt_id || index} className="py-3 text-sm"><p>{fill.seller} · {closed ? 'Sold ' : ''}{Number(fill.quantity).toLocaleString('en-US')} items{!closed && <> × {Number(fill.price_per_item).toLocaleString('en-US')} Meat / item</>} · {Number(fill.payment_meat).toLocaleString('en-US')} Meat {fill.payment_sent ? closed ? 'received' : 'paid' : 'payment queued'}</p>{canViewFees && fill.commission_meat != null && <p>{feeLabel(fill.commission_meat, fill.payment_meat)}: {Number(fill.commission_meat).toLocaleString('en-US')} Meat</p>}<time dateTime={fill.created_at} className="text-xs text-gray-500">{new Date(fill.created_at).toLocaleString()}</time>{fill.delivery_references && <p className="text-xs text-gray-500">{fill.delivery_references.map(d => `${d.reference} (${d.state})`).join(' · ')}</p>}</li>)}</ul> : <p className="text-sm text-gray-600">No purchases yet.</p>}
             </section>
         </div>
     </main>;

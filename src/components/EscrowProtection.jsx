@@ -3,22 +3,21 @@ import { Link } from 'react-router-dom';
 import { feeLabel } from '../lib/feeDisplay';
 import { escrowFee } from '../lib/escrowFees';
 
-export default function EscrowProtection({ forListing = false, buy = false, feeBps = 500, feePolicy = 'tiered_v1', minimumPrice = null }) {
+export default function EscrowProtection({ forListing = false, buy = false, showFees = true, feeBps = 500, feePolicy = 'tiered_v1', minimumPrice = null }) {
     if (buy) return <details className="text-left text-xs text-gray-600">
-        <summary className="w-fit cursor-pointer">Escrow Protection — Buy Auctions</summary>
+        <summary className="w-fit cursor-pointer">How Buy Auctions Work</summary>
         <div className="mt-2 space-y-2 leading-[1.4]">
             <p>Our bot, kHub (#3888760), securely holds your Meat and automatically purchases items as sellers fulfill your order.</p>
             <ul className="list-disc space-y-1 pl-4">
                 <li><strong>Funded Offers:</strong> Deposit your Meat to activate your buy auction. The bot must accept your deposit within 24 hours of creating the listing.</li>
                 <li><strong>Partial Fills:</strong> Sellers reserve a quantity on the website for 10 minutes, then send exactly those items with their reservation command. Your auction remains active until fully filled, canceled, or expired.</li>
-                <li><strong>Gift Delivery:</strong> Hardcore/Ronin packages cost 50 Meat each from uncommitted buyer escrow, separate from commissions. Ordinary KMail has no packaging charge. Gift costs may reduce the unreserved order; purchased items and active reservations stay protected.</li>
+                {showFees && <li><strong>Hardcore/Ronin Deliveries:</strong> Free gift packaging is used only while in Hardcore/Ronin, with items <Link to="/info#buy-gift-delivery" className="text-blue-700 underline">batched</Link> by price. Regular KMail delivery resumes once restrictions end.</li>}
                 <li><strong>Flexible Delivery:</strong> Receive purchased items as they’re acquired or all at once when your order ends.</li>
-                <li><strong>Cancel Anytime:</strong> Cancel your remaining order at any time. Unspent Meat is refunded, but completed purchases and their fees are final.</li>
+                <li><strong>Cancel Anytime:</strong> Cancel your remaining order at any time. Unspent Meat is refunded; {showFees ? 'completed purchases and their fees are final.' : 'completed purchases are final.'}</li>
                 <li><strong>Automatic Settlement:</strong> The bot handles payments, item deliveries, and refunds via KMail.</li>
                 <li><strong>Fast Delivery:</strong> Transactions usually process within seconds. Service disruptions may cause delays.</li>
             </ul>
-            <p className="italic">Fees start at 5% and decrease for higher-priced items, with each rate applying only to its portion of the price per item, not the total order value. See the <Link to="/info#escrow-fees-title" className="text-blue-700 underline">fee chart</Link> for details. Fees are rounded down to whole Meat and deducted from your deposit. No purchase, no fee.</p>
-            <p>The buyer pays fees separately; sellers receive the full advertised price per item. Fractional per-item fees are multiplied by the quantity fulfilled before rounding down.</p>
+            {showFees && <p className="italic">Fees range from 1–5% depending on the item’s price. See the <Link to="/info#escrow-fees-title" className="text-blue-700 underline">fee chart</Link> for details. No purchase, no fee.</p>}
         </div>
     </details>;
     return <details className={forListing ? 'text-left text-xs text-gray-600' : 'group w-full text-left text-xs text-gray-600'}>
@@ -46,4 +45,4 @@ export default function EscrowProtection({ forListing = false, buy = false, feeB
     </details>;
 }
 
-EscrowProtection.propTypes = { forListing: PropTypes.bool, buy: PropTypes.bool, feeBps: PropTypes.number, feePolicy: PropTypes.oneOf(['flat', 'tiered_v1']), minimumPrice: PropTypes.number };
+EscrowProtection.propTypes = { forListing: PropTypes.bool, buy: PropTypes.bool, showFees: PropTypes.bool, feeBps: PropTypes.number, feePolicy: PropTypes.oneOf(['flat', 'tiered_v1']), minimumPrice: PropTypes.number };

@@ -6,10 +6,7 @@ Remaining work only. Updated October 21, 2026.
 - 
 
 # Small Quick fixes:
-- Once a trade is COMPLETED (aka items have been successfully exchanged), logged in users can see usernames of all bids placed on that auction. We still want to only show the winning bidder if the auction has been concluded but items havent been exchanged yet.
-- Introduce a "update log", should just be a simple page with paraphrased bulleted updated 
-- For now, on this updated log page will contain: 1. Users can now see all bidder's usernames once an auction completes (i.e. after all items have been exchanged). 2. Introduced Buy Auctions! We tried to keep things relavatively similar between Sell and Buy auctions but there are a few differences. Please refer to the info page for more details. For now, Buy Auctions will be escro only. 
-- introduce a way for the admin to put a site wide banner (users can dismiss by Xing out of it) to give important information/messages to users
+
 
 ## 1. Outstanding audit fixes
 - Show an unavailable/retry state on All Auctions after a failed initial load,

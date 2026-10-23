@@ -47,7 +47,7 @@ test('Info explains first bids, both trade modes and exact buyouts alongside all
     assert.match(table, /0\.5%/);
     assert.match(table, /Round To/);
     assert.match(table, /500k/);
-    assert.match(html, /round up to a multiple/);
+    assert.match(html, /rounded up to the nearest multiple/);
     assert.match(html, /1\.81M Meat/);
 });
 const base = { sellerId: 'seller', owner: 'Seller', quantity: 1, minBidMeat: 100, currentBid: 0, bids: [], createdAt: Date.now(), endTime: Date.now() + 3600000, status: 'active' };
@@ -294,7 +294,7 @@ test('Info explains marginal seller fees and displays the five agreed fee tiers'
     assert.equal((table.match(/<tr/g) || []).length, 6);
     for (const rate of ['5%', '4%', '3%', '2%', '1%']) assert.ok(table.includes(rate));
     assert.match(html, /Each rate applies only to the portion within that tier/);
-    assert.match(html, /410k Meat total \(4.1%\)/);
+    assert.match(html, /410,000 Meat \(4.1%\)/);
     assert.match(html, /rounded down to whole Meat/);
     assert.doesNotMatch(html, /7\.5%/);
 });
@@ -406,4 +406,28 @@ test('ownership action labels cycle from My Auctions to Others to View All and f
     const guest=render('/auctions?mine=others',listings);
     assert.doesNotMatch(guest,/>My Auctions<\/button>|>Others<\/button>|>View All<\/button>/);
     assert.match(guest,/Own listing/);assert.match(guest,/Other listing/);
+});
+
+
+test('Info separates Buy operation from per-item fee examples and explains free whole-quantity gift batches',()=>{
+ const html=render('/info',[]);
+ const types=html.indexOf('Escrow and Direct Trade auction comparison');
+ const buy=html.indexOf('>Auctions for Buying Items</h2>');
+ const fees=html.indexOf('>Escrow Fees</h2>');
+ assert.ok(types<buy && buy<fees);
+ assert.match(html,/Reservations automatically expire after 10 minutes/);
+ assert.match(html,/Gift packaging is free/);
+ assert.match(html,/under 50 Meat \(1,000 items\), 50–999 \(100 items\), 1,000–49,999 \(10 items\), and 50,000\+ \(immediate\)/);
+ assert.match(html,/all accumulated items are sent/);
+ const feeNote=html.slice(fees);
+ const feeText=feeNote.replace(/<[^>]*>/g,'');
+ assert.match(feeText,/When Selling:/);
+ assert.match(feeText,/When Buying:/);
+ assert.match(feeText,/Example: Selling an Item/);
+ assert.match(feeText,/Total commission: 410,000 Meat \(4.1%\)/);
+ assert.match(feeText,/Example: Buying Items/);
+ assert.match(feeText,/1,000 items × 10,000 Meat → 500,000 Meat fee \(5%\)/);
+ assert.match(feeText,/1 item × 10M Meat → 410,000 Meat fee \(4.1%\)/);
+ assert.match(feeText,/Buyers pay the fee; sellers receive the full listed price/);
+ assert.doesNotMatch(feeNote,/Hardcore|top-up|gift expenses|Fund within 24 hours/i);
 });

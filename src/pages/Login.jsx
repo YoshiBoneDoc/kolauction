@@ -30,7 +30,7 @@ const Login = () => {
 
             <form
                 onSubmit={handleSubmit}
-                className="w-full max-w-md bg-white shadow-md rounded p-6 [color-scheme:light]"
+                className="w-full max-w-md bg-white shadow-md rounded p-6"
             >
                 <h1 className="text-2xl font-bold text-center mb-6">Log In</h1>
 
