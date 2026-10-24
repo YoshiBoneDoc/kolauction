@@ -181,6 +181,11 @@ button:focus-visible {
   overflow: hidden;
   padding: 4px 0 10px;
 }
+.popular-auction-viewport[data-moving="false"] {
+  overflow-x: auto;
+  touch-action: pan-x pan-y pinch-zoom;
+  -webkit-overflow-scrolling: touch;
+}
 .popular-auction-track {
   display: flex;
   width: 100%;
@@ -218,7 +223,7 @@ button:focus-visible {
 @media (min-width: 640px) { .popular-auction-viewport { --popular-columns: 2; } }
 @media (min-width: 1024px) { .popular-auction-viewport { --popular-columns: 4; } }
 @media (prefers-reduced-motion: reduce) {
-  .popular-auction-viewport { overflow-x: auto; }
+  .popular-auction-viewport { overflow-x: auto; touch-action: pan-x pan-y pinch-zoom; }
   .popular-auction-viewport[data-moving] .popular-auction-track { animation: none; transform: none; }
 }
 
@@ -286,11 +291,12 @@ html.upside-down #root {
   outline-offset: 1px;
 }
 
-/* High Rollers is a static row: native scrolling plus pointer drag momentum. */
+/* High Rollers: native touch scrolling/inertia, plus desktop pointer dragging. */
 .high-rollers-viewport {
   overflow-x: auto;
   overscroll-behavior-x: contain;
-  touch-action: pan-y pinch-zoom;
+  touch-action: pan-x pan-y pinch-zoom;
+  -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   padding: 2px 2px 8px;
   cursor: grab;

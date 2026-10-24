@@ -76,3 +76,28 @@ test('quick drags coast and settle back to automatic motion; reduced-motion drag
     reduced.emit(reduced.view, 'pointerup', { timeStamp: 21 });
     assert.equal(reduced.viewport.scrollLeft, 100); assert.equal(reduced.frames.size, 0); reduced.stop();
 });
+
+
+test('static strips leave touch swipes native without capture, custom momentum or accidental click blocking',()=>{
+    const h=fixture({moving:false});
+    h.emit(h.viewport,'pointerdown',{pointerType:'touch'});
+    const move=h.emit(h.viewport,'pointermove',{pointerType:'touch',clientX:-500,clientY:35,timeStamp:80});
+    assert.equal(move.prevented,false);assert.equal(h.viewport.dataset.dragging,undefined);
+    assert.equal(h.viewport.scrollLeft,0); // Browser owns scrolling; helper never resets it.
+    h.viewport.scrollLeft=450;
+    h.emit(h.view,'pointercancel',{pointerType:'touch',timeStamp:90});
+    assert.equal(h.viewport.scrollLeft,450);assert.equal(h.frames.size,0);
+    assert.equal(h.emit(h.viewport,'click').prevented,false);
+    h.stop();
+});
+
+test('static strips retain desktop dragging and momentum while touch scrolling remains independent',()=>{
+    const h=fixture({moving:false});
+    h.emit(h.viewport,'pointerdown');h.emit(h.viewport,'pointermove',{clientX:-150,timeStamp:20});
+    h.emit(h.view,'pointerup',{timeStamp:21});assert.equal(h.viewport.scrollLeft,150);
+    h.tick(16);assert.ok(h.viewport.scrollLeft>150);
+    const before=h.viewport.scrollLeft;
+    h.emit(h.viewport,'pointerdown',{pointerType:'touch'});assert.equal(h.frames.size,0);
+    h.emit(h.viewport,'pointermove',{pointerType:'touch',clientX:-300,timeStamp:50});
+    assert.equal(h.viewport.scrollLeft,before);h.stop();
+});

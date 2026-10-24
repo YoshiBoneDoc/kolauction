@@ -1,7 +1,8 @@
 import { CAROUSEL_STEP_MS } from './auctionCarousel.js';
 
-// Pointer events cover mouse, touch and pen. Vertical touch scrolling remains native.
-export function attachCarouselDrag({ viewport, track, moving, reducedMotion, rotate, onElapsed }) {
+// Animated strips use pointer dragging. Static strips leave touch swipes and
+// inertia to the browser; desktop mouse/pen dragging still uses this helper.
+export function attachCarouselDrag({ viewport, track, moving, reducedMotion, rotate, onElapsed, nativeTouch = !moving }) {
     let gesture = null;
     let manual = false;
     let position = 0;
@@ -47,6 +48,13 @@ export function attachCarouselDrag({ viewport, track, moving, reducedMotion, rot
     }
     function down(event) {
         if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
+        if (nativeTouch && event.pointerType === 'touch') {
+            // Do not capture/prevent touch gestures on a native scroll container.
+            // Browser direction locking and momentum handle long/diagonal swipes.
+            gesture = null;
+            stopMomentum();
+            return;
+        }
         if (!moving && viewport.scrollWidth <= viewport.clientWidth + 1) return;
         if (gesture) return;
         suppressClickUntil = 0;
