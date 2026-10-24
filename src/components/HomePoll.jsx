@@ -104,7 +104,7 @@ export function PollPanel({ service = polls }) {
                 disabled={pending} required maxLength={1500} rows={3} placeholder="Your response…" className="w-full rounded border border-yellow-300 bg-white p-3 text-sm text-slate-800" />
             <div className="flex flex-wrap items-center gap-3">
                 <button type="submit" disabled={pending || !(drafts[item.id] || '').trim()} className="min-h-10 rounded border border-yellow-700 bg-yellow-800 px-4 py-2 text-sm font-semibold text-white hover:bg-yellow-900 disabled:opacity-60">{pending ? 'Sending…' : 'Send response'}</button>
-                <p className="text-xs text-yellow-800">Only the administrator can read your response and username.</p>
+                <p className="text-xs text-yellow-800">Only the administrator can read your response.</p>
             </div>
         </form>;
     }
