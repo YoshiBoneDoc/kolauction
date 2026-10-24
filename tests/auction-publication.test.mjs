@@ -163,23 +163,16 @@ test('preview preserves listing values and editing choices in the compact summar
 });
 
 
-test('escrow minimums above 1M cannot preview or publish until Direct is selected', async () => {
-    for (const minimum of ['1.01m', '1,000,001', '1000001']) {
+test('Escrow starting bids above 1M can preview and publish without switching settlement mode', async () => {
+    for (const minimum of ['1.01m', '1,000,001', '1000001', '10b']) {
         const writes = [];
-        const page = harness(async listing => { writes.push(listing); return 'direct-auction'; }).preview(true, { minimum });
-        assert.equal(page.button('Preview Auction').props.disabled, true);
-        assert.equal(page.find(node => node.props?.id === 'minBidMeat').props['aria-invalid'], true);
-        assert.ok(nodes(page.tree).some(node => node.props?.id === 'escrow-minimum-error'));
-        assert.ok(!nodes(page.tree).some(node => node.type === 'dialog'));
-        assert.equal(writes.length, 0);
-        page.button('Direct').props.onClick(); page.render();
-        assert.equal(page.button('Preview Auction').props.disabled, false);
+        const page = harness(async listing => { writes.push(listing); return 'escrow-auction'; }).preview(true, { minimum });
+        assert.ok(nodes(page.tree).some(node => node.type === 'dialog'));
         assert.ok(!nodes(page.tree).some(node => node.props?.id === 'escrow-minimum-error'));
-        page.preview(false, { minimum });
         page.button('Continue to Publish').props.onClick(); page.render();
         await page.button('Publish Auction').props.onClick();
         assert.equal(writes.length, 1);
-        assert.equal(writes[0].escrowMode, false);
+        assert.equal(writes[0].escrowMode, true);
         assert.ok(writes[0].minBidMeat > 1000000);
     }
 });

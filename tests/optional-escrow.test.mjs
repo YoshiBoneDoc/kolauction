@@ -428,19 +428,16 @@ test('completed escrow fees appear in seller settlement details rather than buye
 });
 
 
-test('creation rejects escrow minimums over 1M before sending a request but accepts Direct and the exact boundary', async () => {
+test('creation sends starting bids above 1M for default Escrow, explicit Escrow and Direct', async () => {
     const calls = [];
     const service = createAuctionService({ async rpc(name, args) { calls.push({ name, args }); return { data: 'created-id' }; } });
     const listing = { item: 'Test item', itemId: 1, quantity: 2500, minBidMeat: 1000001, auctionTime: 24 };
-    await assert.rejects(service.create(listing), /Choose Direct/);
-    await assert.rejects(service.create({ ...listing, escrowMode: true }), /Choose Direct/);
-    assert.equal(calls.length, 0);
+    await service.create(listing);
+    await service.create({ ...listing, escrowMode: true });
     await service.create({ ...listing, escrowMode: false });
-    await service.create({ ...listing, minBidMeat: 1000000, instantPurchasePrice: 2000000, escrowMode: true });
-    assert.equal(calls.length, 2);
-    assert.equal(calls[0].args.p_escrow_mode, false);
-    assert.equal(calls[1].args.p_min_bid_meat, 1000000);
-    assert.equal(calls[1].args.p_instant_purchase_price, 2000000);
+    await service.create({ ...listing, minBidMeat: 10000000000, escrowMode: true });
+    assert.deepEqual(calls.map(call=>call.args.p_escrow_mode),[true,true,false,true]);
+    assert.deepEqual(calls.map(call=>call.args.p_min_bid_meat),[1000001,1000001,1000001,10000000000]);
 });
 
 

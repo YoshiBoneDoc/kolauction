@@ -1,5 +1,4 @@
 import { observeAuctionServerTime, auctionClockRequestStarted } from './auctionClock.js';
-import { ESCROW_MIN_BID_LIMIT, ESCROW_MIN_BID_ERROR } from './escrowPolicy.js';
 export function mapAuction(row, bidRows) {
     const bids = bidRows.filter((bid) => bid.auction_id === row.id)
         .sort((a, b) => Number(a.amount) - Number(b.amount))
@@ -164,7 +163,6 @@ export function createAuctionService(client) {
                 if (error) throw databaseError(error);
                 return data;
             }
-            if (auction.escrowMode !== false && Number(auction.minBidMeat) > ESCROW_MIN_BID_LIMIT) throw new Error(ESCROW_MIN_BID_ERROR);
             const { data, error } = await requireClient().rpc('create_auction', {
                 p_item: auction.item,
                 p_quantity: auction.quantity,

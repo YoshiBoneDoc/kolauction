@@ -1085,3 +1085,13 @@ Skipped text polls remain minimized below results as **Answer this poll**. They 
 be answered later while the next queued poll remains available. Only active,
 unanswered text polls are offered; single-response and repeat-response rules stay
 unchanged. Skip remains exclusive to text polls. No bot rebuild required.
+
+
+### Escrow starting bids above 1M (105)
+
+Apply `202610240105_remove_escrow_starting_bid_cap.sql` after 104, then deploy the
+website. The temporary 1M starting-bid cap is removed for both preset durations
+and custom ending times. Existing price precision bounds, catalog eligibility,
+fees, deposit rules and loss-protection terms are unchanged. No bot rebuild needed.
+
+Offline check: `python3 tests/escrow_starting_bid_cap_database_test.py`.

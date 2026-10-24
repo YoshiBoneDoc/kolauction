@@ -13,7 +13,6 @@ import { parseAuctionAmount, parseMeatAmount, normalizeAuctionAmount } from '../
 import useKolIdentity from '../hooks/useKolIdentity';
 import EscrowProtection from '../components/EscrowProtection';
 import DirectTradeHelp from '../components/DirectTradeHelp';
-import { ESCROW_MIN_BID_LIMIT, ESCROW_MIN_BID_ERROR } from '../lib/escrowPolicy';
 import { auctionNow } from '../lib/auctionClock';
 import { customAuctionEnd, localDateTimeInput, formatAuctionEnd, MAX_AUCTION_DURATION_MS } from '../lib/auctionSchedule';
 
@@ -66,7 +65,6 @@ export default function AuctionAnItem() {
     const searchResults = matchingItems.slice(0, resultLimit);
     const quantityValue = parseAuctionAmount(quantity, 5000000000);
     const minimumValue = parseMeatAmount(minBidMeat);
-    const escrowLimitExceeded = !isBuy && escrowMode && minimumValue !== null && minimumValue > ESCROW_MIN_BID_LIMIT;
 
     function stepQuantity(change) {
         setQuantity((value) => {
@@ -85,7 +83,6 @@ export default function AuctionAnItem() {
         if (!item) { setError('Please select an item to auction.'); return; }
         if (count === null) { setError('Quantity must be a whole number between 1 and 5 billion.'); return; }
         if (minimum === null) { setError(isBuy ? 'Enter a valid positive price per item in Meat.' : 'Enter a valid positive minimum bid in Meat.'); return; }
-        if (!isBuy && escrowMode && minimum > ESCROW_MIN_BID_LIMIT) { setError(ESCROW_MIN_BID_ERROR); return; }
         if (!isBuy && instantPrice.trim() && (purchasePrice === null || purchasePrice < minimum)) {
             setError('Buyout price must be a valid Meat amount at least as large as the minimum bid.'); return;
         }
@@ -210,7 +207,7 @@ export default function AuctionAnItem() {
                     </fieldset>
                     <div className="mb-5">
                         {escrowMode ? <EscrowProtection forListing buy={isBuy} minimumPrice={minimumValue} /> : <DirectTradeHelp forListing />}
-                        {escrowMode && !isBuy && <p className="my-4 rounded-[6px] border-l-[3px] border-[#22C55E] bg-[#F0FDF4] px-4 py-3 text-xs leading-[1.4] text-[#334155]"><strong className="font-bold text-[#15803D]">Early Access:</strong> While kHub is in its early stages, escrow is available only for auctions with a minimum bid of 1,000,000 Meat or less. In the unlikely event of a verified loss caused by our escrow system, we guarantee reimbursement of the actual loss, up to 1,000,000 Meat per affected user.</p>}
+                        {escrowMode && !isBuy && <p className="my-4 rounded-[6px] border-l-[3px] border-[#22C55E] bg-[#F0FDF4] px-4 py-3 text-xs leading-[1.4] text-[#334155]"><strong className="font-bold text-[#15803D]">Early Access:</strong> In the unlikely event of a verified loss caused by our escrow system, we guarantee reimbursement of the actual loss, up to 1,000,000 Meat per affected user.</p>}
                         {!escrowMode && <p className="mt-2 text-xs leading-[1.4] text-red-600">Failure to honor a valid, completed auction is a violation of kHub policy and will likely get you banned. We take these very seriously.</p>}
                     </div>
                     <label htmlFor="listing-item-search" className="mb-2 block text-sm font-bold">Find an item</label>
@@ -248,8 +245,7 @@ export default function AuctionAnItem() {
                             onClick={() => stepQuantity(-1)} className="min-h-11 min-w-11 shrink-0 rounded border border-gray-400 bg-white px-3 text-gray-900 disabled:opacity-40">▼</button>
                     </div>
                     <label htmlFor="minBidMeat" className="mb-2 block text-sm font-bold">{isBuy ? 'Maximum purchase price per item (Meat):' : 'Minimum Bid (Meat, whole listing):'}</label>
-                    <input id="minBidMeat" aria-invalid={escrowLimitExceeded} aria-describedby={escrowLimitExceeded ? 'escrow-minimum-error' : undefined} type="text" inputMode="decimal" required autoComplete="off" value={minBidMeat} onChange={(event) => setMinBidMeat(event.target.value)} onBlur={() => setMinBidMeat(value => normalizeAuctionAmount(value, { meat: true }))} placeholder="e.g. 1000, 10b, 4.53m, 50k" className={fieldClass} />
-                    {escrowLimitExceeded && <p id="escrow-minimum-error" role="alert" className="mb-4 text-sm text-red-700">{ESCROW_MIN_BID_ERROR}</p>}
+                    <input id="minBidMeat" type="text" inputMode="decimal" required autoComplete="off" value={minBidMeat} onChange={(event) => setMinBidMeat(event.target.value)} onBlur={() => setMinBidMeat(value => normalizeAuctionAmount(value, { meat: true }))} placeholder="e.g. 1000, 10b, 4.53m, 50k" className={fieldClass} />
                     {!isBuy && (showBuyout ? <section id="buyout-price-fields" className="mb-4">
                         <label htmlFor="instantPurchasePrice" className="mb-2 block text-sm font-bold">Buyout Price (Meat, whole listing, optional):</label>
                         <input ref={buyoutInput} id="instantPurchasePrice" type="text" inputMode="decimal" autoComplete="off" value={instantPrice}
@@ -298,7 +294,7 @@ export default function AuctionAnItem() {
                         <p id="custom-ending-help" className="mt-2 text-xs text-gray-500">Your timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}. Choose a time within 30 days.{escrowMode && ' Deposit your items before the chosen ending time.'}</p>
                     </section>}
                     {!isBuy && <p className="-mt-2 mb-4 text-xs text-gray-500">Last-minute bids reset the countdown to 1 minute.</p>}
-                    <button type="submit" disabled={escrowLimitExceeded} className="min-h-11 w-full rounded bg-blue-600 px-4 py-3 font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">Preview Auction</button>
+                    <button type="submit" className="min-h-11 w-full rounded bg-blue-600 px-4 py-3 font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">Preview Auction</button>
                 </form>}
             </div>
         </main>
