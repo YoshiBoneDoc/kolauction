@@ -8,6 +8,7 @@ html:not([data-theme="dark"]) {
   --light-divider: #F8EEEA;
   --light-border: #E8D9D2;
   --light-input: #FFFCF9;
+  --light-completed: #EDF8EF;
   --light-escrow-header: #EDEBFF;
   --light-direct-header: #E8F4EC;
 }
@@ -22,14 +23,15 @@ html:not([data-theme="dark"]) :is(
   [class~="bg-gray-50"], [class~="bg-gray-50/50"],
   [class~="bg-gray-100"], [class~="bg-gray-200"],
   [class~="bg-slate-50"], [class~="bg-slate-100"],
-  [class~="bg-[#F8F6F4]"], [class~="bg-[#ECEDEF]"], [class~="bg-[#F7FAFF]"], [class~="bg-[#F7FBF8]"],
+  [class~="bg-[#F8F6F4]"], [class~="bg-[#F7FAFF]"], [class~="bg-[#F7FBF8]"],
   [class~="bg-blue-50"], [class~="bg-blue-50/70"]
 ):where(:not(:is(button, input, select, textarea, option, span, footer, thead, th, [role="button"], a.inline-flex, .site-page-background, .button-green, .button-red))) {
   background-color: var(--light-surface);
 }
 
-/* Auction cards share the same cream surface in every light-mode view. */
-html:not([data-theme="dark"]) .auction-card { background-color: var(--light-surface); }
+/* Only the default auction surface is cream; outcome classes keep their hues. */
+html:not([data-theme="dark"]) .auction-card[class~="bg-[#F8F6F4]"] { background-color: var(--light-surface); }
+html:not([data-theme="dark"]) .auction-card[class~="bg-green-50"] { background-color: var(--light-completed); }
 
 html:not([data-theme="dark"]) .bid-kmail-instructions { background-color: var(--light-input); }
 html:not([data-theme="dark"]) .bid-kmail-instructions .copy-message-field { background-color: #FFFFFF; }
