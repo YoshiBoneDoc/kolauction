@@ -1064,3 +1064,24 @@ response reopens that same conversation. Existing trade, appeal, withdrawal and
 evidence grouping/projections are preserved.
 
 Offline check: `python3 tests/free_text_polls_database_test.py`.
+
+
+### Multiple-choice polls and skipping text polls (102–103)
+
+Apply `202610230102_multiple_choice_polls.sql` after 101, then
+`202610230103_skip_text_polls.sql`, and deploy the website. No bot rebuild is needed.
+Multiple-choice polls support 2–8 choices, one vote per account, and results only
+once answered. Free-text polls now offer **Skip** beside **Send response**. Skips
+persist per account and advance to the next poll without creating a response,
+inbox message, or vote. They never unlock poll results or affect response totals.
+
+Offline check: `python3 tests/multiple_choice_polls_database_test.py`.
+
+
+### Reopen skipped text polls (104)
+
+Apply `202610230104_reopen_skipped_text_polls.sql` after 103 and deploy the website.
+Skipped text polls remain minimized below results as **Answer this poll**. They can
+be answered later while the next queued poll remains available. Only active,
+unanswered text polls are offered; single-response and repeat-response rules stay
+unchanged. Skip remains exclusive to text polls. No bot rebuild required.

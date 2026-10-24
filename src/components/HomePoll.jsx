@@ -26,7 +26,9 @@ export function PollPanel({ service = polls }) {
     const poll = feed?.poll;
     const isAdmin = feed?.can_manage === true || poll?.can_manage === true;
     const published = (feed?.published_results || []).filter(result => result.poll_type !== 'free_text' && (isAdmin || result.has_voted) && result.id !== poll?.id);
-    const repeatable = !isAdmin ? (feed?.repeatable_polls || []).filter(item => item.active && item.poll_type === 'free_text' && item.allow_multiple_responses) : [];
+    const repeatable = !isAdmin ? (feed?.repeatable_polls || []).filter(item => item.active && item.poll_type === 'free_text' && item.allow_multiple_responses).map(item => ({...item,has_voted:true})) : [];
+    const skipped = !isAdmin ? (feed?.skipped_polls || []).filter(item => item.active && item.poll_type === 'free_text' && !item.has_voted) : [];
+    const minimized = [...skipped, ...repeatable.filter(item => !skipped.some(other => other.id === item.id))];
     useEffect(() => {
         let cancelled = false;
         async function refresh() {
@@ -89,10 +91,23 @@ export function PollPanel({ service = polls }) {
             setNotice('Thanks! Your response was sent privately to the administrator.');
             setFeed(previous => ({...previous,
                 poll: previous.poll?.id === item.id ? {...previous.poll,has_voted:true} : previous.poll,
+                skipped_polls: (previous.skipped_polls || []).filter(p => p.id !== item.id),
                 repeatable_polls: item.allow_multiple_responses
-                    ? [...(previous.repeatable_polls || []).filter(p => p.id !== item.id),item]
+                    ? [...(previous.repeatable_polls || []).filter(p => p.id !== item.id),{...item,has_voted:true}]
                     : previous.repeatable_polls || [],
             }));
+            setFeed(await service.read());
+        } catch (failure) { setError(failure.message); }
+        finally { writing.current = false;setPending(false); }
+    }
+    async function skip(item) {
+        if (writing.current || isAdmin) return;
+        writing.current = true;generation.current += 1;setPending(true);setError('');
+        try {
+            await service.skip(item.id);
+            setFeed(previous => ({...previous,poll:previous.poll?.id === item.id ? null : previous.poll,
+                skipped_polls:[...(previous.skipped_polls || []).filter(p => p.id !== item.id),{...item,has_voted:false}]}));
+            setNotice('Poll skipped. No response was submitted.');
             setFeed(await service.read());
         } catch (failure) { setError(failure.message); }
         finally { writing.current = false;setPending(false); }
@@ -104,6 +119,7 @@ export function PollPanel({ service = polls }) {
                 disabled={pending} required maxLength={1500} rows={3} placeholder="Your response…" className="w-full rounded border border-yellow-300 bg-white p-3 text-sm text-slate-800" />
             <div className="flex flex-wrap items-center gap-3">
                 <button type="submit" disabled={pending || !(drafts[item.id] || '').trim()} className="min-h-10 rounded border border-yellow-700 bg-yellow-800 px-4 py-2 text-sm font-semibold text-white hover:bg-yellow-900 disabled:opacity-60">{pending ? 'Sending…' : 'Send response'}</button>
+                {poll?.id === item.id && !item.has_voted && <button type="button" disabled={pending} onClick={() => skip(item)} className="min-h-10 px-2 py-2 text-sm text-yellow-900 underline hover:text-yellow-700 disabled:opacity-60">Skip</button>}
                 <p className="text-xs text-yellow-800">Only the administrator can read your response.</p>
             </div>
         </form>;
@@ -116,7 +132,7 @@ export function PollPanel({ service = polls }) {
         setSelectedResult(results[(resultIndex + direction + results.length) % results.length].id);
     }
     const question = !isAdmin && poll?.active && !poll.has_voted ? poll : null;
-    if (!question && !answered.length && !published.length && !repeatable.length && !feed?.can_manage && !error && !notice) return null;
+    if (!question && !answered.length && !published.length && !minimized.length && !feed?.can_manage && !error && !notice) return null;
     return <section aria-label="Community poll" className="mx-auto mb-6 w-full max-w-6xl space-y-3">
         {question && <div className="rounded-md border border-yellow-300 bg-yellow-100 px-5 py-5 text-slate-800 sm:px-6">
             <div className="flex flex-wrap items-center justify-between gap-4">
@@ -130,7 +146,7 @@ export function PollPanel({ service = polls }) {
                 </div>}
             </div>
             {question.poll_type === 'free_text' && responseForm(question)}
-            {question.poll_type === 'multiple_choice' && <form className="mt-3 space-y-3" onSubmit={event => { event.preventDefault();if (choice?.pollId === question.id) vote(choice.index); }}>
+            {question.poll_type === 'multiple_choice' && <form className="mt-3 space-y-3" onSubmit={event => { event.preventDefault();if (choice?.pollId === question.id) return vote(choice.index); }}>
                 <fieldset disabled={pending} className="space-y-2">
                     <legend className="sr-only">Choose one answer to {question.question}</legend>
                     {(question.choices || []).map((label,index) => <label key={index} className="flex cursor-pointer items-start gap-2 text-sm leading-5">
@@ -142,15 +158,6 @@ export function PollPanel({ service = polls }) {
                 <button type="submit" disabled={pending || choice?.pollId !== question.id} className="min-h-10 rounded border border-yellow-700 bg-yellow-800 px-4 py-2 text-sm font-semibold text-white hover:bg-yellow-900 disabled:opacity-60">{pending ? 'Submitting…' : 'Submit vote'}</button>
             </form>}
         </div>}
-        {repeatable.map(item => <div key={item.id} className={repeatId === item.id ? 'rounded-md border border-yellow-300 bg-yellow-100 px-5 py-4 text-slate-800' : 'w-fit max-w-full'}>
-            <button type="button" disabled={pending} aria-label={`${repeatId === item.id ? 'Close response form' : 'Send another response'}: ${item.question}`} title={item.question}
-                aria-expanded={repeatId === item.id} onClick={() => setRepeatId(current => current === item.id ? null : item.id)}
-                className="inline-flex min-h-9 max-w-full items-center gap-2 rounded border border-yellow-200 bg-yellow-50 px-3 py-1.5 text-left text-xs text-yellow-900 hover:bg-yellow-100 disabled:opacity-60">
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-4 w-4 shrink-0"><path strokeLinecap="round" strokeLinejoin="round" d="M8 10h8m-4-4v8M5 19l-2 2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5Z" /></svg>
-                <span className="min-w-0 truncate">{repeatId === item.id ? 'Close response form' : 'Send another response'} · {item.question}</span>
-            </button>
-            {repeatId === item.id && <><h2 className="mt-3 text-lg font-semibold">{item.question}</h2>{responseForm(item)}</>}
-        </div>)}
         {notice && <p role="status" className="text-sm text-gray-600">{notice}</p>}
         {result && <article aria-label={`Results: ${result.question}`} className="max-w-sm rounded-md border border-yellow-200 bg-yellow-50 px-3 py-3 text-slate-800">
             <div className="mb-1 flex items-center justify-between gap-2">
@@ -177,6 +184,15 @@ export function PollPanel({ service = polls }) {
                 </div>}
             </div>
         </article>}
+        {minimized.map(item => <div key={item.id} className={repeatId === item.id ? 'rounded-md border border-yellow-300 bg-yellow-100 px-5 py-4 text-slate-800' : 'w-fit max-w-full'}>
+            <button type="button" disabled={pending} aria-label={`${repeatId === item.id ? 'Close response form' : item.has_voted === false ? 'Answer this poll' : 'Send another response'}: ${item.question}`} title={item.question}
+                aria-expanded={repeatId === item.id} onClick={() => setRepeatId(current => current === item.id ? null : item.id)}
+                className="inline-flex min-h-9 max-w-full items-center gap-2 rounded border border-yellow-200 bg-yellow-50 px-3 py-1.5 text-left text-xs text-yellow-900 hover:bg-yellow-100 disabled:opacity-60">
+                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-4 w-4 shrink-0"><path strokeLinecap="round" strokeLinejoin="round" d="M8 10h8m-4-4v8M5 19l-2 2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5Z" /></svg>
+                <span className="min-w-0 truncate">{repeatId === item.id ? 'Close response form' : item.has_voted === false ? 'Answer this poll' : 'Send another response'} · {item.question}</span>
+            </button>
+            {repeatId === item.id && <><h2 className="mt-3 text-lg font-semibold">{item.question}</h2>{responseForm(item)}</>}
+        </div>)}
         {feed?.can_manage && <p className="text-sm"><Link to="/admin/polls" className="text-blue-800 underline">Manage polls &amp; view past results</Link></p>}
         {error && <p role="alert" className="text-sm text-red-800">{error}{' '}<button type="button" disabled={pending} onClick={() => setAttempt(value => value + 1)} className="underline">Retry</button></p>}
     </section>;

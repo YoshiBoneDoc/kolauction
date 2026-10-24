@@ -17,7 +17,7 @@ export function auctionCardBackground(status) {
     if (status === 'completed') return 'bg-green-50';
     if (['cancelled', 'voided'].includes(status)) return 'bg-[#ECEDEF]';
     if (['awaiting_trade', 'settling'].includes(status)) return 'bg-yellow-50';
-    if (status === 'expired') return 'bg-orange-50';
+    if (['expired', 'ended_no_bids'].includes(status)) return 'bg-[#FFF0E5]';
     return 'bg-[#F8F6F4]';
 }
 

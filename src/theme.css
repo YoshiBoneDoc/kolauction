@@ -29,7 +29,7 @@ html[data-theme="dark"] [class~="bg-gray-50"],
 html[data-theme="dark"] [class~="bg-gray-50/50"] { background-color: var(--theme-panel); }
 
 html[data-theme="dark"] [class~="bg-[#ECEDEF]"] { background-color: #252b34; }
-html[data-theme="dark"] [class~="bg-orange-50"] { background-color: #38291e; }
+html[data-theme="dark"] [class~="bg-[#FFF0E5]"] { background-color: #38291e; }
 
 html[data-theme="dark"] [class~="bg-gray-100"],
 html[data-theme="dark"] [class~="bg-gray-200"],

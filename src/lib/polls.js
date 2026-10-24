@@ -10,6 +10,7 @@ export function createPollService(client) {
         list: () => call('read_admin_polls'),
         voters: id => call('read_poll_voters', { p_poll_id: id }),
         saveDraft: (question, id = null, type = 'yes_no', multiple = false, choices = []) => call('save_poll_draft', { p_question: question, p_poll_id: id, p_poll_type: type, p_allow_multiple: multiple, p_choices: choices }),
+        skip: id => call('skip_home_poll', { p_poll_id: id }),
         respond: (id, response, requestId) => call('respond_to_home_poll', { p_poll_id: id, p_response: response, p_request_id: requestId }),
         publish: (id, concludeCurrent = false) => call('publish_poll', { p_poll_id: id, p_conclude_current: concludeCurrent }),
         publishResults: (id, publish) => call('publish_poll_results', { p_poll_id: id, p_publish: publish }),

@@ -141,12 +141,65 @@ with tempfile.TemporaryDirectory(prefix='khub-choice-polls-',dir='/tmp') as fold
         assert feed(first)['repeatable_polls'][0]['id']==text
         assert 'Still private' not in json.dumps(feed(first))
         assert snapshot()['deliveries']==before['deliveries']
+        # Skips persist independently of answers and never create inbox messages.
+        sql(next(p for p in migrations if p.name=='202610230103_skip_text_polls.sql').read_text())
+        close(second_poll);close(legacy);close(text)
+        skippable=call("select public.save_poll_draft('Any other suggestions for us?',null,'free_text',true);");publish(skippable)
+        next_bool=call("select public.save_poll_draft('Should we add more options?');");publish(next_bool)
+        next_choice=call("select public.save_poll_draft('Which option would you choose?',null,'multiple_choice',false,array['One','Two']);");publish(next_choice)
+        last_text=call("select public.save_poll_draft('Anything else to tell us?',null,'free_text',false);");publish(last_text)
+        def skip(p,uid=first,error=None):return call(f"select public.skip_home_poll('{p}');",uid,error)
+        baseline=snapshot()
+        skip(skippable,admin,error='Administrators')
+        skip(next_bool,error='Only text polls')
+        skip(last_text,error='preceding')
+        sql(f"set role anon;select public.skip_home_poll('{skippable}');",error='permission denied')
+        sql('set role authenticated;select * from khub_bot.site_poll_skips;',first,error='permission denied')
+        with ThreadPoolExecutor(max_workers=2) as pool:list(pool.map(lambda _:skip(skippable),range(2)))
+        assert sql(f"select count(*) from khub_bot.site_poll_skips where poll_id='{skippable}' and voter_id='{first}';")=='1'
+        assert snapshot()==baseline
+        assert feed(first)['poll']['id']==next_bool
+        assert feed(second)['poll']['id']==skippable
+        assert not any(p['id']==skippable for p in feed(first)['answered_polls']+feed(first)['repeatable_polls'])
+        assert json.loads(sql(f"select khub_bot.poll_results('{skippable}');"))=={'total':0}
+        call(f"select public.respond_to_home_poll('{skippable}','A stale draft','{uuid4()}');",first,error='preceding')
+        call(f"select public.vote_home_poll('{next_bool}',true);",first)
+        vote(next_choice,2)
+        assert feed(first)['poll']['id']==last_text
+        call(f"select public.respond_to_home_poll('{last_text}','A real response','{uuid4()}');",first)
+        assert feed(first)['poll'] is None
+        skip(last_text) # stale Skip after a successful response is a harmless no-op
+        assert sql(f"select count(*) from khub_bot.site_poll_skips where poll_id='{last_text}';")=='0'
+        close(skippable);skip(skippable) # uncertain Skip can be safely retried after closure
+        assert sql(f"select count(*) from khub_bot.bug_reports where poll_id='{skippable}';")=='0'
+        sql(next(p for p in migrations if p.name=='202610230104_reopen_skipped_text_polls.sql').read_text())
+        optional=call("select public.save_poll_draft('Any optional feedback for us?',null,'free_text',false);");publish(optional)
+        blocker=call("select public.save_poll_draft('Should the next poll stay visible?');");publish(blocker)
+        skip(optional)
+        skipped_feed=feed(first)
+        assert skipped_feed['poll']['id']==blocker
+        assert [p['id'] for p in skipped_feed['skipped_polls']]==[optional]
+        assert 'skipped_polls' in feed(second) and feed(second)['skipped_polls']==[]
+        assert feed(admin)['skipped_polls']==[]
+        assert 'results' not in skipped_feed['skipped_polls'][0]
+        key=str(uuid4())
+        call(f"select public.respond_to_home_poll('{optional}','Changed my mind','{key}');",first)
+        call(f"select public.respond_to_home_poll('{optional}','Changed my mind','{key}');",first)
+        assert feed(first)['skipped_polls']==[]
+        assert feed(first)['poll']['id']==blocker
+        assert sql(f"select count(*) from khub_bot.bug_reports where poll_id='{optional}';")=='1'
+        assert json.loads(sql(f"select khub_bot.poll_results('{optional}');"))=={'total':1}
+        call(f"select public.respond_to_home_poll('{optional}','Another answer','{uuid4()}');",first)
+        assert sql(f"select count(*) from khub_bot.bug_reports where poll_id='{optional}';")=='1'
+        close(optional)
         # Persisted votes/results are stable across a database/worker restart.
         saved=sql("select jsonb_agg(to_jsonb(v) order by poll_id,voter_id) from khub_bot.site_poll_votes v;")
         pg('-m','fast','-w','stop');started=False
         pg('-l',str(Path(folder)/'postgres.log'),'-o',f"-F -h '' -k {folder}",'-w','start');started=True
         assert saved==sql("select jsonb_agg(to_jsonb(v) order by poll_id,voter_id) from khub_bot.site_poll_votes v;")
         assert feed(first)['published_results'][0]['results']==final
+        assert feed(first)['poll']['id']==blocker
+        assert feed(first)['skipped_polls']==[]
         print('PASS: multiple-choice drafts/validation, immutable single votes with concurrent retries, ordered mixed poll queue, private pre-vote counts and voter names, frozen archives, unchanged Yes/No and repeated text responses, zero delivery effects, restart persistence')
     finally:
         if started:pg('-m','fast','-w','stop')

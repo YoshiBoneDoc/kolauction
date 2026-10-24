@@ -363,7 +363,7 @@ test('completed card shading excludes every pending and unsuccessful outcome in 
             assert.equal(card.includes('bg-green-50'), status === 'completed', `${escrowMode}: ${status}`);
             assert.equal(card.includes('bg-[#ECEDEF]'), ['cancelled','voided'].includes(status), `${escrowMode}: ${status}`);
             assert.equal(card.includes('bg-yellow-50'), ['awaiting_trade','settling'].includes(status), `${escrowMode}: ${status}`);
-            assert.equal(card.includes('bg-orange-50'), status === 'expired', `${escrowMode}: ${status}`);
+            assert.equal(card.includes('bg-[#FFF0E5]'), ['expired', 'ended_no_bids'].includes(status), `${escrowMode}: ${status}`);
             const home = render('/', [listing]);
             const recent = home.slice(home.indexOf('aria-label="Recently completed trades"'));
             assert.equal(recent.includes('Active accessory'), status === 'completed');

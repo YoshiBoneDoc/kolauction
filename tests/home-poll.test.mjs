@@ -192,3 +192,52 @@ test('text poll service sends only the poll, response, retry ID and admin draft 
  await service.respond('poll','Suggestion','request');await service.saveDraft('Question goes here',null,'free_text',true);
  assert.deepEqual(calls,[['respond_to_home_poll',{p_poll_id:'poll',p_response:'Suggestion',p_request_id:'request'}],['save_poll_draft',{p_question:'Question goes here',p_poll_id:null,p_poll_type:'free_text',p_allow_multiple:true,p_choices:[]}]]);
 });
+
+test('Skip advances a text poll without submitting a response and prevents duplicate requests',async()=>{
+ const textPoll={...poll,poll_type:'free_text'};const calls=[];let finish;let skipped=false;
+ const service={read:async()=>feed(skipped?{...poll,id:'next',question:'The next question?'}:textPoll),skip:id=>{calls.push(id);return new Promise(resolve=>{finish=()=>{skipped=true;resolve();};});},respond:()=>assert.fail('Skip must not submit a response')};
+ const h=harness(service);await h.load();assert.ok(h.button('Skip'));
+ const first=h.button('Skip').props.onClick();await h.button('Skip').props.onClick();assert.deepEqual(calls,['poll']);
+ finish();await first;h.render();assert.match(h.html(),/The next question/);assert.match(h.html(),/No response was submitted/);assert.equal(h.button('Skip'),undefined);
+});
+
+test('failed Skip keeps the question and draft available for retry',async()=>{
+ const h=harness({read:async()=>feed({...poll,poll_type:'free_text'}),skip:async()=>{throw Error('Skip unavailable');}});await h.load();
+ nodes(h.tree).find(n=>n.type==='textarea').props.onChange({target:{value:'Keep this draft'}});h.render();
+ await h.button('Skip').props.onClick();h.render();assert.match(h.html(),/Skip unavailable/);assert.match(h.html(),/Keep this draft/);assert.ok(h.button('Skip'));
+});
+
+test('multiple-choice selection submits once and reveals results only after answering',async()=>{
+ const item={...poll,poll_type:'multiple_choice',choices:['First option','Second option']};let answered=false;const calls=[];
+ const service={read:async()=>({poll:answered?null:item,answered_polls:answered?[{...item,has_voted:true,results:{total:2,choices:[{index:1,label:'First option',count:0},{index:2,label:'Second option',count:2}]}}]:[]}),voteChoice:async(...args)=>{calls.push(args);answered=true;}};
+ const h=harness(service);await h.load();assert.equal(h.button('Yes'),undefined);assert.ok(h.button('Submit vote').props.disabled);assert.doesNotMatch(h.html(),/100%/);
+ nodes(h.tree).filter(n=>n.type==='input'&&n.props.type==='radio')[1].props.onChange();h.render();assert.deepEqual(calls,[]);assert.equal(h.button('Submit vote').props.disabled,false);
+ await nodes(h.tree).find(n=>n.type==='form').props.onSubmit({preventDefault(){}});h.render();assert.deepEqual(calls,[['poll',2]]);assert.match(h.html(),/100%/);assert.equal(h.button('Submit vote'),undefined);
+});
+
+test('admin manager validates and saves multiple-choice options',async()=>{
+ const calls=[];const h=harness({list:async()=>[],saveDraft:async(...args)=>calls.push(args)},PollManager);await h.load();
+ const byId=id=>nodes(h.tree).find(n=>n.props.id===id);
+ byId('poll-type').props.onChange({target:{value:'multiple_choice'}});h.render();
+ byId('poll-question').props.onChange({target:{value:'Which feature should we add?'}});byId('poll-choices').props.onChange({target:{value:'Duplicate\nduplicate'}});h.render();assert.ok(h.button('Save draft').props.disabled);
+ byId('poll-choices').props.onChange({target:{value:' First \n Second '}});h.render();assert.equal(h.button('Save draft').props.disabled,false);
+ await nodes(h.tree).find(n=>n.type==='form').props.onSubmit({preventDefault(){}});assert.deepEqual(calls,[['Which feature should we add?',null,'multiple_choice',false,['First','Second']]]);
+});
+
+test('choice and Skip service calls use only the target poll and chosen option',async()=>{
+ const calls=[];const service=createPollService({rpc:async(...args)=>{calls.push(args);return{data:null};}});
+ await service.voteChoice('one',2);await service.skip('text');
+ assert.deepEqual(calls,[['vote_home_poll_choice',{p_poll_id:'one',p_choice:2}],['skip_home_poll',{p_poll_id:'text'}]]);
+});
+
+test('skipped text questions stay minimized below results and can be answered without blocking the next poll',async()=>{
+ const skipped={...poll,id:'skipped',question:'Any suggestions for us?',poll_type:'free_text',allow_multiple_responses:false,has_voted:false};
+ const next={...poll,id:'next',poll_type:'multiple_choice',choices:['One','Two']};let submitted=false;const calls=[];
+ const h=harness({read:async()=>({poll:next,skipped_polls:submitted?[]:[skipped],answered_polls:[{...poll,id:'old',has_voted:true,results:{yes:1,no:0,total:1}}]}),respond:async(...args)=>{calls.push(args);submitted=true;}});
+ await h.load();assert.equal(h.button('Skip'),undefined);assert.ok(h.button('Submit vote'));assert.ok(h.button('Answer this poll: '+skipped.question));
+ assert.ok(h.html().indexOf('Answer this poll')>h.html().indexOf('Live poll results'));
+ h.button('Answer this poll: '+skipped.question).props.onClick();h.render();assert.equal(h.button('Skip'),undefined);
+ nodes(h.tree).find(n=>n.type==='textarea').props.onChange({target:{value:'Changed my mind'}});h.render();
+ await nodes(h.tree).find(n=>n.type==='form'&&nodes(n).some(child=>child.type==='textarea')).props.onSubmit({preventDefault(){}});h.render();
+ assert.equal(calls[0][0],'skipped');assert.equal(calls[0][1],'Changed my mind');assert.ok(h.button('Submit vote'));assert.equal(h.button('Answer this poll: '+skipped.question),undefined);
+});
