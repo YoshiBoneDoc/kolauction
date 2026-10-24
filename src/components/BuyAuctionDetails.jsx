@@ -13,6 +13,14 @@ import EscrowProtection from './EscrowProtection';
 import CopyMessage from './CopyMessage';
 import SellerLink from './SellerLink';
 
+const progressColors = {
+    active: ['#fde047', '#eab308'],
+    completed: ['#4ade80', '#15803d'],
+    cancelled: ['#a78bfa', '#7e22ce'],
+    expired: ['#fbbf24', '#b45309'],
+    voided: ['#f87171', '#b91c1c'],
+};
+
 export default function BuyAuctionDetails({ auction, now, backLink }) {
     const { currentUser } = useContext(UserContext);
     const { cancelAuction, reserveBuyQuantity, cancelBuyReservation } = useContext(AuctionsContext);
@@ -42,6 +50,7 @@ export default function BuyAuctionDetails({ auction, now, backLink }) {
     const purchased = auction.purchasedQuantity || 0;
     const outcomeLabel = active && !closed ? 'In Progress' : result.status === 'cancelled' ? 'Canceled early' : result.label;
     const outcomeColor = active && !closed ? 'text-yellow-700 accent-yellow-500' : { completed: 'text-green-700 accent-green-700', cancelled: 'text-purple-700 accent-purple-700', expired: 'text-amber-700 accent-amber-700', voided: 'text-red-700 accent-red-700' }[result.status] || 'text-blue-700 accent-blue-700';
+    const [progressStart, progressEnd] = progressColors[active && !closed ? 'active' : result.status] || ['#60a5fa', '#2563eb'];
     async function reserve(event) {
         event.preventDefault();
         if (pending) return;
@@ -72,9 +81,11 @@ export default function BuyAuctionDetails({ auction, now, backLink }) {
                 <p className="text-3xl font-bold">{auction.pricePerItem.toLocaleString('en-US')} Meat <span className="text-sm font-normal">per item</span></p>
                 <p>Originally requested: <strong>{auction.quantity.toLocaleString('en-US')}</strong> · Purchased: <strong>{purchased.toLocaleString('en-US')}{purchased < auction.quantity && `/${auction.quantity.toLocaleString('en-US')}`}</strong> · <span aria-label="Auction status" className={`font-semibold ${outcomeColor}`}>{outcomeLabel}</span></p>
                 {active && !closed && <p className="text-sm">Available to reserve: <strong>{available.toLocaleString('en-US')}</strong> · Reserved: <strong>{(auction.reservedQuantity || 0).toLocaleString('en-US')}</strong></p>}
-                <progress aria-label="Order fulfillment" value={purchased} max={target || 1} className={`h-3 w-full ${outcomeColor}`} />
+                <progress aria-label="Order fulfillment" value={purchased} max={target || 1}
+                    style={{ '--progress-start': progressStart, '--progress-end': progressEnd }}
+                    className={`buy-card-progress h-3 w-full ${outcomeColor}`} />
                 <p className="text-sm">{target ? Math.floor(purchased / target * 100) : 0}% filled{auction.buyClosingReason && auction.reservedQuantity > 0 && ['active', 'settling'].includes(result.status) && ' — honoring existing reservations'}{active && !closed && <> · Ends in {timeRemaining(auction.endTime, now)}</>}</p>
-                {!closed && <p className="text-sm text-gray-600">The price applies to each item. Sellers receive the full advertised price.{canViewFees && ' The buyer pays commission separately.'}</p>}
+                {!closed && <p className="text-sm text-gray-600">Any associated Escrow fees are paid by the buyer. <strong>Sellers receive the full listed price.</strong></p>}
                 {owns && canViewFees && <p className="text-sm">Delivery: {auction.deliveryMode === 'finished' ? 'When the order is fully filled, expires, or is canceled.' : 'As items are acquired.'}</p>}
             </section>
             {owns && canViewFees && result.status === 'pending_escrow' && <section aria-label="Fund buy auction" className="space-y-2 rounded border border-blue-200 bg-blue-50 p-4">

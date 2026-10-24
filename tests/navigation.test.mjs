@@ -104,9 +104,9 @@ test('update log explains completed bidder visibility and escrow-only Buy Auctio
     assert.match(html, /items have been exchanged/);
     assert.match(html, /Buy Auctions are here/);
     assert.match(html, /Escrow only/);
-    assert.match(html, /minimum bid required to raise/);
+    assert.match(html.replace(/<[^>]*>/g, ''), /minimum bid required to raise/);
     assert.match(html, /href="\/info#escrow-fees-title"[^>]*>fee table/);
-    assert.match(html, /href="\/info"[^>]*>Info page/);
+    assert.match(html, /href="\/info#buy-auctions-title"[^>]*>Info page/);
 });
 
 

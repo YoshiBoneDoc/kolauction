@@ -17,9 +17,9 @@ export function getAuctionStatus(auction, now = Date.now()) {
     if (auction.status && auction.status !== 'active') return auction.status;
     if (auction.biddingRestricted && auction.endTime > now) return 'bidding_closed';
     if (auction.endTime > now) return 'active';
-    if (auction.auctionKind === 'buy') return 'settling';
-    if (auction.escrowMode) return auction.receiptTimeBidding ? 'finalizing' : 'settling';
-    return auction.highestBidderId || auction.currentBid > 0 ? 'awaiting_trade' : 'ended_no_bids';
+    // A local countdown cannot establish the outcome: an unseen bid may extend it.
+    // Keep the last server status provisional until a fresh read confirms closure.
+    return 'finalizing';
 }
 
 export function isUnclassifiedDepositClosure(auction) {

@@ -110,7 +110,7 @@ test('escrow settlement distinguishes sold lots from item returns for every view
         for (const status of ['settling', 'active']) {
             const returning = render({ auction: { ...auction, escrowMode: true, status, currentBid: 0,
                 highestBidderId: null, winnerId: null, finalPrice: null }, userId });
-            assert.match(returning, /returning the deposited items to the seller/);
+            assert.match(returning, status === 'active' ? /Finalizing bids/ : /returning the deposited items to the seller/);
             assert.doesNotMatch(returning, /payment to the seller|both deliveries|Winner:/);
         }
         const unsold = render({ auction: { ...auction, escrowMode: true, status: 'ended_no_bids' }, userId });

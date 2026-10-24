@@ -26,7 +26,8 @@ export function browseAuctions(auctions, { search = '', status = 'active', sort 
     return auctions.filter((auction) => {
         const lifecycle = getAuctionStatus(auction, now);
         const matchesStatus = status === 'all'
-            || (status === 'ended' ? !['active', 'pending_escrow', 'on_hold', 'bidding_closed'].includes(lifecycle) : lifecycle === status);
+            || (status === 'ended' ? !['active', 'finalizing', 'pending_escrow', 'on_hold', 'bidding_closed'].includes(lifecycle)
+                : lifecycle === status || status === 'active' && lifecycle === 'finalizing');
         return matchesStatus && (kind === 'all' || (auction.auctionKind || 'sell') === kind) && (trade === 'all' || trade !== 'none' && auction.escrowMode === (trade === 'escrow')) && auction.item.toLocaleLowerCase().includes(query);
     }).sort((a, b) => {
         let comparison = 0;

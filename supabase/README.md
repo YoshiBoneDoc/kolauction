@@ -1008,3 +1008,30 @@ listings, including custom ending times. No old bids or financial records are
 rewritten. No additional bot rebuild is needed for this SQL rule.
 
 Verify locally with `python3 tests/anti_sniping_database_test.py`.
+
+### Direct Trade reminders (100)
+
+Apply `queue/202610230100_direct_trade_reminders.sql` after 099. Newly concluded
+Direct Sell auctions queue a KMail for each verified participant with the other
+player’s KoL name/ID and kHub username, item quantity, agreed whole-listing price,
+role-specific exchange instructions, confirmation instructions, and an exact UTC
+deadline 48 hours after the actual auction close. Buyouts use their early close;
+natural endings use the latest extended deadline. Existing concluded history is
+not enrolled retroactively.
+
+A second notice is due 24 hours after close if the trade remains incomplete. Both
+parties receive it while either confirmation is outstanding. The existing bot tick
+and claim path queue due notices and cancel definitely unsent stale notices after
+completion or the deadline. Delayed processing does not restart the deadline;
+a stale initial notice is replaced by the current reminder. Already sending or
+uncertain notices keep their existing recovery state and immutable message.
+
+The private `khub_bot.direct_trade_reminders` table records schedule, participant
+roles, linked delivery IDs and suppression reasons. Unique stage/role keys prevent
+duplicate mail across concurrent cycles and restarts. All messages are zero-asset
+notices through the existing durable delivery queue. Escrow and Buy settlement,
+fees, bidding, and anti-sniping are unchanged. `bot_inspect` reports
+`directTradeRemindersVersion: 1`. The current worker is compatible: **SQL only;
+no bot rebuild or website deployment required**.
+
+Offline validation: `python3 tests/direct_trade_reminders_database_test.py`.

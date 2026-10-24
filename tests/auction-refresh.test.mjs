@@ -38,12 +38,54 @@ test('final-minute Sell auctions poll every five seconds and revert after an ext
     assert.equal(auctionRefreshDelay({view: 'detail'}, [auction], now), 5000);
     assert.equal(auctionRefreshDelay(request, [{...auction, endTime: now + 75000}], now), 15000);
     assert.equal(auctionRefreshDelay(request, [{...auction, endTime: now + 120000}], now), 30000);
-    assert.equal(auctionRefreshDelay(request, [{...auction, endTime: now - 1000}], now), 5000);
+    assert.equal(auctionRefreshDelay(request, [{...auction, endTime: now - 1000}], now), 30000);
+    assert.equal(auctionRefreshDelay(request, [{...auction, endTime: now + 1200}], now), 1200);
     for (const status of ['completed', 'cancelled', 'settling', 'pending_escrow']) {
         assert.equal(auctionRefreshDelay(request, [{...auction, status}], now), 30000);
     }
     assert.equal(auctionRefreshDelay(request, [{...auction, auctionKind: 'buy'}], now), 30000);
     assert.equal(auctionRefreshDelay(request, [{...auction, biddingRestricted: true}], now), 30000);
+});
+
+test('simultaneous deadlines trigger one shared refresh and an extension restores normal timing', async () => {
+    const f = fixture();
+    let now = 100000;
+    let auctions = ['a', 'b', 'c'].map(id => ({id, status: 'active', endTime: now + 1200}));
+    let calls = 0;
+    const stop = startAuctionRefresh({...f,
+        delay: () => auctionRefreshDelay({view: 'browse'}, auctions, now),
+        refresh: async () => {
+            calls++;
+            if (calls === 2) auctions = auctions.map(a => ({...a, endTime: now + 120000}));
+        },
+    });
+    await f.tick();
+    assert.equal([...f.queue.values()][0].ms, 1200);
+    now += 1200;
+    await f.tick();
+    assert.equal(calls, 2);
+    assert.equal(f.queue.size, 1);
+    assert.equal([...f.queue.values()][0].ms, 30000);
+    stop();
+});
+
+test('focus does not duplicate visibility refreshes and leaving during a read cannot restart polling', async () => {
+    const f = fixture(true);
+    let calls = 0;
+    let finish;
+    const stop = startAuctionRefresh({...f, delay: 5000,
+        refresh: () => { calls++; return new Promise(resolve => { finish = resolve; }); },
+    });
+    f.document.hidden = false;
+    f.document.dispatchEvent(new Event('visibilitychange'));
+    f.window.dispatchEvent(new Event('focus'));
+    assert.equal(calls, 1);
+    stop();
+    finish();
+    await Promise.resolve();
+    assert.equal(f.queue.size, 0);
+    f.document.dispatchEvent(new Event('visibilitychange'));
+    assert.equal(calls, 1);
 });
 
 test('polling recalculates its delay after each response without starting overlapping loops', async () => {

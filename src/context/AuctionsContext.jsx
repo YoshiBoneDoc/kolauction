@@ -5,6 +5,7 @@ import { supabase } from "../lib/supabase";
 import { createAuctionService } from "../lib/auctions";
 import { UserContext } from "./UserContext";
 import { auctionReadRequest, auctionRefreshDelay, startAuctionRefresh } from '../lib/auctionRefresh';
+import { auctionNow } from '../lib/auctionClock';
 
 export const AuctionsContext = createContext();
 const storage = createAuctionService(supabase);
@@ -71,8 +72,8 @@ export const AuctionsProvider = ({ children }) => {
         if (!request || (request.view === 'profile' && !currentUser?.id)) return;
         const stop = startAuctionRefresh({
             refresh: refreshAuctions,
-            delay: () => auctionRefreshDelay(request, pollingSnapshot.current?.key === key ? pollingSnapshot.current.auctions : []),
-            document, window,
+            delay: () => auctionRefreshDelay(request, pollingSnapshot.current?.key === key ? pollingSnapshot.current.auctions : [], auctionNow()),
+            document,
             initialDelay: ['browse', 'seller'].includes(request.view) && request.search ? 250 : 0,
         });
         return () => {

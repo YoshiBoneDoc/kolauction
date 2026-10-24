@@ -55,7 +55,7 @@ const auctions = [
     { ...base, id: 'active', item: 'Active accessory' },
     { ...base, id: 'complete', item: 'Completed accessory', status: 'completed', finalPrice: 200, winnerId: 'buyer', winner: 'Buyer' },
     { ...base, id: 'pending', item: 'Pending accessory', status: 'awaiting_trade' },
-    { ...base, id: 'expired', item: 'Expired accessory', endTime: Date.now() - 1000, bids: Array(10).fill({bidder: 'Buyer', amount: 200, timestamp: Date.now() - 10000}) },
+    { ...base, id: 'expired', item: 'Expired accessory', status: 'ended_no_bids', endTime: Date.now() - 1000, bids: Array(10).fill({bidder: 'Buyer', amount: 200, timestamp: Date.now() - 10000}) },
 ];
 
 test('auction details render server-authorized bidder names without replacing them with aliases', () => {
@@ -395,16 +395,16 @@ test('receipt-time closing auctions show only a brief finalizing status and no p
 });
 
 
-test('ownership action labels cycle from My Auctions to Others to View All and filter the right sellers', () => {
+test('ownership button labels describe the current view and filter the right sellers', () => {
     const listings=[{...auctions[0],id:'mine',item:'Own listing',sellerId:'viewer'},{...auctions[0],id:'other',item:'Other listing',sellerId:'someone'}];
     const all=render('/auctions',listings,{id:'viewer'});
-    assert.match(all,/>My Auctions<\/button>/);assert.match(all,/Own listing/);assert.match(all,/Other listing/);
+    assert.match(all,/aria-label="Auction ownership: View All"/);assert.match(all,/Own listing/);assert.match(all,/Other listing/);
     const mine=render('/auctions?mine=1',listings,{id:'viewer'});
-    assert.match(mine,/>Others<\/button>/);assert.match(mine,/Own listing/);assert.doesNotMatch(mine,/Other listing/);
+    assert.match(mine,/aria-label="Auction ownership: My Auctions"/);assert.match(mine,/Own listing/);assert.doesNotMatch(mine,/Other listing/);
     const others=render('/auctions?mine=others',listings,{id:'viewer'});
-    assert.match(others,/>View All<\/button>/);assert.match(others,/Other listing/);assert.doesNotMatch(others,/Own listing/);
+    assert.match(others,/aria-label="Auction ownership: Others"/);assert.match(others,/Other listing/);assert.doesNotMatch(others,/Own listing/);
     const guest=render('/auctions?mine=others',listings);
-    assert.doesNotMatch(guest,/>My Auctions<\/button>|>Others<\/button>|>View All<\/button>/);
+    assert.doesNotMatch(guest,/aria-label="Auction ownership:/);
     assert.match(guest,/Own listing/);assert.match(guest,/Other listing/);
 });
 

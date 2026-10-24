@@ -5,14 +5,17 @@ import { getAuctionStatus, getAuctionResult } from '../src/lib/auctionLifecycle.
 const now = 10000;
 const auction = { endTime: now + 1, status: 'active', currentBid: 100, highestBidderId: 'buyer', highestBidder: 'Buyer' };
 
-test('deadline transitions to awaiting trade, including the exact boundary', () => {
+test('deadline waits for server verification, including the exact boundary and an extension', () => {
     assert.equal(getAuctionStatus(auction, now), 'active');
-    assert.equal(getAuctionStatus(auction, now + 1), 'awaiting_trade');
+    assert.equal(getAuctionStatus(auction, now + 1), 'finalizing');
+    assert.equal(getAuctionResult(auction, now + 1).hasWinner, false);
+    assert.equal(getAuctionStatus({...auction, endTime: now + 60000}, now + 1), 'active');
+    assert.equal(getAuctionStatus({...auction, status: 'awaiting_trade'}, now + 1), 'awaiting_trade');
 });
 
 test('expired listing without a bid has no winning price', () => {
     const result = getAuctionResult({ ...auction, highestBidderId: null, currentBid: 0 }, now + 1);
-    assert.equal(result.status, 'ended_no_bids');
+    assert.equal(result.status, 'finalizing');
     assert.equal(result.winnerId, null);
     assert.equal(result.finalPrice, null);
 });
@@ -41,7 +44,7 @@ test('receipt-time escrow shows finalizing without naming a winner until the dat
     const pending=getAuctionResult(auction,1001);
     assert.equal(pending.status,'finalizing');assert.equal(pending.hasWinner,false);assert.equal(pending.winnerId,null);
     assert.equal(getAuctionResult({...auction,status:'settling',winnerId:'leader',hasWinner:true,finalPrice:500},1001).hasWinner,true);
-    assert.equal(getAuctionResult({...auction,escrowMode:false},1001).status,'awaiting_trade');
+    assert.equal(getAuctionResult({...auction,escrowMode:false},1001).status,'finalizing');
 });
 
 test('missed deposit deadlines, explicit cancellations and ambiguous older closures have distinct labels', () => {

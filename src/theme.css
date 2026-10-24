@@ -46,8 +46,10 @@ html[data-theme="dark"] [class~="bg-[#F7FAFF]"],
 html[data-theme="dark"] [class~="bg-[#EAF2FF]"] { background-color: #172e4d; }
 
 html[data-theme="dark"] [class~="bg-[#E0F2F3]"] { background-color: #12343a; }
+html[data-theme="dark"] [class~="bg-[#F0F9F9]"] { background-color: #152e35; }
 
 html[data-theme="dark"] [class~="bg-red-50"],
+html[data-theme="dark"] [class~="bg-red-100"],
 html[data-theme="dark"] [class~="bg-red-50/60"] { background-color: #3d202b; }
 
 html[data-theme="dark"] [class~="bg-amber-50"],
@@ -55,6 +57,7 @@ html[data-theme="dark"] [class~="bg-yellow-50"],
 html[data-theme="dark"] [class~="bg-yellow-100"] { background-color: #372d17; }
 
 html[data-theme="dark"] [class~="bg-violet-100"] { background-color: #30234c; }
+html[data-theme="dark"] [class~="bg-violet-50"] { background-color: #261f3a; }
 
 html[data-theme="dark"] [class~="bg-blue-500"] { background-color: #2563eb; }
 
@@ -126,7 +129,8 @@ html[data-theme="dark"] [class~="text-amber-950"] { color: #fcd34d; }
 html[data-theme="dark"] [class~="text-purple-700"],
 html[data-theme="dark"] [class~="text-violet-600"] { color: #d8b4fe; }
 
-html[data-theme="dark"] [class~="text-[#238B95]"] { color: #67e8f9; }
+html[data-theme="dark"] [class~="text-[#238B95]"],
+html[data-theme="dark"] [class~="text-[#1F7480]"] { color: #67e8f9; }
 
 html[data-theme="dark"] [class~="border-gray-100"],
 html[data-theme="dark"] [class~="border-gray-200"],
@@ -195,6 +199,9 @@ html[data-theme="dark"] [class~="hover:bg-gray-50"]:hover { background-color: va
 html[data-theme="dark"] [class~="hover:bg-gray-100"]:hover { background-color: var(--theme-hover); }
 
 html[data-theme="dark"] [class~="hover:bg-blue-50"]:hover { background-color: #243f63; }
+html[data-theme="dark"] [class~="hover:bg-blue-100"]:hover { background-color: #243f63; }
+html[data-theme="dark"] [class~="hover:bg-violet-100"]:hover { background-color: #30234c; }
+html[data-theme="dark"] [class~="hover:bg-[#E0F2F3]"]:hover { background-color: #16414a; }
 
 html[data-theme="dark"] [class~="hover:bg-yellow-50"]:hover { background-color: #493b1b; }
 
@@ -233,6 +240,9 @@ html[data-theme="dark"] input:-webkit-autofill {
 }
 
 html[data-theme="dark"] [class~="hover:bg-blue-600"]:hover { background-color: #2563eb; }
+html[data-theme="dark"] [class~="hover:bg-green-200"]:hover { background-color: #1b4532; }
+html[data-theme="dark"] [class~="hover:bg-red-200"]:hover { background-color: #522936; }
+html[data-theme="dark"] [class~="hover:bg-violet-200"]:hover { background-color: #423160; }
 html[data-theme="dark"] [class~="hover:bg-blue-700"]:hover { background-color: #1d4ed8; }
 html[data-theme="dark"] [class~="hover:bg-blue-800"]:hover { background-color: #1e40af; }
 html[data-theme="dark"] [class~="hover:bg-blue-900"]:hover { background-color: #1e3a8a; }

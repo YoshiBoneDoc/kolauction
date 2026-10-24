@@ -8,7 +8,7 @@ const base = { item: 'Mr. Accessory', status: 'active', createdAt: 100, endTime:
 const listings = [
     { ...base, id: 'a', endTime: 12000, createdAt: 200, minBidMeat: 300 },
     { ...base, id: 'b', item: 'tiny plastic sword', currentBid: 200, createdAt: 300, bids: [{}] },
-    { ...base, id: 'expired', endTime: now, bids: Array(20).fill({}) },
+    { ...base, id: 'expired', status: 'ended_no_bids', endTime: now, bids: Array(20).fill({}) },
     { ...base, id: 'pending', status: 'awaiting_trade', highestBidderId: 'buyer', currentBid: 500 },
     { ...base, id: 'complete', status: 'completed', finalPrice: 50, currentBid: 500 },
     { ...base, id: 'cancel', status: 'cancelled' },
@@ -34,10 +34,11 @@ test('sorts by deadline, creation time, and actual current or starting price wit
     assert.deepEqual(ids(listings), original);
 });
 
-test('homepage excludes expired and terminal listings regardless of popularity, including deadline transitions', () => {
+test('homepage excludes confirmed terminal listings but keeps unverified deadlines pending a shared refresh', () => {
     assert.deepEqual(ids(popularActiveAuctions(listings, now)), ['b', 'a']);
-    assert.deepEqual(ids(popularActiveAuctions(listings, 12000)), ['b']);
-    assert.deepEqual(ids(popularActiveAuctions(listings, 20000)), []);
+    assert.deepEqual(ids(popularActiveAuctions(listings, 12000)), ['b', 'a']);
+    assert.deepEqual(ids(popularActiveAuctions(listings, 20000)), ['b', 'a']);
+    assert.deepEqual(ids(browseAuctions([listings[0]], {now: 12000, status: 'ended'})), []);
 });
 
 test('amount parsing preserves supported shorthand and rejects invalid or excessive bids instead of changing them', () => {

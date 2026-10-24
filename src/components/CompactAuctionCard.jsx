@@ -29,7 +29,7 @@ export default function CompactAuctionCard({ auction, now, expanded = false, onT
     const showForm = expanded && canBid;
     const itemLabel = `${auction.item} ×${auction.quantity.toLocaleString('en-US')}`;
 
-    if (auction.auctionKind === 'buy') return <BuyAuctionCard auction={auction} now={now} />;
+    if (auction.auctionKind === 'buy') return <BuyAuctionCard auction={auction} now={now} inlineReserve expanded={expanded} onToggleReserve={onToggleBid} />;
     return <article className={`relative isolate grid h-[134px] min-w-0 self-start grid-cols-[60px_minmax(0,1fr)] grid-rows-[32px_44px_44px] gap-x-3 overflow-hidden rounded-lg border border-gray-200 ${result.status === 'completed' ? 'bg-green-50' : 'bg-[#F8F6F4]'} px-3 py-1.5 shadow-sm transition-shadow hover:border-gray-300 hover:shadow-md [&_button]:relative [&_button]:z-10 [&_input]:relative [&_input]:z-10 [&_label]:relative [&_label]:z-10`}>
         <header className="col-span-2 flex min-h-0 items-start justify-between gap-3">
             <Link to={`/auction/${auction.id}`} state={linkState} title={itemLabel}

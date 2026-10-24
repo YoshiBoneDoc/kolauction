@@ -113,7 +113,7 @@ test('closed Buy orders show the actual outcome and concise sales without claimi
  const pending=harness({...order,status:'settling',buyClosingReason:'deadline',fulfillments:[{...fill,payment_sent:false}]}).html();
  assert.match(pending,/Sold 15 items · 1,500 Meat payment queued/);assert.doesNotMatch(pending,/Meat received/);
  const live=harness({...order,fulfillments:[fill]}).html();
- assert.match(live,/The price applies to each item/);assert.match(live,/15 items × 100 Meat \/ item · 1,500 Meat paid/);
+ assert.match(live,/Any associated Escrow fees are paid by the buyer/);assert.match(live,/<strong>Sellers receive the full listed price\.<\/strong>/);assert.match(live,/15 items × 100 Meat \/ item · 1,500 Meat paid/);
 });
 
 

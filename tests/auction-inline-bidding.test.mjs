@@ -274,24 +274,26 @@ test('ownership button cycles mine, others and all, preserves other filters, res
         user = { id: 'seller' }; listings[1].sellerId = 'another-seller';
         params = new URLSearchParams('q=Item&status=active&sort=price-desc&page=3');
         const h = harness(AllAuctions);
-        const button = () => h.find(node => node.type === 'button' && ['My Auctions','Others','View All'].includes(node.props.children));
+        const button = () => h.find(node => node.type === 'button' && node.props['aria-label']?.startsWith('Auction ownership:'));
         assert.equal(button().props['aria-pressed'], false);
-        const fixedSize=()=>{assert.match(button().props.className,/h-9 w-32 shrink-0/);};fixedSize();
+        assert.equal(button().props['aria-label'],'Auction ownership: View All');
+        const fixedSize=()=>{assert.match(button().props.className,/h-9 w-36 shrink-0/);};fixedSize();
         button().props.onClick(); h.render();
         fixedSize();assert.equal(params.get('mine'), '1'); assert.equal(params.has('page'), false);
         assert.equal(params.get('q'), 'Item'); assert.equal(params.get('status'), 'active'); assert.equal(params.get('sort'), 'price-desc');
         assert.equal(button().props['aria-pressed'], true);
+        assert.equal(button().props['aria-label'],'Auction ownership: My Auctions');
         assert.deepEqual(nodes(h.tree).filter(node => node.type === CompactAuctionCard).map(node => node.props.auction.id), ['first']);
         button().props.onClick(); h.render();
         fixedSize();assert.equal(params.get('mine'), 'others');
-        assert.equal(button().props.children,'View All');
+        assert.equal(button().props['aria-label'],'Auction ownership: Others');
         assert.deepEqual(nodes(h.tree).filter(node => node.type === CompactAuctionCard).map(node => node.props.auction.id),['second']);
         button().props.onClick(); h.render();
         assert.equal(params.has('mine'), false);
-        fixedSize();assert.equal(button().props.children,'My Auctions');
+        fixedSize();assert.equal(button().props['aria-label'],'Auction ownership: View All');
         assert.equal(nodes(h.tree).filter(node => node.type === CompactAuctionCard).length, 2);
         user = null; h.render();
-        assert.equal(nodes(h.tree).some(node => node.type === 'button' && node.props.children === 'My Auctions'), false);
+        assert.equal(nodes(h.tree).some(node => node.type === 'button' && node.props['aria-label']?.startsWith('Auction ownership:')), false);
     } finally { user = previousUser; listings[1].sellerId = previousOwner; params = new URLSearchParams(); }
 });
 
@@ -306,12 +308,46 @@ test('browse toolbar keeps one sort active, toggles directions, combines methods
     click('Most Bids ▴'); assert.equal(params.get('sort'), 'bids-asc');
     click('Price ▴▾'); assert.equal(params.get('sort'), 'price-desc');
     click('Price ▴'); assert.equal(params.get('sort'), 'price-asc');
-    assert.equal(nodes(h.tree).filter(n => n.type === 'button' && n.props['aria-pressed'] === true && !['My Auctions','Others','View All','Escrow','Direct'].includes(n.props.children)).length, 1);
+    assert.equal(nodes(h.tree).filter(n => n.type === 'button' && n.props['aria-pressed'] === true && !n.props['aria-label']?.startsWith('Auction ') && !['Escrow','Direct'].includes(n.props.children)).length, 1);
     const methods = () => nodes(h.tree).filter(n => n.type === 'button' && ['Escrow', 'Direct'].includes(n.props.children));
+    assert.match(methods()[0].props.className,/bg-violet-50/);
+    assert.match(methods()[1].props.className,/bg-\[#F0F9F9\]/);
     methods()[1].props.onClick(); h.render(); assert.equal(params.get('trade'), 'escrow');
     methods()[0].props.onClick(); h.render(); assert.equal(params.get('trade'), 'none');
     methods()[1].props.onClick(); h.render(); assert.equal(params.get('trade'), 'direct');
     methods()[0].props.onClick(); h.render(); assert.equal(params.has('trade'), false);
     assert.equal(params.get('q'), 'fixture'); assert.equal(params.get('status'), 'all'); assert.equal(params.get('mine'), '1');
     click('Reset filters'); assert.equal(params.toString(), '');
+});
+
+test('auction type button cycles the current Buy & Sell, Sell and Buy views without disturbing other filters', () => {
+    const previousKind=listings[1].auctionKind;
+    const previousUser=user;
+    try {
+        user={id:'viewer'};listings[1].auctionKind='buy';
+        params=new URLSearchParams('q=Item&status=active&sort=price-desc&mine=others&page=3');
+        const h=harness(AllAuctions);
+        const button=()=>h.find(n=>n.type==='button'&&n.props['aria-label']?.startsWith('Auction type:'));
+        const cards=()=>nodes(h.tree).filter(n=>n.type===CompactAuctionCard).map(n=>n.props.auction.id);
+        assert.equal(button().props['aria-label'],'Auction type: Buy & Sell');
+        assert.match(button().props.className,/bg-blue-50/);
+        assert.deepEqual(new Set(cards()),new Set(['first','second']));
+        button().props.onClick();h.render();
+        assert.equal(params.get('kind'),'sell');assert.equal(params.has('page'),false);
+        assert.equal(button().props['aria-label'],'Auction type: Sell');assert.deepEqual(cards(),['first']);
+        assert.match(button().props.className,/bg-green-100/);
+        button().props.onClick();h.render();
+        assert.equal(params.get('kind'),'buy');assert.equal(button().props['aria-label'],'Auction type: Buy');
+        assert.match(button().props.className,/bg-red-100/);
+        assert.deepEqual(cards(),['second']);
+        button().props.onClick();h.render();
+        assert.equal(params.has('kind'),false);assert.equal(button().props['aria-label'],'Auction type: Buy & Sell');
+        assert.equal(params.get('q'),'Item');assert.equal(params.get('status'),'active');
+        assert.equal(params.get('sort'),'price-desc');assert.equal(params.get('mine'),'others');
+        assert.match(button().props.className,/h-9 w-32 shrink-0/);
+        params=new URLSearchParams('kind=buy');h.render();assert.equal(button().props['aria-label'],'Auction type: Buy');
+    } finally {
+        if(previousKind===undefined)delete listings[1].auctionKind;else listings[1].auctionKind=previousKind;
+        user=previousUser;params=new URLSearchParams();
+    }
 });

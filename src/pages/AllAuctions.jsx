@@ -20,10 +20,19 @@ export default function AllAuctions() {
     const mineOnly = Boolean(currentUser && params.get('mine') === '1');
     const othersOnly = Boolean(currentUser && params.get('mine') === 'others');
     const ownershipFiltered = mineOnly || othersOnly;
-    const ownershipAction = mineOnly ? 'Others' : othersOnly ? 'View All' : 'My Auctions';
+    const ownershipLabel = mineOnly ? 'My Auctions' : othersOnly ? 'Others' : 'View All';
     const status = auctionFilters.some(([value]) => value === params.get('status')) ? params.get('status') : 'active';
     const sort = auctionSorts.some(([value]) => value === params.get('sort')) ? params.get('sort') : 'ending';
     const kind = ['buy', 'sell'].includes(params.get('kind')) ? params.get('kind') : 'all';
+    const kindLabel = kind === 'all' ? 'Buy & Sell' : kind === 'sell' ? 'Sell' : 'Buy';
+    const kindColors = {
+        all: 'border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100',
+        sell: 'border-[#22C55E] bg-green-100 text-green-800 hover:bg-green-200',
+        buy: 'border-red-300 bg-red-100 text-red-800 hover:bg-red-200',
+    }[kind];
+    const cycleIcon = <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-3.5 w-3.5 shrink-0 opacity-70">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 3M18 17a7 7 0 0 1-12 1l-2-3" />
+    </svg>;
     const trade = ['escrow', 'direct', 'none'].includes(params.get('trade')) ? params.get('trade') : 'all';
     const page = Math.min(1000000, Math.max(1, Number.parseInt(params.get('page'), 10) || 1));
     const visible = useMemo(() => browseAuctions(ownershipFiltered ? auctions.filter(auction => mineOnly ? auction.sellerId === currentUser.id : auction.sellerId !== currentUser.id) : auctions, { search, status, sort, trade, kind, now }), [auctions, mineOnly, ownershipFiltered, currentUser?.id, search, status, sort, trade, kind, now]);
@@ -80,7 +89,9 @@ export default function AllAuctions() {
                             {['escrow', 'direct'].map(method => {
                                 const selected = trade === 'all' || trade === method;
                                 const colors = selected
-                                    ? 'border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100'
+                                    ? method === 'escrow'
+                                        ? 'border-violet-200 bg-violet-50 text-violet-600 hover:bg-violet-100'
+                                        : 'border-[#A5DADD] bg-[#F0F9F9] text-[#1F7480] hover:bg-[#E0F2F3]'
                                     : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50';
                                 return <button key={method} type="button" aria-pressed={selected}
                                     onClick={() => update('trade', trade === 'all' ? (method === 'escrow' ? 'direct' : 'escrow') : trade === method ? 'none' : trade === 'none' ? method : '')}
@@ -89,19 +100,23 @@ export default function AllAuctions() {
                                 </button>;
                             })}
                         </div>
-                        <div>
-                            <label htmlFor="auction-kind" className="sr-only">Buy or sell auctions</label>
-                            <select id="auction-kind" value={kind} onChange={event => update('kind', event.target.value === 'all' ? '' : event.target.value)} className="h-9 rounded border border-gray-400 bg-white px-2 text-sm text-gray-900"><option value="all">Buy &amp; Sell</option><option value="sell">Sell Auctions</option><option value="buy">Buy Auctions</option></select>
-                        </div>
+                        <button type="button" aria-label={`Auction type: ${kindLabel}`} aria-pressed={kind !== 'all'}
+                            onClick={() => update('kind', kind === 'all' ? 'sell' : kind === 'sell' ? 'buy' : '')}
+                            title={`Showing ${kindLabel}. Click to show ${kind === 'all' ? 'Sell' : kind === 'sell' ? 'Buy' : 'Buy & Sell'} auctions.`}
+                            className={`inline-flex h-9 w-32 shrink-0 items-center gap-2 whitespace-nowrap rounded border px-3 text-sm font-semibold transition-colors ${kindColors}`}>
+                            <span className="flex-1 text-center">{kindLabel}</span>{cycleIcon}
+                        </button>
                         <div>
                             <label htmlFor="auction-status" className="sr-only">Auction status</label>
                             <select id="auction-status" value={status} onChange={event => update('status', event.target.value)} className="h-9 rounded border border-gray-400 bg-white px-2 text-sm text-gray-900">
                                 {auctionFilters.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                             </select>
                         </div>
-                        {currentUser && <button type="button" aria-pressed={ownershipFiltered} onClick={() => update('mine', mineOnly ? 'others' : othersOnly ? '' : '1')}
+                        {currentUser && <button type="button" aria-label={`Auction ownership: ${ownershipLabel}`} aria-pressed={ownershipFiltered} onClick={() => update('mine', mineOnly ? 'others' : othersOnly ? '' : '1')}
                             title={mineOnly ? 'Show auctions from other sellers' : othersOnly ? 'Show all auctions' : 'Show only your listings'}
-                            className={`h-9 w-32 shrink-0 whitespace-nowrap rounded border border-blue-700 px-3 text-sm font-semibold transition-colors ${ownershipFiltered ? 'bg-blue-700 text-white hover:bg-blue-100 hover:text-blue-800' : 'bg-white text-blue-700 hover:bg-blue-50'}`}>{ownershipAction}</button>}
+                            className={`inline-flex h-9 w-36 shrink-0 items-center gap-2 whitespace-nowrap rounded border border-blue-700 px-3 text-sm font-semibold transition-colors ${ownershipFiltered ? 'bg-blue-700 text-white hover:bg-blue-100 hover:text-blue-800' : 'bg-white text-blue-700 hover:bg-blue-50'}`}>
+                            <span className="flex-1 text-center">{ownershipLabel}</span>{cycleIcon}
+                        </button>}
                     </div>
                 </section>
                 {isLoading ? <p role="status">Loading auctions…</p> : <>

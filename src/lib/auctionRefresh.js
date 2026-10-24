@@ -24,19 +24,21 @@ export function auctionReadRequest(pathname, search = '', viewerId = null) {
 export function auctionRefreshDelay(request, auctions = [], now = Date.now()) {
     let delay = request?.view === 'detail' ? 10000 : 30000;
     for (const auction of auctions) {
-        if (auction.status !== 'active' || auction.auctionKind === 'buy' || auction.biddingRestricted) continue;
+        if (auction.status !== 'active') continue;
         const remaining = auction.endTime - now;
-        if (!Number.isFinite(remaining)) continue;
-        // Keep checking just-ended listings until the server finalizes or extends them.
-        if (remaining <= 60000) return 5000;
-        // Wake at the final-minute boundary rather than waiting a full normal interval.
-        delay = Math.min(delay, remaining - 60000);
+        if (!Number.isFinite(remaining) || remaining <= 0) continue;
+        // One page-level read at the next deadline, even with simultaneous expirations.
+        delay = Math.min(delay, remaining);
+        if (auction.auctionKind === 'buy' || auction.biddingRestricted) continue;
+        if (remaining <= 60000) delay = Math.min(delay, 5000);
+        // Wake at the final-minute boundary without introducing a second timer.
+        else delay = Math.min(delay, remaining - 60000);
     }
     return delay;
 }
 
 // Schedule after each read finishes, avoiding overlapping polling requests.
-export function startAuctionRefresh({ refresh, delay, document, window, timers = globalThis, initialDelay = 0 }) {
+export function startAuctionRefresh({ refresh, delay, document, timers = globalThis, initialDelay = 0 }) {
     let stopped = false;
     let running = false;
     let timer;
@@ -55,12 +57,10 @@ export function startAuctionRefresh({ refresh, delay, document, window, timers =
         if (!document.hidden) update();
     }
     document.addEventListener('visibilitychange', visibility);
-    window.addEventListener('focus', visibility);
     if (!document.hidden) timer = timers.setTimeout(update, initialDelay);
     return () => {
         stopped = true;
         timers.clearTimeout(timer);
         document.removeEventListener('visibilitychange', visibility);
-        window.removeEventListener('focus', visibility);
     };
 }
