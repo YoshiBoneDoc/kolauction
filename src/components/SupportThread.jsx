@@ -117,7 +117,7 @@ export default function SupportThread({ thread, expanded, onToggle, pending, onC
         </span>}
         <span className={auction ? 'grid min-w-0 flex-1 gap-2 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)] md:items-stretch md:gap-4' : 'block min-w-0 flex-1'}>
             <span className="min-w-0">
-                <span className={`block ${isAppeal ? 'truncate' : 'break-words'} text-sm font-semibold text-gray-900`}>{auction ? `${auction.quantity.toLocaleString('en-US')} × ${auction.item}` : first.reporter_username}</span>
+                <span className={`block ${isAppeal ? 'truncate' : 'break-words'} text-sm font-semibold text-gray-900`}>{auction ? `${auction.quantity.toLocaleString('en-US')} × ${auction.item}` : thread.poll ? `Poll: ${thread.poll.question}` : first.reporter_username}</span>
                 <span className={`mt-1 block text-xs text-gray-500 ${isAppeal ? 'truncate' : ''}`}>{auction ? `Auction #${auction.number || auction.id}` : first.reference} · {state} · {messageCount} {messageCount === 1 ? 'message' : 'messages'}</span>
                 {withdrawals.length > 0 && <span className="mt-1 block text-xs font-semibold text-green-700">{withdrawals.length === 1 ? 'Report withdrawn' : `${withdrawals.length} reports withdrawn`}</span>}
                 {!auction && <span className="mt-1 block truncate text-sm text-gray-600">{first.body}</span>}
@@ -173,7 +173,7 @@ export default function SupportThread({ thread, expanded, onToggle, pending, onC
                 </div>
             </section> : <section key={message.id} className={`space-y-2 ${isAppeal ? 'py-2' : 'py-4'} first:pt-0 last:pb-0`}>
                 <div className="flex flex-wrap items-baseline justify-between gap-1 text-xs text-gray-500">
-                    <p><strong className="font-medium text-gray-800">{message.reporter_username}</strong>{message.reporter_role && ` · ${message.reporter_role}`} · {message.message_type === 'trade_rating' ? `Reported Incomplete about ${message.target_username || 'the other player'}` : message.message_type === 'trade_query' ? 'Trade query' : supportCategories.find(([value]) => value === message.category)?.[1]} · {message.reference}{message.status === 'resolved' && ` · ${message.resolution_kind === 'participant_resolved' ? 'Withdrawn' : 'Resolved'}`}</p>
+                    <p><strong className="font-medium text-gray-800">{message.reporter_username}</strong>{message.reporter_role && ` · ${message.reporter_role}`} · {message.message_type === 'trade_rating' ? `Reported Incomplete about ${message.target_username || 'the other player'}` : message.message_type === 'trade_query' ? 'Trade query' : message.message_type === 'poll_response' ? 'Poll response' : supportCategories.find(([value]) => value === message.category)?.[1]} · {message.reference}{message.status === 'resolved' && ` · ${message.resolution_kind === 'participant_resolved' ? 'Withdrawn' : 'Resolved'}`}</p>
                     <time dateTime={message.created_at} className="whitespace-nowrap">{formatSupportTimestamp(message.created_at)}</time>
                 </div>
                 <p className={`whitespace-pre-wrap break-words text-sm ${isAppeal ? 'leading-5' : 'leading-6'} text-gray-800`}>{message.body}</p>

@@ -207,6 +207,7 @@ html[data-theme="dark"] [class~="hover:bg-violet-100"]:hover { background-color:
 html[data-theme="dark"] [class~="hover:bg-[#E0F2F3]"]:hover { background-color: #16414a; }
 
 html[data-theme="dark"] [class~="hover:bg-yellow-50"]:hover { background-color: #493b1b; }
+html[data-theme="dark"] [class~="hover:bg-yellow-100"]:hover { background-color: #493b1b; }
 
 html[data-theme="dark"] [class~="hover:!bg-green-50"]:hover { background-color: #184b34 !important; }
 

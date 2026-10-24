@@ -2,8 +2,8 @@ import { getAuctionStatus } from './auctionLifecycle.js';
 
 export const auctionFilters = [
     ['active', 'Active'],
-    ['ended', 'Ended (all outcomes)'],
     ['completed', 'Completed trades'],
+    ['ended', 'Ended (all outcomes)'],
     ['all', 'All auctions'],
 ];
 

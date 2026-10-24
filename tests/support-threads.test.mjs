@@ -214,3 +214,15 @@ test('admin resolution/exclusion never creates a reporter withdrawal or completi
     assert.match(update, /withdrew their incomplete report/);
     assert.doesNotMatch(update, /changed their response|Confirmed Complete/);
 });
+
+test('free-text responses render under one poll question with individual authors and safely escaped bodies', () => {
+    const pollThread={id:'poll-thread',is_trade:false,poll:{id:'poll-thread',question:'What could we improve?'},updated_at:'2026-10-23T12:00:00Z',status:'open',messages:[
+        {...message,id:'one',category:'other',message_type:'poll_response',reporter_role:null,reporter_username:'First player',body:'Add <script>alert(1)</script>'},
+        {...message,id:'two',category:'other',message_type:'poll_response',reporter_role:null,reporter_username:'Second player',body:'A second suggestion'},
+    ]};
+    const html=render(pollThread,true);
+    assert.match(html,/Poll: What could we improve\?/);assert.match(html,/2 messages/);
+    assert.match(html,/First player/);assert.match(html,/Second player/);assert.match(html,/Poll response/);
+    assert.match(html,/&lt;script&gt;alert\(1\)&lt;\/script&gt;/);assert.doesNotMatch(html,/<script>/);
+    assert.equal((html.match(/<article/g)||[]).length,1);
+});

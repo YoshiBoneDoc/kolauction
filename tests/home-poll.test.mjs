@@ -144,3 +144,51 @@ test('admin manager publishes an additional poll without concluding existing liv
  const h=harness(service,PollManager);await h.load();assert.ok(h.button('Publish poll'));assert.doesNotMatch(h.html(),/Conclude current/);
  await h.button('Publish poll').props.onClick();h.render();assert.deepEqual(published,[['draft']]);assert.equal(records.filter(p=>p.active).length,3);
 });
+
+test('free-text poll collapses after submission and reopens for optional additional private responses',async()=>{
+ const textPoll={...poll,id:'text',question:'What would you like us to improve?',poll_type:'free_text',allow_multiple_responses:true};
+ let answered=false;const calls=[];
+ const service={read:async()=>({poll:answered?null:textPoll,answered_polls:[],published_results:[],repeatable_polls:answered?[textPoll]:[]}),respond:async(...args)=>{calls.push(args);answered=true;}};
+ const h=harness(service);await h.load();assert.equal(h.button('Yes'),undefined);assert.equal(h.button('No'),undefined);
+ const textarea=()=>nodes(h.tree).find(n=>n.type==='textarea');
+ textarea().props.onChange({target:{value:'A suggestion'}});h.render();
+ await nodes(h.tree).find(n=>n.type==='form').props.onSubmit({preventDefault(){}});h.render();
+ assert.equal(calls[0][0],'text');assert.equal(calls[0][1],'A suggestion');assert.match(calls[0][2],/^[a-f0-9-]{36}$/);
+ assert.equal(textarea(),undefined);assert.match(h.html(),/sent privately/);assert.doesNotMatch(h.html(),/Yes:|No:|View voters/);
+ h.button('Send another response: '+textPoll.question).props.onClick();h.render();assert.ok(textarea());
+ textarea().props.onChange({target:{value:'Another suggestion'}});h.render();
+ await nodes(h.tree).find(n=>n.type==='form').props.onSubmit({preventDefault(){}});h.render();
+ assert.equal(calls.length,2);assert.notEqual(calls[0][2],calls[1][2]);assert.equal(textarea(),undefined);
+});
+
+test('uncertain free-text writes retain the draft and request ID across retries, while double submissions are blocked',async()=>{
+ const textPoll={...poll,poll_type:'free_text',allow_multiple_responses:true};const calls=[];let finish;let fail=true;
+ const service={read:async()=>feed(textPoll),respond:(...args)=>{calls.push(args);return new Promise((resolve,reject)=>{finish=()=>fail?reject(Error('Network interrupted.')):resolve();});}};
+ const h=harness(service);await h.load();
+ nodes(h.tree).find(n=>n.type==='textarea').props.onChange({target:{value:'Keep my suggestion'}});h.render();
+ const form=()=>nodes(h.tree).find(n=>n.type==='form');
+ const first=form().props.onSubmit({preventDefault(){}});await form().props.onSubmit({preventDefault(){}});assert.equal(calls.length,1);
+ finish();await first;h.render();assert.match(h.html(),/Network interrupted/);assert.match(h.html(),/Keep my suggestion/);
+ fail=false;const second=form().props.onSubmit({preventDefault(){}});finish();await second;h.render();
+ assert.equal(calls[0][2],calls[1][2]);
+});
+
+test('poll manager saves the free-text type and multiple-response setting and does not offer public text results',async()=>{
+ const calls=[];const service={list:async()=>[],saveDraft:async(...args)=>calls.push(args)};
+ const h=harness(service,PollManager);await h.load();
+ const find=type=>nodes(h.tree).find(n=>n.type===type);
+ find('select').props.onChange({target:{value:'free_text'}});h.render();
+ nodes(h.tree).find(n=>n.type==='input'&&n.props.type==='checkbox').props.onChange({target:{checked:true}});h.render();
+ find('textarea').props.onChange({target:{value:'What would you like to suggest?'}});h.render();
+ await find('form').props.onSubmit({preventDefault(){}});h.render();
+ assert.deepEqual(calls,[['What would you like to suggest?',null,'free_text',true]]);
+ const closed=harness({list:async()=>[{id:'private',question:'A private text question?',poll_type:'free_text',allow_multiple_responses:true,published_at:'2026-10-23T12:00:00Z',closed_at:'2026-10-23T13:00:00Z',results:{total:4}}]},PollManager);
+ await closed.load();assert.match(closed.html(),/4 responses/);assert.match(closed.html(),/category=other/);
+ assert.equal(closed.button('Publish results on homepage'),undefined);assert.doesNotMatch(closed.html(),/Yes:|No:|View voters/);
+});
+
+test('text poll service sends only the poll, response, retry ID and admin draft settings',async()=>{
+ const calls=[];const service=createPollService({rpc:async(...args)=>{calls.push(args);return{data:null};}});
+ await service.respond('poll','Suggestion','request');await service.saveDraft('Question goes here',null,'free_text',true);
+ assert.deepEqual(calls,[['respond_to_home_poll',{p_poll_id:'poll',p_response:'Suggestion',p_request_id:'request'}],['save_poll_draft',{p_question:'Question goes here',p_poll_id:null,p_poll_type:'free_text',p_allow_multiple:true}]]);
+});

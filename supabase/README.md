@@ -1035,3 +1035,32 @@ fees, bidding, and anti-sniping are unchanged. `bot_inspect` reports
 no bot rebuild or website deployment required**.
 
 Offline validation: `python3 tests/direct_trade_reminders_database_test.py`.
+
+### Free-text community polls (101)
+
+Apply `queue/202610230101_free_text_polls.sql` after 100, then deploy the website.
+No bot rebuild is required. Poll drafts now choose Yes/No or Free text; free-text
+drafts optionally allow multiple responses. Type and repeat settings freeze when
+published, alongside the question. Existing Yes/No votes/results remain unchanged.
+
+Initial responses follow the same per-player publication queue. Free-text answers
+(1–1,500 characters) go privately to Other in the administrator inbox, grouped by
+`bug_reports.poll_id` before filtering/pagination. One thread contains each poll’s
+authenticated authors, timestamps and response bodies. Ordinary feeds never contain
+text responses or their totals, and free-text results cannot be published publicly.
+Accounts without linked KoL characters retain a null reporter player ID. No assets
+or per-response KMail notifications are queued.
+
+Single-response polls retain the first answer. Multiple-response polls collapse
+after answering into “Send another response”; players can reopen them while live
+without blocking the next initial poll. Each send has a stable request UUID for
+retries, making lost acknowledgments and double submits idempotent. Repeatable
+polls allow up to 10 responses per account per poll per hour. Closing a poll freezes
+the total and removes the repeat control. A retry of an already saved request can
+still recover its acknowledgment after closure.
+
+Inbox resolution/category changes apply to the complete poll thread. A later
+response reopens that same conversation. Existing trade, appeal, withdrawal and
+evidence grouping/projections are preserved.
+
+Offline check: `python3 tests/free_text_polls_database_test.py`.

@@ -47,7 +47,9 @@ with tempfile.TemporaryDirectory(prefix='khub-poll-queue-',dir='/tmp') as folder
         migrations=sorted([*ROOT.glob('supabase/migrations/*.sql'),*ROOT.glob('supabase/migrations/queue/*.sql')],key=lambda p:p.name)
         assert len({p.name for p in migrations})==len(migrations)
         for migration in migrations:
-            if not migration.name.startswith(('202610220083_', '202610220084_')): sql(migration.read_text())
+            # Preserve the pre-queue upgrade fixture; current mixed queues are
+            # covered separately by free_text_polls_database_test.py.
+            if migration.name<'202610220083_': sql(migration.read_text())
         catalog_path=ROOT/'src/data/items.json'
         if not catalog_path.exists(): catalog_path=ROOT/'catalog/items.json'
         catalog=json.loads(catalog_path.read_text())
