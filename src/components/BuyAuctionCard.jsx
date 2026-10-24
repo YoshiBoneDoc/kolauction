@@ -17,7 +17,7 @@ export default function BuyAuctionCard({ auction, now }) {
             <div className="min-w-0 flex-1">
         <p className="text-center text-2xl font-bold text-[#112D4E]">{formatCompactMeat(auction.pricePerItem)} <span className="text-xs font-normal">Meat / item</span></p>
         <p className="truncate text-center text-xs text-gray-600">{purchased.toLocaleString('en-US')} / {target.toLocaleString('en-US')} purchased · {auction.availableQuantity ?? auction.remainingQuantity} available{auction.reducedQuantity > 0 && <> · {auction.reducedQuantity} reduced</>}</p>
-        <progress aria-label="Order fulfillment" value={purchased} max={target || 1} className="mt-1 h-1.5 w-full accent-blue-600" />
+        <progress aria-label="Order fulfillment" value={purchased} max={target || 1} className="buy-card-progress mt-2 h-2 w-full" />
             </div>
         </div>
         <div className="mt-auto flex items-center justify-between gap-2 text-xs"><span>{result.status === 'active' && !auction.buyClosingReason ? timeRemaining(auction.endTime, now) + ' left' : result.label}</span><Link to={`/auction/${auction.id}`} className="font-semibold text-blue-700 underline">{result.status === 'active' && !auction.buyClosingReason ? 'Sell to this order' : 'View order'}</Link></div>

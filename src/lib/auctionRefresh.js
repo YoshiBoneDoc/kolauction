@@ -21,8 +21,18 @@ export function auctionReadRequest(pathname, search = '', viewerId = null) {
     };
 }
 
-export function auctionRefreshDelay(request) {
-    return request?.view === 'detail' ? 10000 : 30000;
+export function auctionRefreshDelay(request, auctions = [], now = Date.now()) {
+    let delay = request?.view === 'detail' ? 10000 : 30000;
+    for (const auction of auctions) {
+        if (auction.status !== 'active' || auction.auctionKind === 'buy' || auction.biddingRestricted) continue;
+        const remaining = auction.endTime - now;
+        if (!Number.isFinite(remaining)) continue;
+        // Keep checking just-ended listings until the server finalizes or extends them.
+        if (remaining <= 60000) return 5000;
+        // Wake at the final-minute boundary rather than waiting a full normal interval.
+        delay = Math.min(delay, remaining - 60000);
+    }
+    return delay;
 }
 
 // Schedule after each read finishes, avoiding overlapping polling requests.
@@ -37,7 +47,7 @@ export function startAuctionRefresh({ refresh, delay, document, window, timers =
         try { await refresh(); }
         finally {
             running = false;
-            if (!stopped && !document.hidden) timer = timers.setTimeout(update, delay);
+            if (!stopped && !document.hidden) timer = timers.setTimeout(update, typeof delay === 'function' ? delay() : delay);
         }
     }
     function visibility() {

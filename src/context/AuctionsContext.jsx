@@ -19,6 +19,7 @@ export const AuctionsProvider = ({ children }) => {
     const key = JSON.stringify([request, viewerId, showPending ? pendingPage : null]);
     const sellerScope = request?.view === 'seller' ? JSON.stringify([request.id, viewerId ?? null]) : null;
     const [snapshot, setSnapshot] = useState(null);
+    const pollingSnapshot = useRef(null);
     const requestVersion = useRef(0);
     const inFlight = useRef(null);
     const matches = snapshot?.key === key;
@@ -45,7 +46,10 @@ export const AuctionsProvider = ({ children }) => {
         const promise = storage.load(request).then(async (data) => {
             // The main load closes expired auctions before reading personal trades.
             const pending = await readPending();
-            if (version === requestVersion.current) setSnapshot({ key, sellerScope, ...data, ...pending, error: '' });
+            if (version === requestVersion.current) {
+                pollingSnapshot.current = { key, auctions: data.auctions };
+                setSnapshot({ key, sellerScope, ...data, ...pending, error: '' });
+            }
         }).catch((failure) => {
             if (version === requestVersion.current) setSnapshot((previous) => ({
                 key, sellerScope, auctions: previous?.key === key ? previous.auctions : [],
@@ -66,7 +70,9 @@ export const AuctionsProvider = ({ children }) => {
         const requests = requestVersion;
         if (!request || (request.view === 'profile' && !currentUser?.id)) return;
         const stop = startAuctionRefresh({
-            refresh: refreshAuctions, delay: auctionRefreshDelay(request), document, window,
+            refresh: refreshAuctions,
+            delay: () => auctionRefreshDelay(request, pollingSnapshot.current?.key === key ? pollingSnapshot.current.auctions : []),
+            document, window,
             initialDelay: ['browse', 'seller'].includes(request.view) && request.search ? 250 : 0,
         });
         return () => {
@@ -74,7 +80,7 @@ export const AuctionsProvider = ({ children }) => {
             inFlight.current = null;
             stop();
         };
-    }, [refreshAuctions, request, currentUser?.id]);
+    }, [refreshAuctions, request, currentUser?.id, key]);
 
     const addAuction = async (auction) => {
         const id = await storage.create(auction);

@@ -30,6 +30,38 @@ function fixture(hidden=false) {
     return {document,window,timers,queue,tick};
 }
 
+test('final-minute Sell auctions poll every five seconds and revert after an extension or settlement', () => {
+    const request = {view: 'browse'};
+    const now = 1000000;
+    const auction = {status: 'active', auctionKind: 'sell', endTime: now + 60000};
+    assert.equal(auctionRefreshDelay(request, [auction], now), 5000);
+    assert.equal(auctionRefreshDelay({view: 'detail'}, [auction], now), 5000);
+    assert.equal(auctionRefreshDelay(request, [{...auction, endTime: now + 75000}], now), 15000);
+    assert.equal(auctionRefreshDelay(request, [{...auction, endTime: now + 120000}], now), 30000);
+    assert.equal(auctionRefreshDelay(request, [{...auction, endTime: now - 1000}], now), 5000);
+    for (const status of ['completed', 'cancelled', 'settling', 'pending_escrow']) {
+        assert.equal(auctionRefreshDelay(request, [{...auction, status}], now), 30000);
+    }
+    assert.equal(auctionRefreshDelay(request, [{...auction, auctionKind: 'buy'}], now), 30000);
+    assert.equal(auctionRefreshDelay(request, [{...auction, biddingRestricted: true}], now), 30000);
+});
+
+test('polling recalculates its delay after each response without starting overlapping loops', async () => {
+    const f = fixture();
+    let nextDelay = 30000;
+    const stop = startAuctionRefresh({...f, delay: () => nextDelay, refresh: async () => {}});
+    await f.tick();
+    assert.equal([...f.queue.values()][0].ms, 30000);
+    nextDelay = 5000;
+    await f.tick();
+    assert.equal(f.queue.size, 1);
+    assert.equal([...f.queue.values()][0].ms, 5000);
+    nextDelay = 30000;
+    await f.tick();
+    assert.equal([...f.queue.values()][0].ms, 30000);
+    stop();
+});
+
 test('polling pauses while hidden, refreshes on return, and cleans up timers/listeners',async()=>{
     const f=fixture();let calls=0;
     const stop=startAuctionRefresh({...f,delay:30000,refresh:async()=>{calls++;}});
