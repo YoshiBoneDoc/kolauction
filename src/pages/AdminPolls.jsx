@@ -43,6 +43,15 @@ export function PollManager({ service = polls }) {
         if (pollType === 'multiple_choice' && !validChoices) { setError('Enter 2–8 different choices, up to 120 characters each.');return; }
         await action(async () => { await service.saveDraft(question, editing, pollType, pollType === 'free_text' && multiple, pollType === 'multiple_choice' ? choices : []); setQuestion(''); setEditing(null); setPollType('yes_no'); setMultiple(false);setChoiceText(''); });
     }
+    async function deletePoll(poll) {
+        if (writing.current) return;
+        if (!window.confirm(`Are you sure you want to permanently delete the poll “${poll.question}”?\n\nThe poll, all votes, written responses, and saved results will be removed. This cannot be recovered.${poll.active ? '\n\nThis poll is live. Deleting it will immediately stop collecting responses.' : ''}`)) return;
+        await action(async () => {
+            await service.remove(poll.id);
+            setRecords(previous => previous.filter(item => item.id !== poll.id));
+            if (editing === poll.id) { setEditing(null); setQuestion(''); setPollType('yes_no'); setMultiple(false); setChoiceText(''); }
+        });
+    }
     const button = 'min-h-9 rounded border border-gray-300 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-gray-100 disabled:opacity-50';
     return <>
         <div className="flex justify-end"><button type="button" disabled={pending} onClick={() => setAttempt(value => value + 1)} className="text-sm text-blue-700 underline disabled:opacity-50">Refresh results</button></div>
@@ -92,6 +101,7 @@ export function PollManager({ service = polls }) {
                     {poll.active && <button type="button" disabled={pending} onClick={() => action(() => service.close(poll.id))} className={button}>Conclude poll</button>}
                     {poll.closed_at && poll.poll_type !== 'free_text' && <button type="button" aria-pressed={poll.results_published} disabled={pending} onClick={() => action(() => service.publishResults(poll.id, !poll.results_published))} className={button}>{poll.results_published ? 'Hide homepage results' : 'Publish results on homepage'}</button>}
                     {poll.results_published && <span className="text-xs text-green-700">Results visible to voters on the homepage</span>}
+                    <button type="button" disabled={pending} onClick={() => deletePoll(poll)} className="ml-auto min-h-9 border-0 bg-transparent px-2 py-1.5 text-sm text-red-700 underline disabled:opacity-50">Delete poll</button>
                 </div>
             </article>)}</div>
         </>}

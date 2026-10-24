@@ -77,6 +77,13 @@ export function createBugReportService(client) {
         async updateSupportThread(threadId, isTrade, { status = null, category = null }) {
             await rpc('update_support_thread', { p_thread_id: threadId, p_is_trade: isTrade, p_status: status, p_category: category }, true);
         },
+        async deleteSupportMessage(reportId) {
+            await rpc('delete_support_message', { p_report_id: reportId }, true);
+        },
+        async deleteSupportThread(thread) {
+            await rpc('delete_support_thread', { p_thread_id: thread.id, p_is_trade: thread.is_trade,
+                p_report_ids: thread.messages.map(message => message.id) }, true);
+        },
         async withdrawTradeRating(auctionId) {
             await rpc('withdraw_trade_rating', { p_auction_id: auctionId });
         },

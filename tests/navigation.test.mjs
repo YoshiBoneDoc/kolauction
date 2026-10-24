@@ -124,3 +124,16 @@ test('theme switch is available to guests and signed-in users across routes', ()
         assert.match(html, /Dark<\/span>|Dark mode/);
     }
 });
+
+test('mobile menu starts collapsed and controls the shared links while Home and theme stay outside', () => {
+    for (const user of [null, { id: 'member', khubUsername: 'Member' }]) {
+        const nav = navigation(render('/', user));
+        assert.match(nav, /aria-expanded="false" aria-controls="main-navigation-links"/);
+        assert.equal((nav.match(/id="main-navigation-links"/g) || []).length, 1);
+        assert.equal((nav.match(/href="\/"/g) || []).length, 1);
+        const panelStart = nav.indexOf('id="main-navigation-links"');
+        assert.ok(nav.indexOf('>Home</a>') < panelStart);
+        assert.ok(nav.indexOf('aria-label="Switch to dark mode"') < panelStart);
+        assert.ok(nav.indexOf('>View All Auctions</a>') > panelStart);
+    }
+});

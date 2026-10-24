@@ -17,5 +17,6 @@ export function createPollService(client) {
         vote: (id, answer) => call('vote_home_poll', { p_poll_id: id, p_answer: answer }),
         voteChoice: (id, choice) => call('vote_home_poll_choice', { p_poll_id: id, p_choice: choice }),
         close: id => call('close_home_poll', { p_poll_id: id }),
+        remove: id => call('delete_home_poll', { p_poll_id: id }),
     };
 }

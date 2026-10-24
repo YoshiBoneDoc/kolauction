@@ -174,6 +174,11 @@ button:focus-visible {
   text-shadow: 0 0 7px rgba(220, 38, 38, 0.65);
 }
 
+@media (max-width: 1023px) {
+  .site-navigation .theme-toggle { justify-content: center; width: 44px; padding: 0; }
+  .site-navigation .theme-toggle span { display: none; }
+}
+
 .popular-auction-viewport {
   touch-action: pan-y pinch-zoom;
   user-select: none;

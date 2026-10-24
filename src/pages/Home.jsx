@@ -1,7 +1,7 @@
 import PopularAuctions from '../components/PopularAuctions';
 import HighRollers from '../components/HighRollers';
 import ExploreAuctions from '../components/ExploreAuctions';
-import { useContext, useMemo } from 'react';
+import { useContext, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { AuctionsContext } from '../context/AuctionsContext';
 import { recentCompletedAuctions, highRollerAuctions } from '../lib/auctionBrowsing';
@@ -14,6 +14,7 @@ import HomePoll from '../components/HomePoll';
 export default function Home() {
     const { auctions, isLoading, error } = useContext(AuctionsContext);
     const now = useNow();
+    const featuredPollTarget = useRef(null);
     const hasActiveAuctions = auctions.some(auction => ['active', 'finalizing'].includes(getAuctionStatus(auction, now)));
 
     const highRollers = useMemo(() => highRollerAuctions(auctions, now), [auctions, now]);
@@ -26,6 +27,7 @@ export default function Home() {
                 <p className="mt-4 text-lg text-gray-700 sm:text-xl">The best place to find and bid on rare treasures.</p>
             </header>
             <main className="mx-auto mt-6 w-full max-w-6xl flex-1 pb-8">
+                <div ref={featuredPollTarget} />
                 <PendingTrades />
                 <HighRollers auctions={highRollers} now={now}>
                     {isLoading && <p role="status">Loading High Rollers…</p>}
@@ -44,7 +46,7 @@ export default function Home() {
                 </div>
                 {error && <p role="alert" className="mt-4 text-red-700">Auctions could not be refreshed. {error}</p>}
             </main>
-            <HomePoll />
+            <HomePoll featuredTarget={featuredPollTarget} />
             <SiteFooter className="-mx-4 sm:-mx-6" />
         </div>
     );

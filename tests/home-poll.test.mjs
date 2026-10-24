@@ -23,14 +23,14 @@ const compiled={exports:{}};
 const require=createRequire(import.meta.url);
 new Function('require','module','exports',outputFiles[0].text)(name=>name==='react'?{
  ...React,useState:state,useRef:initial=>state({current:initial})[0],useEffect:fn=>active.effects.push(fn),useContext:()=>({currentUser:user}),
-}:require(name),compiled,compiled.exports);
+}:name==='react-dom'?{...require(name),createPortal:(panel,target)=>React.cloneElement(panel,{'data-placement':target.name})}:require(name),compiled,compiled.exports);
 const {HomePoll,PollPanel,PollManager}=compiled.exports;
 function nodes(tree) {
  if(!tree || typeof tree!=='object')return [];
  return [tree,...React.Children.toArray(tree.props?.children).flatMap(nodes)];
 }
-function harness(service,component=PollPanel) {
- const h={slots:[],render(){active=h;h.cursor=0;h.effects=[];h.tree=component({service});return h;},
+function harness(service,component=PollPanel,props={}) {
+ const h={slots:[],render(){active=h;h.cursor=0;h.effects=[];h.tree=component({service,...props});return h;},
   async load(){h.effects.forEach(fn=>fn());await new Promise(resolve=>setImmediate(resolve));h.render();},
   button(label){return nodes(h.tree).find(n=>n.type==='button'&&(n.props['aria-label']||n.props.children)===label);},
   html(){return h.tree?renderToStaticMarkup(React.createElement(StaticRouter,{location:'/'},h.tree)):'';}};
@@ -39,6 +39,49 @@ function harness(service,component=PollPanel) {
 const poll={id:'poll',question:'Should sellers have the option to end auctions early if they’re happy with the current bid?',active:true,has_voted:false,can_manage:false};
 
 const feed = poll => ({poll,published_results:[],can_manage:poll?.can_manage || false});
+
+test('deleting a poll requires explicit confirmation and removes it only after the server succeeds',async()=>{
+ const previousWindow=globalThis.window;
+ try {
+  let records=[{...poll,results:{yes:1,no:0,total:1},published_at:'2026-10-24T12:00:00Z'}];
+  const calls=[];let accept=false;let fail=false;const prompts=[];
+  globalThis.window={confirm:message=>{prompts.push(message);return accept;}};
+  const service={list:async()=>records,remove:async id=>{calls.push(id);if(fail)throw Error('Delete failed.');records=[];}};
+  const h=harness(service,PollManager);await h.load();
+  await h.button('Delete poll').props.onClick();h.render();assert.deepEqual(calls,[]);assert.match(h.html(),/current bid/);
+  assert.match(prompts[0],/permanently delete/);assert.match(prompts[0],/cannot be recovered/);assert.match(prompts[0],/This poll is live/);
+  accept=true;fail=true;await h.button('Delete poll').props.onClick();h.render();assert.match(h.html(),/Delete failed/);assert.ok(h.button('Delete poll'));
+  fail=false;await h.button('Delete poll').props.onClick();h.render();assert.equal(h.button('Delete poll'),undefined);
+  assert.deepEqual(calls,['poll','poll']);
+ } finally {if(previousWindow===undefined)delete globalThis.window;else globalThis.window=previousWindow;}
+});
+
+test('unanswered polls feature above auctions and keep results there until leaving the homepage',async()=>{
+ let saved=false;
+ const service={read:async()=>feed(saved?{...poll,has_voted:true,results:{yes:1,no:0,total:1}}:poll),vote:async()=>{saved=true;}};
+ const props={featuredTarget:{current:{name:'top'}}};
+ const visit=harness(service,PollPanel,props);await visit.load();assert.equal(visit.tree.props['data-placement'],'top');
+ await visit.button('Yes').props.onClick();visit.render();assert.equal(visit.tree.props['data-placement'],'top');assert.match(visit.html(),/Live poll results/);
+ await visit.load();assert.equal(visit.tree.props['data-placement'],'top');
+ const returned=harness(service,PollPanel,props);await returned.load();assert.equal(returned.tree.props['data-placement'],undefined);assert.match(returned.html(),/Live poll results/);
+});
+
+test('skipped text polls stay featured this visit but return minimized at the bottom on a later visit',async()=>{
+ let skipped=false;const textPoll={...poll,poll_type:'free_text'};
+ const service={read:async()=>({...feed(skipped?null:textPoll),skipped_polls:skipped?[textPoll]:[]}),skip:async()=>{skipped=true;}};
+ const props={featuredTarget:{current:{name:'top'}}};
+ const visit=harness(service,PollPanel,props);await visit.load();await visit.button('Skip').props.onClick();visit.render();
+ assert.equal(visit.tree.props['data-placement'],'top');assert.match(visit.html(),/Answer this poll/);
+ const returned=harness(service,PollPanel,props);await returned.load();assert.equal(returned.tree.props['data-placement'],undefined);assert.match(returned.html(),/Answer this poll/);
+});
+
+test('remaining unanswered questions feature on return; admin results stay at the bottom',async()=>{
+ const props={featuredTarget:{current:{name:'top'}}};
+ const visit=harness({read:async()=>({...feed(poll),answered_polls:[{...poll,id:'older',has_voted:true,results:{yes:1,no:0,total:1}}]})},PollPanel,props);
+ await visit.load();assert.equal(visit.tree.props['data-placement'],'top');assert.ok(visit.button('Yes'));
+ const admin=harness({read:async()=>feed({...poll,can_manage:true,results:{yes:1,no:0,total:1}})},PollPanel,props);
+ await admin.load();assert.equal(admin.tree.props['data-placement'],undefined);assert.equal(admin.button('Yes'),undefined);
+});
 
 test('poll service passes only the authenticated RPC arguments and surfaces failures',async()=>{
  const calls=[];
@@ -227,7 +270,8 @@ test('admin manager validates and saves multiple-choice options',async()=>{
 test('choice and Skip service calls use only the target poll and chosen option',async()=>{
  const calls=[];const service=createPollService({rpc:async(...args)=>{calls.push(args);return{data:null};}});
  await service.voteChoice('one',2);await service.skip('text');
- assert.deepEqual(calls,[['vote_home_poll_choice',{p_poll_id:'one',p_choice:2}],['skip_home_poll',{p_poll_id:'text'}]]);
+ await service.remove('old-poll');
+ assert.deepEqual(calls,[['vote_home_poll_choice',{p_poll_id:'one',p_choice:2}],['skip_home_poll',{p_poll_id:'text'}],['delete_home_poll',{p_poll_id:'old-poll'}]]);
 });
 
 test('skipped text questions stay minimized below results and can be answered without blocking the next poll',async()=>{

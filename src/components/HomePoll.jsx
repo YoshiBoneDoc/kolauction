@@ -1,5 +1,6 @@
 import { useContext, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 import PropTypes from 'prop-types';
 import { UserContext } from '../context/UserContext';
 import { supabase } from '../lib/supabase';
@@ -10,7 +11,7 @@ import { startAuctionRefresh } from '../lib/auctionRefresh';
 
 const polls = createPollService(supabase);
 
-export function PollPanel({ service = polls }) {
+export function PollPanel({ service = polls, featuredTarget }) {
     const [feed, setFeed] = useState(null);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState('');
@@ -20,6 +21,9 @@ export function PollPanel({ service = polls }) {
     const [repeatId, setRepeatId] = useState(null);
     const [notice, setNotice] = useState('');
     const [choice, setChoice] = useState(null);
+    // Once an unanswered poll is shown at the top, keep it there for this visit,
+    // including its results. A new mount uses the saved answers/skips from the feed.
+    const [featured, setFeatured] = useState(false);
     const responseRequest = useRef(null);
     const writing = useRef(false);
     const generation = useRef(0);
@@ -36,7 +40,10 @@ export function PollPanel({ service = polls }) {
             const request = ++generation.current;
             try {
                 const data = await service.read();
-                if (!cancelled && request === generation.current) { setFeed(data); setError(''); }
+                if (!cancelled && request === generation.current) {
+                    setFeed(data); setError('');
+                    if (!data?.can_manage && !data?.poll?.can_manage && data?.poll?.active && !data.poll.has_voted) setFeatured(true);
+                }
             } catch (failure) { if (!cancelled && request === generation.current) setError(failure.message); }
         }
         const stop = typeof document === 'undefined'
@@ -113,10 +120,10 @@ export function PollPanel({ service = polls }) {
         finally { writing.current = false;setPending(false); }
     }
     function responseForm(item) {
-        return <form onSubmit={event => sendResponse(event,item)} className="mt-3 space-y-2">
+        return <form onSubmit={event => sendResponse(event,item)} className="mt-2 space-y-2">
             <label htmlFor={`poll-response-${item.id}`} className="sr-only">Your response to {item.question}</label>
             <textarea id={`poll-response-${item.id}`} value={drafts[item.id] || ''} onChange={event => setDrafts(previous => ({...previous,[item.id]:event.target.value}))}
-                disabled={pending} required maxLength={1500} rows={3} placeholder="Your response…" className="w-full rounded border border-yellow-300 bg-white p-3 text-sm text-slate-800" />
+                disabled={pending} required maxLength={1500} rows={2} placeholder="Your response…" className="w-full rounded border border-yellow-300 bg-white p-2 text-sm text-slate-800" />
             <div className="flex flex-wrap items-center gap-3">
                 <button type="submit" disabled={pending || !(drafts[item.id] || '').trim()} className="min-h-10 rounded border border-yellow-700 bg-yellow-800 px-4 py-2 text-sm font-semibold text-white hover:bg-yellow-900 disabled:opacity-60">{pending ? 'Sending…' : 'Send response'}</button>
                 {poll?.id === item.id && !item.has_voted && <button type="button" disabled={pending} onClick={() => skip(item)} className="min-h-10 px-2 py-2 text-sm text-yellow-900 underline hover:text-yellow-700 disabled:opacity-60">Skip</button>}
@@ -133,21 +140,21 @@ export function PollPanel({ service = polls }) {
     }
     const question = !isAdmin && poll?.active && !poll.has_voted ? poll : null;
     if (!question && !answered.length && !published.length && !minimized.length && !feed?.can_manage && !error && !notice) return null;
-    return <section aria-label="Community poll" className="mx-auto mb-6 w-full max-w-6xl space-y-3">
-        {question && <div className="rounded-md border border-yellow-300 bg-yellow-100 px-5 py-5 text-slate-800 sm:px-6">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="min-w-0 flex-1 basis-64">
-                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-yellow-800">Community poll</p>
-                    <h2 className="text-lg font-semibold leading-6">{question.question}</h2>
+    const panel = <section aria-label="Community poll" className="mx-auto mb-4 w-full max-w-6xl space-y-2">
+        {question && <div className="rounded-md border border-yellow-300 bg-yellow-100 px-3 py-3 text-slate-800">
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                <div className="min-w-0 flex-1 basis-48">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-yellow-800">Community poll</p>
+                    <h2 className="text-sm font-semibold leading-5">{question.question}</h2>
                 </div>
                 {!['free_text','multiple_choice'].includes(question.poll_type) && <div className="flex gap-2" role="group" aria-label="Your vote">
-                    <button type="button" disabled={pending} onClick={() => vote(true)} className="min-h-10 min-w-20 rounded border border-yellow-700 bg-yellow-800 px-5 py-2 text-sm font-semibold text-white hover:bg-yellow-900 disabled:opacity-60">Yes</button>
-                    <button type="button" disabled={pending} onClick={() => vote(false)} className="min-h-10 min-w-20 rounded border border-yellow-700 bg-white px-5 py-2 text-sm font-semibold text-yellow-900 hover:bg-yellow-50 disabled:opacity-60">No</button>
+                    <button type="button" disabled={pending} onClick={() => vote(true)} className="min-h-10 min-w-16 rounded border border-yellow-700 bg-yellow-800 px-3 py-2 text-sm font-semibold text-white hover:bg-yellow-900 disabled:opacity-60">Yes</button>
+                    <button type="button" disabled={pending} onClick={() => vote(false)} className="min-h-10 min-w-16 rounded border border-yellow-700 bg-white px-3 py-2 text-sm font-semibold text-yellow-900 hover:bg-yellow-50 disabled:opacity-60">No</button>
                 </div>}
             </div>
             {question.poll_type === 'free_text' && responseForm(question)}
-            {question.poll_type === 'multiple_choice' && <form className="mt-3 space-y-3" onSubmit={event => { event.preventDefault();if (choice?.pollId === question.id) return vote(choice.index); }}>
-                <fieldset disabled={pending} className="space-y-2">
+            {question.poll_type === 'multiple_choice' && <form className="mt-2 space-y-2" onSubmit={event => { event.preventDefault();if (choice?.pollId === question.id) return vote(choice.index); }}>
+                <fieldset disabled={pending} className="space-y-1">
                     <legend className="sr-only">Choose one answer to {question.question}</legend>
                     {(question.choices || []).map((label,index) => <label key={index} className="flex cursor-pointer items-start gap-2 text-sm leading-5">
                         <input type="radio" name={`poll-choice-${question.id}`} value={index+1} required checked={choice?.pollId === question.id && choice.index === index+1}
@@ -196,10 +203,12 @@ export function PollPanel({ service = polls }) {
         {feed?.can_manage && <p className="text-sm"><Link to="/admin/polls" className="text-blue-800 underline">Manage polls &amp; view past results</Link></p>}
         {error && <p role="alert" className="text-sm text-red-800">{error}{' '}<button type="button" disabled={pending} onClick={() => setAttempt(value => value + 1)} className="underline">Retry</button></p>}
     </section>;
+    return featured && featuredTarget?.current ? createPortal(panel, featuredTarget.current) : panel;
 }
-PollPanel.propTypes = { service: PropTypes.object };
+PollPanel.propTypes = { service: PropTypes.object, featuredTarget: PropTypes.shape({ current: PropTypes.object }) };
 
-export default function HomePoll() {
+export default function HomePoll({ featuredTarget } = {}) {
     const { currentUser } = useContext(UserContext);
-    return currentUser && !currentUser.isBanned ? <PollPanel key={currentUser.id} /> : null;
+    return currentUser && !currentUser.isBanned ? <PollPanel key={currentUser.id} featuredTarget={featuredTarget} /> : null;
 }
+HomePoll.propTypes = { featuredTarget: PropTypes.shape({ current: PropTypes.object }) };

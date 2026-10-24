@@ -25,6 +25,18 @@ const requireModule = createRequire(import.meta.url);
 new Function('require', 'module', 'exports', outputFiles[0].text)(name => name === 'react-router-dom' ? router : requireModule(name), compiled, compiled.exports);
 const { render } = compiled.exports;
 
+test('permanent deletion RPCs send exact message and conversation identifiers with an expected message snapshot',async()=>{
+    const calls=[];
+    const service=createBugReportService({rpc:async(name,args)=>{calls.push([name,args]);return{data:null,error:null};}});
+    await service.deleteSupportMessage('report-1');
+    await service.deleteSupportThread({id:'poll-1',is_trade:false,messages:[{id:'report-1'},{id:'report-2'}]});
+    assert.deepEqual(calls,[['delete_support_message',{p_report_id:'report-1'}],
+        ['delete_support_thread',{p_thread_id:'poll-1',p_is_trade:false,p_report_ids:['report-1','report-2']}]]);
+    const denied=createBugReportService({rpc:async()=>({error:{code:'42501'}})});
+    await assert.rejects(denied.deleteSupportMessage('report-1'),/Administrator access required/);
+    await assert.rejects(denied.deleteSupportThread({id:'poll-1',is_trade:false,messages:[]}),/Administrator access required/);
+});
+
 const message = { id:'report-1',reference:'B-1003',category:'trade',body:'The buyer has not paid.',status:'open',
     created_at:'2026-10-20T12:00:00Z',reporter_username:'Seller',reporter_role:'seller',
     reporter_kol_id:111,message_type:'trade_rating',negative_counted:true,feedback_withdrawn:false,target_username:'Buyer' };

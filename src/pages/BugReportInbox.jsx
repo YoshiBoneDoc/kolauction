@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { UserContext } from '../context/UserContext';
 import SiteFooter from '../components/SiteFooter';
@@ -20,6 +20,7 @@ function Inbox() {
     const [pending, setPending] = useState(null);
     const [actionError, setActionError] = useState('');
     const [expanded, setExpanded] = useState(() => new Set());
+    const writing = useRef(false);
     const key = JSON.stringify([category, status, page, attempt]);
     const result = snapshot?.key === key ? snapshot : null;
     const visibleThreads = result?.threads || [];
@@ -41,7 +42,8 @@ function Inbox() {
     }, [category, status, page, key]);
 
     async function updateThread(thread, nextCategory) {
-        if (pending) return;
+        if (writing.current) return;
+        writing.current = true;
         setPending(threadKey(thread));
         setActionError('');
         try {
@@ -50,7 +52,25 @@ function Inbox() {
                 : { status: thread.status === 'open' ? 'resolved' : 'open' });
             setAttempt(value => value + 1);
         } catch (failure) { setActionError(failure.message); }
-        finally { setPending(null); }
+        finally { writing.current = false; setPending(null); }
+    }
+
+    async function deleteMessages(thread, message = null) {
+        if (writing.current) return;
+        const subject = message ? `message ${message.reference}` : thread.poll ? `the conversation for poll “${thread.poll.question}”`
+            : thread.auction ? `the conversation for Auction #${thread.auction.number || thread.auction.id}`
+                : `the conversation with ${thread.messages[0].reporter_username}`;
+        const scope = message ? 'Its text and attachments will be removed.'
+            : `All ${thread.messages.length} current messages and their attachments will be removed.`;
+        if (!window.confirm(`Are you sure you want to permanently delete ${subject}?\n\n${scope} This cannot be recovered.\n\nAuction, payment, and rating records will be kept.${!message && thread.poll ? '\nThe poll itself will remain available. You can delete it from Manage polls.' : ''}`)) return;
+        writing.current = true;
+        setPending(threadKey(thread)); setActionError('');
+        try {
+            if (message) await reports.deleteSupportMessage(message.id);
+            else await reports.deleteSupportThread(thread);
+            setAttempt(value => value + 1);
+        } catch (failure) { setActionError(failure.message); }
+        finally { writing.current = false; setPending(null); }
     }
 
     function toggleThread(thread) {
@@ -91,6 +111,7 @@ function Inbox() {
             <div className="space-y-2">{result.threads.map(thread => <SupportThread key={threadKey(thread)}
                 thread={thread} expanded={expanded.has(threadKey(thread))} onToggle={() => toggleThread(thread)}
                 pending={Boolean(pending)} onCategoryChange={updateThread} onStatusChange={thread => updateThread(thread)}
+                onDelete={deleteMessages}
                 onUpdated={() => setAttempt(value => value + 1)} />)}</div>
             {(result.total > 20 || page > 1) && <nav aria-label="Inbox pages" className="flex flex-wrap items-center justify-center gap-4">
                 <button disabled={page <= 1} onClick={() => setPage(value => value - 1)} className="min-h-11 rounded border bg-white px-3 disabled:opacity-50">Previous</button>

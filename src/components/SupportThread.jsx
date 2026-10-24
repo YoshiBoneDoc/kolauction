@@ -87,7 +87,7 @@ function Participant({ thread, role }) {
 }
 Participant.propTypes = { thread: PropTypes.object.isRequired, role: PropTypes.string.isRequired };
 
-export default function SupportThread({ thread, expanded, onToggle, pending, onCategoryChange, onStatusChange, onUpdated }) {
+export default function SupportThread({ thread, expanded, onToggle, pending, onCategoryChange, onStatusChange, onUpdated, onDelete }) {
     const key = threadKey(thread);
     const auction = thread.auction;
     const first = thread.messages[0];
@@ -135,6 +135,8 @@ export default function SupportThread({ thread, expanded, onToggle, pending, onC
             <div className={`ml-auto shrink-0 text-right ${isAppeal ? 'w-32' : 'w-fit'}`}>
                 <time dateTime={thread.updated_at} className="block whitespace-nowrap text-xs leading-5 text-gray-500">{formatSupportTimestamp(thread.updated_at)}</time>
                 <ChangeType thread={thread} pending={pending} onChange={onCategoryChange} />
+                {onDelete && <button type="button" disabled={pending} onClick={() => onDelete(thread)}
+                    className="mt-1 min-h-9 border-0 bg-transparent px-2 py-1 text-xs text-red-700 underline disabled:opacity-50">{thread.poll ? 'Delete responses' : 'Delete conversation'}</button>}
             </div>
         </div>
         {expanded && <div id={`body-${key}`} className={isAppeal ? 'space-y-3 border-t border-gray-100 px-4 py-3 sm:px-5' : 'space-y-4 border-t border-gray-100 p-4 sm:px-5'}>
@@ -174,7 +176,11 @@ export default function SupportThread({ thread, expanded, onToggle, pending, onC
             </section> : <section key={message.id} className={`space-y-2 ${isAppeal ? 'py-2' : 'py-4'} first:pt-0 last:pb-0`}>
                 <div className="flex flex-wrap items-baseline justify-between gap-1 text-xs text-gray-500">
                     <p><strong className="font-medium text-gray-800">{message.reporter_username}</strong>{message.reporter_role && ` · ${message.reporter_role}`} · {message.message_type === 'trade_rating' ? `Reported Incomplete about ${message.target_username || 'the other player'}` : message.message_type === 'trade_query' ? 'Trade query' : message.message_type === 'poll_response' ? 'Poll response' : supportCategories.find(([value]) => value === message.category)?.[1]} · {message.reference}{message.status === 'resolved' && ` · ${message.resolution_kind === 'participant_resolved' ? 'Withdrawn' : 'Resolved'}`}</p>
-                    <time dateTime={message.created_at} className="whitespace-nowrap">{formatSupportTimestamp(message.created_at)}</time>
+                    <div className="flex items-center gap-2">
+                        <time dateTime={message.created_at} className="whitespace-nowrap">{formatSupportTimestamp(message.created_at)}</time>
+                        {onDelete && <button type="button" disabled={pending} onClick={() => onDelete(thread, message)} aria-label={`Delete message ${message.reference}`}
+                            className="min-h-9 border-0 bg-transparent px-2 py-1 text-xs text-red-700 underline disabled:opacity-50">Delete</button>}
+                    </div>
                 </div>
                 <p className={`whitespace-pre-wrap break-words text-sm ${isAppeal ? 'leading-5' : 'leading-6'} text-gray-800`}>{message.body}</p>
                 {message.has_evidence && <AppealEvidence reportId={message.id} />}
@@ -190,4 +196,5 @@ SupportThread.propTypes = {
     thread: PropTypes.object.isRequired, expanded: PropTypes.bool.isRequired, onToggle: PropTypes.func.isRequired,
     pending: PropTypes.bool.isRequired, onCategoryChange: PropTypes.func.isRequired,
     onStatusChange: PropTypes.func.isRequired, onUpdated: PropTypes.func.isRequired,
+    onDelete: PropTypes.func,
 };
