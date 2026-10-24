@@ -19,6 +19,7 @@ export function PollPanel({ service = polls }) {
     const [drafts, setDrafts] = useState({});
     const [repeatId, setRepeatId] = useState(null);
     const [notice, setNotice] = useState('');
+    const [choice, setChoice] = useState(null);
     const responseRequest = useRef(null);
     const writing = useRef(false);
     const generation = useRef(0);
@@ -48,7 +49,8 @@ export function PollPanel({ service = polls }) {
         generation.current += 1;
         setPending(true); setError('');
         try {
-            await service.vote(poll.id, answer);
+            if (poll.poll_type === 'multiple_choice') await service.voteChoice(poll.id, answer);
+            else await service.vote(poll.id, answer);
             setFeed(previous => {
                 const voted = { ...previous.poll, has_voted: true };
                 return { ...previous, poll: voted, answered_polls: [...(previous.answered_polls || []).filter(item => item.id !== voted.id), voted] };
@@ -122,12 +124,23 @@ export function PollPanel({ service = polls }) {
                     <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-yellow-800">Community poll</p>
                     <h2 className="text-lg font-semibold leading-6">{question.question}</h2>
                 </div>
-                {question.poll_type !== 'free_text' && <div className="flex gap-2" role="group" aria-label="Your vote">
+                {!['free_text','multiple_choice'].includes(question.poll_type) && <div className="flex gap-2" role="group" aria-label="Your vote">
                     <button type="button" disabled={pending} onClick={() => vote(true)} className="min-h-10 min-w-20 rounded border border-yellow-700 bg-yellow-800 px-5 py-2 text-sm font-semibold text-white hover:bg-yellow-900 disabled:opacity-60">Yes</button>
                     <button type="button" disabled={pending} onClick={() => vote(false)} className="min-h-10 min-w-20 rounded border border-yellow-700 bg-white px-5 py-2 text-sm font-semibold text-yellow-900 hover:bg-yellow-50 disabled:opacity-60">No</button>
                 </div>}
             </div>
             {question.poll_type === 'free_text' && responseForm(question)}
+            {question.poll_type === 'multiple_choice' && <form className="mt-3 space-y-3" onSubmit={event => { event.preventDefault();if (choice?.pollId === question.id) vote(choice.index); }}>
+                <fieldset disabled={pending} className="space-y-2">
+                    <legend className="sr-only">Choose one answer to {question.question}</legend>
+                    {(question.choices || []).map((label,index) => <label key={index} className="flex cursor-pointer items-start gap-2 text-sm leading-5">
+                        <input type="radio" name={`poll-choice-${question.id}`} value={index+1} required checked={choice?.pollId === question.id && choice.index === index+1}
+                            onChange={() => setChoice({pollId:question.id,index:index+1})} className="mt-0.5 h-4 w-4 shrink-0 accent-yellow-700" />
+                        <span className="min-w-0 break-words">{label}</span>
+                    </label>)}
+                </fieldset>
+                <button type="submit" disabled={pending || choice?.pollId !== question.id} className="min-h-10 rounded border border-yellow-700 bg-yellow-800 px-4 py-2 text-sm font-semibold text-white hover:bg-yellow-900 disabled:opacity-60">{pending ? 'Submitting…' : 'Submit vote'}</button>
+            </form>}
         </div>}
         {repeatable.map(item => <div key={item.id} className={repeatId === item.id ? 'rounded-md border border-yellow-300 bg-yellow-100 px-5 py-4 text-slate-800' : 'w-fit max-w-full'}>
             <button type="button" disabled={pending} aria-label={`${repeatId === item.id ? 'Close response form' : 'Send another response'}: ${item.question}`} title={item.question}

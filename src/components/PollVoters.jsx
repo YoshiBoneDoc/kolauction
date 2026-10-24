@@ -24,8 +24,10 @@ export default function PollVoters({ pollId, service = polls }) {
         <summary className="w-fit cursor-pointer text-blue-800">View voters</summary>
         {open && <div className="mt-2 space-y-2">
             {loading ? <p role="status" className="text-gray-500">Loading voters…</p> : error ? <p role="alert" className="text-red-700">{error}</p> : voters && <div className="grid gap-3 sm:grid-cols-2">
-                <p className="break-words"><strong>Yes:</strong> {voters.yes.length ? voters.yes.join(', ') : 'No votes yet.'}</p>
-                <p className="break-words"><strong>No:</strong> {voters.no.length ? voters.no.join(', ') : 'No votes yet.'}</p>
+                {voters.choices ? voters.choices.map(choice => <p key={choice.index} className="break-words"><strong>{choice.label}:</strong> {choice.voters.length ? choice.voters.join(', ') : 'No votes yet.'}</p>) : <>
+                    <p className="break-words"><strong>Yes:</strong> {voters.yes.length ? voters.yes.join(', ') : 'No votes yet.'}</p>
+                    <p className="break-words"><strong>No:</strong> {voters.no.length ? voters.no.join(', ') : 'No votes yet.'}</p>
+                </>}
             </div>}
             <button type="button" disabled={loading} onClick={() => setAttempt(value => value + 1)} className="text-xs text-blue-800 underline disabled:opacity-50">Refresh voters</button>
         </div>}

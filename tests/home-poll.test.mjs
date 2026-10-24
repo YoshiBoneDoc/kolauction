@@ -181,7 +181,7 @@ test('poll manager saves the free-text type and multiple-response setting and do
  nodes(h.tree).find(n=>n.type==='input'&&n.props.type==='checkbox').props.onChange({target:{checked:true}});h.render();
  find('textarea').props.onChange({target:{value:'What would you like to suggest?'}});h.render();
  await find('form').props.onSubmit({preventDefault(){}});h.render();
- assert.deepEqual(calls,[['What would you like to suggest?',null,'free_text',true]]);
+ assert.deepEqual(calls,[['What would you like to suggest?',null,'free_text',true,[]]]);
  const closed=harness({list:async()=>[{id:'private',question:'A private text question?',poll_type:'free_text',allow_multiple_responses:true,published_at:'2026-10-23T12:00:00Z',closed_at:'2026-10-23T13:00:00Z',results:{total:4}}]},PollManager);
  await closed.load();assert.match(closed.html(),/4 responses/);assert.match(closed.html(),/category=other/);
  assert.equal(closed.button('Publish results on homepage'),undefined);assert.doesNotMatch(closed.html(),/Yes:|No:|View voters/);
@@ -190,5 +190,5 @@ test('poll manager saves the free-text type and multiple-response setting and do
 test('text poll service sends only the poll, response, retry ID and admin draft settings',async()=>{
  const calls=[];const service=createPollService({rpc:async(...args)=>{calls.push(args);return{data:null};}});
  await service.respond('poll','Suggestion','request');await service.saveDraft('Question goes here',null,'free_text',true);
- assert.deepEqual(calls,[['respond_to_home_poll',{p_poll_id:'poll',p_response:'Suggestion',p_request_id:'request'}],['save_poll_draft',{p_question:'Question goes here',p_poll_id:null,p_poll_type:'free_text',p_allow_multiple:true}]]);
+ assert.deepEqual(calls,[['respond_to_home_poll',{p_poll_id:'poll',p_response:'Suggestion',p_request_id:'request'}],['save_poll_draft',{p_question:'Question goes here',p_poll_id:null,p_poll_type:'free_text',p_allow_multiple:true,p_choices:[]}]]);
 });
