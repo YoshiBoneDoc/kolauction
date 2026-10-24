@@ -56,7 +56,7 @@ test('personal trade cards appear above auctions on home and browse, including a
         assert.match(html, /Confirm Complete/);
         assert.match(html, /Private trade details and instructions/);
         assert.match(html, /Page 1 of 2/);
-        assert.ok(html.indexOf('Your pending trades') < html.indexOf(path==='/' ? 'Popular Items' : 'Find auctions'));
+        assert.ok(html.indexOf('Your pending trades') < html.indexOf(path==='/' ? 'Explore Auctions' : 'Find auctions'));
         // Cards link to the full private details instead of printing identities on browse.
         assert.doesNotMatch(html, /Verified Buyer|Verified Seller|towho=/);
     }

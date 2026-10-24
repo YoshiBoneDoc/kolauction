@@ -1,6 +1,5 @@
 import { useContext } from 'react';
 import ThemeToggle from './ThemeToggle';
-import UpsideDownToggle from './UpsideDownToggle';
 import { Link, useLocation } from 'react-router-dom';
 import { activeNavigationPath } from '../lib/navigation';
 import useAdministrator from '../hooks/useAdministrator';
@@ -50,10 +49,7 @@ export default function AuctionNavigation() {
                     <Link {...linkProps("/register")}>Register</Link>
                 </>}
                 {separator}
-                <div className="flex max-w-full flex-col items-center gap-3">
-                    <ThemeToggle />
-                    <UpsideDownToggle />
-                </div>
+                <ThemeToggle />
             </div>
         </nav>
     );

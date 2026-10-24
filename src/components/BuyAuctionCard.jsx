@@ -7,7 +7,6 @@ import { getAuctionResult, getAuctionDisplayStatus, auctionCardBackground } from
 import { timeRemaining } from '../lib/auctionBrowsing';
 import { formatCompactMeat } from '../lib/formatMeat';
 import { normalizeAuctionAmount, parseAuctionAmount } from '../lib/auctionInputs';
-import TradeTypeBadge from './TradeTypeBadge';
 import FittedPrice from './FittedPrice';
 import CopyMessage from './CopyMessage';
 
@@ -29,6 +28,7 @@ export default function BuyAuctionCard({ auction, now, inlineReserve = false, ex
     const owns = currentUser?.id === auction.sellerId;
     const available = auction.availableQuantity ?? auction.remainingQuantity ?? 0;
     const purchased = auction.purchasedQuantity || 0;
+    const reserved = auction.reservedQuantity || 0;
     const target = Math.max(purchased, auction.quantity - (auction.reducedQuantity || 0));
     // A later snapshot may fulfill, expire or cancel a successful local reservation.
     const candidate = auction.myReservation || (saved?.auction === auction ? saved.reservation : null);
@@ -68,11 +68,11 @@ export default function BuyAuctionCard({ auction, now, inlineReserve = false, ex
     }
 
     return <article className={`relative isolate min-h-[134px] min-w-0 self-start rounded-lg border border-gray-200 px-3 py-1.5 shadow-sm transition-shadow hover:border-gray-300 hover:shadow-md ${auctionCardBackground(result.status)}`}>
-        <div className="flex min-h-[120px] min-w-0 flex-col">
-            <header className="flex min-h-[34px] shrink-0 items-start justify-between gap-3">
+        <div className="flex h-[120px] min-w-0 flex-col">
+            <header className="flex h-8 shrink-0 items-start justify-between gap-3">
                 <Link to={`/auction/${auction.id}`} state={linkState} title={itemLabel}
                     className="min-w-0 flex-1 rounded text-[#14248A] after:absolute after:inset-0 after:z-0 after:cursor-pointer after:rounded-lg hover:text-[#14248A] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-blue-500">
-                    <h2 className="flex min-w-0 items-start gap-1 text-base font-bold leading-5">
+                    <h2 className="flex min-w-0 items-start gap-1 text-base font-bold leading-4">
                         <span className="line-clamp-2 min-w-0 break-words">{auction.item}</span>
                         <span className="shrink-0 whitespace-nowrap font-semibold text-[#5365AB]">×{auction.quantity.toLocaleString('en-US')}</span>
                     </h2>
@@ -84,13 +84,13 @@ export default function BuyAuctionCard({ auction, now, inlineReserve = false, ex
                     <span className="inline-flex rounded border border-red-200 bg-red-100 px-1.5 py-0.5 text-[11px] font-medium leading-3 text-red-700">Buy</span>
                 </div>
             </header>
-            <div className="flex min-h-[60px] min-w-0 shrink-0 items-start gap-3">
+            <div className="flex h-[52px] min-w-0 shrink-0 items-start gap-3">
                 <Link to={`/auction/${auction.id}`} state={linkState} aria-label={`View ${itemLabel}`} className="relative z-10 flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-md bg-white/70">
                     {auction.image ? <img src={auction.image} alt="" loading="lazy" className="h-[60px] w-[60px] object-contain [image-rendering:pixelated]" /> : <span className="text-[10px] text-gray-400">No image</span>}
                 </Link>
                 <div className="min-w-0 flex-1">
                     {showForm ? <>
-                        <FittedPrice as="p" fitKey={`${auction.pricePerItem}:${available}:reserve`} className="w-full text-center text-sm font-semibold leading-5 text-[#112D4E]">
+                        <FittedPrice as="p" fitKey={`${auction.pricePerItem}:${available}:reserve`} className="w-full text-center text-sm font-semibold leading-4 text-[#112D4E]">
                             {formatCompactMeat(auction.pricePerItem)} Meat / item <span className="font-normal text-gray-600">· {available.toLocaleString('en-US')} available</span>
                         </FittedPrice>
                         <section id={formId} aria-label={`Selling to ${auction.item}`} className="relative z-10 mt-1">
@@ -115,16 +115,15 @@ export default function BuyAuctionCard({ auction, now, inlineReserve = false, ex
                         </section>
                     </> : <>
                         <FittedPrice as="p" fitKey={`${auction.pricePerItem}:buy`} className="w-full text-center text-[26px] font-bold leading-7 tracking-tight text-[#112D4E]">
-                            {formatCompactMeat(auction.pricePerItem)} Meat <span className="text-[11px] font-normal tracking-normal text-gray-500">/ item</span>
+                            {formatCompactMeat(auction.pricePerItem)} Meat <span className="text-[11px] font-normal leading-none tracking-normal text-gray-500">/ item</span>
                         </FittedPrice>
-                        <p className="truncate text-center text-[11px] leading-4 text-gray-600">{purchased.toLocaleString('en-US')} / {target.toLocaleString('en-US')} purchased · {available.toLocaleString('en-US')} available</p>
+                        <p className="truncate text-center text-[11px] leading-[14px] text-gray-600">{purchased.toLocaleString('en-US')} / {target.toLocaleString('en-US')} purchased{reserved > 0 && <> · {reserved.toLocaleString('en-US')} reserved</>}</p>
                         <progress aria-label="Order fulfillment" value={purchased} max={target || 1} className="buy-card-progress mt-1 h-1.5 w-full" />
                     </>}
                 </div>
             </div>
-            <footer className="mt-1 flex min-h-8 shrink-0 items-end justify-between gap-2">
-                <TradeTypeBadge escrow compact short />
-                {showForm ? <button type="button" onClick={onToggleReserve} disabled={pending} aria-expanded={true} aria-controls={formId} className="relative z-10 h-6 border-0 bg-transparent px-1 text-xs text-gray-600 underline">Close</button>
+            <footer className="mt-1 flex min-h-8 shrink-0 items-end justify-end gap-2">
+                {showForm ? <button type="button" onClick={onToggleReserve} disabled={pending} aria-label="Close reservation form" aria-expanded={true} aria-controls={formId} className="relative z-10 inline-flex h-8 min-w-24 shrink-0 items-center justify-center rounded-[2px] border border-gray-300 bg-white px-4 py-0 text-xs font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-500">Close</button>
                     : owns ? <span className="rounded bg-white/70 px-2 py-1 text-[11px] font-medium text-gray-500">Your Listing</span>
                         : inlineReserve && (active || reservation) ? <button type="button" disabled={currentUser?.isBanned || !reservation && available <= 0} onClick={onToggleReserve}
                             aria-expanded={false} aria-controls={formId} className={`relative z-10 ${actionClass}`}>{reservation ? 'View reservation' : 'Sell to this order'}</button>

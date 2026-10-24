@@ -138,9 +138,9 @@ test('instant purchase controls appear for eligible buyers including the highest
     assert.doesNotMatch(render('/auction/active', auctions, {id: 'buyer'}), /Buyout Price/);
 });
 
-test('listing form labels instant purchase optional and homepage shows its amount', () => {
+test('listing form labels instant purchase optional and compact homepage cards focus on the current price', () => {
     assert.match(render('/auction-item', auctions, {id: 'seller'}), /Set Buyout Price \(optional\)/);
-    assert.match(render('/', [{ ...auctions[0], instantPurchasePrice: 1000 }]), /Buyout Price: 1k/);
+    assert.doesNotMatch(render('/', [{ ...auctions[0], instantPurchasePrice: 1000 }]), /Buyout Price: 1k/);
 });
 
 test('empty item search shows a typing hint without a catalog dropdown', () => {
@@ -223,7 +223,7 @@ test('auction lists abbreviate prices while individual details keep exact amount
     assert.match(details,/>Buy Now<\/button>/);
     const home=render('/',[listing]);
     assert.match(home,/>59.6m Meat<\/span>/);
-    assert.match(home,/Buyout Price: 6.2b/);
+    assert.doesNotMatch(home,/Buyout Price: 6.2b/);
 });
 
 
@@ -315,14 +315,17 @@ test('individual auction pages display the exact hybrid minimum in Direct inputs
     }
 });
 
-test('homepage has one See all auctions link beside Popular Items and retains the entire open-auction strip', () => {
+test('homepage has one See all auctions link beside Explore Auctions and retains the entire open-auction strip', () => {
     const listings = Array.from({ length: 31 }, (_, i) => ({ ...auctions[0], id: `carousel-${i}`, item: `Carousel item ${i}`, bidCount: 31-i }));
     const html = render('/', listings);
     assert.equal((html.match(/>See all auctions<\/a>/g) || []).length, 1);
     assert.doesNotMatch(html, /Browse active auctions|See more active auctions/);
-    assert.match(html, /Popular Items<\/h2><span[^>]*aria-hidden="true"[^>]*>·<\/span>/);
-    assert.equal((html.match(/<li class="popular-auction-slot"/g) || []).length, 31);
-    assert.match(html, /Pause auction scrolling/);
+    assert.match(html, /Explore Auctions<\/h2>/);
+    assert.match(html, /role="tablist" aria-label="Explore auction sorting"/);
+    assert.match(html, /aria-selected="true"[^>]*>Popular<\/button>/);
+    assert.match(html, /href="\/auctions\?status=active&amp;sort=bids-desc"/);
+    assert.equal((html.match(/<li class="w-64 shrink-0"/g) || []).length, 31);
+    assert.doesNotMatch(html, /Pause auction scrolling/);
     for (const listing of listings) assert.equal((html.match(new RegExp(`>${listing.item} <span`, 'g')) || []).length, 1);
 });
 
@@ -368,7 +371,7 @@ test('completed card shading excludes every pending and unsuccessful outcome in 
             const recent = home.slice(home.indexOf('aria-label="Recently completed trades"'));
             assert.equal(recent.includes('Active accessory'), status === 'completed');
             if (status === 'completed') {
-                assert.match(recent, /Final price: 5,000 Meat/);
+                assert.match(recent, /Final: 5,000 Meat/);
                 assert.doesNotMatch(recent, /Ends in|Buyout Price|Winner:|Sold by/);
             }
         }
@@ -446,6 +449,19 @@ test('homepage High Rollers mixes active and genuinely completed cards with corr
     assert.match(section,/High live item/);assert.match(section,/High completed item/);
     assert.doesNotMatch(section,/Not a completed trade|Exactly 50M/);
     assert.match(section,/bg-green-50/);assert.match(section,/Final: 80,000,000 Meat/);assert.match(section,/Completed ·/);assert.match(section,/Ends in/);
-    assert.ok(html.indexOf('aria-label="High Rollers"')<html.indexOf('aria-label="Popular auctions"'));
+    assert.ok(html.indexOf('aria-label="High Rollers"')<html.indexOf('aria-label="Explore auctions"'));
     assert.match(section,/high-rollers-viewport/);assert.match(section,/grid h-24/);assert.doesNotMatch(section,/popular-auction-track|Pause|Buyout/);
+});
+
+
+test('all home strips use compact cards, only recently completed trades auto-scroll',()=>{
+    const rows=[...Array.from({length:6},(_,i)=>({...auctions[0],id:'live-'+i,item:'Live '+i,currentBid:60000000,image:'/test.gif'})),
+        ...Array.from({length:6},(_,i)=>({...auctions[0],id:'done-'+i,item:'Done '+i,image:'/test.gif',status:'completed',finalPrice:70000000,completedAt:'2026-10-24T12:00:00Z'}))];
+    const html=render('/',rows);
+    for(const label of ['High Rollers','Explore auctions','Recently completed trades']) {
+        const section=html.split(`aria-label="${label}"`)[1].split('</section>')[0];
+        assert.match(section,/grid h-24/);assert.match(section,/h-10 w-10/);assert.doesNotMatch(section,/h-\[192px\]/);
+        if(label==='Recently completed trades') {assert.match(section,/Pause completed trade scrolling/);assert.match(section,/data-moving="true"/);}
+        else {assert.doesNotMatch(section,/Pause|popular-auction-track/);assert.match(section,/high-rollers-viewport/);}
+    }
 });

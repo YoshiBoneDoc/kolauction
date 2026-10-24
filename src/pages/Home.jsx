@@ -1,9 +1,11 @@
 import PopularAuctions from '../components/PopularAuctions';
 import HighRollers from '../components/HighRollers';
+import ExploreAuctions from '../components/ExploreAuctions';
 import { useContext, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { AuctionsContext } from '../context/AuctionsContext';
-import { popularActiveAuctions, recentCompletedAuctions, highRollerAuctions } from '../lib/auctionBrowsing';
+import { recentCompletedAuctions, highRollerAuctions } from '../lib/auctionBrowsing';
+import { getAuctionStatus } from '../lib/auctionLifecycle';
 import { useNow } from '../hooks/useNow';
 import PendingTrades from '../components/PendingTrades';
 import SiteFooter from '../components/SiteFooter';
@@ -12,7 +14,7 @@ import HomePoll from '../components/HomePoll';
 export default function Home() {
     const { auctions, isLoading, error } = useContext(AuctionsContext);
     const now = useNow();
-    const popular = useMemo(() => popularActiveAuctions(auctions, now), [auctions, now]);
+    const hasActiveAuctions = auctions.some(auction => ['active', 'finalizing'].includes(getAuctionStatus(auction, now)));
 
     const highRollers = useMemo(() => highRollerAuctions(auctions, now), [auctions, now]);
     const completed = useMemo(() => recentCompletedAuctions(auctions), [auctions]);
@@ -29,10 +31,10 @@ export default function Home() {
                     {isLoading && <p role="status">Loading High Rollers…</p>}
                     {!isLoading && !error && highRollers.length === 0 && <p>No active or completed auctions over 50M Meat yet.</p>}
                 </HighRollers>
-                <PopularAuctions auctions={popular} now={now}>
+                <ExploreAuctions auctions={auctions} now={now}>
                     {isLoading && <p role="status">Loading auctions…</p>}
-                    {!isLoading && !error && popular.length === 0 && <p>No active auctions right now. <Link to="/auctions?status=all" className="text-blue-700 underline">Browse auction history</Link> or <Link to="/auction-item" className="text-blue-700 underline">list an item</Link>.</p>}
-                </PopularAuctions>
+                    {!isLoading && !error && !hasActiveAuctions && <p>No active auctions right now. <Link to="/auctions?status=all" className="text-blue-700 underline">Browse auction history</Link> or <Link to="/auction-item" className="text-blue-700 underline">list an item</Link>.</p>}
+                </ExploreAuctions>
 
                 <div className="mt-8">
                     <PopularAuctions auctions={completed} now={now} completed>

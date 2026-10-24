@@ -51,6 +51,24 @@ export function popularActiveAuctions(auctions, now = Date.now()) {
     );
 }
 
+export const exploreAuctionTabs = [
+    { id: 'popular', label: 'Popular', sort: 'bids-desc' },
+    { id: 'new', label: 'New', sort: 'newest' },
+    { id: 'ending', label: 'Ending Soon', sort: 'ending' },
+];
+
+// Sort the full active pool before choosing one representative per catalog item.
+export function exploreAuctions(auctions, tab = 'popular', now = Date.now()) {
+    const { sort } = exploreAuctionTabs.find(option => option.id === tab) || exploreAuctionTabs[0];
+    const seen = new Set();
+    return browseAuctions(auctions, { sort, now }).filter(auction => {
+        const key = auction.itemId != null ? `id:${auction.itemId}` : `name:${auction.item.trim().toLocaleLowerCase()}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
 export function timeRemaining(endTime, now) {
     const remaining = Math.max(0, Math.ceil((endTime - now) / 1000));
     const days = Math.floor(remaining / 86400);

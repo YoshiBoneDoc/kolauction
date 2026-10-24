@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { browseAuctions, popularActiveAuctions, auctionPrice, highRollerAuctions } from '../src/lib/auctionBrowsing.js';
+import { browseAuctions, popularActiveAuctions, auctionPrice, highRollerAuctions, exploreAuctions, exploreAuctionTabs } from '../src/lib/auctionBrowsing.js';
 import { parseAuctionAmount, parseMeatAmount, normalizeAuctionAmount } from '../src/lib/auctionInputs.js';
 
 const now = 10000;
@@ -15,6 +15,39 @@ const listings = [
     { ...base, id: 'unsold', status: 'ended_no_bids' },
 ];
 const ids = (values) => values.map((value) => value.id);
+
+test('Explore selects a unique item after ranking the full pool for each tab, without affecting All Auctions', () => {
+    const pool = [
+        { ...base, id: 'popular', itemId: 1, bidCount: 9, createdAt: 100, endTime: 19000 },
+        { ...base, id: 'new', itemId: '1', bidCount: 1, createdAt: 300, endTime: 18000, auctionKind: 'buy' },
+        { ...base, id: 'ending', itemId: 1, bidCount: 2, createdAt: 200, endTime: 11000 },
+        { ...base, id: 'other', itemId: 2, item: 'Other item', bidCount: 4, createdAt: 250, endTime: 15000 },
+        { ...base, id: 'closed', itemId: 3, status: 'completed', bidCount: 99, createdAt: 500, endTime: 10500 },
+        { ...base, id: 'pending', itemId: 4, status: 'pending_escrow' },
+    ];
+    const original = [...pool];
+    assert.deepEqual(ids(exploreAuctions(pool, 'popular', now)), ['popular', 'other']);
+    assert.deepEqual(ids(exploreAuctions(pool, 'new', now)), ['new', 'other']);
+    assert.deepEqual(ids(exploreAuctions(pool, 'ending', now)), ['ending', 'other']);
+    assert.deepEqual(ids(exploreAuctions(pool, 'invalid', now)), ['popular', 'other']);
+    assert.equal(browseAuctions(pool, { now }).length, 4);
+    assert.deepEqual(pool, original);
+    for (const tab of exploreAuctionTabs) {
+        const sorted = browseAuctions(pool, { now, sort: tab.sort });
+        assert.equal(exploreAuctions(pool, tab.id, now)[0].id, sorted[0].id);
+    }
+});
+
+test('Explore does not truncate before deduplication and falls back to normalized item names', () => {
+    const pool = [
+        ...Array.from({ length: 60 }, (_, i) => ({ ...base, id: `duplicate-${i}`, bidCount: 100 - i })),
+        { ...base, id: 'name-variant', item: '  MR. ACCESSORY ', bidCount: 2 },
+        ...Array.from({ length: 30 }, (_, i) => ({ ...base, id: `unique-${i}`, item: `Item ${i}`, bidCount: 1 })),
+    ];
+    assert.equal(exploreAuctions(pool, 'popular', now).length, 31);
+    assert.equal(exploreAuctions(pool, 'popular', now)[0].id, 'duplicate-0');
+    assert.deepEqual(exploreAuctions([], 'new', now), []);
+});
 
 test('search combines with lifecycle filters and trims case-insensitive item names', () => {
     assert.deepEqual(ids(browseAuctions(listings, { search: '  PLASTIC SwOrD ', now })), ['b']);

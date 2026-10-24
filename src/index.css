@@ -175,7 +175,6 @@ button:focus-visible {
 }
 
 .popular-auction-viewport {
-  --popular-columns: 1;
   touch-action: pan-y pinch-zoom;
   user-select: none;
   overflow: hidden;
@@ -189,11 +188,11 @@ button:focus-visible {
 .popular-auction-track {
   display: flex;
   width: 100%;
-  gap: 1rem;
+  gap: 0.75rem;
   align-items: stretch;
 }
 .popular-auction-slot {
-  flex: 0 0 calc((100% - (var(--popular-columns) - 1) * 1rem) / var(--popular-columns));
+  flex: 0 0 256px;
   min-width: 0;
 }
 .popular-auction-viewport[data-moving="true"] .popular-auction-track {
@@ -217,11 +216,9 @@ button:focus-visible {
   transform: none;
 }
 @keyframes popular-auction-scroll {
-  from { transform: translateX(calc((-100% - 1rem) / var(--popular-columns))); }
+  from { transform: translateX(-268px); }
   to { transform: translateX(0); }
 }
-@media (min-width: 640px) { .popular-auction-viewport { --popular-columns: 2; } }
-@media (min-width: 1024px) { .popular-auction-viewport { --popular-columns: 4; } }
 @media (prefers-reduced-motion: reduce) {
   .popular-auction-viewport { overflow-x: auto; touch-action: pan-x pan-y pinch-zoom; }
   .popular-auction-viewport[data-moving] .popular-auction-track { animation: none; transform: none; }
@@ -271,10 +268,6 @@ html[data-theme="dark"] .buy-card-progress {
   --progress-end: #3b82f6;
 }
 
-/* Temporary upside-down joke; removing the toggle and this rule restores normal layout. */
-html.upside-down #root {
-  transform: rotate(180deg);
-}
 
 .poll-result-arrow svg {
   flex-shrink: 0;
@@ -291,7 +284,7 @@ html.upside-down #root {
   outline-offset: 1px;
 }
 
-/* High Rollers: native touch scrolling/inertia, plus desktop pointer dragging. */
+/* Static homepage strips: native touch scrolling plus desktop pointer dragging. */
 .high-rollers-viewport {
   overflow-x: auto;
   overscroll-behavior-x: contain;
@@ -302,5 +295,24 @@ html.upside-down #root {
   cursor: grab;
 }
 .high-rollers-viewport a { user-select: none; }
+
+/* Homepage discovery tabs stay lighter than the full browsing toolbar. */
+.explore-auction-tab {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 5px 0;
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+  color: #64748b;
+}
+.explore-auction-tab:hover { color: #6d55a3; border-bottom-color: #ddd6f1; }
+.explore-auction-tab[aria-selected="true"] { color: #5f488c; border-bottom-color: #b6a1df; }
+.explore-auction-tab:focus { outline: none; }
+.explore-auction-tab:focus-visible { outline: 2px solid #b6a1df; outline-offset: 3px; }
+html[data-theme="dark"] .explore-auction-tab { color: #a6b0c1; }
+html[data-theme="dark"] .explore-auction-tab:hover,
+html[data-theme="dark"] .explore-auction-tab[aria-selected="true"] { color: #ddd0f9; }
 .high-rollers-viewport[data-dragging="true"],
 .high-rollers-viewport[data-dragging="true"] a { cursor: grabbing; }

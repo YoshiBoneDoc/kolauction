@@ -30,11 +30,13 @@ const submit=h=>h.find(n=>n.type==='form').props.onSubmit({preventDefault(){}});
 
 test('Buy cards match Sell typography, stretch the main link and place distinct badges and timer',()=>{
  const h=harness({expanded:false});const html=h.html();
- assert.match(html,/text-base font-bold leading-5/);assert.match(html,/text-\[26px\] font-bold/);
+ assert.match(html,/text-base font-bold leading-4/);assert.match(html,/text-\[26px\] font-bold/);
  assert.match(html,/after:absolute after:inset-0/);assert.match(html,/href="\/auction\/order"/);
- assert.match(html,/border-red-200 bg-red-100/);assert.match(html,/>Buy<\/span>/);assert.match(html,/>Escrow<\/span>/);
+ assert.match(html,/border-red-200 bg-red-100/);assert.match(html,/>Buy<\/span>/);assert.doesNotMatch(html,/>Escrow<\/span>/);
  assert.match(html,/text-\[11px\] leading-3 tabular-nums/);assert.match(html,/Order fulfillment/);
- assert.match(html,/50,000 available/);assert.match(html,/Sell to this order/);
+ assert.match(html,/0 \/ 50,000 purchased/);assert.doesNotMatch(html,/available|reserved/);assert.match(html,/Sell to this order/);
+ const reserved=harness({listing:{...auction,reservedQuantity:4321,availableQuantity:45679},expanded:false}).html();
+ assert.match(reserved,/0 \/ 50,000 purchased · 4,321 reserved/);assert.doesNotMatch(reserved,/45,679 available/);
  for(const status of ['cancelled','voided'])assert.match(harness({listing:{...auction,status},expanded:false}).html(),/bg-\[#ECEDEF\]/);
  assert.match(harness({listing:{...auction,status:'completed'},expanded:false}).html(),/bg-green-50/);
  assert.match(harness({listing:{...auction,status:'settling'},expanded:false}).html(),/bg-yellow-50/);
