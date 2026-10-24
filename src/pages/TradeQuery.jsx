@@ -54,7 +54,7 @@ export default function TradeQuery() {
     const auction = auctions.find(entry => String(entry.id) === id);
     const eligible = canSendTradeQuery(auction, currentUser);
 
-    return <div className="flex flex-1 flex-col bg-gray-50">
+    return <div className="site-page-background flex flex-1 flex-col bg-gray-50">
         <main className="mx-auto w-full max-w-2xl flex-1 space-y-5 px-4 py-6 sm:px-6">
             <Link to={`/auction/${id}`} className="inline-flex min-h-11 items-center text-blue-700 underline">Back to auction</Link>
             <h1 className="text-3xl font-bold text-blue-700">Trade query</h1>

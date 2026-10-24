@@ -27,7 +27,7 @@ const Profile = () => {
 
     if (!currentUser) {
         return (
-            <div className="flex-1 flex flex-col items-center justify-center bg-[#F1F3F5] p-6">
+            <div className="site-page-background flex-1 flex flex-col items-center justify-center bg-[#F1F3F5] p-6">
                 <p className="text-red-500 text-xl font-bold mb-4">You must be logged in to view your profile.</p>
                 <Link to="/login" className="text-blue-500 hover:underline text-lg">Log In</Link>
             </div>
@@ -35,7 +35,7 @@ const Profile = () => {
     }
     if (isLoading) return <div className="p-6"><p role="status" className="mt-3">Loading your auction history…</p></div>;
 
-    if (error) return <main className="flex-1 bg-[#F1F3F5] p-6">
+    if (error) return <main className="site-page-background flex-1 bg-[#F1F3F5] p-6">
         <h1 className="my-6 text-center text-4xl font-bold text-blue-600">My Account</h1>
         <section aria-labelledby="history-unavailable" className="mx-auto max-w-xl space-y-3 rounded border border-gray-200 bg-white p-6">
             <h2 id="history-unavailable" className="text-lg font-semibold text-gray-900">Auction history unavailable</h2>
@@ -72,7 +72,7 @@ const Profile = () => {
     ];
 
     return (
-        <div className="flex-1 bg-[#F1F3F5] p-6">
+        <div className="site-page-background flex-1 bg-[#F1F3F5] p-6">
             <h1 className="text-4xl font-bold text-blue-600 my-6 text-center">{currentUser.khubUsername}&apos;s Profile</h1>
             <p className="mb-4 text-center"><Link to="/change-password" className="text-blue-700 underline">Change password</Link></p>
             {selling.some(auction => auction.status !== 'pending_escrow') && <p className="mb-4 text-center"><Link to={`/seller/${currentUser.id}`} className="text-blue-700 underline">View public seller profile</Link></p>}

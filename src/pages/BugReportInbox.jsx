@@ -125,7 +125,7 @@ function Inbox() {
 
 export default function BugReportInbox() {
     const { currentUser } = useContext(UserContext);
-    return <div className="flex flex-1 flex-col bg-gray-50">
+    return <div className="site-page-background flex flex-1 flex-col bg-gray-50">
         <main className="mx-auto w-full max-w-6xl flex-1 space-y-5 px-4 py-6 sm:px-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <h1 className="text-3xl font-bold text-blue-700">Administrator inbox</h1>

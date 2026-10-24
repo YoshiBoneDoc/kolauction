@@ -26,7 +26,7 @@ const Login = () => {
     };
 
     return (
-        <div className="flex-1 bg-gray-50 flex flex-col items-center justify-center px-4 py-16">
+        <div className="site-page-background flex-1 bg-gray-50 flex flex-col items-center justify-center px-4 py-16">
 
             <form
                 onSubmit={handleSubmit}

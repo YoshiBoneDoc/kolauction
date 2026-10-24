@@ -24,7 +24,7 @@ export default function AuctionCard({ auction, now }) {
     const displayStatus = getAuctionDisplayStatus(auction, result);
     if (auction.auctionKind === 'buy') return <BuyAuctionCard auction={auction} now={now} />;
     return (
-        <article className={`relative isolate flex min-w-0 flex-col rounded-lg border ${auctionCardBackground(result.status)} p-4 shadow [&_button]:relative [&_button]:z-10 [&_form]:relative [&_form]:z-10`}>
+        <article className={`relative isolate flex min-w-0 flex-col rounded-lg border ${auctionCardBackground(result.status)} p-4 shadow [&_button]:relative [&_button]:z-10 [&_form]:relative [&_form]:z-10 auction-card`}>
             <Link to={`/auction/${auction.id}`} state={linkState} className="flex flex-col items-center gap-3 text-center after:absolute after:inset-0 after:z-0 after:cursor-pointer after:rounded-lg focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-blue-500">
                 {auction.image && <img src={auction.image} alt="" loading="lazy" className="h-24 w-24 object-contain" />}
                 <h2 className="w-full break-words text-xl font-bold text-[#14248A]">{auction.item} <span className="text-[#5365AB]">×{auction.quantity.toLocaleString('en-US')}</span></h2>

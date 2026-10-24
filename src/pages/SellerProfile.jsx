@@ -43,7 +43,7 @@ export default function SellerProfile() {
 
     const stats = seller.stats;
     return (
-        <main className="flex-1 bg-gray-50 px-4 py-6 sm:px-6">
+        <main className="site-page-background flex-1 bg-gray-50 px-4 py-6 sm:px-6">
             <div className="mx-auto max-w-6xl">
                 <Link to="/auctions" className="inline-flex min-h-11 items-center text-blue-700 underline">Back to Auctions</Link>
                 <h1 className="my-5 break-words text-3xl font-bold text-blue-700">{currentUser && !currentUser.isBanned && seller.usernames_visible !== false ? seller.username : 'Player profile'}</h1>

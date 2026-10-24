@@ -25,7 +25,7 @@ export default function CopyMessage({ text, label = 'message', className = '', c
 
     return (
         <div className={className}>
-            <div className={`flex min-w-0 items-center rounded bg-gray-100 ${inline && recipient ? 'gap-1' : 'gap-2'} ${inline ? 'h-6 rounded-none rounded-l-[2px] border border-r-0 border-gray-300' : compact ? 'h-12 px-3' : 'p-3'}`}>
+            <div className={`copy-message-field flex min-w-0 items-center rounded bg-gray-100 ${inline && recipient ? 'gap-1' : 'gap-2'} ${inline ? 'h-6 rounded-none rounded-l-[2px] border border-r-0 border-gray-300' : compact ? 'h-12 px-3' : 'p-3'}`}>
                 {inline ? <input id={inputId} type="text" readOnly value={text} aria-label={label} title={text} onFocus={event => event.target.select()}
                     style={recipient ? { width: `calc(${text.length}ch + 0.5rem)`, maxWidth: '65%' } : undefined}
                     className={`h-full min-w-0 rounded-none border-0 bg-transparent text-left font-mono text-[13px] text-gray-700 focus:outline-none ${recipient ? 'shrink-0 px-1' : 'flex-1 px-2'}`} />

@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import PropTypes from 'prop-types';
 
 export default function SiteFooter({ className = '', showReportLink = true }) {
-    return <footer className={`border-t bg-gray-100 px-4 py-3 text-center ${className}`}>
+    return <footer className={`site-footer border-t bg-gray-100 px-4 py-3 text-center ${className}`}>
         <nav aria-label="Footer links" className="flex flex-wrap items-center justify-center gap-3 text-sm">
             <Link to="/donate" className="inline-flex min-h-11 items-center text-blue-700 hover:underline">Donate</Link>
             {showReportLink && <span aria-hidden="true">•</span>}

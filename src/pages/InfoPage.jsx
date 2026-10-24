@@ -40,7 +40,7 @@ const InfoPage = () => {
         if (['#escrow-fees-title', '#buy-gift-delivery', '#buy-auctions-title', '#gift-packages', '#anti-sniping', '#bid-increases-title'].includes(hash)) document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
     }, [hash]);
     return (
-        <div className="flex-1 bg-gray-50 flex flex-col items-center justify-center p-6">
+        <div className="site-page-background flex-1 bg-gray-50 flex flex-col items-center justify-center p-6">
             <h1 className="text-4xl font-bold text-blue-600 mb-4">About KoL Auction Hub</h1>
             <p className="w-full max-w-3xl mb-6 text-sm leading-6 text-gray-700 text-justify">
                 Welcome to <span className="font-bold text-blue-500">kHub</span> (Kingdom of Loathing Auction Hub), a modern take on the old “kBay.”{' '}

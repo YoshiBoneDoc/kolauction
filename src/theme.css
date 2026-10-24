@@ -1,5 +1,73 @@
-/* Shared dark palette for the existing Tailwind utilities and custom card colors.
-   Match exact utility tokens so unrelated classes and image pixels stay intact. */
+/* Shared surface palettes. Exact utility tokens keep text, buttons, badges,
+   status accents, and image pixels independent from the page surfaces. */
+html:not([data-theme="dark"]) {
+  --light-page: #FDF0EA;
+  --light-surface: #FFFAF5;
+  --light-row: #FFF3EA;
+  --light-header: #F5EAE4;
+  --light-divider: #F8EEEA;
+  --light-border: #E8D9D2;
+  --light-input: #FFFCF9;
+  --light-escrow-header: #EDEBFF;
+  --light-direct-header: #E8F4EC;
+}
+html:not([data-theme="dark"]),
+html:not([data-theme="dark"]) body,
+html:not([data-theme="dark"]) .site-page-background { background-color: var(--light-page); }
+
+/* Neutral cards, panels, toolbars, code boxes, and information callouts.
+   Leave controls and badges on their original interactive/accent palette. */
+html:not([data-theme="dark"]) :is(
+  [class~="bg-white"], [class~="bg-white/70"],
+  [class~="bg-gray-50"], [class~="bg-gray-50/50"],
+  [class~="bg-gray-100"], [class~="bg-gray-200"],
+  [class~="bg-slate-50"], [class~="bg-slate-100"],
+  [class~="bg-[#F8F6F4]"], [class~="bg-[#ECEDEF]"], [class~="bg-[#F7FAFF]"], [class~="bg-[#F7FBF8]"],
+  [class~="bg-blue-50"], [class~="bg-blue-50/70"]
+):where(:not(:is(button, input, select, textarea, option, span, footer, thead, th, [role="button"], a.inline-flex, .site-page-background, .button-green, .button-red))) {
+  background-color: var(--light-surface);
+}
+
+/* Auction cards share the same cream surface in every light-mode view. */
+html:not([data-theme="dark"]) .auction-card { background-color: var(--light-surface); }
+
+html:not([data-theme="dark"]) .bid-kmail-instructions { background-color: var(--light-input); }
+html:not([data-theme="dark"]) .bid-kmail-instructions .copy-message-field { background-color: #FFFFFF; }
+
+/* Tables use solid surfaces, including tables without explicit color classes. */
+html:not([data-theme="dark"]) table { background-color: var(--light-surface); }
+html:not([data-theme="dark"]) tbody > tr:nth-child(odd),
+html:not([data-theme="dark"]) tbody > tr:nth-child(odd) > td {
+  background-color: var(--light-row);
+}
+html:not([data-theme="dark"]) :is(thead, thead tr, th[scope="col"]) { background-color: var(--light-header); }
+html:not([data-theme="dark"]) th[scope="rowgroup"] { background-color: var(--light-divider); }
+html:not([data-theme="dark"]) th[class~="bg-[#EAF2FF]"] { background-color: var(--light-escrow-header); }
+html:not([data-theme="dark"]) th[class~="bg-[#EDF5EF]"] { background-color: var(--light-direct-header); }
+
+/* Neutral edges change together, while colored accents and button/badge edges
+   retain their existing states. Uncolored borders include Tailwind's defaults. */
+html:not([data-theme="dark"]) :is(
+  [class~="border-gray-100"], [class~="border-gray-200"], [class~="border-gray-300"], [class~="border-gray-400"],
+  [class~="border-slate-200"], [class~="border-[#E0E5EB]"], [class~="border-[#E5E7EB]"]
+):not(:is(button, span, [role="button"], a.inline-flex, .button-green, .button-red)),
+html:not([data-theme="dark"]) :is([class~="border"], [class~="border-t"], [class~="border-b"], [class~="border-y"], [class~="border-l"], [class~="border-r"]):not(:is(
+    [class*="border-blue-"], [class*="border-green-"], [class*="border-red-"], [class*="border-yellow-"], [class*="border-violet-"], [class*="border-amber-"],
+    [class*="border-[#"], [class*="border-t-[#"], [class*="border-r-[#"], [class*="border-b-[#"], [class*="border-l-[#"],
+    [class~="border-transparent"], [class~="border-white"], button, span, [role="button"], a.inline-flex, .button-green, .button-red)) {
+  border-color: var(--light-border);
+}
+html:not([data-theme="dark"]) [class~="border-r-[#E0E5EB]"] { border-right-color: var(--light-border); }
+html:not([data-theme="dark"]) [class~="divide-y"] > :not([hidden]) ~ :not([hidden]) { border-color: var(--light-divider); }
+html:not([data-theme="dark"]) hr { background-color: var(--light-divider); border-color: var(--light-divider); }
+
+html:not([data-theme="dark"]) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
+html:not([data-theme="dark"]) select,
+html:not([data-theme="dark"]) textarea { background-color: var(--light-input); }
+html:not([data-theme="dark"]) option { background-color: var(--light-input); }
+html:not([data-theme="dark"]) input:-webkit-autofill { box-shadow: 0 0 0 1000px var(--light-input) inset; }
+html:not([data-theme="dark"]) :is(.site-footer, .shame-footer) { background-color: var(--light-divider); border-color: var(--light-border); }
+
 html[data-theme="dark"] {
   color-scheme: dark;
   --theme-page: #0b1220;

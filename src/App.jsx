@@ -33,7 +33,7 @@ const App = () => {
     const { error, refreshAuctions } = useContext(AuctionsContext) || {};
     const isWallOfShame = pathname.replace(/\/+$/, '') === '/wall-of-shame';
     return (
-        <div className={`flex min-h-screen flex-col ${isWallOfShame ? 'shame-background' : 'bg-[#F9F9F9]'}`}>
+        <div className={`flex min-h-screen flex-col ${isWallOfShame ? 'shame-background' : 'site-page-background bg-[#F9F9F9]'}`}>
             <div className="px-4 sm:px-6"><AuctionNavigation /></div>
             <SiteBanner />
             {error && <div role="alert" className="bg-red-50 p-4 text-red-700">

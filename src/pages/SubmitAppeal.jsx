@@ -95,7 +95,7 @@ function AppealForm() {
 export default function SubmitAppeal() {
     const { currentUser, signedInUserId, restrictedAccount } = useContext(UserContext);
     const userId = signedInUserId || currentUser?.id;
-    return <div className="flex flex-1 flex-col bg-gray-50">
+    return <div className="site-page-background flex flex-1 flex-col bg-gray-50">
         {restrictedAccount && <div className="mx-auto w-full max-w-6xl px-4 sm:px-6"><Link to="/" className="inline-flex min-h-9 items-center text-sm text-blue-700 underline">Back to account status</Link></div>}
         <main className="mx-auto w-full max-w-2xl flex-1 space-y-5 px-4 py-6 sm:px-6">
             <h1 className="text-3xl font-bold text-blue-700">Submit an appeal</h1>

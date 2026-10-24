@@ -177,6 +177,10 @@ button:focus-visible {
 @media (max-width: 1023px) {
   .site-navigation .theme-toggle { justify-content: center; width: 44px; padding: 0; }
   .site-navigation .theme-toggle span { display: none; }
+  .mobile-primary-links > a[href="/info"] { grid-area: 1 / 1; }
+  .mobile-primary-links > a[href="/auctions"] { grid-area: 1 / 2; }
+  .mobile-primary-links > a[href="/wall-of-shame"] { grid-area: 2 / 1; }
+  .mobile-primary-links > a[href="/auction-item"] { grid-area: 2 / 2; }
 }
 
 .popular-auction-viewport {

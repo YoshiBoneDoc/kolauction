@@ -30,9 +30,7 @@ export default function AllAuctions() {
         sell: 'border-[#22C55E] bg-green-100 text-green-800 hover:bg-green-200',
         buy: 'border-red-300 bg-red-100 text-red-800 hover:bg-red-200',
     }[kind];
-    const cycleIcon = <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-3.5 w-3.5 shrink-0 opacity-70">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 3M18 17a7 7 0 0 1-12 1l-2-3" />
-    </svg>;
+    const cycleIcon = <span aria-hidden="true" className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center text-base leading-none opacity-70">↺</span>;
     const trade = ['escrow', 'direct', 'none'].includes(params.get('trade')) ? params.get('trade') : 'all';
     const page = Math.min(1000000, Math.max(1, Number.parseInt(params.get('page'), 10) || 1));
     const visible = useMemo(() => browseAuctions(ownershipFiltered ? auctions.filter(auction => mineOnly ? auction.sellerId === currentUser.id : auction.sellerId !== currentUser.id) : auctions, { search, status, sort, trade, kind, now }), [auctions, mineOnly, ownershipFiltered, currentUser?.id, search, status, sort, trade, kind, now]);
@@ -50,7 +48,7 @@ export default function AllAuctions() {
     }
 
     return (
-        <div className="flex-1 bg-[#F9F9F9] px-4 pb-8 sm:px-6">
+        <div className="site-page-background flex-1 bg-[#F9F9F9] px-4 pb-8 sm:px-6">
 
             <main className="mx-auto max-w-7xl">
                 <h1 className="my-4 text-center text-3xl font-bold text-[#7695FF] sm:text-4xl">All Auctions</h1>

@@ -54,7 +54,7 @@ ReportForm.propTypes = { support: PropTypes.bool.isRequired };
 
 export default function ReportBug({ support = false }) {
     const { currentUser } = useContext(UserContext);
-    return <div className="flex flex-1 flex-col bg-gray-50">
+    return <div className="site-page-background flex flex-1 flex-col bg-gray-50">
         <main className="mx-auto w-full max-w-2xl flex-1 space-y-5 px-4 py-6 sm:px-6">
             <h1 className="text-3xl font-bold text-blue-700">{support ? 'Submit a Support Ticket' : 'Report a Bug'}</h1>
             <p className="text-sm text-gray-700">{support ? 'Support tickets' : 'Reports'} are private to administrators.</p>

@@ -3,7 +3,7 @@ import CopyMessage from '../components/CopyMessage';
 
 export default function AuthEmailPage() {
     return (
-        <main className="flex-1 bg-gray-50 flex items-center justify-center p-6">
+        <main className="site-page-background flex-1 bg-gray-50 flex items-center justify-center p-6">
             <section className="w-full max-w-lg bg-white rounded shadow p-6 space-y-4">
 
                 <h1 className="text-2xl font-bold">Recover your kHub login</h1>

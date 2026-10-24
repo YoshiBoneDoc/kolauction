@@ -74,7 +74,7 @@ export default function BuyAuctionDetails({ auction, now, backLink }) {
         setPending(true);setError('');
         try { await cancelAuction(auction.id); } catch (failure) { setError(failure.message); } finally { setPending(false); }
     }
-    return <main className="flex-1 bg-[#F1F3F5] px-4 py-6 sm:px-6">{backLink}
+    return <main className="site-page-background flex-1 bg-[#F1F3F5] px-4 py-6 sm:px-6">{backLink}
         <div className="mx-auto max-w-4xl space-y-5 rounded-lg border border-gray-200 bg-white p-4 shadow sm:p-6">
             <header className="flex items-center gap-4">{auction.image && <img src={auction.image} alt="" className="h-20 w-20 shrink-0 object-contain" />}<div className="min-w-0"><p className="text-sm font-semibold text-blue-700">Buy Auction · Escrow · #{auction.auctionNumber}</p><h1 className="break-words text-3xl font-bold text-blue-600">{auction.item}</h1><p className="text-sm">Requested by <SellerLink auction={auction} /></p></div></header>
             <section aria-label="Buy order overview" className="space-y-2">

@@ -58,7 +58,7 @@ const AllAuctions = () => {
     }, [auctions]);
 
     return (
-        <div className="min-h-screen bg-gray-50 p-6">
+        <div className="site-page-background min-h-screen bg-gray-50 p-6">
             {/* Home Button */}
             <div className="mb-4">
                 <BackHomeLinks />

@@ -12,7 +12,7 @@ export default function KmailInstructions({ auction, mode = 'bid', showHeading =
     const command = `${mode === 'list' ? 'LIST' : mode === 'buy' ? 'BUY' : 'BID'} ${auction.auctionNumber || auction.id}`;
     const minimum = mode === 'list' ? null : minimumAuctionBid(auction);
     return (
-        <section aria-label={`${mode} KMail instructions`} className={`w-full space-y-2 rounded border border-gray-200 bg-white text-left text-sm leading-5 text-gray-800 ${mode === 'bid' ? 'p-4' : 'p-3'}`}>
+        <section aria-label={`${mode} KMail instructions`} className={`w-full space-y-2 rounded border border-gray-200 bg-white text-left text-sm leading-5 text-gray-800 ${mode === 'bid' ? 'bid-kmail-instructions p-4' : 'p-3'}`}>
             {mode === 'bid' && showHeading && <h2 className="text-base font-semibold text-gray-900">Place a Bid</h2>}
             <p>Send a KMail to <strong>kHub (#3888760)</strong> with this exact message:</p>
             <CopyMessage text={command} label={`${command.split(' ')[0]} command`} className="text-base" compact={mode === 'bid'} />

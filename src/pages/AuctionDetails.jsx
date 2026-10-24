@@ -32,9 +32,9 @@ export default function AuctionDetails() {
         <Link to={backTo} className="inline-flex min-h-11 items-center text-sm text-blue-700 underline">Back to Auctions</Link>
     </div>;
 
-    if (isLoading) return <main className="flex-1 bg-[#F1F3F5] px-4 py-6 sm:px-6">{backLink}<p role="status" className="mx-auto max-w-4xl">Loading auction…</p></main>;
+    if (isLoading) return <main className="site-page-background flex-1 bg-[#F1F3F5] px-4 py-6 sm:px-6">{backLink}<p role="status" className="mx-auto max-w-4xl">Loading auction…</p></main>;
     if (!auction) return (
-        <main className="flex-1 bg-[#F1F3F5] px-4 py-6 sm:px-6">
+        <main className="site-page-background flex-1 bg-[#F1F3F5] px-4 py-6 sm:px-6">
             {backLink}
             <p className="mx-auto max-w-4xl text-xl font-bold text-red-700">{error ? 'Auction could not be loaded.' : 'Auction not found.'}</p>
         </main>
@@ -52,7 +52,7 @@ export default function AuctionDetails() {
     const price = result.finalPrice ?? auction.currentBid;
     const { reportedIncomplete, label: statusLabel, color: statusColor } = getAuctionDisplayStatus(auction, result);
     return (
-        <main className="flex-1 bg-[#F1F3F5] px-4 py-6 sm:px-6">
+        <main className="site-page-background flex-1 bg-[#F1F3F5] px-4 py-6 sm:px-6">
             {backLink}
             <div className="mx-auto max-w-4xl rounded-lg border border-gray-200 bg-white p-4 shadow-lg sm:p-6">
                 <section aria-label="Auction overview" className="grid min-w-0 grid-cols-1 items-start gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:gap-6">

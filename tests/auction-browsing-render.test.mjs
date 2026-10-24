@@ -465,3 +465,21 @@ test('all home strips use compact cards, only recently completed trades auto-scr
         else {assert.doesNotMatch(section,/Pause|popular-auction-track/);assert.match(section,/high-rollers-viewport/);}
     }
 });
+
+test('every home strip distinguishes Buy cards and keeps per-item Sell price breakdowns',()=>{
+    const rows=['active','completed'].flatMap(status=>[
+        {...auctions[0],id:`buy-${status}`,item:`Buy item ${status}`,auctionKind:'buy',pricePerItem:60000000,quantity:20,status,completedAt:'2026-10-24T12:00:00Z',escrowMode:true},
+        {...auctions[0],id:`sell-${status}`,item:`Sell item ${status}`,quantity:20,currentBid:80000000,finalPrice:80000000,status,completedAt:'2026-10-24T12:00:00Z',escrowMode:false},
+    ]);
+    const html=render('/',rows);
+    for(const label of ['High Rollers','Explore auctions','Recently completed trades']) {
+        const section=html.split(`aria-label="${label}"`)[1].split('</section>')[0];
+        const state=label==='Recently completed trades'?'completed':'active';
+        const buy=section.match(new RegExp(`<a[^>]*href="/auction/buy-${state}"[\\s\\S]*?</a>`))[0];
+        const sell=section.match(new RegExp(`<a[^>]*href="/auction/sell-${state}"[\\s\\S]*?</a>`))[0];
+        assert.match(buy,/absolute right-2 top-2[^>]*bg-red-100[^>]*>Buy<\/span>/);
+        assert.doesNotMatch(buy,/>Escrow<|>Direct</);
+        assert.match(buy,/60m Meat/);assert.match(buy,/\/ item/);assert.doesNotMatch(buy,/each/);
+        assert.match(sell,/80m Meat/);assert.match(sell,/· 4m each/);assert.match(sell,/>Direct<\/span>/);
+    }
+});
