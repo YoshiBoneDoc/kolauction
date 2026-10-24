@@ -64,3 +64,20 @@ export function recentCompletedAuctions(auctions) {
         .sort((a, b) => (Date.parse(b.completedAt) || 0) - (Date.parse(a.completedAt) || 0)
             || String(a.id).localeCompare(String(b.id))).slice(0, 24);
 }
+
+
+export const HIGH_ROLLER_MIN_PRICE = 50_000_000;
+export function auctionEndingSoon(auction, now = Date.now()) {
+    return getAuctionStatus(auction, now) === 'active' && auction.endTime - now <= 3 * 60 * 60 * 1000;
+}
+export function highRollerAuctions(auctions, now = Date.now()) {
+    const price = auction => auction.auctionKind === 'buy' ? auction.pricePerItem
+        : auction.status === 'completed' ? auction.finalPrice ?? auction.currentBid : auction.currentBid || auction.minBidMeat;
+    return auctions.filter(auction => ['active', 'completed'].includes(getAuctionStatus(auction, now))
+        && price(auction) > HIGH_ROLLER_MIN_PRICE)
+        .sort((a, b) => {
+            const aSoon = auctionEndingSoon(a, now), bSoon = auctionEndingSoon(b, now);
+            return Number(bSoon) - Number(aSoon) || (aSoon && bSoon ? a.endTime - b.endTime : 0)
+                || price(b) - price(a) || String(a.id).localeCompare(String(b.id));
+        });
+}

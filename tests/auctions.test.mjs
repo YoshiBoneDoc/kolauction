@@ -155,7 +155,7 @@ test('homepage loads every active page beyond four and 24 cards using existing p
         if (name === 'finalize_expired_auctions') return { error: null };
         if (args.p_status === 'completed') {
             assert.equal(args.p_sort, 'completed'); assert.equal(args.p_page, 1);
-            return { data: { privacy_version: 1, rows: [{ ...row, id: 'completed', status: 'completed', completed_at: '2026-10-22T12:00:00Z' }], bids: [], total: 99 }, error: null };
+            return { data: { privacy_version: 1, rows: [{ ...row, id: 'completed', status: 'completed', completed_at: '2026-10-22T12:00:00Z' }], bids: [], total: 1 }, error: null };
         }
         assert.equal(args.p_view, 'browse'); assert.equal(args.p_status, 'active');
         assert.equal(args.p_search, ''); assert.equal(args.p_sort, 'newest');
@@ -241,4 +241,24 @@ test('Others uses an authenticated server-side view before pagination, including
     const result=await service.load({excludeOwn:true,search:'hat',status:'all',sort:'price-desc',trade:'escrow',page:3});
     assert.deepEqual(requests[1],['read_auction_page',{p_view:'others',p_id:null,p_search:'hat',p_status:'all',p_trade:'escrow',p_sort:'price-desc',p_page:3}]);
     assert.equal(result.total,55);
+});
+
+
+test('homepage includes older high-priced completed trades, batches pages and stops at 50M without duplicate rows or bids',async()=>{
+    const requests=[];
+    const high=Array.from({length:26},(_,i)=>({...row,id:'high-'+i,status:'completed',final_price:String(100000000-i),completed_at:'2026-01-01T00:00:00Z'}));
+    const low={...row,id:'boundary',status:'completed',final_price:'50000000'};
+    const recent=[high[0],...Array.from({length:23},(_,i)=>({...row,id:'recent-'+i,status:'completed',final_price:'1000',completed_at:'2026-10-24T00:00:00Z'}))];
+    const bid={id:'winning',auction_id:'high-0',amount:'100000000',created_at:'2026-01-01T00:00:00Z'};
+    const service=createAuctionService({rpc:async(name,args)=>{
+        if(name==='finalize_expired_auctions')return{error:null};
+        requests.push(args);
+        const rows=args.p_status==='active'?[]:args.p_sort==='completed'?recent:args.p_page===1?high.slice(0,24):[...high.slice(24),low];
+        return{data:{privacy_version:1,rows,bids:rows.some(r=>r.id===bid.auction_id)?[bid]:[],total:args.p_status==='active'?0:100}};
+    }});
+    const data=await service.load({view:'home'});
+    assert.equal(data.auctions.length,49);assert.equal(data.auctions.filter(a=>a.id.startsWith('high-')).length,26);
+    assert.equal(data.auctions.find(a=>a.id==='high-0').bids.length,1);
+    assert.ok(!data.auctions.some(a=>a.id==='boundary'));
+    assert.deepEqual(requests.map(r=>[r.p_status,r.p_sort,r.p_page]),[['active','newest',1],['completed','completed',1],['completed','price-desc',1],['completed','price-desc',2]]);
 });

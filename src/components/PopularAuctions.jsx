@@ -101,28 +101,32 @@ export default function PopularAuctions({ auctions, now, children, completed = f
                 </svg>
             </button>}
         </div>
-        <p className="mb-3 text-sm text-gray-600">{completed ? 'Successful trades, most recently completed first.' : 'Active listings, ranked by number of bids.'}</p>
         {children}
         {auctions.length > 0 && <div ref={viewportRef} className="popular-auction-viewport" onFocusCapture={revealKeyboardFocus} onBlurCapture={resetKeyboardScroll} data-moving={moving} data-paused={paused}>
             <ul ref={trackRef} className="popular-auction-track" style={{ animationDelay: `-${resumeElapsed}ms` }} onAnimationIteration={advance}>
-                {displayed.map(auction => <li key={auction.id} className="popular-auction-slot">
-                    <Link to={`/auction/${auction.id}`} className={`grid h-[192px] min-w-0 grid-cols-[64px_minmax(0,1fr)] grid-rows-[44px_minmax(0,1fr)_18px] gap-x-3 gap-y-1 rounded-md border ${completed ? 'bg-green-50' : 'bg-[#F8F6F4]'} p-3 shadow transition-shadow hover:shadow-lg`}>
+                {displayed.map(auction => {
+                    const cardCompleted = auction.status === 'completed';
+                    return <li key={auction.id} className="popular-auction-slot">
+                    <Link to={`/auction/${auction.id}`} className={`grid h-[192px] min-w-0 grid-cols-[64px_minmax(0,1fr)] grid-rows-[44px_minmax(0,1fr)_18px] gap-x-3 gap-y-1 rounded-md border ${cardCompleted ? 'bg-green-50' : 'bg-[#F8F6F4]'} p-3 shadow transition-shadow hover:shadow-lg`}>
                         <div className="col-start-1 row-span-3 row-start-1 flex items-center justify-center">
                             {auction.image && <img src={auction.image} alt="" loading="lazy" className="h-16 w-16 shrink-0 object-contain [image-rendering:pixelated]" />}
                         </div>
                         <h3 title={`${auction.item} ×${auction.quantity.toLocaleString('en-US')}`} className="col-start-2 row-start-1 line-clamp-2 break-words text-center text-lg font-bold leading-[22px] text-[#14248A]">{auction.item} <span className="text-[#5365AB]">×{auction.quantity.toLocaleString('en-US')}</span></h3>
                         <div className="col-start-2 row-start-2 flex min-h-0 min-w-0 flex-col items-center text-center">
-                            <p title={`${auction.auctionKind === 'buy' ? 'Price per item' : completed ? 'Final price' : auction.currentBid ? 'Bid' : 'Minimum bid'}: ${(auction.auctionKind === 'buy' ? auction.pricePerItem : completed ? auction.finalPrice ?? auction.currentBid : auction.currentBid || auction.minBidMeat).toLocaleString('en-US')} Meat`} className="w-full min-w-0 text-[#112D4E]">
-                                <span className="block text-xs font-medium leading-[14px] text-gray-500">{auction.auctionKind === 'buy' ? 'Buy · per item' : completed ? 'Final · whole listing' : auction.currentBid ? 'Bid' : 'Min'}</span>
-                                <FittedPrice fitKey={`${auction.auctionKind}:${auction.pricePerItem}:${auction.finalPrice}:${auction.currentBid}:${auction.minBidMeat}:${auction.quantity}`} className={`block ${auction.auctionKind !== 'buy' && auction.quantity > 1 ? 'text-[24px]' : 'text-[30px]'} font-bold leading-[34px] tracking-tight`}>{auction.auctionKind === 'buy' ? `${formatCompactMeat(auction.pricePerItem)} Meat` : <SellPrice amount={completed ? auction.finalPrice ?? auction.currentBid : auction.currentBid || auction.minBidMeat} quantity={auction.quantity} />}</FittedPrice>
+                            <p title={`${auction.auctionKind === 'buy' ? 'Price per item' : cardCompleted ? 'Final price' : auction.currentBid ? 'Bid' : 'Minimum bid'}: ${(auction.auctionKind === 'buy' ? auction.pricePerItem : cardCompleted ? auction.finalPrice ?? auction.currentBid : auction.currentBid || auction.minBidMeat).toLocaleString('en-US')} Meat`} className="w-full min-w-0 text-[#112D4E]">
+                                <span className="block text-xs font-medium leading-[14px] text-gray-500">{auction.auctionKind === 'buy' ? 'Buy · per item' : cardCompleted ? 'Final · whole listing' : auction.currentBid ? 'Bid' : 'Min'}</span>
+                                <FittedPrice fitKey={`${auction.auctionKind}:${auction.pricePerItem}:${auction.finalPrice}:${auction.currentBid}:${auction.minBidMeat}:${auction.quantity}`} className={`block ${auction.auctionKind !== 'buy' && auction.quantity > 1 ? 'text-[24px]' : 'text-[30px]'} font-bold leading-[34px] tracking-tight`}>{auction.auctionKind === 'buy' ? `${formatCompactMeat(auction.pricePerItem)} Meat` : <SellPrice amount={cardCompleted ? auction.finalPrice ?? auction.currentBid : auction.currentBid || auction.minBidMeat} quantity={auction.quantity} />}</FittedPrice>
                             </p>
-                            <p className="h-4 w-full truncate text-xs font-semibold leading-4 text-green-800">{auction.auctionKind === 'buy' ? `${auction.purchasedQuantity.toLocaleString('en-US')} purchased · ${(auction.availableQuantity ?? auction.remainingQuantity).toLocaleString('en-US')} available` : !completed && auction.instantPurchasePrice ? `Buyout Price: ${formatCompactMeat(auction.instantPurchasePrice)}` : null}</p>
-                            <div className="flex w-full flex-1 items-center justify-center"><TradeTypeBadge escrow={auction.escrowMode} short /></div>
+                            <p className="h-4 w-full truncate text-xs font-semibold leading-4 text-green-800">{auction.auctionKind === 'buy' ? `${auction.purchasedQuantity.toLocaleString('en-US')} purchased · ${(auction.availableQuantity ?? auction.remainingQuantity).toLocaleString('en-US')} available` : !cardCompleted && auction.instantPurchasePrice ? `Buyout Price: ${formatCompactMeat(auction.instantPurchasePrice)}` : null}</p>
                         </div>
-                        {completed ? <p className="col-start-2 row-start-3 whitespace-nowrap text-center text-[11px] leading-[18px] text-green-700">Trade completed{auction.completedAt && <> · <time dateTime={new Date(auction.completedAt).toISOString()}>{new Date(auction.completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</time></>}</p>
-                            : <p className={`col-start-2 row-start-3 whitespace-nowrap text-center text-[11px] leading-[18px] ${auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-600'}`}>Ends in <time dateTime={new Date(auction.endTime).toISOString()}>{timeRemaining(auction.endTime, now)}</time></p>}
+                        <div className="col-start-2 row-start-3 flex min-w-0 items-center justify-center gap-1">
+                        {cardCompleted ? <p className="min-w-0 truncate text-center text-[11px] leading-[18px] text-green-700">Trade completed{auction.completedAt && <> · <time dateTime={new Date(auction.completedAt).toISOString()}>{new Date(auction.completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</time></>}</p>
+                            : <p className={`min-w-0 truncate text-center text-[11px] leading-[18px] ${auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-600'}`}>Ends in <time dateTime={new Date(auction.endTime).toISOString()}>{timeRemaining(auction.endTime, now)}</time></p>}
+                            <span className="shrink-0"><TradeTypeBadge escrow={auction.escrowMode} compact short /></span>
+                        </div>
                     </Link>
-                </li>)}
+                </li>;
+                })}
             </ul>
         </div>}
     </section>;

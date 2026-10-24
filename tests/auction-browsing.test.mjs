@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { browseAuctions, popularActiveAuctions, auctionPrice } from '../src/lib/auctionBrowsing.js';
+import { browseAuctions, popularActiveAuctions, auctionPrice, highRollerAuctions } from '../src/lib/auctionBrowsing.js';
 import { parseAuctionAmount, parseMeatAmount, normalizeAuctionAmount } from '../src/lib/auctionInputs.js';
 
 const now = 10000;
@@ -105,4 +105,32 @@ test('recent completed trades exclude other outcomes and order by completion rat
     const recent = recentCompletedAuctions(rows);
     assert.equal(recent.length, 24);
     assert.deepEqual(recent.map(a => a.id), Array.from({ length: 24 }, (_, i) => String(29-i)));
+});
+
+
+test('High Rollers requires strictly over 50M and active or confirmed completion, with displayed price semantics',()=>{
+    const base={endTime:20000000,minBidMeat:60000000,currentBid:0,auctionKind:'sell'};
+    const rows=['active','completed','awaiting_trade','settling','cancelled','expired','voided','pending_escrow','ended_no_bids'].map(status=>({...base,id:status,status,finalPrice:70000000}));
+    rows.push({...base,id:'boundary',status:'active',minBidMeat:50000000},
+        {...base,id:'past-deadline',status:'active',endTime:999},
+        {...base,id:'low-final',status:'completed',finalPrice:40000000,currentBid:90000000},
+        {...base,id:'low-buyout',status:'active',minBidMeat:1000,instantPurchasePrice:100000000},
+        {...base,id:'cheap-order',status:'active',auctionKind:'buy',pricePerItem:100,quantity:1000000},
+        {...base,id:'expensive-order',status:'active',auctionKind:'buy',pricePerItem:80000000},
+        {...base,id:'direct',status:'active',escrowMode:false,minBidMeat:50000001});
+    assert.deepEqual(highRollerAuctions(rows,1000).map(a=>a.id),['expensive-order','completed','active','direct']);
+});
+
+
+test('High Rollers prioritizes red countdowns by ending time and reorders after a deadline extension',()=>{
+    const now=1000000, hours=3600000;
+    const base={status:'active',minBidMeat:60000000,currentBid:0};
+    const rows=[{...base,id:'later',endTime:now+4*hours,minBidMeat:90000000},
+        {...base,id:'urgent',endTime:now+2*hours,minBidMeat:100000000},
+        {...base,id:'soonest',endTime:now+hours},
+        {...base,id:'three-hour-boundary',endTime:now+3*hours},
+        {...base,id:'completed',status:'completed',endTime:now-hours,finalPrice:1000000000}];
+    assert.deepEqual(highRollerAuctions(rows,now).map(a=>a.id),['soonest','urgent','three-hour-boundary','completed','later']);
+    const extended=rows.map(a=>a.id==='soonest'?{...a,endTime:now+5*hours}:a);
+    assert.deepEqual(highRollerAuctions(extended,now).map(a=>a.id),['urgent','three-hour-boundary','completed','later','soonest']);
 });

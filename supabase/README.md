@@ -1095,3 +1095,29 @@ and custom ending times. Existing price precision bounds, catalog eligibility,
 fees, deposit rules and loss-protection terms are unchanged. No bot rebuild needed.
 
 Offline check: `python3 tests/escrow_starting_bid_cap_database_test.py`.
+
+
+### Nonblocking closet reconciliation (106)
+
+Stop Oracle, apply `202610240106_isolate_uncertain_closet_moves.sql` after 105,
+upload/extract the updated worker bundle, and rebuild/start the container.
+Both the migration and worker upgrade are required.
+
+Uncertain closet moves no longer stop auction intake, finalization, funded payments,
+refunds, or item deliveries. The original move stays moving/unknown and is never
+automatically retried. Further closet moves of the same asset wait; unrelated
+closet assets and gift wrappers can continue. Each uncertain transfer gets one
+private Other inbox report and one zero-asset admin notification.
+
+Fresh inventory and player-liability checks remain mandatory before dispatch.
+Packaging costs still use spare bot funds with pending closet obligations protected.
+Unreadable/insufficient balances never authorize a send. Older donation-policy
+refund recovery waits for closet reconciliation without blocking ordinary work.
+
+Inspect and lookup remain read-only. Stop the bot before manual reconciliation.
+Since other payouts continue, inventory may differ from the original snapshot;
+compare the recorded and actual closet amount for that asset and account for
+manual closet changes. Closing the inbox report does not resolve or retry a move.
+
+Offline checks: `python3 tests/closet_isolation_database_test.py` and `npm test`
+from the standalone bot directory for the worker tests.

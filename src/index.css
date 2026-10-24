@@ -285,3 +285,16 @@ html.upside-down #root {
   outline: 2px solid #a16207;
   outline-offset: 1px;
 }
+
+/* High Rollers is a static row: native scrolling plus pointer drag momentum. */
+.high-rollers-viewport {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  touch-action: pan-y pinch-zoom;
+  scrollbar-width: thin;
+  padding: 2px 2px 8px;
+  cursor: grab;
+}
+.high-rollers-viewport a { user-select: none; }
+.high-rollers-viewport[data-dragging="true"],
+.high-rollers-viewport[data-dragging="true"] a { cursor: grabbing; }

@@ -1,8 +1,9 @@
 import PopularAuctions from '../components/PopularAuctions';
+import HighRollers from '../components/HighRollers';
 import { useContext, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { AuctionsContext } from '../context/AuctionsContext';
-import { popularActiveAuctions, recentCompletedAuctions } from '../lib/auctionBrowsing';
+import { popularActiveAuctions, recentCompletedAuctions, highRollerAuctions } from '../lib/auctionBrowsing';
 import { useNow } from '../hooks/useNow';
 import PendingTrades from '../components/PendingTrades';
 import SiteFooter from '../components/SiteFooter';
@@ -13,6 +14,7 @@ export default function Home() {
     const now = useNow();
     const popular = useMemo(() => popularActiveAuctions(auctions, now), [auctions, now]);
 
+    const highRollers = useMemo(() => highRollerAuctions(auctions, now), [auctions, now]);
     const completed = useMemo(() => recentCompletedAuctions(auctions), [auctions]);
 
     return (
@@ -23,10 +25,15 @@ export default function Home() {
             </header>
             <main className="mx-auto mt-6 w-full max-w-6xl flex-1 pb-8">
                 <PendingTrades />
+                <HighRollers auctions={highRollers} now={now}>
+                    {isLoading && <p role="status">Loading High Rollers…</p>}
+                    {!isLoading && !error && highRollers.length === 0 && <p>No active or completed auctions over 50M Meat yet.</p>}
+                </HighRollers>
                 <PopularAuctions auctions={popular} now={now}>
                     {isLoading && <p role="status">Loading auctions…</p>}
                     {!isLoading && !error && popular.length === 0 && <p>No active auctions right now. <Link to="/auctions?status=all" className="text-blue-700 underline">Browse auction history</Link> or <Link to="/auction-item" className="text-blue-700 underline">list an item</Link>.</p>}
                 </PopularAuctions>
+
                 <div className="mt-8">
                     <PopularAuctions auctions={completed} now={now} completed>
                         {isLoading && <p role="status">Loading completed trades…</p>}

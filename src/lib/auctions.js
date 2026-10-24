@@ -1,3 +1,4 @@
+import { auctionPrice, HIGH_ROLLER_MIN_PRICE } from './auctionBrowsing.js';
 import { observeAuctionServerTime, auctionClockRequestStarted } from './auctionClock.js';
 export function mapAuction(row, bidRows) {
     const bids = bidRows.filter((bid) => bid.auction_id === row.id)
@@ -117,7 +118,7 @@ export function createAuctionService(client) {
         async load({ view = 'browse', id = null, sellerId = null, excludeOwn = false, kind = 'all', search = '', status = 'active', sort = 'ending', trade = 'all', page = 1 } = {}) {
             const { error } = await requireClient().rpc('finalize_expired_auctions');
             if (error) throw databaseError(error);
-            async function readPage(pageNumber, completed = false) {
+            async function readPage(pageNumber, completed = false, highValue = false) {
                 // The historical home endpoint returns only four rows. Use the
                 // existing privacy-filtered browse pages for the complete strip.
                 const requestStartedAt = auctionClockRequestStarted();
@@ -127,7 +128,7 @@ export function createAuctionService(client) {
                     p_search: view === 'home' ? '' : search, p_status: view === 'home' ? (completed ? 'completed' : 'active') : status,
                     ...(['browse', 'seller'].includes(view) && ['escrow', 'direct', 'none'].includes(trade) ? { p_trade: trade } : {}),
                     ...(['buy', 'sell'].includes(kind) ? { p_kind: kind, p_trade: trade } : {}),
-                    p_sort: view === 'home' ? (completed ? 'completed' : 'newest') : sort, p_page: pageNumber,
+                    p_sort: view === 'home' ? (completed ? highValue ? 'price-desc' : 'completed' : 'newest') : sort, p_page: pageNumber,
                 });
                 if (readError) throw databaseError(readError);
                 if (data?.privacy_version !== 1) throw new Error('Auctions are temporarily unavailable while a privacy update is being completed. Please try again later.');
@@ -147,9 +148,25 @@ export function createAuctionService(client) {
                 }
                 const recent = await readPage(1, true);
                 rows.push(...recent.rows); bids.push(...recent.bids);
+                // Recent trades cover the whole history when there are <=24.
+                // Otherwise scan expensive completed trades in price order,
+                // stopping at the threshold instead of reading all history.
+                if (Number(recent.total) > 24) {
+                    let maxPages = Math.ceil(Number(recent.total) / 24);
+                    for (let next = 1; next <= maxPages; next++) {
+                        const high = await readPage(next, true, true);
+                        maxPages = Math.min(maxPages, Math.ceil(Number(high.total) / 24));
+                        const qualifying = high.rows.filter(row => auctionPrice(mapAuction(row, [])) > HIGH_ROLLER_MIN_PRICE);
+                        rows.push(...qualifying);
+                        const ids = new Set(qualifying.map(row => row.id));
+                        bids.push(...high.bids.filter(bid => ids.has(bid.auction_id)));
+                        if (!high.rows.length || qualifying.length < high.rows.length) break;
+                    }
+                }
             }
             const unique = [...new Map(rows.map(row => [row.id, row])).values()];
-            return { auctions: unique.map(row => mapAuction(row, bids)), total: Number(data.total), seller: data.seller || null };
+            const uniqueBids = [...new Map(bids.map((bid, index) => [bid.id ?? index, bid])).values()];
+            return { auctions: unique.map(row => mapAuction(row, uniqueBids)), total: Number(data.total), seller: data.seller || null };
         },
         async pendingTrades(page = 1) {
             const { data, error } = await requireClient().rpc('read_pending_trades', { p_page: page });
