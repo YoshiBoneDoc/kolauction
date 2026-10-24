@@ -357,10 +357,13 @@ test('only active cards with the global hot flag show a fire emoji immediately b
 
 test('completed card shading excludes every pending and unsuccessful outcome in both trade modes', () => {
     for (const escrowMode of [true, false]) {
-        for (const status of ['completed', 'awaiting_trade', 'settling', 'cancelled', 'voided', 'ended_no_bids', 'pending_escrow', 'on_hold']) {
+        for (const status of ['completed', 'awaiting_trade', 'settling', 'cancelled', 'voided', 'expired', 'ended_no_bids', 'pending_escrow', 'on_hold']) {
             const listing = {...auctions[0], escrowMode, status, finalPrice: 5000, currentBid: 6000};
             const card = render('/auctions?status=all', [listing]);
             assert.equal(card.includes('bg-green-50'), status === 'completed', `${escrowMode}: ${status}`);
+            assert.equal(card.includes('bg-[#ECEDEF]'), ['cancelled','voided'].includes(status), `${escrowMode}: ${status}`);
+            assert.equal(card.includes('bg-yellow-50'), ['awaiting_trade','settling'].includes(status), `${escrowMode}: ${status}`);
+            assert.equal(card.includes('bg-orange-50'), status === 'expired', `${escrowMode}: ${status}`);
             const home = render('/', [listing]);
             const recent = home.slice(home.indexOf('aria-label="Recently completed trades"'));
             assert.equal(recent.includes('Active accessory'), status === 'completed');

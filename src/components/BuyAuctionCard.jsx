@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { Link, useLocation } from 'react-router-dom';
 import { UserContext } from '../context/UserContext';
 import { AuctionsContext } from '../context/AuctionsContext';
-import { getAuctionResult, getAuctionDisplayStatus } from '../lib/auctionLifecycle';
+import { getAuctionResult, getAuctionDisplayStatus, auctionCardBackground } from '../lib/auctionLifecycle';
 import { timeRemaining } from '../lib/auctionBrowsing';
 import { formatCompactMeat } from '../lib/formatMeat';
 import { normalizeAuctionAmount, parseAuctionAmount } from '../lib/auctionInputs';
@@ -67,7 +67,7 @@ export default function BuyAuctionCard({ auction, now, inlineReserve = false, ex
         finally { pendingRef.current = false;setPending(false); }
     }
 
-    return <article className={`relative isolate min-h-[134px] min-w-0 self-start rounded-lg border border-gray-200 px-3 py-1.5 shadow-sm transition-shadow hover:border-gray-300 hover:shadow-md ${result.status === 'completed' ? 'bg-green-50' : 'bg-[#F8F6F4]'}`}>
+    return <article className={`relative isolate min-h-[134px] min-w-0 self-start rounded-lg border border-gray-200 px-3 py-1.5 shadow-sm transition-shadow hover:border-gray-300 hover:shadow-md ${auctionCardBackground(result.status)}`}>
         <div className="flex min-h-[120px] min-w-0 flex-col">
             <header className="flex min-h-[34px] shrink-0 items-start justify-between gap-3">
                 <Link to={`/auction/${auction.id}`} state={linkState} title={itemLabel}

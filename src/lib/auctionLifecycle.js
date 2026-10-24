@@ -13,6 +13,14 @@ export const auctionStatusLabels = {
     completed: 'Trade completed',
 };
 
+export function auctionCardBackground(status) {
+    if (status === 'completed') return 'bg-green-50';
+    if (['cancelled', 'voided'].includes(status)) return 'bg-[#ECEDEF]';
+    if (['awaiting_trade', 'settling'].includes(status)) return 'bg-yellow-50';
+    if (status === 'expired') return 'bg-orange-50';
+    return 'bg-[#F8F6F4]';
+}
+
 export function getAuctionStatus(auction, now = Date.now()) {
     if (auction.status && auction.status !== 'active') return auction.status;
     if (auction.biddingRestricted && auction.endTime > now) return 'bidding_closed';

@@ -35,6 +35,10 @@ test('Buy cards match Sell typography, stretch the main link and place distinct 
  assert.match(html,/border-red-200 bg-red-100/);assert.match(html,/>Buy<\/span>/);assert.match(html,/>Escrow<\/span>/);
  assert.match(html,/text-\[11px\] leading-3 tabular-nums/);assert.match(html,/Order fulfillment/);
  assert.match(html,/50,000 available/);assert.match(html,/Sell to this order/);
+ for(const status of ['cancelled','voided'])assert.match(harness({listing:{...auction,status},expanded:false}).html(),/bg-\[#ECEDEF\]/);
+ assert.match(harness({listing:{...auction,status:'completed'},expanded:false}).html(),/bg-green-50/);
+ assert.match(harness({listing:{...auction,status:'settling'},expanded:false}).html(),/bg-yellow-50/);
+ assert.match(harness({listing:{...auction,status:'expired'},expanded:false}).html(),/bg-orange-50/);
 });
 
 test('compact wrappers forward the existing one-open-card state to inline Buy reservations',()=>{
