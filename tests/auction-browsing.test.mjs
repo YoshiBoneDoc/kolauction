@@ -141,7 +141,7 @@ test('recent completed trades exclude other outcomes and order by completion rat
 });
 
 
-test('High Rollers requires strictly over 50M and active or confirmed completion, with displayed price semantics',()=>{
+test('High Rollers requires at least 50M and active or confirmed completion, with displayed price semantics',()=>{
     const base={endTime:20000000,minBidMeat:60000000,currentBid:0,auctionKind:'sell'};
     const rows=['active','completed','awaiting_trade','settling','cancelled','expired','voided','pending_escrow','ended_no_bids'].map(status=>({...base,id:status,status,finalPrice:70000000}));
     rows.push({...base,id:'boundary',status:'active',minBidMeat:50000000},
@@ -151,7 +151,7 @@ test('High Rollers requires strictly over 50M and active or confirmed completion
         {...base,id:'cheap-order',status:'active',auctionKind:'buy',pricePerItem:100,quantity:1000000},
         {...base,id:'expensive-order',status:'active',auctionKind:'buy',pricePerItem:80000000},
         {...base,id:'direct',status:'active',escrowMode:false,minBidMeat:50000001});
-    assert.deepEqual(highRollerAuctions(rows,1000).map(a=>a.id),['expensive-order','completed','active','direct']);
+    assert.deepEqual(highRollerAuctions(rows,1000).map(a=>a.id),['expensive-order','completed','active','direct','boundary']);
 });
 
 
@@ -166,4 +166,17 @@ test('High Rollers prioritizes red countdowns by ending time and reorders after 
     assert.deepEqual(highRollerAuctions(rows,now).map(a=>a.id),['soonest','urgent','three-hour-boundary','completed','later']);
     const extended=rows.map(a=>a.id==='soonest'?{...a,endTime:now+5*hours}:a);
     assert.deepEqual(highRollerAuctions(extended,now).map(a=>a.id),['urgent','three-hour-boundary','completed','later','soonest']);
+});
+
+
+test('High Rollers qualifies by current total market value OR auction price, including multi-item and Buy orders',()=>{
+    const now=1000,base={status:'active',endTime:20000000,auctionKind:'sell',minBidMeat:100,currentBid:0};
+    const rows=[{...base,id:'market-only',quantity:10,marketValueMeat:50000000},
+        {...base,id:'bid-only',currentBid:60000000,marketValueMeat:0},
+        {...base,id:'both',currentBid:70000000,marketValueMeat:80000000},
+        {...base,id:'under',currentBid:49999999,marketValueMeat:49999999},
+        {...base,id:'order',auctionKind:'buy',pricePerItem:100,quantity:100000,marketValueMeat:90000000},
+        {...base,id:'completed-market',status:'completed',finalPrice:1000,marketValueMeat:55000000},
+        {...base,id:'canceled',status:'cancelled',marketValueMeat:1000000000}];
+    assert.deepEqual(highRollerAuctions(rows,now).map(a=>a.id),['order','both','bid-only','completed-market','market-only']);
 });

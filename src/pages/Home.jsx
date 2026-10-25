@@ -31,7 +31,7 @@ export default function Home() {
                 <PendingTrades />
                 <HighRollers auctions={highRollers} now={now}>
                     {isLoading && <p role="status">Loading High Rollers…</p>}
-                    {!isLoading && !error && highRollers.length === 0 && <p>No active or completed auctions over 50M Meat yet.</p>}
+                    {!isLoading && !error && highRollers.length === 0 && <p>No active or completed auctions valued at 50M Meat or more yet.</p>}
                 </HighRollers>
                 <ExploreAuctions auctions={auctions} now={now}>
                     {isLoading && <p role="status">Loading auctions…</p>}

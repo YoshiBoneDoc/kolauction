@@ -244,21 +244,21 @@ test('Others uses an authenticated server-side view before pagination, including
 });
 
 
-test('homepage includes older high-priced completed trades, batches pages and stops at 50M without duplicate rows or bids',async()=>{
+test('homepage reads older High Rollers by server-side market-or-price filtering without scanning unrelated history',async()=>{
     const requests=[];
     const high=Array.from({length:26},(_,i)=>({...row,id:'high-'+i,status:'completed',final_price:String(100000000-i),completed_at:'2026-01-01T00:00:00Z'}));
-    const low={...row,id:'boundary',status:'completed',final_price:'50000000'};
+    const market={...row,id:'market',status:'completed',final_price:'1000',market_value_meat:'50000000'};
     const recent=[high[0],...Array.from({length:23},(_,i)=>({...row,id:'recent-'+i,status:'completed',final_price:'1000',completed_at:'2026-10-24T00:00:00Z'}))];
     const bid={id:'winning',auction_id:'high-0',amount:'100000000',created_at:'2026-01-01T00:00:00Z'};
     const service=createAuctionService({rpc:async(name,args)=>{
         if(name==='finalize_expired_auctions')return{error:null};
         requests.push(args);
-        const rows=args.p_status==='active'?[]:args.p_sort==='completed'?recent:args.p_page===1?high.slice(0,24):[...high.slice(24),low];
-        return{data:{privacy_version:1,rows,bids:rows.some(r=>r.id===bid.auction_id)?[bid]:[],total:args.p_status==='active'?0:100}};
+        const rows=args.p_status==='active'?[]:args.p_sort==='completed'?recent:args.p_page===1?high.slice(0,24):[...high.slice(24),market];
+        return{data:{privacy_version:1,rows,bids:rows.some(r=>r.id===bid.auction_id)?[bid]:[],total:args.p_status==='active'?0:args.p_sort==='high-rollers'?27:100}};
     }});
     const data=await service.load({view:'home'});
-    assert.equal(data.auctions.length,49);assert.equal(data.auctions.filter(a=>a.id.startsWith('high-')).length,26);
+    assert.equal(data.auctions.length,50);assert.equal(data.auctions.filter(a=>a.id.startsWith('high-')).length,26);
     assert.equal(data.auctions.find(a=>a.id==='high-0').bids.length,1);
-    assert.ok(!data.auctions.some(a=>a.id==='boundary'));
-    assert.deepEqual(requests.map(r=>[r.p_status,r.p_sort,r.p_page]),[['active','newest',1],['completed','completed',1],['completed','price-desc',1],['completed','price-desc',2]]);
+    assert.equal(data.auctions.find(a=>a.id==='market').marketValueMeat,50000000);
+    assert.deepEqual(requests.map(r=>[r.p_status,r.p_sort,r.p_page]),[['active','newest',1],['completed','completed',1],['completed','high-rollers',1],['completed','high-rollers',2]]);
 });

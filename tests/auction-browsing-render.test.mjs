@@ -444,10 +444,11 @@ test('homepage High Rollers mixes active and genuinely completed cards with corr
     const rows=[{...base,id:'high-live',item:'High live item',status:'active',currentBid:60000000},
         {...base,id:'high-done',item:'High completed item',status:'completed',finalPrice:80000000,completedAt:'2026-10-24T00:00:00Z'},
         {...base,id:'high-pending',item:'Not a completed trade',status:'settling',finalPrice:90000000},
-        {...base,id:'low',item:'Exactly 50M',status:'active',currentBid:50000000}];
+        {...base,id:'low',item:'Exactly 50M',status:'active',currentBid:50000000},
+        {...base,id:'market-high',item:'Market-only high roller',status:'active',currentBid:100,marketValueMeat:60000000}];
     const html=render('/',rows);const section=html.split('aria-label="High Rollers"')[1].split('</section>')[0];
-    assert.match(section,/High live item/);assert.match(section,/High completed item/);
-    assert.doesNotMatch(section,/Not a completed trade|Exactly 50M/);
+    assert.match(section,/High live item/);assert.match(section,/High completed item/);assert.match(section,/Market-only high roller/);
+    assert.doesNotMatch(section,/Not a completed trade/);assert.match(section,/Exactly 50M/);
     assert.match(section,/bg-green-50/);assert.match(section,/Final: 80,000,000 Meat/);assert.match(section,/Completed ·/);assert.match(section,/Ends in/);
     assert.ok(html.indexOf('aria-label="High Rollers"')<html.indexOf('aria-label="Explore auctions"'));
     assert.match(section,/high-rollers-viewport/);assert.match(section,/grid h-24/);assert.doesNotMatch(section,/popular-auction-track|Pause|Buyout/);

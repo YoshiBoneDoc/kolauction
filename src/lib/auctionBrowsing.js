@@ -88,14 +88,17 @@ export const HIGH_ROLLER_MIN_PRICE = 50_000_000;
 export function auctionEndingSoon(auction, now = Date.now()) {
     return getAuctionStatus(auction, now) === 'active' && auction.endTime - now <= 3 * 60 * 60 * 1000;
 }
-export function highRollerAuctions(auctions, now = Date.now()) {
-    const price = auction => auction.auctionKind === 'buy' ? auction.pricePerItem
+export function highRollerValue(auction) {
+    const price = auction.auctionKind === 'buy' ? auction.pricePerItem
         : auction.status === 'completed' ? auction.finalPrice ?? auction.currentBid : auction.currentBid || auction.minBidMeat;
+    return Math.max(Number(price) || 0, Number(auction.marketValueMeat) || 0);
+}
+export function highRollerAuctions(auctions, now = Date.now()) {
     return auctions.filter(auction => ['active', 'completed'].includes(getAuctionStatus(auction, now))
-        && price(auction) > HIGH_ROLLER_MIN_PRICE)
+        && highRollerValue(auction) >= HIGH_ROLLER_MIN_PRICE)
         .sort((a, b) => {
             const aSoon = auctionEndingSoon(a, now), bSoon = auctionEndingSoon(b, now);
             return Number(bSoon) - Number(aSoon) || (aSoon && bSoon ? a.endTime - b.endTime : 0)
-                || price(b) - price(a) || String(a.id).localeCompare(String(b.id));
+                || highRollerValue(b) - highRollerValue(a) || String(a.id).localeCompare(String(b.id));
         });
 }

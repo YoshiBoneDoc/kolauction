@@ -1,4 +1,4 @@
-import { auctionPrice, HIGH_ROLLER_MIN_PRICE } from './auctionBrowsing.js';
+import { highRollerValue, HIGH_ROLLER_MIN_PRICE } from './auctionBrowsing.js';
 import { observeAuctionServerTime, auctionClockRequestStarted } from './auctionClock.js';
 export function mapAuction(row, bidRows) {
     const bids = bidRows.filter((bid) => bid.auction_id === row.id)
@@ -47,6 +47,7 @@ export function mapAuction(row, bidRows) {
         quantity: Number(row.quantity),
         minBidMeat: Number(row.min_bid_meat),
         itemId: row.item_id,
+        marketValueMeat: Number(row.market_value_meat || 0),
         escrowMode: row.escrow_mode === true,
         startOnDeposit: row.start_on_deposit !== false,
         customEndAt: row.custom_end_at || null,
@@ -128,7 +129,7 @@ export function createAuctionService(client) {
                     p_search: view === 'home' ? '' : search, p_status: view === 'home' ? (completed ? 'completed' : 'active') : status,
                     ...(['browse', 'seller'].includes(view) && ['escrow', 'direct', 'none'].includes(trade) ? { p_trade: trade } : {}),
                     ...(['buy', 'sell'].includes(kind) ? { p_kind: kind, p_trade: trade } : {}),
-                    p_sort: view === 'home' ? (completed ? highValue ? 'price-desc' : 'completed' : 'newest') : sort, p_page: pageNumber,
+                    p_sort: view === 'home' ? (completed ? highValue ? 'high-rollers' : 'completed' : 'newest') : sort, p_page: pageNumber,
                 });
                 if (readError) throw databaseError(readError);
                 if (data?.privacy_version !== 1) throw new Error('Auctions are temporarily unavailable while a privacy update is being completed. Please try again later.');
@@ -149,14 +150,14 @@ export function createAuctionService(client) {
                 const recent = await readPage(1, true);
                 rows.push(...recent.rows); bids.push(...recent.bids);
                 // Recent trades cover the whole history when there are <=24.
-                // Otherwise scan expensive completed trades in price order,
-                // stopping at the threshold instead of reading all history.
+                // Otherwise read only qualifying High Rollers, filtered and
+                // ranked in the database before pagination (including market value).
                 if (Number(recent.total) > 24) {
                     let maxPages = Math.ceil(Number(recent.total) / 24);
                     for (let next = 1; next <= maxPages; next++) {
                         const high = await readPage(next, true, true);
                         maxPages = Math.min(maxPages, Math.ceil(Number(high.total) / 24));
-                        const qualifying = high.rows.filter(row => auctionPrice(mapAuction(row, [])) > HIGH_ROLLER_MIN_PRICE);
+                        const qualifying = high.rows.filter(row => highRollerValue(mapAuction(row, [])) >= HIGH_ROLLER_MIN_PRICE);
                         rows.push(...qualifying);
                         const ids = new Set(qualifying.map(row => row.id));
                         bids.push(...high.bids.filter(bid => ids.has(bid.auction_id)));

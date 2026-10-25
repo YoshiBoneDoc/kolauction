@@ -1158,3 +1158,23 @@ The public `read_completed_market_prices` RPC supports up to 500 auction IDs and
 returns only market-reference fields for completed trades. It uses the website's
 existing batch/cache service; no extra polling or game requests are introduced.
 Validate with `python3 tests/completed_market_prices_database_test.py`.
+
+## Market-value High Rollers (`110`)
+
+Apply `migrations/queue/202610240110_market_value_high_rollers.sql` after 109, then
+deploy the website. No bot runtime change is required. High Rollers qualifies
+active and genuinely completed auctions when either their existing auction-price
+value or current approximate market value is at least 50M Meat. The market value
+is the current available per-item Mall estimate multiplied by listing quantity,
+using PostgreSQL numeric arithmetic. Missing/unavailable estimates contribute zero;
+bid-based eligibility continues working independently. Completed detail pages still
+show their separate fixed completion-time snapshots.
+
+The existing privacy-filtered auction readers include `market_value_meat` in their
+page rows. The internal `high-rollers` sort filters qualifying completed trades
+before pagination, avoiding a scan of unrelated history from the browser. No
+additional per-card price reads, game requests, or polling mechanisms are added.
+Normal auction filters/sorts and the homepage's other sections are unchanged;
+red countdowns retain first priority in High Rollers.
+
+Verify with `python3 tests/high_roller_market_database_test.py` (local database).
