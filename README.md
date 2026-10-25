@@ -36,6 +36,24 @@ modes log into the same KoL account and can repeatedly replace each other's sess
 
 ## Useful starting points
 
+### Preventing credential leaks
+
+Website builds reject private-key material, privileged Supabase keys, secret
+`VITE_` variables, and private files/backups in public assets or generated output.
+The browser's Supabase **publishable** key is public by design; the bot's secret
+key and KoL password belong only in its private server environment.
+
+The bot packager also scans its allowlisted files before creating an upload
+archive. Keep credentials and SSH keys out of source, `public/`, build output,
+and deployment archives. `.gitignore` does not protect files already tracked by
+Git, and removing a tracked file does not remove its earlier history.
+
+`npm run security:check` scans nonignored website source without displaying
+credentials. `npm run security:install` installs the local pre-commit check
+(preserving an existing custom hook). It checks staged file contents and rejects
+forced additions of private files. Install it again on a fresh clone; Git hooks
+are local and can be bypassed. Guard tests: `node --test tests/asset-security.test.mjs`.
+
 New registration uses KMail to **kHub (#3888760)**: `REGISTER`. The bot creates and links the account, then sends a generated
 password. `CREDENTIALS` from the linked KoL player issues a new password. This needs
 the matching bot/website update and queued migration `019`; see the database setup.

@@ -1,3 +1,4 @@
+import MarketPrice from '../components/MarketPrice';
 import SellPrice from '../components/SellPrice';
 import BuyAuctionDetails from '../components/BuyAuctionDetails';
 import TradeTypeBadge from '../components/TradeTypeBadge';
@@ -75,6 +76,7 @@ export default function AuctionDetails() {
                             </div>
                             {closedSale && auction.instantPurchasedAt && <p className="text-sm leading-6 text-green-700">Buyout accepted for {result.finalPrice.toLocaleString('en-US')} Meat on <span className="inline-block whitespace-nowrap">{new Date(auction.instantPurchasedAt).toLocaleString()}.</span></p>}
                         </div>
+                        {(active || result.status === 'completed') && <MarketPrice itemId={auction.itemId} auctionId={auction.id} completed={result.status === 'completed'} />}
                         {active && <InstantPurchaseAction key={`purchase-${auction.id}`} auction={auction} showTerms={false} />}
                         <div className="space-y-1 text-sm text-gray-700">
                             <p className="break-words">Sold by: <SellerLink auction={auction} /></p>

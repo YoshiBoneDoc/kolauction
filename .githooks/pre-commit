@@ -1,0 +1,3 @@
+#!/bin/sh
+# Inspect the actual staged blobs, including forced additions of ignored files.
+exec node scripts/checkSecrets.mjs --staged

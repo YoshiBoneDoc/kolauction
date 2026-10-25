@@ -1121,3 +1121,40 @@ manual closet changes. Closing the inbox report does not resolve or retry a move
 
 Offline checks: `python3 tests/closet_isolation_database_test.py` and `npm test`
 from the standalone bot directory for the worker tests.
+
+## Mall market estimates (`108`)
+
+Apply `migrations/queue/202610240108_mall_market_prices.sql` after 107. Deploy the
+updated standalone bot and website separately. `khub_bot.market_prices` retains
+last successful per-item prices and observation times, with a separate latest
+check time and availability flag. An unavailable result never exposes the prior
+price as a current quote. Failed refreshes preserve the last successful snapshot;
+`khub_bot.market_price_state` persists the daily schedule and hourly failure backoff.
+No auction, bid, commission, escrow or settlement calculations use these tables.
+
+The service-role-only `bot_import_market_prices` RPC validates and imports a
+complete processed bulk response in one transaction using its own advisory lock.
+Missing catalog items and null prices are normal unavailable observations. Older
+or repeated snapshot imports cannot replace newer data. `read_market_prices`
+accepts up to 500 item IDs per call for public reference-data reads; raw tables,
+refresh controls and retained historical prices are not exposed to browsers.
+
+Verification: `python3 tests/market_prices_database_test.py` uses a disposable local
+database. Bot parser/scheduling tests are in `bot/tests/market-prices.test.mjs`;
+website cache and display tests are in `tests/market-prices.test.mjs`.
+
+## Completed-trade market values (`109`)
+
+Apply `migrations/queue/202610240109_completed_market_values.sql` after 108, then
+deploy the website. No bot runtime change is required. Future Buy and Sell trades
+capture the available market estimate when their database status becomes
+`completed`. The private `khub_bot.auction_market_prices` table stores one immutable
+snapshot per auction; later daily refreshes never change it. Missing prices remain
+unavailable. Historical completed trades are not backfilled, and active listings
+continue to use the current cached price. The website shows no observation-date
+line. Snapshot freshness is evaluated at completion, rather than aging indefinitely.
+
+The public `read_completed_market_prices` RPC supports up to 500 auction IDs and
+returns only market-reference fields for completed trades. It uses the website's
+existing batch/cache service; no extra polling or game requests are introduced.
+Validate with `python3 tests/completed_market_prices_database_test.py`.

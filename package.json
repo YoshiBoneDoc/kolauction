@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "security:check": "node scripts/checkSecrets.mjs",
+    "security:install": "node scripts/installSecurityHook.mjs",
     "preview": "vite preview",
     "update:items": "node scripts/update-items.mjs"
   },

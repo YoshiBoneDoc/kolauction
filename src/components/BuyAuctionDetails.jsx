@@ -1,3 +1,4 @@
+import MarketPrice from './MarketPrice';
 import { feeLabel, effectiveFeePercent } from '../lib/feeDisplay';
 import { buyFunding, buyFee } from '../lib/buyOrders';
 import { useContext, useState } from 'react';
@@ -79,6 +80,7 @@ export default function BuyAuctionDetails({ auction, now, backLink }) {
             <header className="flex items-center gap-4">{auction.image && <img src={auction.image} alt="" className="h-20 w-20 shrink-0 object-contain" />}<div className="min-w-0"><p className="text-sm font-semibold text-blue-700">Buy Auction · Escrow · #{auction.auctionNumber}</p><h1 className="break-words text-3xl font-bold text-blue-600">{auction.item}</h1><p className="text-sm">Requested by <SellerLink auction={auction} /></p></div></header>
             <section aria-label="Buy order overview" className="space-y-2">
                 <p className="text-3xl font-bold">{auction.pricePerItem.toLocaleString('en-US')} Meat <span className="text-sm font-normal">per item</span></p>
+                {((active && !closed) || result.status === 'completed') && <MarketPrice itemId={auction.itemId} auctionId={auction.id} completed={result.status === 'completed'} />}
                 <p>Originally requested: <strong>{auction.quantity.toLocaleString('en-US')}</strong> · Purchased: <strong>{purchased.toLocaleString('en-US')}{purchased < auction.quantity && `/${auction.quantity.toLocaleString('en-US')}`}</strong> · <span aria-label="Auction status" className={`font-semibold ${outcomeColor}`}>{outcomeLabel}</span></p>
                 {active && !closed && <p className="text-sm">Available to reserve: <strong>{available.toLocaleString('en-US')}</strong> · Reserved: <strong>{(auction.reservedQuantity || 0).toLocaleString('en-US')}</strong></p>}
                 <progress aria-label="Order fulfillment" value={purchased} max={target || 1}

@@ -483,3 +483,19 @@ test('every home strip distinguishes Buy cards and keeps per-item Sell price bre
         assert.match(sell,/80m Meat/);assert.match(sell,/· 4m each/);assert.match(sell,/>Direct<\/span>/);
     }
 });
+
+
+test('live market estimates mount on active detail pages; historical completions, other outcomes and cards stay unchanged', () => {
+    const sell = {...auctions[0], itemId: 2};
+    const buy = {...sell, id: 'buy-market', auctionKind: 'buy', pricePerItem: 100, quantity: 20,
+        purchasedQuantity: 0, remainingQuantity: 20, availableQuantity: 20, reservedQuantity: 0, fulfillments: []};
+    assert.match(render(`/auction/${sell.id}`, [sell]), /Loading market price/);
+    assert.match(render(`/auction/${buy.id}`, [buy]), /Loading market price/);
+    for (const listing of [sell, buy]) {
+        for (const status of ['completed', 'cancelled', 'expired', 'pending_escrow']) {
+            const closed = {...listing, status, endTime: Date.now() - 1000};
+            assert.doesNotMatch(render(`/auction/${closed.id}`, [closed]), /Loading market price|Approximate Market Value/);
+        }
+    }
+    assert.doesNotMatch(render('/auctions', [sell, buy]), /Loading market price|Approximate Market Value/);
+});
