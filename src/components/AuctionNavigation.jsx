@@ -67,7 +67,7 @@ export default function AuctionNavigation() {
                     {separator}
                     <Link {...linkProps("/wall-of-shame")}>Wall of Shame</Link>
                 </div>
-                <div className="mobile-account-links flex min-w-0 max-w-full flex-wrap items-center gap-x-4 border-t border-gray-300 pt-2 lg:ml-auto lg:justify-end lg:gap-x-3 lg:border-0 lg:pt-0">
+                <div className={`mobile-account-links flex min-w-0 max-w-full flex-wrap items-center gap-x-4 border-t border-gray-300 pt-2 lg:ml-auto lg:justify-end lg:gap-x-3 lg:border-0 lg:pt-0 ${account ? '' : 'flex-row-reverse lg:flex-row'}`}>
                     {isAdministrator && <><Link {...linkProps("/admin/inbox")}>Inbox</Link>{separator}</>}
                     {account ? <>
                         <div className="flex min-h-11 min-w-0 max-w-[12rem] flex-1 flex-col items-start justify-center lg:flex-none lg:items-center lg:text-center">

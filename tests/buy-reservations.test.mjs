@@ -148,3 +148,22 @@ test('Buy support link is available only to the creator or a verified fulfillmen
    assert.doesNotMatch(harness(auction,user).html(),/Contact an administrator about this order/);
  }
 });
+
+
+test('signed-in unrestricted viewers see Buy seller links; guests and restricted views hide names and IDs',()=>{
+ const fill={seller:'Real KoL Seller',seller_id:'seller-profile-id',quantity:5,price_per_item:200,payment_meat:1000,payment_sent:true,created_at:'2026-10-22T12:00:00Z'};
+ for(const status of ['active','completed']) {
+  for(const user of [{id:'outsider'},{id:'seller-profile-id'}]) {
+   const html=harness({...order,status,fulfillments:[fill]},user).html();
+   assert.match(html,/href="\/seller\/seller-profile-id"[^>]*>Real KoL Seller<\/a>/);
+   assert.match(html,/1,000 Meat/);
+  }
+  for(const [user,extra] of [[null,{}],[{id:'banned',isBanned:true},{}],[{id:'outsider'},{usernamesVisible:false}]]) {
+   const html=harness({...order,status,...extra,fulfillments:[fill]},user).html();
+   assert.doesNotMatch(html,/Real KoL Seller|seller-profile-id/);
+   assert.match(html,/Seller ·/);
+  }
+ }
+ const legacy=harness({...order,fulfillments:[{...fill,seller_id:null}]}).html();
+ assert.match(legacy,/Real KoL Seller/);assert.doesNotMatch(legacy,/seller-profile-id/);
+});

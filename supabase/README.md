@@ -1178,3 +1178,39 @@ Normal auction filters/sorts and the homepage's other sections are unchanged;
 red countdowns retain first priority in High Rollers.
 
 Verify with `python3 tests/high_roller_market_database_test.py` (local database).
+
+## Buy-auction gift-expense wording (`111`)
+
+Apply `migrations/queue/202610240111_remove_gift_expense_message_line.sql` after
+110. This removes only the separate gift-expense line from the Buy-auction fee
+message template. It preserves tiered-fee text, financial records, previously saved
+messages, and send/recovery state. No bot rebuild or website deployment is needed.
+Verify with `python3 tests/gift_expense_wording_database_test.py` (local database).
+
+## Public Buy-fulfillment sellers (`112`)
+
+Apply `migrations/queue/202610240112_public_buy_fulfillment_sellers.sql` after 111,
+then deploy the website. No bot rebuild is required. The existing `buy_history`
+profile join now includes the accepted seller's KoL username and kHub profile ID
+for all viewers, including guests, on both active and historical Buy auctions.
+Fulfillment History links those names to their kHub profiles. This is a read-time
+change, so existing accepted fulfillments need no backfill. Unfulfilled
+reservations are not exposed. Existing latest-100 history ordering is unchanged.
+
+No per-seller API calls or additional profile queries are added. Regular Sell
+auction names/bids, creator-only Buy fees and administrator-only receipt/delivery
+references keep their existing visibility rules. Escrow and historical records are
+untouched. Verify with `python3 tests/public_buy_sellers_database_test.py`.
+
+## Login-required Buy-fulfillment sellers (`113`)
+
+Apply `migrations/queue/202610240113_authenticated_buy_fulfillment_sellers.sql`
+after 112, then deploy the website. This supersedes 112's guest visibility:
+all unrestricted logged-in users can see accepted Buy sellers' KoL usernames and
+profile links, including historical fulfillments. Guests and restricted viewers
+receive only `Seller`, with a null profile ID. The page also hides identities when
+logged out, including after a session change. The existing profile join is reused;
+there are no additional per-seller requests or changes to Sell anonymity, escrow,
+fees, or private administrator references. No bot rebuild is required.
+
+Verify with `python3 tests/authenticated_buy_sellers_database_test.py` (local DB).
