@@ -63,6 +63,6 @@ export function createCompletedMarketPriceService(client, now = Date.now) {
 
 export function marketPriceDisplay(record, now = Date.now()) {
     if (!record?.available || !Number.isSafeInteger(record.price_meat) || record.price_meat <= 0) return { text: 'Market price unavailable', stale: false };
-    return { text: `Approximate Market Value: ${record.price_meat.toLocaleString('en-US')} Meat per item`,
+    return { text: `Market Value: ${record.price_meat.toLocaleString('en-US')} Meat per item`,
         stale: Boolean(record.readFailed) || !Number.isFinite(Date.parse(record.checked_at)) || (Number.isFinite(Date.parse(record.captured_at)) ? Date.parse(record.captured_at) : now) - Date.parse(record.checked_at) >= DAY };
 }

@@ -24,9 +24,10 @@ const captions = [
 
 export default function AuctionItemImage({ src, item }) {
     const [caption] = useState(() => captions[Math.floor(Math.random() * captions.length)]);
+    const [loading, setLoading] = useState(true);
     return <figure className="min-w-0 text-center">
-        <img src={src} alt={item} className="mx-auto h-28 w-28 object-contain [image-rendering:pixelated] sm:h-40 sm:w-40" />
-        <figcaption className="mt-2 text-xs italic text-[#94A3B8]">{caption}</figcaption>
+        <img src={src} alt={item} onLoad={() => setLoading(false)} onError={() => setLoading(false)} className="mx-auto h-28 w-28 object-contain [image-rendering:pixelated] sm:h-40 sm:w-40" />
+        <figcaption className="mt-2 min-h-4 text-[11px] italic text-[#A7B1C0]">{loading ? 'Loading image…' : caption}</figcaption>
     </figure>;
 }
 AuctionItemImage.propTypes = { src: PropTypes.string.isRequired, item: PropTypes.string.isRequired };

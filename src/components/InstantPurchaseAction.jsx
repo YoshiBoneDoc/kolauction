@@ -40,11 +40,11 @@ export default function InstantPurchaseAction({ auction, compact = false, showTe
 
     return (
         <section aria-label="Buyout" className={`w-full text-left ${dense ? 'mb-3 border-b border-gray-200 pb-2' : 'mb-4 border-y border-gray-200 py-3'}`}>
-            <div className={`flex flex-wrap items-center gap-x-3 gap-y-2 ${isSeller ? 'justify-center text-center' : 'justify-between'}`}>
+            <div className={`flex flex-wrap items-end gap-x-3 gap-y-2 ${isSeller ? 'justify-center text-center' : 'justify-between'}`}>
                 <div className="min-w-0">
                     {compact ? <p title={`${price} Meat`} className="break-words text-sm font-medium text-green-800">Buyout Price: {displayedPrice}</p> : <>
                         <p className="text-xs font-medium text-green-800">Buyout Price</p>
-                        <p className={`break-words font-semibold text-green-800 ${dense ? 'text-sm' : 'text-lg'}`}><SellPrice amount={auction.instantPurchasePrice} quantity={auction.quantity} compact={false} /></p>
+                        <p className={`break-words font-bold text-green-800 ${dense ? 'text-sm' : 'text-2xl'}`}><SellPrice amount={auction.instantPurchasePrice} quantity={auction.quantity} compact={false} /></p>
                     </>}
                 </div>
                 {currentUser?.isBanned || currentUser?.id === auction.sellerId ? null : auction.escrowMode ? (compact && <Link to={`/auction/${auction.id}`} title="View KMail buyout instructions" className={buttonClass}>Buy Now</Link>) : currentUser ? (
@@ -52,7 +52,7 @@ export default function InstantPurchaseAction({ auction, compact = false, showTe
                 ) : compact ? <Link to="/login" className={buttonClass}>Buy Now</Link> : null}
             </div>
             {!compact && <div className="mt-2 space-y-2 text-xs text-gray-600">
-                <p>For the entire listing. A bid reaching this amount ends bidding early at this price.</p>
+                <p>Buy the entire listing immediately at this price.</p>
                 {showTerms && !auction.escrowMode && <SettlementTerms escrowMode={false} />}
                 {auction.escrowMode && <p>Use the same BID command. Any excess Meat is returned.</p>}
                 {currentUser?.id === auction.sellerId && <p>Your optional buyout offer.</p>}

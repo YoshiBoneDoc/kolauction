@@ -19,6 +19,7 @@ import DirectTradeHelp from '../components/DirectTradeHelp';
 import EscrowProtection from '../components/EscrowProtection';
 import { formatCompactMeat, formatPerItemMeat } from '../lib/formatMeat';
 import TradeReportDismissals from '../components/TradeReportDismissals';
+import ItemResources from '../components/ItemResources';
 
 export default function AuctionDetails() {
     const { id } = useParams();
@@ -60,7 +61,7 @@ export default function AuctionDetails() {
                     <div className="flex min-w-0 items-center justify-center sm:pt-2">
                         {auction.image ? <AuctionItemImage key={auction.id} src={auction.image} item={auction.item} /> : <p className="text-gray-500">No Image Available</p>}
                     </div>
-                    <div className="min-w-0 space-y-3 text-left">
+                    <div className="min-w-0 space-y-5 text-left">
                         <div className="space-y-1">
                             <h1 className="break-words text-3xl font-bold text-blue-600 sm:text-4xl">{auction.item} <span className="text-xl text-gray-600">×{auction.quantity.toLocaleString('en-US')}</span></h1>
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-600">
@@ -68,11 +69,12 @@ export default function AuctionDetails() {
                                 <span aria-hidden="true">·</span>
                                 <TradeTypeBadge escrow={auction.escrowMode} />
                             </div>
+                            <ItemResources item={auction.item} itemId={auction.itemId} />
                         </div>
                         <div className={closedSale ? 'space-y-0.5 py-1' : 'space-y-1'}>
                             <div className={closedSale ? 'flex flex-wrap items-baseline gap-x-3 gap-y-1' : undefined}>
                                 <p className="text-sm text-gray-600">{active ? 'Current Bid (whole listing)' : result.hasWinner ? 'Final price: (whole listing)' : 'Last Bid (whole listing)'}</p>
-                                <p className="break-words text-2xl font-extrabold text-gray-900 sm:text-3xl">{price ? <SellPrice amount={price} quantity={auction.quantity} compact={false} /> : 'No bids yet'}</p>
+                                <p className="break-words text-3xl font-extrabold text-gray-900 sm:text-4xl">{price ? <SellPrice amount={price} quantity={auction.quantity} compact={false} /> : 'No bids yet'}</p>
                             </div>
                             {closedSale && auction.instantPurchasedAt && <p className="text-sm leading-6 text-green-700">Buyout accepted for {result.finalPrice.toLocaleString('en-US')} Meat on <span className="inline-block whitespace-nowrap">{new Date(auction.instantPurchasedAt).toLocaleString()}.</span></p>}
                         </div>
@@ -93,12 +95,12 @@ export default function AuctionDetails() {
                             <span className="inline-flex rounded border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Live</span>
                             <span aria-hidden="true" className="text-gray-400">·</span>
                             <p className={auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-600'}>Ends in <time dateTime={new Date(auction.endTime).toISOString()}>{timeRemaining(auction.endTime, now)}</time></p>
-                            <p className="w-full text-xs text-gray-500">Last-minute bids reset the countdown to 1 minute.</p>
+                            <p className="w-full text-xs text-gray-500">Late bids extend the auction by 1 minute.</p>
                         </div> : <div className="space-y-0.5"><p className={`text-lg font-bold ${statusColor}`}>{statusLabel}</p>{endedTime}</div>}
                     </div>
                 </section>
                 {active && <section aria-label="Auction bidding" className="mt-4 border-t border-gray-100 pt-4">
-                    <div className={`mx-auto w-full max-w-xl ${auction.escrowMode && !ownsAuction ? '' : 'rounded border border-gray-200 p-4'}`}>
+                    <div className={`mx-auto w-full max-w-xl ${auction.escrowMode && !ownsAuction ? '' : 'rounded border border-gray-100 p-4'}`}>
                         {ownsAuction ? <AuctionOutcome key={auction.id} auction={auction} now={now} />
                             : <AuctionBidForm key={auction.id} auction={auction} showTerms={false} />}
                     </div>

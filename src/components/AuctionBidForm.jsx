@@ -91,7 +91,7 @@ export default function AuctionBidForm({ auction, showTerms = true, showHeading 
     </form>;
 
     return (
-        <form onSubmit={submit} className="w-full space-y-2 text-left" aria-label={`Bid on ${auction.item}`}>
+        <form onSubmit={submit} className="w-full space-y-1.5 text-left" aria-label={`Bid on ${auction.item}`}>
             {showTerms && <div className={`text-xs ${compact ? 'leading-4 text-gray-500' : 'text-gray-700'}`}><SettlementTerms escrowMode={false} /></div>}
             <label htmlFor={inputId} className="block text-sm font-semibold">Your bid (Meat)</label>
             <input id={inputId} type="text" inputMode="decimal" autoComplete="off"
@@ -101,7 +101,7 @@ export default function AuctionBidForm({ auction, showTerms = true, showHeading 
                 aria-invalid={Boolean(error)} aria-describedby={`${inputId}-help${error ? ` ${inputId}-error` : ''}`}
                 className={`w-full min-w-0 rounded border border-gray-400 bg-white text-gray-900 ${compact ? 'min-h-10 px-3 py-2 text-sm' : 'min-h-11 p-3 text-base'}`} />
             <p id={`${inputId}-help`} className="text-xs text-gray-600">{minimum === null ? minimumText : `Next minimum bid: ${minimumText} Meat. Full amounts or k/m/b shorthand.`}</p>
-            {auction.instantPurchasePrice && <p className="text-xs text-gray-700">A bid of {auction.instantPurchasePrice.toLocaleString('en-US')} Meat or more accepts the buyout price and ends bidding at that price.</p>}
+            {auction.instantPurchasePrice && <p className="text-xs text-gray-700">Buy the entire listing immediately at this price.</p>}
             <button type="submit" disabled={pending || minimum === null} className={`w-full rounded bg-blue-600 px-4 font-semibold text-white hover:bg-blue-700 disabled:opacity-50 ${compact ? 'min-h-9 py-2 text-sm' : 'min-h-11 py-3'}`}>
                 {pending ? 'Submitting…' : 'Place Bid'}
             </button>

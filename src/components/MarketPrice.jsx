@@ -16,7 +16,7 @@ export default function MarketPrice({ itemId, auctionId, completed = false }) {
     if (completed && !record?.has_snapshot) return null;
     const display = marketPriceDisplay(record);
     return <div className="space-y-0.5 text-xs text-gray-500">
-        <p className={record?.available ? 'text-violet-600' : undefined}>{display.text}{completed && record?.available && <span> (at completion)</span>}{display.stale && <span> · Stale estimate</span>}</p>
+        <p className={record?.available ? 'text-violet-500' : undefined}>{display.text}{completed && record?.available && <span> (at completion)</span>}{display.stale && <span> · Stale estimate</span>}</p>
     </div>;
 }
 MarketPrice.propTypes = { itemId: PropTypes.number, auctionId: PropTypes.string, completed: PropTypes.bool };

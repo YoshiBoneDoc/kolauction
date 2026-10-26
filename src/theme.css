@@ -7,7 +7,7 @@ html:not([data-theme="dark"]) {
   --light-header: #F5EAE4;
   --light-divider: #F8EEEA;
   --light-border: #E8D9D2;
-  --light-input: #FFFCF9;
+  --light-input: #FFFFFF;
   --light-completed: #EDF8EF;
   --light-escrow-header: #EDEBFF;
   --light-direct-header: #E8F4EC;
@@ -65,7 +65,11 @@ html:not([data-theme="dark"]) hr { background-color: var(--light-divider); borde
 
 html:not([data-theme="dark"]) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
 html:not([data-theme="dark"]) select,
-html:not([data-theme="dark"]) textarea { background-color: var(--light-input); }
+html:not([data-theme="dark"]) textarea {
+  background-color: var(--light-input);
+  border-color: #D8C4B9;
+  box-shadow: 0 1px 2px rgb(80 45 30 / 8%);
+}
 html:not([data-theme="dark"]) option { background-color: var(--light-input); }
 html:not([data-theme="dark"]) input:-webkit-autofill { box-shadow: 0 0 0 1000px var(--light-input) inset; }
 html:not([data-theme="dark"]) :is(.site-footer, .shame-footer) { background-color: var(--light-divider); border-color: var(--light-border); }
