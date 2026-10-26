@@ -73,6 +73,8 @@ html:not([data-theme="dark"]) textarea {
 html:not([data-theme="dark"]) option { background-color: var(--light-input); }
 html:not([data-theme="dark"]) input:-webkit-autofill { box-shadow: 0 0 0 1000px var(--light-input) inset; }
 html:not([data-theme="dark"]) :is(.site-footer, .shame-footer) { background-color: var(--light-divider); border-color: var(--light-border); }
+html:not([data-theme="dark"]) .site-footer.home-footer { background-color: #FFE1DB; border-color: #DCE3EE; }
+html[data-theme="dark"] .site-footer.home-footer { background-color: #17253A; border-color: #34455F; }
 
 html[data-theme="dark"] {
   color-scheme: dark;
@@ -325,3 +327,30 @@ html[data-theme="dark"] [class~="hover:bg-blue-700"]:hover { background-color: #
 html[data-theme="dark"] [class~="hover:bg-blue-800"]:hover { background-color: #1e40af; }
 html[data-theme="dark"] [class~="hover:bg-blue-900"]:hover { background-color: #1e3a8a; }
 html[data-theme="dark"] [class~="hover:bg-yellow-900"]:hover { background-color: #713f12; }
+
+/* Buy order detail surfaces keep their compact layout in both themes. */
+html[data-theme="dark"] .buy-auction-detail { background-color: var(--theme-panel); border-color: var(--theme-border); }
+html[data-theme="dark"] .buy-auction-detail :is(header, details, li) { border-color: var(--theme-border); }
+html[data-theme="dark"] .buy-detail-action { background-color: #172e4d; }
+html[data-theme="dark"] :is(.buy-detail-title, .buy-detail-price) { color: var(--theme-text); }
+html[data-theme="dark"] .buy-auction-detail [class~="text-[#64748B]"] { color: var(--theme-muted); }
+html[data-theme="dark"] .buy-detail-active-badge { color: #fbbf24; background-color: #372d17; }
+html[data-theme="dark"] .buy-detail-login { color: #fff; }
+html[data-theme="dark"] .buy-reservation-heading { color: #86efac; }
+html[data-theme="dark"] .buy-reservation-deadline[class~="text-[#B7791F]"] { color: #fbbf24; }
+html[data-theme="dark"] .buy-reservation-cancel { color: #fca5a5; background-color: transparent; border-color: #88505e; }
+html[data-theme="dark"] .buy-reservation-cancel:hover:not(:disabled) { background-color: #3d202b; }
+html[data-theme="dark"] .buy-fulfillment-head { color: var(--theme-muted); }
+html[data-theme="dark"] .auction-advanced-filters { border-color: var(--theme-border); }
+html[data-theme="dark"] .auction-filters-button { background-color: var(--theme-raised); border-color: var(--theme-border); color: var(--theme-text); }
+html[data-theme="dark"] .auction-filters-active { background-color: #422c25; border-color: #956047; color: #f0b89b; }
+html[data-theme="dark"] .auction-advanced-filters [class~="text-[#A65332]"] { color: #F5B08C; }
+html[data-theme="dark"] .auction-price-range { background: transparent; }
+
+html[data-theme="dark"] .auction-price-control {
+  --auction-range-active: #C46A45;
+  --auction-range-handle: #F5B08C;
+  --auction-range-handle-fill: #F5B08C;
+  --auction-range-label: #F5B08C;
+  --auction-range-track: #40516A;
+}

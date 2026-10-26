@@ -33,10 +33,10 @@ const base = { id: 'first', item: 'Item', quantity: 3, currentBid: 200, minBidMe
 const listings = [base, { ...base, id: 'second', item: 'Other item' }];
 new Function('require', 'module', 'exports', outputFiles[0].text)(name => name === 'react' ? {
     ...React, useState: slot, useRef: value => slot({ current: value })[0], useId: () => 'inline-bid-test',
-    useMemo: fn => fn(), useEffect: () => {},
+    useMemo: fn => fn(), useCallback: fn => fn, useEffect: () => {},
     useContext: context => context === compiled.exports.UserContext ? { currentUser: user } : { auctions: listings, isLoading: false, ...trading },
 } : name === 'react-router-dom' ? {
-    ...router, useLocation: () => ({ pathname: '/auctions', search: params.toString() }),
+    ...router, useNavigationType: () => 'REPLACE', useLocation: () => ({ pathname: '/auctions', search: params.toString() }),
     useSearchParams: () => [params, next => { params = typeof next === 'function' ? next(params) : new URLSearchParams(next); }],
 } : require(name), compiled, compiled.exports);
 const { AllAuctions, CompactAuctionCard, AuctionBidForm, InstantPurchaseAction, CopyMessage } = compiled.exports;
@@ -267,34 +267,31 @@ test('open Direct and Escrow card controls refresh their rounded minimum when li
     }
 });
 
-test('ownership button cycles mine, others and all, preserves other filters, resets pagination, and hides for guests', () => {
+test('ownership choices remain in Filters while View All resets every control', () => {
     const previousUser = user;
     const previousOwner = listings[1].sellerId;
     try {
         user = { id: 'seller' }; listings[1].sellerId = 'another-seller';
         params = new URLSearchParams('q=Item&status=active&sort=price-desc&page=3');
         const h = harness(AllAuctions);
-        const button = () => h.find(node => node.type === 'button' && node.props['aria-label']?.startsWith('Auction ownership:'));
-        assert.equal(button().props['aria-pressed'], false);
-        assert.equal(button().props['aria-label'],'Auction ownership: View All');
-        const fixedSize=()=>{assert.match(button().props.className,/h-9 w-36 shrink-0/);};fixedSize();
+        const button = () => h.find(node => node.type === 'button' && node.props['aria-label'] === 'View all auctions');
+        const filters = () => nodes(h.tree).find(n => n.props?.onRangeChange && n.props?.onClear);
+        assert.match(button().props.className,/h-9 w-36 shrink-0/);
+        h.find(n => n.props?.onToggle && n.props?.controls).props.onToggle(); h.render();
+        assert.equal(filters().props.ownership,'all');
+        filters().props.onUpdate('mine','1'); h.render();
+        assert.equal(params.get('mine'),'1'); assert.equal(params.has('page'),false);
+        assert.equal(params.get('q'),'Item'); assert.equal(params.get('sort'),'price-desc');
+        assert.deepEqual(nodes(h.tree).filter(n=>n.type===CompactAuctionCard).map(n=>n.props.auction.id),['first']);
+        filters().props.onUpdate('mine','others'); h.render();
+        assert.equal(filters().props.ownership,'others');
+        assert.deepEqual(nodes(h.tree).filter(n=>n.type===CompactAuctionCard).map(n=>n.props.auction.id),['second']);
         button().props.onClick(); h.render();
-        fixedSize();assert.equal(params.get('mine'), '1'); assert.equal(params.has('page'), false);
-        assert.equal(params.get('q'), 'Item'); assert.equal(params.get('status'), 'active'); assert.equal(params.get('sort'), 'price-desc');
-        assert.equal(button().props['aria-pressed'], true);
-        assert.equal(button().props['aria-label'],'Auction ownership: My Auctions');
-        assert.deepEqual(nodes(h.tree).filter(node => node.type === CompactAuctionCard).map(node => node.props.auction.id), ['first']);
-        button().props.onClick(); h.render();
-        fixedSize();assert.equal(params.get('mine'), 'others');
-        assert.equal(button().props['aria-label'],'Auction ownership: Others');
-        assert.deepEqual(nodes(h.tree).filter(node => node.type === CompactAuctionCard).map(node => node.props.auction.id),['second']);
-        button().props.onClick(); h.render();
-        assert.equal(params.has('mine'), false);
-        fixedSize();assert.equal(button().props['aria-label'],'Auction ownership: View All');
-        assert.equal(nodes(h.tree).filter(node => node.type === CompactAuctionCard).length, 2);
-        user = null; h.render();
-        assert.equal(nodes(h.tree).some(node => node.type === 'button' && node.props['aria-label']?.startsWith('Auction ownership:')), false);
-    } finally { user = previousUser; listings[1].sellerId = previousOwner; params = new URLSearchParams(); }
+        assert.equal(params.toString(),''); assert.equal(filters().props.ownership,'all');
+        assert.equal(nodes(h.tree).filter(n=>n.type===CompactAuctionCard).length,2);
+        user=null; h.render(); assert.equal(filters().props.ownership,null);
+        assert.ok(button());
+    } finally { user=previousUser; listings[1].sellerId=previousOwner; params=new URLSearchParams(); }
 });
 
 
@@ -309,13 +306,13 @@ test('browse toolbar keeps one sort active, toggles directions, combines methods
     click('Price ▴▾'); assert.equal(params.get('sort'), 'price-desc');
     click('Price ▴'); assert.equal(params.get('sort'), 'price-asc');
     assert.equal(nodes(h.tree).filter(n => n.type === 'button' && n.props['aria-pressed'] === true && !n.props['aria-label']?.startsWith('Auction ') && !['Escrow','Direct'].includes(n.props.children)).length, 1);
-    const methods = () => nodes(h.tree).filter(n => n.type === 'button' && ['Escrow', 'Direct'].includes(n.props.children));
-    assert.match(methods()[0].props.className,/bg-violet-50/);
-    assert.match(methods()[1].props.className,/bg-\[#F0F9F9\]/);
-    methods()[1].props.onClick(); h.render(); assert.equal(params.get('trade'), 'escrow');
-    methods()[0].props.onClick(); h.render(); assert.equal(params.get('trade'), 'none');
-    methods()[1].props.onClick(); h.render(); assert.equal(params.get('trade'), 'direct');
-    methods()[0].props.onClick(); h.render(); assert.equal(params.has('trade'), false);
+    h.find(n => n.props?.onToggle && n.props?.controls).props.onToggle(); h.render();
+    const filters = () => nodes(h.tree).find(n => n.props?.onRangeChange && n.props?.onClear);
+    assert.equal(filters().props.trade, 'all');
+    for (const trade of ['escrow', 'none', 'direct', '']) {
+        filters().props.onUpdate('trade', trade); h.render();
+        assert.equal(params.get('trade'), trade || null);
+    }
     assert.equal(params.get('q'), 'fixture'); assert.equal(params.get('status'), 'all'); assert.equal(params.get('mine'), '1');
     click('Reset filters'); assert.equal(params.toString(), '');
 });
@@ -350,4 +347,41 @@ test('auction type button cycles the current Buy & Sell, Sell and Buy views with
         if(previousKind===undefined)delete listings[1].auctionKind;else listings[1].auctionKind=previousKind;
         user=previousUser;params=new URLSearchParams();
     }
+});
+
+test('advanced filters retain selections while disabled price limits are ignored', () => {
+    const previousTrading = trading;
+    try {
+        trading = { priceBounds: { min: 100, max: 9000000000 } };
+        params = new URLSearchParams('q=Item&status=completed&trade=escrow&sort=price-asc&mine=others&page=3');
+        const h = harness(AllAuctions);
+        const toggle = () => h.find(n => n.props?.onToggle && n.props?.controls);
+        const filters = () => nodes(h.tree).find(n => n.props?.onRangeChange && n.props?.onClear);
+        assert.equal(filters(), undefined);
+        toggle().props.onToggle(); h.render();
+        const toolbar = h.find(n => n.type === 'section' && n.props['aria-label'] === 'Find auctions');
+        const children = React.Children.toArray(toolbar.props.children);
+        assert.equal(children[1].props.id, toggle().props.controls);
+        const controls = React.Children.toArray(children[0].props.children);
+        const index = controls.findIndex(n => n.props?.onToggle);
+        assert.equal(controls[index + 1].props['aria-label'], 'View all auctions');
+        assert.equal(filters().props.ownership,'others');
+        filters().props.onRangeChange({ min: 200, max: 500 }); h.render();
+        assert.equal(params.has('page'), false);
+        assert.equal(params.get('minPrice'), '200'); assert.equal(params.get('maxPrice'), '500');
+        assert.equal(toggle().props.count, 3);
+        const selected = params.toString();
+        toggle().props.onToggle(); h.render(); assert.equal(filters(), undefined);
+        toggle().props.onToggle(); h.render();
+        assert.equal(params.toString(), selected);
+        assert.equal(filters().props.minPrice, null); assert.equal(filters().props.maxPrice, null);
+        filters().props.onClear(); h.render();
+        for (const key of ['status', 'trade', 'minPrice', 'maxPrice']) assert.equal(params.has(key), false);
+        assert.equal(params.toString(), '');
+        assert.equal(toggle().props.count, 0);
+        assert.equal(filters().props.trade, 'all');
+        assert.equal(filters().props.status, 'active');
+        assert.equal(filters().props.minPrice, null);
+        assert.equal(filters().props.maxPrice, null);
+    } finally { trading = previousTrading; params = new URLSearchParams(); }
 });

@@ -3,6 +3,7 @@ import CopyMessage from '../components/CopyMessage';
 
 const DonatePage = () => {
     return (
+        <>
         <div className="site-page-background flex-1 bg-gray-50 flex flex-col items-center justify-center p-6">
             {/* Donate Page Content */}
             <h1 className="text-3xl font-bold text-blue-600 mb-3">Support kHub</h1>
@@ -26,17 +27,20 @@ const DonatePage = () => {
                     </li>
                 </ol>
                 <p className="text-left text-[15px] leading-6 text-gray-700 mt-3">
-                    <span className="font-bold">Gift packages:</span> Packages without an auction command in their outside message are treated as donations. kHub opens them, identifies the sender from the updated KMail, and stores the donated contents in its closet. For an auction deposit or bid, use the exact command from the auction page as the outside message and include the required items or Meat.
+                    <span className="font-bold">Gift packages:</span> Packages without a valid auction command in the outside message are treated as donations. For bids or deposits, include the exact auction command. If you sent a package by mistake, KMail teres minor.
                 </p>
-                <p className="text-[15px] leading-6 text-gray-700 mt-[18px]">The bot will confirm your donation with a short thank-you message. Sending <span className="font-mono">DONATE</span> without attachments returns donation instructions. Items or Meat sent through regular KMail without a valid command will be returned.</p>
+                <p className="text-sm leading-tight text-gray-500 mt-[18px]">The bot will confirm your donation with a short thank-you message. Sending <span className="font-mono">DONATE</span> without attachments returns donation instructions. <em>Items or Meat sent through regular KMail without a valid command will be returned.</em></p>
             </div>
 
             {/* Thank You Note */}
             <p className="text-[15px] leading-6 text-gray-700 text-center mt-6 max-w-3xl">
-                Thank you for supporting kHub!
+                Thank you for your support!
             </p>
-            <p className="text-[15px] leading-6 text-gray-700 text-center mt-3">Questions? <Link to="/support" className="text-blue-600 hover:underline">We’re here to help</Link>.</p>
         </div>
+        <footer className="site-page-background bg-gray-50 px-6 pt-6 pb-12 text-center">
+            <p className="text-[15px] leading-6 text-gray-700">Questions? <Link to="/support" className="text-blue-600 hover:underline">We’re here to help</Link>.</p>
+        </footer>
+        </>
     );
 };
 

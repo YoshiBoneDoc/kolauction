@@ -1,3 +1,4 @@
+import AuctionEndedTime from './AuctionEndedTime';
 import { useContext, useId, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Link, useLocation } from 'react-router-dom';
@@ -24,6 +25,7 @@ export default function BuyAuctionCard({ auction, now, inlineReserve = false, ex
     const [resolvedId, setResolvedId] = useState(null);
     const result = getAuctionResult(auction, now);
     const status = getAuctionDisplayStatus(auction, result);
+    const ended = ['completed', 'awaiting_trade', 'settling', 'ended_no_bids', 'expired', 'cancelled', 'voided'].includes(result.status);
     const active = result.status === 'active' && !auction.buyClosingReason;
     const owns = currentUser?.id === auction.sellerId;
     const available = auction.availableQuantity ?? auction.remainingQuantity ?? 0;
@@ -118,12 +120,12 @@ export default function BuyAuctionCard({ auction, now, inlineReserve = false, ex
                             {formatCompactMeat(auction.pricePerItem)} Meat <span className="text-[11px] font-normal leading-none tracking-normal text-gray-500">/ item</span>
                         </FittedPrice>
                         <p className="truncate text-center text-[11px] leading-[14px] text-gray-600">{purchased.toLocaleString('en-US')} / {target.toLocaleString('en-US')} purchased{reserved > 0 && <> · {reserved.toLocaleString('en-US')} reserved</>}</p>
-                        <progress aria-label="Order fulfillment" value={purchased} max={target || 1} className="buy-card-progress mt-1 h-1.5 w-full" />
+                        <progress aria-label="Order fulfillment" data-status={result.status} value={purchased} max={target || 1} className="buy-card-progress mt-1 h-1.5 w-full" />
                     </>}
                 </div>
             </div>
             <footer className="mt-1 flex min-h-8 shrink-0 items-end justify-end gap-2">
-                {showForm ? <button type="button" onClick={onToggleReserve} disabled={pending} aria-label="Close reservation form" aria-expanded={true} aria-controls={formId} className="relative z-10 inline-flex h-8 min-w-24 shrink-0 items-center justify-center rounded-[2px] border border-gray-300 bg-white px-4 py-0 text-xs font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-500">Close</button>
+                {ended && !showForm ? <AuctionEndedTime auction={auction} /> : showForm ? <button type="button" onClick={onToggleReserve} disabled={pending} aria-label="Close reservation form" aria-expanded={true} aria-controls={formId} className="relative z-10 inline-flex h-8 min-w-24 shrink-0 items-center justify-center rounded-[2px] border border-gray-300 bg-white px-4 py-0 text-xs font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-500">Close</button>
                     : owns ? <span className="rounded bg-white/70 px-2 py-1 text-[11px] font-medium text-gray-500">Your Listing</span>
                         : inlineReserve && (active || reservation) ? <button type="button" disabled={currentUser?.isBanned || !reservation && available <= 0} onClick={onToggleReserve}
                             aria-expanded={false} aria-controls={formId} className={`relative z-10 ${actionClass}`}>{reservation ? 'View reservation' : 'Sell to this order'}</button>

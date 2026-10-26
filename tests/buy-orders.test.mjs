@@ -30,7 +30,7 @@ test('buy kind filters reach the paginated database read with existing ownership
     assert.equal(auctionReadRequest('/auctions','?kind=buy&mine=others','viewer').kind,'buy');
     const calls=[];const service=createAuctionService({async rpc(name,args){calls.push([name,args]);return {data:{privacy_version:1,rows:[],bids:[],total:0}};}});
     await service.load({kind:'buy',excludeOwn:true,page:2,trade:'escrow'});
-    assert.deepEqual(calls[1],['read_auction_page',{p_view:'others',p_id:null,p_search:'',p_status:'active',p_trade:'escrow',p_kind:'buy',p_sort:'ending',p_page:2}]);
+    assert.deepEqual(calls[1],['read_filtered_auction_page',{p_view:'others',p_id:null,p_search:'',p_status:'active',p_trade:'escrow',p_kind:'buy',p_min_price:null,p_max_price:null,p_sort:'ending',p_page:2}]);
 });
 
 test('buy projections distinguish per-item prices, partial fills, no single winning bidder and participant support',()=>{

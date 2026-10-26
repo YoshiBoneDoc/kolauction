@@ -67,3 +67,6 @@ amplifytools.xcconfig
 
 # Private database backups
 /khub-backup_10-21-2026/
+
+# Personal photos
+about_me_pics/

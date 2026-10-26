@@ -1,3 +1,4 @@
+import AuctionEndedTime from '../components/AuctionEndedTime';
 import MarketPrice from '../components/MarketPrice';
 import SellPrice from '../components/SellPrice';
 import BuyAuctionDetails from '../components/BuyAuctionDetails';
@@ -11,7 +12,7 @@ import AuctionItemImage from '../components/AuctionItemImage';
 import AuctionBidForm from '../components/AuctionBidForm';
 import InstantPurchaseAction from '../components/InstantPurchaseAction';
 import { getAuctionResult, getAuctionDisplayStatus } from '../lib/auctionLifecycle';
-import { timeRemaining } from '../lib/auctionBrowsing';
+import { auctionEndTime, timeRemaining } from '../lib/auctionBrowsing';
 import { useNow } from '../hooks/useNow';
 import SellerLink from '../components/SellerLink';
 import WinnerLink from '../components/WinnerLink';
@@ -48,9 +49,9 @@ export default function AuctionDetails() {
     const active = result.status === 'active';
     const ownsAuction = Boolean(currentUser && !currentUser.isBanned && currentUser.id === auction.sellerId);
     const closedSale = result.hasWinner;
-    const endedAt = auction.instantPurchasedAt || auction.cancelledAt || auction.expiredAt || auction.endTime;
-    const endedDate = new Date(endedAt);
-    const endedTime = ['awaiting_trade', 'completed', 'settling', 'ended_no_bids', 'cancelled', 'expired'].includes(result.status) && Number.isFinite(endedDate.getTime()) && endedDate.getTime() <= now ? <p className="text-sm leading-6 text-gray-600">Auction ended: <time dateTime={endedDate.toISOString()}>{endedDate.toLocaleString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}</time></p> : null;
+    const endedAt = auctionEndTime(auction);
+    const endedTime = ['awaiting_trade', 'completed', 'settling', 'ended_no_bids', 'cancelled', 'expired', 'voided'].includes(result.status)
+        && Number.isFinite(endedAt) && endedAt <= now ? <AuctionEndedTime auction={auction} compact={false} /> : null;
     const price = result.finalPrice ?? auction.currentBid;
     const { reportedIncomplete, label: statusLabel, color: statusColor } = getAuctionDisplayStatus(auction, result);
     return (

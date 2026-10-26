@@ -156,3 +156,14 @@ test('Others requests exclude the authenticated viewer while preserving combined
     assert.equal(auctionReadRequest('/auctions','?mine=others').excludeOwn,undefined);
     assert.equal(auctionReadRequest('/seller/someone','?mine=others','viewer').excludeOwn,undefined);
 });
+
+test('closed auction filters request newest endings before pagination on browse and seller pages', () => {
+    for (const path of ['/auctions', '/seller/example']) {
+        for (const status of ['ended', 'completed']) {
+            assert.equal(auctionReadRequest(path, `?status=${status}`).sort, 'ended-desc');
+            assert.equal(auctionReadRequest(path, `?status=${status}&sort=invalid`).sort, 'ended-desc');
+            assert.equal(auctionReadRequest(path, `?status=${status}&sort=price-desc`).sort, 'price-desc');
+        }
+        assert.equal(auctionReadRequest(path).sort, 'ending');
+    }
+});

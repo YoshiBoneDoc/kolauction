@@ -1,15 +1,17 @@
 import { Link } from 'react-router-dom';
 import PropTypes from 'prop-types';
 
-export default function SiteFooter({ className = '', showReportLink = true }) {
+export default function SiteFooter({ className = '', showReportLink = true, showCreatorLink = false }) {
     return <footer className={`site-footer border-t bg-gray-100 px-4 py-3 text-center ${className}`}>
         <nav aria-label="Footer links" className="flex flex-wrap items-center justify-center gap-3 text-sm">
             <Link to="/donate" className="inline-flex min-h-11 items-center text-blue-700 hover:underline">Donate</Link>
             {showReportLink && <span aria-hidden="true">•</span>}
             {showReportLink && <Link to="/report-a-bug" className="inline-flex min-h-11 items-center text-blue-700 hover:underline">Report a Bug</Link>}
+            {showCreatorLink && <span aria-hidden="true">•</span>}
+            {showCreatorLink && <Link to="/meet-the-creator" className="inline-flex min-h-11 items-center text-blue-700 hover:underline">Meet the Creator</Link>}
         </nav>
         <p className="text-xs text-gray-500">All game images are copyright Asymmetric Publications from The Kingdom of Loathing</p>
     </footer>;
 }
 
-SiteFooter.propTypes = { className: PropTypes.string, showReportLink: PropTypes.bool };
+SiteFooter.propTypes = { className: PropTypes.string, showReportLink: PropTypes.bool, showCreatorLink: PropTypes.bool };

@@ -180,3 +180,15 @@ test('High Rollers qualifies by current total market value OR auction price, inc
         {...base,id:'canceled',status:'cancelled',marketValueMeat:1000000000}];
     assert.deepEqual(highRollerAuctions(rows,now).map(a=>a.id),['order','both','bid-only','completed-market','market-only']);
 });
+
+test('Ended and Completed default to actual end time descending, with explicit sorts preserved', () => {
+    const lots = [
+        { ...base, id: 'old', status: 'completed', endTime: 2000, createdAt: 900 },
+        { ...base, id: 'recent', status: 'completed', endTime: 5000, createdAt: 100 },
+        { ...base, id: 'buyout', status: 'completed', endTime: 9000, instantPurchasedAt: new Date(3000).toISOString(), createdAt: 500 },
+        { ...base, id: 'cancelled', status: 'cancelled', endTime: 9000, finalizedAt: new Date(4000).toISOString() },
+    ];
+    assert.deepEqual(ids(browseAuctions(lots, { status: 'completed', now })), ['recent', 'buyout', 'old']);
+    assert.deepEqual(ids(browseAuctions(lots, { status: 'ended', now })), ['recent', 'cancelled', 'buyout', 'old']);
+    assert.deepEqual(ids(browseAuctions(lots, { status: 'completed', sort: 'newest', now })), ['old', 'buyout', 'recent']);
+});

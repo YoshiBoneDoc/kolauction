@@ -36,8 +36,11 @@ export default function PendingTrades() {
     const { currentUser } = useContext(UserContext);
     const [expanded, setExpanded] = useState(false);
     const listId = useId();
-    const { pendingTrades = [], pendingTotal = 0, pendingPage = 1, setPendingPage, pendingError, refreshAuctions } = useContext(AuctionsContext);
+    const { pendingTrades = [], pendingTotal = 0, pendingPage = 1, setPendingPage, pendingError, pendingHasLoaded = !pendingError || pendingTrades.length > 0, refreshAuctions } = useContext(AuctionsContext);
     if (!currentUser || currentUser.isBanned) return null;
+    if (pendingError && !pendingHasLoaded) return <section aria-label="Your pending trades" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3">
+        <p role="alert" className="text-red-700">Pending trades could not be loaded. <button onClick={refreshAuctions} className="min-h-11 underline">Retry</button></p>
+    </section>;
     const visibleTrades = pendingTrades.filter(auction => !auction.escrowMode
         && ['awaiting_trade', 'completed'].includes(auction.status)
         && (auction.sellerId === currentUser.id || auction.winnerId === currentUser.id)
@@ -48,7 +51,7 @@ export default function PendingTrades() {
     return <section aria-label="Your pending trades" className="mb-4 space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3">
         <h2 className="text-base font-bold">{visibleTotal === 1 ? 'Trade' : 'Trades'} awaiting your response</h2>
         <p className="text-xs leading-5 text-gray-600">{visibleTotal} pending {visibleTotal === 1 ? 'trade' : 'trades'} awaiting a trade response or optional experience rating.</p>
-        {pendingError && <p role="alert" className="text-red-700">{pendingError} <button onClick={refreshAuctions} className="min-h-11 underline">Retry</button></p>}
+        {pendingError && <p role="alert" className="text-red-700">Refresh delayed. Showing previously loaded trades. <button onClick={refreshAuctions} className="min-h-11 underline">Retry</button></p>}
         <div id={listId} className="space-y-2">{displayedTrades.map(auction => <TradeCard key={auction.id} auction={auction} />)}</div>
         {visibleTrades.length > 3 && <button type="button" aria-expanded={expanded} aria-controls={listId} onClick={() => setExpanded(value => !value)} className="min-h-8 text-xs font-medium text-blue-700 underline hover:text-blue-800">{expanded ? 'Show fewer trades' : `Show ${visibleTrades.length - 3} more ${visibleTrades.length - 3 === 1 ? 'trade' : 'trades'}`}</button>}
         {(visibleTotal > 12 || pendingPage > 1) && (expanded || visibleTrades.length <= 3) && <nav aria-label="Pending trade pages" className="flex flex-wrap items-center justify-center gap-3">

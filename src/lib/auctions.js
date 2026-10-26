@@ -1,4 +1,5 @@
-import { highRollerValue, HIGH_ROLLER_MIN_PRICE } from './auctionBrowsing.js';
+import { parsePrice, auctionPriceBounds } from './auctionPriceRange.js';
+import { resolveAuctionSort, highRollerValue, HIGH_ROLLER_MIN_PRICE } from './auctionBrowsing.js';
 import { observeAuctionServerTime, auctionClockRequestStarted } from './auctionClock.js';
 export function mapAuction(row, bidRows) {
     const bids = bidRows.filter((bid) => bid.auction_id === row.id)
@@ -103,10 +104,11 @@ export function mapAuction(row, bidRows) {
 }
 
 function databaseError(error) {
+    let failure;
     if (['PGRST205', 'PGRST202', '42P01', '42883', '42501'].includes(error.code)) {
-        return new Error('Auction storage is not ready. Apply any pending auction SQL migrations (including the auction page-read migration) in Supabase, then retry.');
+        failure = new Error('Auction storage is not ready. Apply any pending auction SQL migrations (including the auction page-read migration) in Supabase, then retry.');
     }
-    return new Error(error.message || 'The database request failed. Please try again.');
+    return Object.assign(failure || new Error(error.message || 'The database request failed. Please try again.'), { code: error.code, status: error.status });
 }
 
 export function createAuctionService(client) {
@@ -116,23 +118,64 @@ export function createAuctionService(client) {
     }
 
     return {
-        async load({ view = 'browse', id = null, sellerId = null, excludeOwn = false, kind = 'all', search = '', status = 'active', sort = 'ending', trade = 'all', page = 1 } = {}) {
+        async loadDataset({ signal } = {}) {
+            // Use only the existing privacy-filtered RPC, never raw tables or
+            // financial maintenance. All pages belong to one atomic cache commit.
+            for (let attempt = 0; attempt < 2; attempt++) {
+                const rows = new Map(), bids = new Map();
+                let expected = null, changed = false;
+                for (let page = 1; page <= 250; page++) {
+                    signal?.throwIfAborted();
+                    const started = auctionClockRequestStarted();
+                    let request = requireClient().rpc('read_auction_page', {
+                        p_view: 'browse', p_id: null, p_search: '', p_status: 'all',
+                        p_sort: 'newest', p_page: page, p_trade: 'all', p_kind: 'all',
+                    });
+                    if (signal && request.abortSignal) request = request.abortSignal(signal);
+                    const { data, error, status: statusCode } = await request;
+                    signal?.throwIfAborted();
+                    if (error) throw databaseError({ ...error, status: error.status ?? statusCode });
+                    if (data?.privacy_version !== 1) throw Object.assign(new Error('The auction privacy policy could not be verified.'), { code: 'KHUB_PRIVACY' });
+                    if (!Array.isArray(data.rows) || !Array.isArray(data.bids)
+                        || !Number.isSafeInteger(Number(data.total)) || Number(data.total) < 0) {
+                        throw new Error('The auction list could not be verified. Please retry shortly.');
+                    }
+                    observeAuctionServerTime(data.server_time, started);
+                    if (expected == null) expected = Number(data.total);
+                    if (expected > 6000) throw new Error('The auction list is too large to refresh safely. Please contact support.');
+                    if (Number(data.total) !== expected) { changed = true; break; }
+                    for (const row of data.rows) rows.set(row.id, row);
+                    for (const bid of data.bids) bids.set(bid.id, bid);
+                    if (page * 24 >= expected) {
+                        if (rows.size !== expected) { changed = true; break; }
+                        const bidRows = [...bids.values()];
+                        const auctions = [...rows.values()].map(row => mapAuction(row, bidRows));
+                        return { auctions, total: auctions.length, priceBounds: auctionPriceBounds(auctions) };
+                    }
+                    if (!data.rows.length) { changed = true; break; }
+                }
+                if (!changed) break;
+            }
+            throw new Error('The auction list changed while refreshing. We will retry shortly.');
+        },
+        async load({ view = 'browse', id = null, sellerId = null, excludeOwn = false, kind = 'all', search = '', status = 'active', sort = resolveAuctionSort(status), trade = 'all', page = 1, minPrice = null, maxPrice = null } = {}) {
             const { error } = await requireClient().rpc('finalize_expired_auctions');
             if (error) throw databaseError(error);
             async function readPage(pageNumber, completed = false, highValue = false) {
                 // The historical home endpoint returns only four rows. Use the
                 // existing privacy-filtered browse pages for the complete strip.
                 const requestStartedAt = auctionClockRequestStarted();
-                const { data, error: readError } = await requireClient().rpc('read_auction_page', {
+                const { data, error: readError } = await requireClient().rpc(view === 'browse' ? 'read_filtered_auction_page' : 'read_auction_page', {
                     p_view: view === 'home' ? 'browse' : view === 'browse' && excludeOwn ? 'others' : view === 'browse' && sellerId ? 'seller' : view,
                     p_id: view === 'browse' && sellerId ? sellerId : id,
                     p_search: view === 'home' ? '' : search, p_status: view === 'home' ? (completed ? 'completed' : 'active') : status,
                     ...(['browse', 'seller'].includes(view) && ['escrow', 'direct', 'none'].includes(trade) ? { p_trade: trade } : {}),
                     ...(['buy', 'sell'].includes(kind) ? { p_kind: kind, p_trade: trade } : {}),
+                    ...(view === 'browse' ? { p_trade: trade, p_kind: kind, p_min_price: minPrice, p_max_price: maxPrice } : {}),
                     p_sort: view === 'home' ? (completed ? highValue ? 'high-rollers' : 'completed' : 'newest') : sort, p_page: pageNumber,
                 });
                 if (readError) throw databaseError(readError);
-                if (data?.privacy_version !== 1) throw new Error('Auctions are temporarily unavailable while a privacy update is being completed. Please try again later.');
+                if (data?.privacy_version !== 1) throw Object.assign(new Error('Auctions are temporarily unavailable while a privacy update is being completed. Please try again later.'), { code: 'KHUB_PRIVACY' });
                 observeAuctionServerTime(data.server_time, requestStartedAt);
                 return data;
             }
@@ -167,12 +210,15 @@ export function createAuctionService(client) {
             }
             const unique = [...new Map(rows.map(row => [row.id, row])).values()];
             const uniqueBids = [...new Map(bids.map((bid, index) => [bid.id ?? index, bid])).values()];
-            return { auctions: unique.map(row => mapAuction(row, uniqueBids)), total: Number(data.total), seller: data.seller || null };
+            return { auctions: unique.map(row => mapAuction(row, uniqueBids)), total: Number(data.total), seller: data.seller || null,
+                ...(view === 'browse' ? { priceBounds: data.price_bounds && parsePrice(data.price_bounds.min) != null && parsePrice(data.price_bounds.max) != null
+                    ? { min: Number(data.price_bounds.min), max: Number(data.price_bounds.max) } : null } : {}),
+            };
         },
         async pendingTrades(page = 1) {
-            const { data, error } = await requireClient().rpc('read_pending_trades', { p_page: page });
-            if (error) throw databaseError(error);
-            if (data?.privacy_version !== 1) throw new Error('Private trade details are temporarily unavailable.');
+            const { data, error, status: statusCode } = await requireClient().rpc('read_pending_trades', { p_page: page });
+            if (error) throw databaseError({ ...error, status: error.status ?? statusCode });
+            if (data?.privacy_version !== 1) throw Object.assign(new Error('Private trade details are temporarily unavailable.'), { code: 'KHUB_PRIVACY' });
             return { auctions: data.rows.map((row) => mapAuction(row, [])), total: Number(data.total) };
         },
         async create(auction) {

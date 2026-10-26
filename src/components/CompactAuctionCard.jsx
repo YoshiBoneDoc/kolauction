@@ -1,3 +1,4 @@
+import AuctionEndedTime from './AuctionEndedTime';
 import FittedPrice from './FittedPrice';
 import SellPrice from './SellPrice';
 import BuyAuctionCard from './BuyAuctionCard';
@@ -20,6 +21,7 @@ export default function CompactAuctionCard({ auction, now, expanded = false, onT
     const active = result.status === 'active';
     const ownsAuction = currentUser?.id === auction.sellerId;
     const status = getAuctionDisplayStatus(auction, result);
+    const ended = ['completed', 'awaiting_trade', 'settling', 'ended_no_bids', 'expired', 'cancelled', 'voided'].includes(result.status);
     const price = result.finalPrice ?? (auction.currentBid || auction.minBidMeat);
     const priceLabel = result.hasWinner ? 'Final price' : auction.currentBid ? active ? 'Current bid' : 'Last bid' : 'Minimum bid';
     const shortPriceLabel = result.hasWinner ? 'Final' : auction.currentBid ? active ? 'Bid' : 'Last' : 'Min';
@@ -60,7 +62,9 @@ export default function CompactAuctionCard({ auction, now, expanded = false, onT
                 </p>}
             </div>}
         </div>
-        {showForm ? <section id={formId} aria-label={`Bidding for ${auction.item}`} className="col-start-2 row-start-3 min-h-0 min-w-0 [&_a]:relative [&_a]:z-10">
+        {ended ? <footer className="col-span-2 col-start-1 row-start-3 flex items-end">
+            <AuctionEndedTime auction={auction} />
+        </footer> : showForm ? <section id={formId} aria-label={`Bidding for ${auction.item}`} className="col-start-2 row-start-3 min-h-0 min-w-0 [&_a]:relative [&_a]:z-10">
             {currentUser ? <AuctionBidForm auction={auction} inline showTerms={false} onClose={onToggleBid} /> : <div className="flex h-full min-w-0 items-end gap-1">
                 <div role="alert" className="relative z-10 flex h-8 min-w-0 flex-1 items-center rounded-[2px] border border-red-200 bg-red-50 px-1 py-0 text-xs leading-[14px] text-red-800">
                     <p><Link to="/register" className="font-semibold text-red-800 underline hover:text-red-900">Register</Link> or <Link to="/login" className="font-semibold text-red-800 underline hover:text-red-900">log in</Link> to bid on auctions.</p>

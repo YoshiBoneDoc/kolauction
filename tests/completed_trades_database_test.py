@@ -74,11 +74,12 @@ with tempfile.TemporaryDirectory(prefix='khub-completed-',dir='/tmp') as folder:
             # Listing order is deliberately the reverse of completion order.
             sql(f"""insert into public.auctions(id,seller_id,seller_username,item,quantity,min_bid_meat,duration_hours,
                 item_id,seller_kol_id,escrow_mode,created_at,end_time,current_bid,highest_bidder_id,highest_bidder_username,
-                winner_id,winner_username,final_price,finalized_at,status,seller_confirmed_at,buyer_confirmed_at,settled_at,completed_at)
+                winner_id,winner_username,final_price,finalized_at,status,seller_confirmed_at,buyer_confirmed_at,settled_at,completed_at,instant_purchased_at,instant_purchase_price)
                 values('{ident}','{seller}','Completed Seller','CompletedFixture {i}',1,100,24,
-                2,48889401,{'true' if i%2 else 'false'},'2026-10-01'::timestamptz-interval '{i} hours','2026-10-02',500,
-                '{buyer}','Completed Buyer','{buyer}','Completed Buyer',500,'2026-10-02','completed',
-                '2026-10-03','2026-10-03','2026-10-03','2026-10-03'::timestamptz+interval '{i} hours');""")
+                2,48889401,{'true' if i%2 else 'false'},'2026-10-01'::timestamptz-interval '{i} hours','2026-10-02'::timestamptz+interval '{i} minutes',500,
+                '{buyer}','Completed Buyer','{buyer}','Completed Buyer',500,'2026-10-02'::timestamptz+interval '{i} minutes','completed',
+                '2026-10-03','2026-10-03','2026-10-03','2026-10-03'::timestamptz+interval '{i} hours',
+                {"NULL" if i!=30 else "'2026-10-02'::timestamptz+interval '1 minute'"},{'NULL' if i!=30 else '500'});""")
         for status in ['active','awaiting_trade','settling','cancelled','voided','ended_no_bids','on_hold','pending_escrow']:
             sql(f"""insert into public.auctions(seller_id,seller_username,item,quantity,min_bid_meat,duration_hours,
                 item_id,seller_kol_id,escrow_mode,end_time,status) values('{seller}','Completed Seller','Excluded {status}',1,100,24,2,48889401,true,
@@ -110,5 +111,65 @@ with tempfile.TemporaryDirectory(prefix='khub-completed-',dir='/tmp') as folder:
         assert sql("select jsonb_agg(to_jsonb(a) order by id) from public.auctions a;")==before
         assert [r['id'] for r in read()['rows']]==list(reversed(completed))[:24]
         print('PASS: migration can be reapplied and never changes auction or settlement records')
+        # Recently ended ranks actual closure before LIMIT, independently of completion time.
+        expected=list(reversed(completed[2:-1]))+[completed[1],completed[-1],completed[0]]
+        for status in ['completed','ended']:
+            for extra in ['',",'all'",",'all','all'"]:
+                rows=[]
+                for page in [1,2]:
+                    result=json.loads(sql(f"set role anon;select public.read_auction_page('browse',null,'CompletedFixture','{status}','ended-desc',{page}{extra});"))
+                    assert result['total']==31
+                    rows.extend(r['id'] for r in result['rows'])
+                # Equal closure times fall back to newest listing, then ID.
+                assert rows==expected,rows
+        migration=next(p for p in migrations if p.name.startswith('202610260114_'))
+        sql(migration.read_text())
+        print('PASS: recently ended ordering across two pages, early buyouts, all three reader overloads, and reapplication')
+        # Price filters must precede pagination, with bounds from every public lot.
+        price_ids=[]
+        for i in range(30):
+            ident=str(uuid4());price_ids.append(ident)
+            sql(f"insert into public.auctions(id,seller_id,seller_username,item,quantity,min_bid_meat,duration_hours,item_id,seller_kol_id,escrow_mode,end_time,status) values('{ident}','{seller}','Completed Seller','PriceFixture {i}',1,{100+i*1000},24,2,48889401,{'true' if i%2 else 'false'},clock_timestamp()+interval '1 day','active');")
+        for kind,price,status in [('buy',5,'active'),('sell',1,'pending_escrow'),('sell',1000000000000,'cancelled')]:
+            sql(f"insert into public.auctions(seller_id,seller_username,item,quantity,min_bid_meat,duration_hours,item_id,seller_kol_id,escrow_mode,end_time,status,auction_kind) values('{seller}','Completed Seller','BoundsFixture',1,{price},24,2,48889401,true,clock_timestamp()+interval '1 day','{status}','{kind}');")
+        def price_read(search='',status='all',low='null',high='null',trade='all',kind='all',page=1,view='browse',ident='null',uid=None):
+            return json.loads(sql(f"set role {'authenticated' if uid else 'anon'};select public.read_filtered_auction_page('{view}',{ident},{lit(search)},'{status}','price-asc',{page},'{trade}','{kind}',{low},{high});",uid))
+        price_result=price_read('PriceFixture','active','20100','29100')
+        assert price_result['total']==10 and [r['id'] for r in price_result['rows']]==price_ids[20:]
+        bounds={'min':'5','max':'29100'}
+        assert price_result['price_bounds']==bounds,price_result['price_bounds']
+        assert price_read('missing','completed','999999','1000000')['price_bounds']==bounds
+        assert price_read('PriceFixture','active','20100','29100',trade='escrow')['total']==5
+        assert price_read('PriceFixture','active','20100','29100',kind='buy')['total']==0
+        assert price_read('BoundsFixture',kind='buy')['rows'][0]['min_bid_meat']==5
+        assert price_read('PriceFixture',view='seller',ident=lit(seller),uid=seller)['total']==30
+        assert price_read('PriceFixture',view='others',uid=seller)['total']==0
+        assert price_read('PriceFixture',page=2)['price_bounds']==bounds
+        for status in ['cancelled','voided']:
+            sql(f"insert into public.auctions(seller_id,seller_username,item,quantity,min_bid_meat,duration_hours,item_id,seller_kol_id,escrow_mode,end_time,status,item_escrowed_at) values('{seller}','Completed Seller','Cancelled public lot',1,100,24,2,48889401,true,clock_timestamp()+interval '1 hour','{status}',clock_timestamp()-interval '1 day');")
+        assert price_read(status='cancelled')['total']==2
+        assert price_read(status='expired')['total']==1
+        first=price_read('CompletedFixture','completed')
+        assert all(r['winner_id'] is None and r['highest_bidder_id'] is None for r in first['rows'])
+        migration=next(p for p in migrations if p.name.startswith('202610260115_'))
+        sql(migration.read_text())
+        assert price_read('PriceFixture','active','20100','29100')['total']==10
+        print('PASS: global public price bounds; price filtering before pagination; Buy asks; combined filters; privacy and idempotent migration')
+        cyber_id=int(sql("select id from khub_bot.catalog where is_current and tradeable and name='CyberRealm keycode' limit 1;"))
+        cyber=str(uuid4())
+        sql(f"insert into public.auctions(id,seller_id,seller_username,item,quantity,min_bid_meat,current_bid,highest_bidder_id,highest_bidder_username,duration_hours,item_id,seller_kol_id,escrow_mode,end_time,status) values('{cyber}','{seller}','Completed Seller','CyberRealm keycode',1,100,7000000,'{buyer}','Completed Buyer',24,{cyber_id},48889401,false,clock_timestamp()+interval '1 day','active');")
+        sql(f"insert into khub_bot.market_prices(item_id,price_meat,observed_at,checked_at,available) values({cyber_id},210000000,now(),now(),true);")
+        assert price_read()['price_bounds']=={'min':'5','max':'210000000'}
+        sql(f"update public.auctions set current_bid=400000000 where id='{cyber}';")
+        assert price_read()['price_bounds']=={'min':'5','max':'400000000'}
+        assert price_read('missing','completed','1','10',kind='buy')['price_bounds']=={'min':'5','max':'400000000'}
+        # Lower market quotes count toward the global minimum, not just the max.
+        sql("insert into khub_bot.market_prices(item_id,price_meat,observed_at,checked_at,available) values(2,3,now(),now(),true);")
+        assert price_read()['price_bounds']=={'min':'3','max':'400000000'}
+        sql("update khub_bot.market_prices set available=false where item_id=2;")
+        assert price_read()['price_bounds']=={'min':'5','max':'400000000'}
+        sql(f"update khub_bot.market_prices set price_meat=500000000 where item_id={cyber_id};")
+        assert price_read()['price_bounds']=={'min':'5','max':'500000000'}
+        print('PASS: 7M bid / 210M market gives 210M max; 400M bid gives 400M; lower market sets minimum; changing market prices refresh global bounds')
     finally:
         if started: pg('-m','fast','-w','stop')

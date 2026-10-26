@@ -1,14 +1,19 @@
+export { auctionPrice } from './auctionPriceRange.js';
+import { auctionPrice, auctionFilterPrice } from './auctionPriceRange.js';
 import { getAuctionStatus } from './auctionLifecycle.js';
 
 export const auctionFilters = [
     ['active', 'Active'],
     ['completed', 'Completed trades'],
+    ['cancelled', 'Cancelled'],
+    ['expired', 'Expired / no bids'],
     ['ended', 'Ended (all outcomes)'],
     ['all', 'All auctions'],
 ];
 
 export const auctionSorts = [
     ['ending', 'Ending soon'],
+    ['ended-desc', 'Recently ended'],
     ['newest', 'Newest'],
     ['price-asc', 'Price: low to high'],
     ['price-desc', 'Price: high to low'],
@@ -17,18 +22,27 @@ export const auctionSorts = [
     ['activity', 'Recent activity'],
 ];
 
-export function auctionPrice(auction) {
-    return auction.auctionKind === 'buy' ? auction.pricePerItem : auction.finalPrice ?? (auction.currentBid || auction.minBidMeat);
+export function resolveAuctionSort(status, sort) {
+    return auctionSorts.some(([value]) => value === sort) ? sort
+        : ['ended', 'completed', 'cancelled', 'expired'].includes(status) ? 'ended-desc' : 'ending';
 }
 
-export function browseAuctions(auctions, { search = '', status = 'active', sort = 'ending', trade = 'all', kind = 'all', now = Date.now() } = {}) {
+export function auctionEndTime(auction) {
+    return Math.min(auction.endTime,
+        Date.parse(auction.finalizedAt) || Infinity, Date.parse(auction.instantPurchasedAt) || Infinity);
+}
+
+export function browseAuctions(auctions, { search = '', status = 'active', sort = resolveAuctionSort(status), trade = 'all', kind = 'all', minPrice = null, maxPrice = null, now = Date.now() } = {}) {
     const query = search.trim().toLocaleLowerCase();
     return auctions.filter((auction) => {
         const lifecycle = getAuctionStatus(auction, now);
         const matchesStatus = status === 'all'
             || (status === 'ended' ? !['active', 'finalizing', 'pending_escrow', 'on_hold', 'bidding_closed'].includes(lifecycle)
-                : lifecycle === status || status === 'active' && lifecycle === 'finalizing');
-        return matchesStatus && (kind === 'all' || (auction.auctionKind || 'sell') === kind) && (trade === 'all' || trade !== 'none' && auction.escrowMode === (trade === 'escrow')) && auction.item.toLocaleLowerCase().includes(query);
+                : status === 'cancelled' ? ['cancelled', 'voided'].includes(lifecycle)
+                    : status === 'expired' ? ['expired', 'ended_no_bids'].includes(lifecycle)
+                        : lifecycle === status || status === 'active' && lifecycle === 'finalizing');
+        const price = auctionFilterPrice(auction);
+        return (minPrice == null || price >= minPrice) && (maxPrice == null || price <= maxPrice) && matchesStatus && (kind === 'all' || (auction.auctionKind || 'sell') === kind) && (trade === 'all' || trade !== 'none' && auction.escrowMode === (trade === 'escrow')) && auction.item.toLocaleLowerCase().includes(query);
     }).sort((a, b) => {
         let comparison = 0;
         if (sort === 'bids-desc') comparison = (b.bidCount ?? b.bids?.length ?? 0) - (a.bidCount ?? a.bids?.length ?? 0);
@@ -39,6 +53,7 @@ export function browseAuctions(auctions, { search = '', status = 'active', sort 
         }
         if (sort === 'newest') comparison = b.createdAt - a.createdAt;
         if (sort === 'ending') comparison = a.endTime - b.endTime;
+        if (sort === 'ended-desc') comparison = auctionEndTime(b) - auctionEndTime(a);
         if (sort === 'price-asc') comparison = auctionPrice(a) - auctionPrice(b);
         if (sort === 'price-desc') comparison = auctionPrice(b) - auctionPrice(a);
         return comparison || b.createdAt - a.createdAt || String(a.id).localeCompare(String(b.id));

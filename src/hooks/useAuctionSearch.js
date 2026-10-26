@@ -1,14 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 
-// Keep keystrokes local while URL-backed server results catch up.
-export default function useAuctionSearch() {
+// Seller pages still debounce server searches; cached browsing updates locally.
+export default function useAuctionSearch(setParamsOverride = null, { immediate = false } = {}) {
     const { pathname } = useLocation();
-    const [params, setParams] = useSearchParams();
+    const [params, routeSetParams] = useSearchParams();
+    const setParams = setParamsOverride || routeSetParams;
     const query = params.get('q') || '';
     const [value, setValue] = useState(query);
     const pendingQuery = useRef(null);
     const previousPath = useRef(pathname);
+    const timer = useRef(null);
 
     useEffect(() => {
         if (previousPath.current === pathname && pendingQuery.current === query) {
@@ -21,8 +23,8 @@ export default function useAuctionSearch() {
     }, [pathname, query]);
 
     useEffect(() => {
-        if (value === query) return;
-        const timer = setTimeout(() => {
+        if (immediate || value === query) return;
+        timer.current = setTimeout(() => {
             pendingQuery.current = value;
             setParams(previous => {
                 const next = new URLSearchParams(previous);
@@ -31,8 +33,21 @@ export default function useAuctionSearch() {
                 return next;
             }, { replace: true });
         }, 250);
-        return () => clearTimeout(timer);
-    }, [value, query, setParams]);
+        return () => clearTimeout(timer.current);
+    }, [value, query, setParams, immediate]);
 
-    return [value, setValue];
+    const changeValue = useCallback(next => {
+        clearTimeout(timer.current);
+        setValue(next);
+        if (immediate) {
+            pendingQuery.current = next;
+            setParams(previous => {
+                const params = new URLSearchParams(previous);
+                params.delete('page');
+                if (next) params.set('q', next); else params.delete('q');
+                return params;
+            }, { replace: true });
+        }
+    }, [immediate, setParams]);
+    return [value, changeValue];
 }

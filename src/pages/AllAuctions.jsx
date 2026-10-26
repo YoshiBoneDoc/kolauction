@@ -1,28 +1,36 @@
-import { useContext, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import AuctionFilters, { AuctionFiltersButton, AUCTION_PRICE_RANGE_ENABLED } from '../components/AuctionFilters';
+import { parsePrice } from '../lib/auctionPriceRange';
+import { useContext, useEffect, useId, useMemo, useState } from 'react';
+import useAuctionBrowseSession from '../hooks/useAuctionBrowseSession';
 import { AuctionsContext } from '../context/AuctionsContext';
 import { UserContext } from '../context/UserContext';
-import { auctionFilters, auctionSorts, browseAuctions } from '../lib/auctionBrowsing';
+import { auctionFilters, resolveAuctionSort, browseAuctions } from '../lib/auctionBrowsing';
 import { useNow } from '../hooks/useNow';
 import CompactAuctionCard from '../components/CompactAuctionCard';
 import PendingTrades from '../components/PendingTrades';
 import useAuctionSearch from '../hooks/useAuctionSearch';
 
 export default function AllAuctions() {
-    const { auctions, total, isLoading, error } = useContext(AuctionsContext);
+    const { auctions, priceBounds, isLoading, error, hasLoaded = !isLoading && !error, refreshAuctions } = useContext(AuctionsContext);
     const { currentUser } = useContext(UserContext);
-    const [params, setParams] = useSearchParams();
-    const [searchInput, setSearchInput] = useAuctionSearch();
+    const { params, setParams, rememberSearch, resetSession, navigationType, locationKey } = useAuctionBrowseSession({ priceBounds: AUCTION_PRICE_RANGE_ENABLED ? priceBounds : null, isLoading, error });
+    const [searchInput, setSearchInput] = useAuctionSearch(setParams, { immediate: true });
     const now = useNow();
     const [openBid, setOpenBid] = useState(null);
+    const [filtersOpen, setFiltersOpen] = useState(false);
+    const filtersId = useId();
+    useEffect(() => {
+        if (navigationType !== 'REPLACE') { setFiltersOpen(false); setOpenBid(null); }
+    }, [navigationType, locationKey]);
     const browseKey = params.toString();
-    const search = params.get('q') || '';
+    const search = searchInput;
     const mineOnly = Boolean(currentUser && params.get('mine') === '1');
     const othersOnly = Boolean(currentUser && params.get('mine') === 'others');
     const ownershipFiltered = mineOnly || othersOnly;
-    const ownershipLabel = mineOnly ? 'My Auctions' : othersOnly ? 'Others' : 'View All';
     const status = auctionFilters.some(([value]) => value === params.get('status')) ? params.get('status') : 'active';
-    const sort = auctionSorts.some(([value]) => value === params.get('sort')) ? params.get('sort') : 'ending';
+    const sort = resolveAuctionSort(status, params.get('sort'));
+    const deadlineSort = ['ended', 'completed', 'cancelled', 'expired'].includes(status)
+        ? ['ended-desc', 'Recently Ended'] : ['ending', 'Ending Soon'];
     const kind = ['buy', 'sell'].includes(params.get('kind')) ? params.get('kind') : 'all';
     const kindLabel = kind === 'all' ? 'Buy & Sell' : kind === 'sell' ? 'Sell' : 'Buy';
     const kindColors = {
@@ -32,19 +40,49 @@ export default function AllAuctions() {
     }[kind];
     const cycleIcon = <span aria-hidden="true" className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center text-base leading-none opacity-70">↺</span>;
     const trade = ['escrow', 'direct', 'none'].includes(params.get('trade')) ? params.get('trade') : 'all';
-    const page = Math.min(1000000, Math.max(1, Number.parseInt(params.get('page'), 10) || 1));
-    const visible = useMemo(() => browseAuctions(ownershipFiltered ? auctions.filter(auction => mineOnly ? auction.sellerId === currentUser.id : auction.sellerId !== currentUser.id) : auctions, { search, status, sort, trade, kind, now }), [auctions, mineOnly, ownershipFiltered, currentUser?.id, search, status, sort, trade, kind, now]);
-    const found = total ?? visible.length;
+    const minPrice = AUCTION_PRICE_RANGE_ENABLED ? parsePrice(params.get('minPrice')) : null;
+    const maxPrice = AUCTION_PRICE_RANGE_ENABLED ? parsePrice(params.get('maxPrice')) : null;
+    const requestedPage = Math.min(1000000, Math.max(1, Number.parseInt(params.get('page'), 10) || 1));
+    const visible = useMemo(() => browseAuctions(ownershipFiltered ? auctions.filter(auction => mineOnly ? auction.sellerId === currentUser.id : auction.sellerId !== currentUser.id) : auctions, { search, status, sort, trade, kind, minPrice, maxPrice, now }), [auctions, mineOnly, ownershipFiltered, currentUser?.id, search, status, sort, trade, kind, minPrice, maxPrice, now]);
+    const found = visible.length;
+    const page = Math.min(requestedPage, Math.max(1, Math.ceil(found / 24)));
+    const pageRows = visible.slice((page - 1) * 24, page * 24);
+    useEffect(() => {
+        if (hasLoaded && requestedPage !== page) setParams(previous => {
+            const next = new URLSearchParams(previous);
+            if (page === 1) next.delete('page'); else next.set('page', String(page));
+            return next;
+        }, { replace: true });
+    }, [hasLoaded, requestedPage, page, setParams]);
 
     function update(name, value) {
         setOpenBid(null);
         setParams((previous) => {
             const next = new URLSearchParams(previous);
             if (name !== 'page') next.delete('page');
+            if (name === 'status') next.delete('sort');
             if (value) next.set(name, value);
             else next.delete(name);
             return next;
         }, { replace: true });
+    }
+
+    function updatePriceRange(range) {
+        if (!priceBounds) return;
+        setOpenBid(null);
+        setParams(previous => {
+            const next = new URLSearchParams(previous);
+            next.delete('page');
+            if (range.min > priceBounds.min) next.set('minPrice', String(range.min)); else next.delete('minPrice');
+            if (range.max < priceBounds.max) next.set('maxPrice', String(range.max)); else next.delete('maxPrice');
+            return next;
+        }, { replace: true });
+    }
+
+    function clearAdvancedFilters() {
+        setOpenBid(null);
+        setSearchInput('');
+        resetSession();
     }
 
     return (
@@ -55,14 +93,14 @@ export default function AllAuctions() {
                 <PendingTrades />
                 <section aria-label="Find auctions" className="mb-1 rounded-lg border border-gray-200 bg-white px-3 py-3">
                     <div className="flex flex-wrap items-end gap-3">
-                        <div className="min-w-[160px] flex-1">
+                        <div className="min-w-32 flex-1">
                             <label htmlFor="auction-search" className="sr-only">Search item names</label>
-                            <input id="auction-search" type="search" value={searchInput} onChange={event => setSearchInput(event.target.value)}
+                            <input id="auction-search" type="search" value={searchInput} onChange={event => { rememberSearch(event.target.value); setSearchInput(event.target.value); }}
                                 placeholder="Search for an item…" className="h-9 w-full rounded border border-gray-400 bg-white px-3 text-sm text-gray-900" />
                         </div>
                         <div role="group" aria-label="Sort auctions" className="flex flex-wrap items-center gap-2">
                             {[
-                                [['ending', 'Ending Soon'], ['newest', 'Newest'], ['activity', 'Recent Activity']],
+                                [deadlineSort, ['newest', 'Newest'], ['activity', 'Recent Activity']],
                                 [
                                     [sort === 'bids-desc' ? 'bids-asc' : 'bids-desc', `Most Bids ${sort === 'bids-desc' ? '▴' : sort === 'bids-asc' ? '▾' : '▴▾'}`],
                                     [sort === 'price-desc' ? 'price-asc' : 'price-desc', `Price ${sort === 'price-desc' ? '▴' : sort === 'price-asc' ? '▾' : '▴▾'}`],
@@ -83,48 +121,37 @@ export default function AllAuctions() {
                                 })}
                             </div>)}
                         </div>
-                        <div role="group" aria-label="Trading methods" className="flex items-center gap-1">
-                            {['escrow', 'direct'].map(method => {
-                                const selected = trade === 'all' || trade === method;
-                                const colors = selected
-                                    ? method === 'escrow'
-                                        ? 'border-violet-200 bg-violet-50 text-violet-600 hover:bg-violet-100'
-                                        : 'border-[#A5DADD] bg-[#F0F9F9] text-[#1F7480] hover:bg-[#E0F2F3]'
-                                    : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50';
-                                return <button key={method} type="button" aria-pressed={selected}
-                                    onClick={() => update('trade', trade === 'all' ? (method === 'escrow' ? 'direct' : 'escrow') : trade === method ? 'none' : trade === 'none' ? method : '')}
-                                    className={`h-9 rounded border px-2.5 py-1 text-xs font-medium transition-colors ${colors}`}>
-                                    {method === 'escrow' ? 'Escrow' : 'Direct'}
-                                </button>;
-                            })}
-                        </div>
                         <button type="button" aria-label={`Auction type: ${kindLabel}`} aria-pressed={kind !== 'all'}
                             onClick={() => update('kind', kind === 'all' ? 'sell' : kind === 'sell' ? 'buy' : '')}
                             title={`Showing ${kindLabel}. Click to show ${kind === 'all' ? 'Sell' : kind === 'sell' ? 'Buy' : 'Buy & Sell'} auctions.`}
                             className={`inline-flex h-9 w-32 shrink-0 items-center gap-2 whitespace-nowrap rounded border px-3 text-sm font-semibold transition-colors ${kindColors}`}>
                             <span className="flex-1 text-center">{kindLabel}</span>{cycleIcon}
                         </button>
-                        <div>
-                            <label htmlFor="auction-status" className="sr-only">Auction status</label>
-                            <select id="auction-status" value={status} onChange={event => update('status', event.target.value)} className="h-9 rounded border border-gray-400 bg-white px-2 text-sm text-gray-900">
-                                {auctionFilters.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                            </select>
-                        </div>
-                        {currentUser && <button type="button" aria-label={`Auction ownership: ${ownershipLabel}`} aria-pressed={ownershipFiltered} onClick={() => update('mine', mineOnly ? 'others' : othersOnly ? '' : '1')}
-                            title={mineOnly ? 'Show auctions from other sellers' : othersOnly ? 'Show all auctions' : 'Show only your listings'}
-                            className={`inline-flex h-9 w-36 shrink-0 items-center gap-2 whitespace-nowrap rounded border border-blue-700 px-3 text-sm font-semibold transition-colors ${ownershipFiltered ? 'bg-blue-700 text-white hover:bg-blue-100 hover:text-blue-800' : 'bg-white text-blue-700 hover:bg-blue-50'}`}>
-                            <span className="flex-1 text-center">{ownershipLabel}</span>{cycleIcon}
-                        </button>}
+                        <AuctionFiltersButton open={filtersOpen} controls={filtersId}
+                            count={Number(status !== 'active') + Number(trade !== 'all') + Number(minPrice != null || maxPrice != null) + Number(ownershipFiltered)}
+                            onToggle={() => setFiltersOpen(previous => !previous)} />
+                        <button type="button" aria-label="View all auctions" onClick={clearAdvancedFilters}
+                            title="Reset search, sorting, and all filters"
+                            className="inline-flex h-9 w-36 shrink-0 items-center gap-2 whitespace-nowrap rounded border border-blue-700 bg-white px-3 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+                            <span className="flex-1 text-center">View All</span>{cycleIcon}
+                        </button>
                     </div>
+                    {filtersOpen && <AuctionFilters id={filtersId} status={status} trade={trade} bounds={priceBounds} minPrice={minPrice} maxPrice={maxPrice}
+                        ownership={currentUser ? mineOnly ? '1' : othersOnly ? 'others' : 'all' : null}
+                        onUpdate={update} onRangeChange={updatePriceRange} onClear={clearAdvancedFilters} />}
                 </section>
+                {error && <p role="alert" className="my-3 text-red-700">
+                    {hasLoaded ? 'Refresh delayed. Showing previously loaded auctions.' : 'Auctions could not be loaded. Please try again.'}{' '}
+                    <button onClick={refreshAuctions} className="underline">Retry</button>
+                </p>}
                 {isLoading ? <p role="status">Loading auctions…</p> : <>
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
-                        <p role="status">{found} {found === 1 ? 'auction' : 'auctions'} found</p>
-                        <button onClick={() => { setOpenBid(null); setSearchInput(''); setParams({}, { replace: true }); }} className="min-h-9 border-0 bg-transparent px-2 text-sm text-blue-700 underline">Reset filters</button>
+                        {hasLoaded && <p role="status">{found} {found === 1 ? 'auction' : 'auctions'} found</p>}
+                        <button onClick={clearAdvancedFilters} className="min-h-9 border-0 bg-transparent px-2 text-sm text-blue-700 underline">Reset filters</button>
                     </div>
                     {!error && visible.length === 0 && <p className="rounded-lg border bg-white p-6">{trade === 'none' ? 'Select Escrow or Direct to show auctions.' : mineOnly ? 'No auctions of yours match these filters.' : 'No auctions match your search and filters. Try another item name or status.'}</p>}
                     <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        {visible.map((auction) => <CompactAuctionCard key={auction.id} auction={auction} now={now}
+                        {pageRows.map((auction) => <CompactAuctionCard key={auction.id} auction={auction} now={now}
                             expanded={openBid?.id === auction.id && openBid?.browseKey === browseKey}
                             onToggleBid={() => setOpenBid(previous => previous?.id === auction.id && previous?.browseKey === browseKey ? null : { id: auction.id, browseKey })} />)}
                     </div>

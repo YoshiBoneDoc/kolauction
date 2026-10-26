@@ -14,11 +14,11 @@ const { outputFiles } = buildSync({
             import App from './src/App.jsx';
             import { AuctionsContext } from './src/context/AuctionsContext.jsx';
             import { UserContext } from './src/context/UserContext.jsx';
-            export function render(path, auctions, user = null) {
+            export function render(path, auctions, user = null, state = {}) {
                 return renderToStaticMarkup(
                     <StaticRouter location={path}>
                         <UserContext.Provider value={{currentUser: user}}>
-                            <AuctionsContext.Provider value={{auctions, isLoading: false, error: ''}}><App /></AuctionsContext.Provider>
+                            <AuctionsContext.Provider value={{auctions, isLoading: false, error: '', ...state}}><App /></AuctionsContext.Provider>
                         </UserContext.Provider>
                     </StaticRouter>
                 );
@@ -401,14 +401,14 @@ test('receipt-time closing auctions show only a brief finalizing status and no p
 });
 
 
-test('ownership button labels describe the current view and filter the right sellers', () => {
+test('ownership filters keep showing the right sellers while View All remains a reset control', () => {
     const listings=[{...auctions[0],id:'mine',item:'Own listing',sellerId:'viewer'},{...auctions[0],id:'other',item:'Other listing',sellerId:'someone'}];
     const all=render('/auctions',listings,{id:'viewer'});
-    assert.match(all,/aria-label="Auction ownership: View All"/);assert.match(all,/Own listing/);assert.match(all,/Other listing/);
+    assert.match(all,/aria-label="View all auctions"/);assert.match(all,/Own listing/);assert.match(all,/Other listing/);
     const mine=render('/auctions?mine=1',listings,{id:'viewer'});
-    assert.match(mine,/aria-label="Auction ownership: My Auctions"/);assert.match(mine,/Own listing/);assert.doesNotMatch(mine,/Other listing/);
+    assert.match(mine,/aria-label="View all auctions"/);assert.match(mine,/Own listing/);assert.doesNotMatch(mine,/Other listing/);
     const others=render('/auctions?mine=others',listings,{id:'viewer'});
-    assert.match(others,/aria-label="Auction ownership: Others"/);assert.match(others,/Other listing/);assert.doesNotMatch(others,/Own listing/);
+    assert.match(others,/aria-label="View all auctions"/);assert.match(others,/Other listing/);assert.doesNotMatch(others,/Own listing/);
     const guest=render('/auctions?mine=others',listings);
     assert.doesNotMatch(guest,/aria-label="Auction ownership:/);
     assert.match(guest,/Own listing/);assert.match(guest,/Other listing/);
@@ -499,4 +499,96 @@ test('live market estimates mount on active detail pages; historical completions
         }
     }
     assert.doesNotMatch(render('/auctions', [sell, buy]), /Loading market price|Approximate Market Value/);
+});
+
+test('Ended and Completed pages select Recently Ended and show recent closures first', () => {
+    const lots = [
+        { ...base, id: 'old-closed', item: 'Older closure fixture', status: 'completed', endTime: 2000 },
+        { ...base, id: 'recent-closed', item: 'Recent closure fixture', status: 'completed', endTime: 5000 },
+    ];
+    for (const status of ['ended', 'completed']) {
+        const html = render(`/auctions?status=${status}`, lots);
+        assert.match(html, /aria-label="Recently Ended" aria-pressed="true"/);
+        assert.ok(html.indexOf('Recent closure fixture') < html.indexOf('Older closure fixture'));
+    }
+});
+
+test('closed Sell and Buy cards center an actual-ending timestamp at the bottom', () => {
+    const end = Date.parse('2026-10-26T03:16:00Z');
+    for (const auctionKind of ['sell', 'buy']) {
+        const listing = { ...base, id: `closed-${auctionKind}`, item: 'Closed timestamp fixture', status: 'completed',
+            auctionKind, pricePerItem: 100, endTime: end + 3600000, instantPurchasedAt: new Date(end).toISOString() };
+        const html = render('/auctions?status=completed', [listing]);
+        assert.match(html, /<footer[^>]*>[\s\S]*text-center[^>]*>Ended: <time dateTime="2026-10-26T03:16:00.000Z">/);
+        assert.doesNotMatch(html, />View order<\/a>/);
+    }
+    assert.doesNotMatch(render('/auctions', [auctions[0]]), /Auction ended:/);
+});
+
+
+test('closed card timestamps use outcome labels and colors', () => {
+    for (const [status, label, color] of [
+        ['completed', 'Ended', '#27804A'],
+        ['ended_no_bids', 'Expired', '#A85D45'],
+        ['expired', 'Expired', '#A85D45'],
+        ['cancelled', 'Cancelled', '#64748B'],
+        ['voided', 'Cancelled', '#64748B'],
+    ]) {
+        const html = render('/auctions?status=ended', [{ ...base, id: status, item: 'Outcome fixture', status, endTime: 2000 }]);
+        assert.ok(html.includes(`text-[${color}]`));
+        assert.ok(html.includes(`${label}: <time`));
+    }
+});
+
+test('individual Sell and Buy pages share the cards’ outcome timestamp labels and colors', () => {
+    for (const auctionKind of ['sell', 'buy']) {
+        for (const [status, label, color] of [
+            ['completed', 'Ended', '#27804A'],
+            ['ended_no_bids', 'Expired', '#A85D45'],
+            ['expired', 'Expired', '#A85D45'],
+            ['cancelled', 'Cancelled', '#64748B'],
+            ['voided', 'Cancelled', '#64748B'],
+        ]) {
+            if (auctionKind === 'buy' && status === 'ended_no_bids') continue;
+            const listing = { ...base, id: 'outcome-detail', item: 'Outcome detail fixture', status, auctionKind,
+                pricePerItem: 100, endTime: 2000, fulfillments: [] };
+            const html = render('/auction/outcome-detail', [listing]);
+            assert.ok(html.includes(`text-sm leading-6 text-[${color}]`));
+            assert.ok(html.includes(`${label}: <time dateTime="1970-01-01T00:00:02.000Z">`));
+        }
+    }
+});
+
+
+test('cached browse paginates the full locally filtered pool with accurate counts', () => {
+    const many = Array.from({length: 50}, (_, i) => ({...base, id: `page-${String(i).padStart(2,'0')}`, item: `Page Item ${String(i).padStart(2,'0')}`}));
+    const html = render('/auctions?page=2', many);
+    assert.match(html, /50 auctions found/);
+    assert.match(html, /Page 2 of 3/);
+    assert.match(html, /Page Item 24/);
+    assert.match(html, /Page Item 47/);
+    assert.doesNotMatch(html, /Page Item 23|Page Item 48/);
+});
+
+test('initial timeouts show retry without claiming that no auctions exist', () => {
+    for (const path of ['/', '/auctions']) {
+        const html = render(path, [], null, {error:'timeout',hasLoaded:false});
+        assert.match(html, /Auctions could not be loaded/);
+        assert.match(html, /Retry/);
+        assert.doesNotMatch(html, /0 auctions found|No auctions match|No active auctions right now|No completed trades yet/);
+    }
+});
+
+test('temporary refresh failures retain cached cards with an explicit stale-data notice', () => {
+    for (const path of ['/', '/auctions']) {
+        const html = render(path, [auctions[0]], null, {error:'timeout',hasLoaded:true});
+        assert.match(html, /Showing previously loaded auctions/);
+        assert.match(html, /Active accessory/);
+    }
+});
+
+test('pending-trade timeouts do not claim that the signed-in viewer has zero pending trades', () => {
+    const html = render('/', [], {id:'viewer'}, {pendingError:'timeout',pendingHasLoaded:false});
+    assert.match(html, /Pending trades could not be loaded/);
+    assert.doesNotMatch(html, /0 pending trades/);
 });

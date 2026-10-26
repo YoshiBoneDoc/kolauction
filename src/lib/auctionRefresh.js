@@ -1,4 +1,5 @@
-import { auctionFilters, auctionSorts } from './auctionBrowsing.js';
+import { parsePrice } from './auctionPriceRange.js';
+import { auctionFilters, resolveAuctionSort } from './auctionBrowsing.js';
 
 export function auctionReadRequest(pathname, search = '', viewerId = null) {
     pathname = pathname.replace(/\/+$/, '') || '/';
@@ -9,14 +10,17 @@ export function auctionReadRequest(pathname, search = '', viewerId = null) {
     const seller = pathname.match(/^\/seller\/([^/]+)\/?$/);
     if (pathname !== '/auctions' && !seller) return null;
     const params = new URLSearchParams(search);
+    const status = auctionFilters.some(([value]) => value === params.get('status')) ? params.get('status') : 'active';
     return {
         view: seller ? 'seller' : 'browse', ...(seller ? { id: seller[1] } : {}),
         ...(!seller && viewerId && params.get('mine') === '1' ? { sellerId: viewerId } : {}),
         ...(!seller && viewerId && params.get('mine') === 'others' ? { excludeOwn: true } : {}), search: params.get('q') || '',
         ...(['buy', 'sell'].includes(params.get('kind')) ? { kind: params.get('kind') } : {}),
-        status: auctionFilters.some(([value]) => value === params.get('status')) ? params.get('status') : 'active',
+        status,
+        ...(!seller && parsePrice(params.get('minPrice')) != null ? { minPrice: parsePrice(params.get('minPrice')) } : {}),
+        ...(!seller && parsePrice(params.get('maxPrice')) != null ? { maxPrice: parsePrice(params.get('maxPrice')) } : {}),
         ...(['escrow', 'direct', 'none'].includes(params.get('trade')) ? { trade: params.get('trade') } : {}),
-        sort: auctionSorts.some(([value]) => value === params.get('sort')) ? params.get('sort') : 'ending',
+        sort: resolveAuctionSort(status, params.get('sort')),
         page: Math.min(1000000, Math.max(1, Number.parseInt(params.get('page'), 10) || 1)),
     };
 }

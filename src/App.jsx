@@ -25,6 +25,7 @@ import BugReportInbox from './pages/BugReportInbox';
 
 import SiteBanner from "./components/SiteBanner";
 import UpdateLog from "./pages/UpdateLog";
+import MeetTheCreator from "./pages/MeetTheCreator";
 import AdminBanner from "./pages/AdminBanner";
 import AdminPolls from "./pages/AdminPolls";
 
@@ -45,6 +46,7 @@ const App = () => {
                 <Route path="/report-a-bug" element={<ReportBug />} />
                 <Route path="/support" element={<ReportBug support />} />
                 <Route path="/update-log" element={<UpdateLog />} />
+                <Route path="/meet-the-creator" element={<MeetTheCreator />} />
                 <Route path="/admin/banner" element={<AdminBanner />} />
                 <Route path="/admin/polls" element={<AdminPolls />} />
                 <Route path="/admin/inbox" element={<BugReportInbox />} />

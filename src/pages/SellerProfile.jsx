@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { AuctionsContext } from '../context/AuctionsContext';
 import { UserContext } from '../context/UserContext';
 import AuctionCard from '../components/AuctionCard';
-import { auctionFilters, auctionSorts } from '../lib/auctionBrowsing';
+import { auctionFilters, auctionSorts, resolveAuctionSort } from '../lib/auctionBrowsing';
 import { useNow } from '../hooks/useNow';
 import useAuctionSearch from '../hooks/useAuctionSearch';
 import TradeHistorySummary from '../components/TradeHistorySummary';
@@ -26,12 +26,13 @@ export default function SellerProfile() {
         return { search: next.toString() ? `?${next}` : '' };
     }
     const status = auctionFilters.some(([value]) => value === params.get('status')) ? params.get('status') : 'active';
-    const sort = auctionSorts.some(([value]) => value === params.get('sort')) ? params.get('sort') : 'ending';
+    const sort = resolveAuctionSort(status, params.get('sort'));
     const page = Math.min(1000000, Math.max(1, Number.parseInt(params.get('page'), 10) || 1));
     function update(name, value) {
         setParams(previous => {
             const next = new URLSearchParams(previous);
             if (name !== 'page') next.delete('page');
+            if (name === 'status') next.delete('sort');
             if (value) next.set(name, value); else next.delete(name);
             return next;
         }, { replace: true });

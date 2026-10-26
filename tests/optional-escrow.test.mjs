@@ -78,7 +78,7 @@ test('a saved response switches the reminder to experience feedback only for tha
 test('anonymous and completed accounts see no personal cards; pending failures are visible', () => {
     assert.doesNotMatch(render({user:null,pendingTrades:[auction],pendingTotal:1}), /Your pending trades/);
     assert.doesNotMatch(render({pendingTrades:[],pendingTotal:0}), /Your pending trades/);
-    assert.match(render({pendingError:'Private trades unavailable'}), /Private trades unavailable.*Retry/);
+    assert.match(render({pendingError:'Private trades unavailable'}), /Pending trades could not be loaded.*Retry/);
 });
 
 test('direct participation discloses unfunded bids and optional tips; escrow retains KMail', () => {

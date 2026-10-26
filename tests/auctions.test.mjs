@@ -62,20 +62,20 @@ test('loads a filtered page without downloading all auctions or bid history', as
     const requested = [];
     const service = createAuctionService({ async rpc(name, params) {
         requested.push([name, params]);
-        return { error: null, data: name === 'read_auction_page' ? { privacy_version: 1, rows: [{...row,bid_count:12}], bids: [], total: 100 } : null };
+        return { error: null, data: name === 'read_filtered_auction_page' ? { privacy_version: 1, rows: [{...row,bid_count:12}], bids: [], total: 100 } : null };
     } });
     const result = await service.load({search:'hat',status:'all',sort:'price-desc',page:2});
     assert.equal(result.auctions.length, 1);
     assert.equal(result.auctions[0].bidCount, 12);
     assert.deepEqual(result.auctions[0].bids, []);
     assert.equal(result.total,100);
-    assert.deepEqual(requested, [['finalize_expired_auctions', undefined], ['read_auction_page', {
-        p_view:'browse',p_id:null,p_search:'hat',p_status:'all',p_sort:'price-desc',p_page:2,
+    assert.deepEqual(requested, [['finalize_expired_auctions', undefined], ['read_filtered_auction_page', {
+        p_view:'browse',p_id:null,p_search:'hat',p_status:'all',p_sort:'price-desc',p_page:2,p_trade:'all',p_kind:'all',p_min_price:null,p_max_price:null,
     }]]);
 });
 
 test('missing migration produces setup guidance rather than an empty listing', async () => {
-    const service = createAuctionService({ rpc: async (name) => ({ error: name === 'read_auction_page' ? { code: 'PGRST202' } : null }) });
+    const service = createAuctionService({ rpc: async (name) => ({ error: name === 'read_filtered_auction_page' ? { code: 'PGRST202' } : null }) });
     await assert.rejects(service.load(), /Apply any pending auction SQL migrations/);
 });
 
@@ -86,7 +86,7 @@ test('loads finalize expired auctions before reading rows', async () => {
         async rpc(name) { calls.push(name); return { error: null, data: {privacy_version:1,rows:[],bids:[],total:0} }; },
     });
     await service.load();
-    assert.deepEqual(calls, ['finalize_expired_auctions', 'read_auction_page']);
+    assert.deepEqual(calls, ['finalize_expired_auctions', 'read_filtered_auction_page']);
 });
 
 test('lifecycle actions send only the listing ID and propagate rejections', async () => {
@@ -190,7 +190,7 @@ test('My Auctions uses server-side seller filtering before pagination and preser
         return { error: null, data: { privacy_version: 1, rows: [{ ...row, seller_id: 'owner' }], bids: [], total: 57 } };
     } });
     const result = await service.load({ view: 'browse', sellerId: 'owner', search: 'hat', status: 'all', sort: 'price-desc', page: 3 });
-    assert.deepEqual(requests[1], ['read_auction_page', { p_view: 'seller', p_id: 'owner', p_search: 'hat', p_status: 'all', p_sort: 'price-desc', p_page: 3 }]);
+    assert.deepEqual(requests[1], ['read_filtered_auction_page', { p_view: 'seller', p_id: 'owner', p_search: 'hat', p_status: 'all', p_sort: 'price-desc', p_page: 3, p_trade: 'all', p_kind: 'all', p_min_price: null, p_max_price: null }]);
     assert.equal(result.total, 57);
     assert.equal(result.auctions[0].sellerId, 'owner');
 });
@@ -206,7 +206,7 @@ test('method filtering and activity sort are sent to the paginated reader, mappi
     const requests = [];
     const service = createAuctionService({ async rpc(name, args) {
         requests.push([name,args]);
-        return { error: null, data: name === 'read_auction_page' ? { privacy_version: 1, total: 32, rows: [{ ...row, latest_bid_at: '2026-10-22T01:00:00Z' }], bids: [] } : null };
+        return { error: null, data: name === 'read_filtered_auction_page' ? { privacy_version: 1, total: 32, rows: [{ ...row, latest_bid_at: '2026-10-22T01:00:00Z' }], bids: [] } : null };
     }});
     const result = await service.load({ trade: 'escrow', sort: 'activity', page: 2, sellerId: 'owner' });
     assert.equal(requests[1][1].p_trade, 'escrow'); assert.equal(requests[1][1].p_sort, 'activity');
@@ -237,9 +237,9 @@ test('only custom listings send the explicit ending timestamp to the custom crea
 
 test('Others uses an authenticated server-side view before pagination, including trade filtering', async () => {
     const requests=[];
-    const service=createAuctionService({async rpc(name,args){requests.push([name,args]);return {data:name==='read_auction_page'?{privacy_version:1,rows:[],bids:[],total:55}:null,error:null};}});
+    const service=createAuctionService({async rpc(name,args){requests.push([name,args]);return {data:name==='read_filtered_auction_page'?{privacy_version:1,rows:[],bids:[],total:55}:null,error:null};}});
     const result=await service.load({excludeOwn:true,search:'hat',status:'all',sort:'price-desc',trade:'escrow',page:3});
-    assert.deepEqual(requests[1],['read_auction_page',{p_view:'others',p_id:null,p_search:'hat',p_status:'all',p_trade:'escrow',p_sort:'price-desc',p_page:3}]);
+    assert.deepEqual(requests[1],['read_filtered_auction_page',{p_view:'others',p_id:null,p_search:'hat',p_status:'all',p_trade:'escrow',p_sort:'price-desc',p_page:3,p_kind:'all',p_min_price:null,p_max_price:null}]);
     assert.equal(result.total,55);
 });
 

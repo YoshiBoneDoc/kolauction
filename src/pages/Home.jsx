@@ -12,7 +12,7 @@ import SiteFooter from '../components/SiteFooter';
 import HomePoll from '../components/HomePoll';
 
 export default function Home() {
-    const { auctions, isLoading, error } = useContext(AuctionsContext);
+    const { auctions, isLoading, error, hasLoaded = !isLoading && !error, refreshAuctions } = useContext(AuctionsContext);
     const now = useNow();
     const featuredPollTarget = useRef(null);
     const hasActiveAuctions = auctions.some(auction => ['active', 'finalizing'].includes(getAuctionStatus(auction, now)));
@@ -28,6 +28,10 @@ export default function Home() {
             </header>
             <main className="mx-auto mt-6 w-full max-w-6xl flex-1 pb-8">
                 <div ref={featuredPollTarget} />
+                {error && <p role="alert" className="mb-4 text-red-700">
+                    {hasLoaded ? 'Refresh delayed. Showing previously loaded auctions.' : 'Auctions could not be loaded. Please try again.'}{' '}
+                    <button onClick={refreshAuctions} className="underline">Retry</button>
+                </p>}
                 <PendingTrades />
                 <HighRollers auctions={highRollers} now={now}>
                     {isLoading && <p role="status">Loading High Rollers…</p>}
@@ -44,10 +48,9 @@ export default function Home() {
                         {!isLoading && !error && completed.length === 0 && <p>No completed trades yet.</p>}
                     </PopularAuctions>
                 </div>
-                {error && <p role="alert" className="mt-4 text-red-700">Auctions could not be refreshed. {error}</p>}
             </main>
             <HomePoll featuredTarget={featuredPollTarget} />
-            <SiteFooter className="-mx-4 sm:-mx-6" />
+            <SiteFooter className="home-footer -mx-4 sm:-mx-6" />
         </div>
     );
 }
