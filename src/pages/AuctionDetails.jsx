@@ -61,28 +61,36 @@ export default function AuctionDetails() {
                     <div className="flex min-w-0 items-center justify-center sm:pt-2">
                         {auction.image ? <AuctionItemImage key={auction.id} src={auction.image} item={auction.item} /> : <p className="text-gray-500">No Image Available</p>}
                     </div>
-                    <div className="min-w-0 space-y-5 text-left">
+                    <div className="min-w-0 space-y-6 text-left">
                         <div className="space-y-1">
                             <h1 className="break-words text-3xl font-bold text-blue-600 sm:text-4xl">{auction.item} <span className="text-xl text-gray-600">×{auction.quantity.toLocaleString('en-US')}</span></h1>
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-600">
-                                <p className="leading-6">{auction.auctionNumber && <>Auction #{auction.auctionNumber} · </>}Min Bid: <span title={`${auction.minBidMeat.toLocaleString('en-US')} Meat`}>{formatCompactMeat(auction.minBidMeat)}{auction.minBidMeat < 1000 ? ' Meat' : ''}{auction.quantity > 1 && <span className="text-xs text-gray-700"> · {formatPerItemMeat(auction.minBidMeat, auction.quantity)} each</span>}</span></p>
+                                <p className="leading-6 text-gray-800">{auction.auctionNumber && <>Auction #{auction.auctionNumber} · </>}Min Bid: <span title={`${auction.minBidMeat.toLocaleString('en-US')} Meat`}>{formatCompactMeat(auction.minBidMeat)}{auction.minBidMeat < 1000 ? ' Meat' : ''}{auction.quantity > 1 && <span className="text-xs text-gray-700"> · {formatPerItemMeat(auction.minBidMeat, auction.quantity)} each</span>}</span></p>
                                 <span aria-hidden="true">·</span>
                                 <TradeTypeBadge escrow={auction.escrowMode} />
                             </div>
                             <ItemResources item={auction.item} itemId={auction.itemId} />
                         </div>
-                        <div className={closedSale ? 'space-y-0.5 py-1' : 'space-y-1'}>
-                            <div className={closedSale ? 'flex flex-wrap items-baseline gap-x-3 gap-y-1' : undefined}>
-                                <p className="text-sm text-gray-600">{active ? 'Current Bid (whole listing)' : result.hasWinner ? 'Final price: (whole listing)' : 'Last Bid (whole listing)'}</p>
-                                <p className="break-words text-3xl font-extrabold text-gray-900 sm:text-4xl">{price ? <SellPrice amount={price} quantity={auction.quantity} compact={false} /> : 'No bids yet'}</p>
+                        <div className="space-y-3">
+                            <div className={closedSale ? 'space-y-0.5 py-1' : 'space-y-1'}>
+                                <div className={closedSale ? 'flex flex-wrap items-baseline gap-x-3 gap-y-1' : undefined}>
+                                    <p className="text-xs text-gray-600">{active ? 'Current Bid (whole listing)' : result.hasWinner ? 'Final price: (whole listing)' : 'Last Bid (whole listing)'}</p>
+                                    <p className="break-words text-3xl font-extrabold text-gray-900 sm:text-4xl">{price ? <SellPrice amount={price} quantity={auction.quantity} compact={false} /> : 'No bids yet'}</p>
+                                </div>
+                                {closedSale && auction.instantPurchasedAt && <p className="text-sm leading-6 text-green-700">Buyout accepted for {result.finalPrice.toLocaleString('en-US')} Meat on <span className="inline-block whitespace-nowrap">{new Date(auction.instantPurchasedAt).toLocaleString()}.</span></p>}
                             </div>
-                            {closedSale && auction.instantPurchasedAt && <p className="text-sm leading-6 text-green-700">Buyout accepted for {result.finalPrice.toLocaleString('en-US')} Meat on <span className="inline-block whitespace-nowrap">{new Date(auction.instantPurchasedAt).toLocaleString()}.</span></p>}
+                            {(active || result.status === 'completed') && <MarketPrice itemId={auction.itemId} auctionId={auction.id} completed={result.status === 'completed'} />}
                         </div>
-                        {(active || result.status === 'completed') && <MarketPrice itemId={auction.itemId} auctionId={auction.id} completed={result.status === 'completed'} />}
                         {active && <InstantPurchaseAction key={`purchase-${auction.id}`} auction={auction} showTerms={false} />}
-                        <div className="space-y-1 text-sm text-gray-700">
+                        <div className="space-y-2 text-sm text-gray-700">
                             <p className="break-words">Sold by: <SellerLink auction={auction} /></p>
                             {closedSale && <p className="break-words">Winning bidder: <strong><WinnerLink auction={auction} /></strong></p>}
+                            {!closedSale && active && <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                                <span className="inline-flex rounded border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Live</span>
+                                <span aria-hidden="true" className="text-gray-400">·</span>
+                                <p className={auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-600'}>Ends in <time dateTime={new Date(auction.endTime).toISOString()}>{timeRemaining(auction.endTime, now)}</time></p>
+                                <p className="w-full text-[11px] text-gray-500">Late bids extend the auction by 1 minute.</p>
+                            </div>}
                         </div>
                         {closedSale ? <>
                             <div className="space-y-0.5 border-t border-gray-200 pt-3">
@@ -91,12 +99,7 @@ export default function AuctionDetails() {
                                 {reportedIncomplete && <p className="text-xs leading-4 text-gray-500">At least one party reported the trade incomplete.</p>}
                                 <TradeReportDismissals auction={auction} compact />
                             </div>
-                        </> : active ? <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                            <span className="inline-flex rounded border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Live</span>
-                            <span aria-hidden="true" className="text-gray-400">·</span>
-                            <p className={auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-600'}>Ends in <time dateTime={new Date(auction.endTime).toISOString()}>{timeRemaining(auction.endTime, now)}</time></p>
-                            <p className="w-full text-xs text-gray-500">Late bids extend the auction by 1 minute.</p>
-                        </div> : <div className="space-y-0.5"><p className={`text-lg font-bold ${statusColor}`}>{statusLabel}</p>{endedTime}</div>}
+                        </> : !active && <div className="space-y-0.5"><p className={`text-lg font-bold ${statusColor}`}>{statusLabel}</p>{endedTime}</div>}
                     </div>
                 </section>
                 {active && <section aria-label="Auction bidding" className="mt-4 border-t border-gray-100 pt-4">
