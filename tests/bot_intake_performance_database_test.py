@@ -415,5 +415,21 @@ with tempfile.TemporaryDirectory(prefix='khub-intake-performance-',dir='/tmp') a
         ingest(fake,error='requires verified gift contents')
         assert sql(f"select count(*) from khub_bot.receipts where mail_id='{fake['id']}';")=='0'
         print('PASS: inside BID/LIST/BUY/FUND/FILL commands and empty packages return exact contents once with tailored outside-message instructions; no auction, order or donation side effects; gift proof required')
+
+        admin,_=account(89605,3552305,'Audit Administrator')
+        audit_query=f"select public.read_auction_page('detail','{buy}','','all','ending',1);"
+        before_audit=sql(financial_state)
+        admin_row=json.loads(call('begin read only;'+audit_query+'commit;',admin))['rows'][0]
+        audit=admin_row['reservation_audit']
+        assert len(audit)<=100 and admin_row['buy_admin']
+        created=[event for event in audit if event['kind']=='reservation_created' and event['reservation_id']==reservation['id']]
+        assert len(created)==1 and created[0]['actor_name']=='Receipt Buyer' and created[0]['details']['quantity']==2
+        for uid in [seller,buyer,other]:
+            public_row=json.loads(call('begin read only;'+audit_query+'commit;',uid))['rows'][0]
+            assert 'reservation_audit' not in public_row
+        guest_row=json.loads(sql('begin read only;set local role anon;'+audit_query+'commit;'))['rows'][0]
+        assert 'reservation_audit' not in guest_row
+        assert sql(financial_state)==before_audit
+        print('PASS: existing capped admin audit resolves reservation usernames without mutations; creators, sellers, outsiders and guests receive no audit identities')
     finally:
         if started:pg('-m','fast','-w','stop')

@@ -2,6 +2,7 @@ import AuctionEndedTime from './AuctionEndedTime';
 import MarketPrice from './MarketPrice';
 import { feeLabel, effectiveFeePercent } from '../lib/feeDisplay';
 import { buyFunding } from '../lib/buyOrders';
+import {formatBuyAuditDate,describeBuyAuditEvent} from '../lib/buyAuctionAudit';
 import { useContext, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
@@ -45,6 +46,8 @@ export default function BuyAuctionDetails({ auction, now, backLink }) {
     const owns = currentUser?.id === auction.sellerId;
     const canViewSellers = Boolean(currentUser && !currentUser.isBanned && auction.usernamesVisible !== false);
     const canViewFees = Boolean(currentUser && !currentUser.isBanned && auction.usernamesVisible !== false && (owns || auction.buyAdmin));
+    const auditEvents = canViewFees && auction.buyAdmin
+        ? (auction.reservationAudit || []).filter(event=>event.kind!=='reservation_expired') : [];
     const result = getAuctionResult(auction, now);
     const funding = owns && canViewFees && result.status === 'pending_escrow'
         ? buyFunding(auction.pricePerItem, auction.quantity) : null;
@@ -204,11 +207,15 @@ export default function BuyAuctionDetails({ auction, now, backLink }) {
             {notice && <p role="status" className="text-sm text-green-700">{notice}</p>}
 
             {auction.status === 'settling' && <p>The order has closed. Payments, purchased items, and unused funds are being delivered. Settlement completes once all deliveries are confirmed.</p>}
-            {canViewFees && auction.status !== 'pending_escrow' && auction.balanceMeat != null && <section aria-label="Your buy escrow" className="text-sm"><p>Remaining escrow: {auction.balanceMeat.toLocaleString('en-US')} Meat · Purchased: {auction.purchaseMeat.toLocaleString('en-US')} Meat · {feeLabel(auction.buyCommissionMeat, auction.purchaseMeat)}: {auction.buyCommissionMeat.toLocaleString('en-US')} Meat · Refund queued/returned: {auction.refundedMeat.toLocaleString('en-US')} Meat</p><p>Purchased items still held before delivery: {auction.heldQuantity.toLocaleString('en-US')}. Queued deliveries are tracked separately.</p></section>}
+            {owns && canViewFees && auction.status !== 'pending_escrow' && auction.balanceMeat != null && <section aria-label="Your buy escrow" className="text-sm"><p>Remaining escrow: {auction.balanceMeat.toLocaleString('en-US')} Meat · Purchased: {auction.purchaseMeat.toLocaleString('en-US')} Meat · {feeLabel(auction.buyCommissionMeat, auction.purchaseMeat)}: {auction.buyCommissionMeat.toLocaleString('en-US')} Meat · Refund queued/returned: {auction.refundedMeat.toLocaleString('en-US')} Meat</p><p>Purchased items still held before delivery: {auction.heldQuantity.toLocaleString('en-US')}. Queued deliveries are tracked separately.</p></section>}
             {canCancel && <button disabled={pending} onClick={cancel} className="button-red rounded border px-4 py-2 disabled:opacity-50">{pending ? 'Canceling…' : 'Cancel remaining order'}</button>}
             {error && <p role="alert" className="text-red-700">{error}</p>}
             {canSendTradeQuery(auction, currentUser) && <p><Link to={`/auction/${auction.id}/trade-query`} className="text-sm text-blue-700 underline">Contact an administrator about this order</Link></p>}
-            {canViewFees && auction.buyAdmin && auction.reservationAudit?.length > 0 && <details className="text-xs"><summary className="cursor-pointer">Reservation and gift audit</summary><ul>{auction.reservationAudit.map(event => <li key={event.id} className="py-1">{new Date(event.created_at).toLocaleString()} · {event.kind} · {JSON.stringify(event.details)}</li>)}</ul></details>}
+            {auditEvents.length > 0 && <details className="text-sm"><summary className="cursor-pointer font-medium">Reservation and gift audit</summary><ul>{auditEvents.map(event => <li key={event.id} className="py-1.5">
+                <time dateTime={event.created_at} className="whitespace-nowrap text-xs text-[#64748B]">{formatBuyAuditDate(event.created_at)}</time>
+                <span className="text-[#64748B]"> · </span>
+                <span>{describeBuyAuditEvent(event)}</span>
+            </li>)}</ul></details>}
             <details aria-label="Fulfillment history" className="border-t border-[#E8DDD7] pt-3">
                 <summary className="cursor-pointer text-sm font-semibold text-gray-800">Fulfillment History ({auction.fulfillments.length.toLocaleString('en-US')})</summary>
                 {auction.fulfillments.length > 0 && <div className={`buy-fulfillment-head mt-2 pb-2 text-xs font-medium text-[#64748B] ${fulfillmentColumns}`}>

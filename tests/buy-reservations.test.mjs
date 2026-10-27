@@ -83,6 +83,7 @@ test('reservation cancellation service uses the ownership-checked RPC and propag
 
 test('Buy fees and cost explanations are private to the creator and administrator',()=>{
  const listing={...order,status:'completed',buyClosingReason:'filled',balanceMeat:0,purchaseMeat:2000,buyCommissionMeat:100,giftMeat:50,refundedMeat:0,heldQuantity:0,
+  reservationAudit:[{id:'audit',created_at:'2026-10-24T15:30:30',kind:'reservation_created',actor_name:'User1',details:{quantity:20,expires_at:'private-expiry'}}],
   fulfillments:[{seller:'Vendor',quantity:10,price_per_item:200,payment_meat:2000,commission_meat:100,payment_sent:true,created_at:'2026-10-22T12:00:00Z'}]};
  for(const user of [null,{id:'other'},{id:'seller'},{id:'buyer',isBanned:true}]){
   const html=harness(listing,user).html();
@@ -90,7 +91,9 @@ test('Buy fees and cost explanations are private to the creator and administrato
   assert.doesNotMatch(html,/The price applies to each item/);assert.match(readable(html),/2,000 Meat paid/);
  }
  for(const [user,auction] of [[{id:'buyer'},listing],[{id:'admin'},{...listing,buyAdmin:true}]]){
-  const html=harness(auction,user).html();assert.match(html,/Tiered Fee \(5%\): 100 Meat/);assert.match(html,/Remaining escrow/);assert.match(html,/Fees range from 1–5%/);
+  const html=harness(auction,user).html();assert.match(html,/Tiered Fee \(5%\): 100 Meat/);assert.match(html,/Fees range from 1–5%/);
+  if(user.id==='buyer')assert.match(html,/Remaining escrow/);
+  else {assert.doesNotMatch(html,/Remaining escrow|Purchased items still held/);assert.match(readable(html),/10\/24\/2026 3:30:30pm · User1 reserved 20 items/);}
   if(user.id==='buyer')assert.match(readable(html),/Delivery: As items are acquired/);
   else assert.doesNotMatch(html,/>Delivery:/);
  }
@@ -98,6 +101,10 @@ test('Buy fees and cost explanations are private to the creator and administrato
  const finished={...listing,deliveryMode:'finished'};
  assert.match(readable(harness(finished,{id:'buyer'}).html()),/Delivery: When the order is fully filled, expires, or is canceled/);
  assert.doesNotMatch(harness(finished,{id:'seller'}).html(),/>Delivery:/);
+ assert.match(harness({...listing,buyAdmin:true},{id:'buyer'}).html(),/Reservation and gift audit/);
+ assert.doesNotMatch(harness(listing,{id:'buyer'}).html(),/Reservation and gift audit/);
+ const withExpiry={...listing,buyAdmin:true,reservationAudit:[...listing.reservationAudit,{id:'expired',kind:'reservation_expired',created_at:'2026-10-24T16:30:30',details:{quantity:7}}]};
+ assert.doesNotMatch(harness(withExpiry,{id:'admin'}).html(),/private-expiry|reservation_created|reservation_expired|expires_at|\{"quantity"/);
 });
 
 
