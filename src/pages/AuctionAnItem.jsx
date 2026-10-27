@@ -207,7 +207,7 @@ export default function AuctionAnItem() {
                     </fieldset>
                     <div className="mb-5">
                         {escrowMode ? <EscrowProtection forListing buy={isBuy} minimumPrice={minimumValue} /> : <DirectTradeHelp forListing />}
-                        {escrowMode && !isBuy && <p className="my-4 rounded-[6px] border-l-[3px] border-[#22C55E] bg-[#F0FDF4] px-4 py-3 text-xs leading-[1.4] text-[#334155]"><strong className="font-bold text-[#15803D]">Early Access:</strong> In the unlikely event of a verified loss caused by our escrow system, we guarantee reimbursement of the actual loss, up to 1,000,000 Meat per affected user.</p>}
+                        {escrowMode && !isBuy && <p className="my-4 rounded-[6px] border-l-[3px] border-[#22C55E] bg-[#F0FDF4] px-4 py-3 text-xs leading-[1.4] text-[#334155]"><strong className="font-bold text-[#15803D]">Escrow Protection Guarantee:</strong> In the unlikely event of a verified loss caused by an error in kHub’s automated escrow system, we guarantee full reimbursement without a cap. Losses resulting from malicious exploits, fraudulent activity, or circumstances outside kHub’s reasonable control are excluded.</p>}
                         {!escrowMode && <p className="mt-2 text-xs leading-[1.4] text-red-600">Failure to honor a valid, completed auction is a violation of kHub policy and will likely get you banned. We take these very seriously.</p>}
                     </div>
                     <label htmlFor="listing-item-search" className="mb-2 block text-sm font-bold">Find an item</label>

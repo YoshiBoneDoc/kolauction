@@ -2,6 +2,59 @@
 @tailwind components;
 @tailwind utilities;
 
+.approval-gallery {
+  --approval-gallery-padding-y: clamp(8px, 1.5svh, 16px);
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--approval-gallery-padding-y) clamp(14px, 5vw, 80px);
+  background: #FAF9F6;
+}
+.approval-frame {
+  position: relative;
+  width: 100%;
+  max-width: min(100%, calc((100svh - var(--approval-gallery-padding-y) - var(--approval-gallery-padding-y)) * 1.25));
+  min-width: 0;
+  margin: 0;
+  aspect-ratio: 5 / 4;
+  background: #fff;
+  box-shadow: 0 18px 35px rgb(17 2 7 / 30%);
+}
+.approval-frame-art {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+/* The 500 × 400 source has its opening at approximately x=50..450,
+   y=50..350. These proportional insets preserve every decorative feature. */
+.approval-frame-mat {
+  position: absolute;
+  inset: 12.5% 10%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  background: #fff;
+}
+/* Render the authentic screenshot separately from the decorative frame. */
+.approval-kmail-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 100%;
+  object-fit: contain;
+  opacity: 1;
+  filter: none;
+  mix-blend-mode: normal;
+  background: #fff;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;

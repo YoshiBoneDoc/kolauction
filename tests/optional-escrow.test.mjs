@@ -30,6 +30,17 @@ const auction = { id:'direct', auctionNumber:'1234', sellerId:'seller', owner:'S
     hasWinner:true, winnerId:'buyer', winner:'Buyer', finalPrice:500,
     settlementContacts:{ seller:{username:'Seller',kol_name:'Verified Seller',kol_player_id:777}, buyer:{username:'Buyer',kol_name:'Verified Buyer',kol_player_id:888} } };
 
+test('approval link is above Getting Started and opens the framed KMail page', () => {
+    const info = render({ path: '/info', user: null });
+    assert.ok(info.indexOf('Officially approved by KoL management!') < info.indexOf('Getting Started'));
+    assert.match(info, /href="\/official-approval" target="_blank" rel="noopener noreferrer"[^>]*>See For Yourself ↗<\/a>/);
+    const viewer = render({ path: '/official-approval', user: null, error: 'Unrelated auction error' });
+    assert.match(viewer, /class="approval-frame"/);
+    assert.match(viewer, /src="\/art\/approval-abstract-frame.png"[^>]*width="500" height="400" class="approval-frame-art"/);
+    assert.match(viewer, /Loading approval KMail/);
+    assert.doesNotMatch(viewer, /<nav|Unrelated auction error|All Auctions|about_me_Pics/);
+});
+
 test('listing form defaults to escrow and offers direct settlement before publishing', () => {
     const html = render({path:'/auction-item'});
     assert.match(html, /Trading Method/);
@@ -97,8 +108,9 @@ test('direct participation discloses unfunded bids and optional tips; escrow ret
     assert.doesNotMatch(escrow, /7.5%|seller commission|Seller fee:/);
     assert.match(escrow, /Escrow Protection — How It Works/);
     assert.doesNotMatch(escrow, /Your bids are secured by kHub, with up to 1M Meat in loss protection during early access/);
-    assert.match(escrow, /Fast Delivery:[\s\S]*Early Access Escrow Guarantee:[\s\S]*up to 1,000,000 Meat per affected user\.[\s\S]*<\/details>/);
-    assert.doesNotMatch(html, /Early Access Escrow Guarantee:/);
+    assert.match(escrow, /Fast Delivery:[\s\S]*Escrow Protection Guarantee:[\s\S]*full reimbursement without a cap\.[\s\S]*malicious exploits, fraudulent activity, or circumstances outside kHub’s reasonable control are excluded\.[\s\S]*<\/details>/);
+    assert.doesNotMatch(escrow, /Early Access|1,000,000 Meat per affected user/);
+    assert.doesNotMatch(html, /Escrow Protection Guarantee:/);
     assert.match(escrow, /BID 1234/);
     assert.doesNotMatch(escrow, /Buy Now|Your bid \(Meat\)/);
 });

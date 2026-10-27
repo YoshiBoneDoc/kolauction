@@ -39,7 +39,7 @@ export default function EscrowProtection({ forListing = false, buy = false, show
                 </p>}
             </div>
             {!forListing && <p className="mt-4 rounded-[6px] border-l-[3px] border-[#22C55E] bg-[#F0FDF4] px-4 py-3 text-[#334155]">
-                <strong className="font-bold text-[#15803D]">Early Access Escrow Guarantee:</strong> In the unlikely event of a verified loss caused by kHub’s escrow system, we guarantee reimbursement of the actual loss, up to 1,000,000 Meat per affected user.
+                <strong className="font-bold text-[#15803D]">Escrow Protection Guarantee:</strong> In the unlikely event of a verified loss caused by an error in kHub’s automated escrow system, we guarantee full reimbursement without a cap. Losses resulting from malicious exploits, fraudulent activity, or circumstances outside kHub’s reasonable control are excluded.
             </p>}
         </div>
     </details>;

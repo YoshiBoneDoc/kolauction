@@ -10,6 +10,7 @@ import Login from "./pages/Login"; // Import Login page
 import Profile from "./pages/Profile"; // Import Profile
 import AuctionDetails from "./pages/AuctionDetails";
 import InfoPage from "./pages/InfoPage.jsx";
+import OfficialApproval from './pages/OfficialApproval';
 import DonatePage from "./pages/DonatePage.jsx";
 import AuthEmailPage from "./pages/AuthEmailPage";
 import ResetPassword from "./pages/ResetPassword";
@@ -32,6 +33,7 @@ import AdminPolls from "./pages/AdminPolls";
 const App = () => {
     const { pathname } = useLocation();
     const { error, refreshAuctions } = useContext(AuctionsContext) || {};
+    if (pathname.replace(/\/+$/, '') === '/official-approval') return <OfficialApproval />;
     const isWallOfShame = pathname.replace(/\/+$/, '') === '/wall-of-shame';
     return (
         <div className={`flex min-h-screen flex-col ${isWallOfShame ? 'shame-background' : 'site-page-background bg-[#F9F9F9]'}`}>

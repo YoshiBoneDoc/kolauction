@@ -1,3 +1,14 @@
+.approval-announcement {
+  padding: 8px 12px;
+  border-left: 3px solid #4D9A70;
+  border-radius: 6px;
+  background-color: #F1F5EE;
+}
+html[data-theme="dark"] .approval-announcement {
+  background-color: #1B302B;
+  border-left-color: #6EE7B7;
+}
+
 /* Shared surface palettes. Exact utility tokens keep text, buttons, badges,
    status accents, and image pixels independent from the page surfaces. */
 html:not([data-theme="dark"]) {

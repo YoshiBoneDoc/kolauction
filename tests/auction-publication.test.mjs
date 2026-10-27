@@ -217,7 +217,7 @@ test('Buy mode defaults from Sell, disables Direct, removes sell terms and publi
     page.button('Buy Items').props.onClick();page.render();
     assert.equal(page.button('Direct').props.disabled,true);assert.equal(page.button('Escrow').props['aria-pressed'],true);
     assert.equal(nodes(page.tree).some(n=>n.props?.children==='Set Buyout Price (optional)'),false);
-    assert.equal(nodes(page.tree).some(n=>n.type==='strong'&&n.props.children==='Early Access:'),false);
+    assert.equal(nodes(page.tree).some(n=>n.type==='strong'&&n.props.children==='Escrow Protection Guarantee:'),false);
     page.input('listing-item-search','asbestos ore').input('item','364').input('quantity','20').input('minBidMeat','2m').input('deliveryMode','finished');
     const original=globalThis.requestAnimationFrame;globalThis.requestAnimationFrame=fn=>fn();
     try {page.find(n=>n.type==='form').props.onSubmit({preventDefault(){}});}finally{if(original)globalThis.requestAnimationFrame=original;else delete globalThis.requestAnimationFrame;}

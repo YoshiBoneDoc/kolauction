@@ -29,7 +29,7 @@ const auctionTypeComparison = [
     },
     {
         heading: 'PROTECTION',
-        escrow: 'Items and leading bid Meat are secured by the bot. During early access, verified losses caused by our escrow system may be reimbursed up to 1M Meat per affected user.',
+        escrow: 'Items and leading bid Meat are secured by the bot. Verified losses caused by errors in kHub’s automated escrow system are fully reimbursed, without a cap. Malicious exploits and external interference are excluded.',
         direct: 'Players trade at their own risk. kHub cannot guarantee payment or delivery.',
     },
 ];
@@ -50,6 +50,10 @@ const InfoPage = () => {
             </p>
 
             <div className="w-full max-w-3xl text-left text-sm text-gray-600">
+                <p className="approval-announcement mb-6 font-medium text-gray-800">
+                    <span className="text-green-700">✓</span> Officially approved by KoL management!{' '}
+                    <a href="/official-approval" target="_blank" rel="noopener noreferrer" className="whitespace-nowrap text-blue-700 underline hover:text-blue-800">See For Yourself ↗</a>
+                </p>
                 <h2 className={`${sectionHeadingClass} mb-2`}>Getting Started</h2>
                 <p className="mb-6">
                     <Link to="/register" className="font-medium text-blue-600 hover:underline">Register here</Link> to create your kHub account. Only one account is permitted per KoL player.
