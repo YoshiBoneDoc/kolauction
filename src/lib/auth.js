@@ -40,7 +40,7 @@ export function createAuthService(client, { origin } = {}) {
                 if (!/^KH_.+/i.test(value)) throw new Error("Use your kHub username: KH_ followed by your KoL name.");
                 const resolved = await api.rpc(appeal ? 'khub_appeal_login_address' : 'khub_login_address', { p_username: value });
                 if (resolved.error) throw new Error("Username login is temporarily unavailable. Please try again later.");
-                if (!resolved.data) throw new Error("Invalid username or password. Older email accounts should use their registered email address.");
+                if (!resolved.data) throw new Error("Invalid username or password.");
                 email = resolved.data;
             }
             const { data, error } = await api.auth.signInWithPassword({ email: email.toLowerCase(), password });
