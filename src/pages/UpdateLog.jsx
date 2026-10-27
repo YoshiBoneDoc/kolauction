@@ -6,6 +6,8 @@ export default function UpdateLog() {
         <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-4 py-8 sm:px-6">
             <h1 className="text-3xl font-bold text-blue-700">Update Log</h1>
             <ul className="list-disc space-y-4 pl-5 text-gray-700">
+                <li>Gift items, including fake hands, heart-shaped necklaces, stuffed items, and more, can now be listed in Buy and Sell auctions.</li>
+                <li>Made several performance improvements to significantly reduce lag, freezing, and timeouts when browsing auctions.</li>
                 <li>Individual auction pages now have a link to the wiki and pricegun pages for that specific item.</li>
                 <li>Individual auction pages now display approximate Mall prices, updated daily.</li>
                 <li>Hardcore/Ronin players can use <Link to="/info#gift-packages" className="text-blue-700 underline">gift packages</Link> for bidding and starting auctions. Include the exact auction command in the outside message. <em>All other gift packages without these commands will still be considered donations.</em></li>
