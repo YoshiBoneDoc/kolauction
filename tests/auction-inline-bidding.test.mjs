@@ -242,7 +242,7 @@ test('full and inline bid forms display rounded hybrid minimums and accept exact
             const h = harness(AuctionBidForm, { auction, inline });
             const text = expected.toLocaleString('en-US');
             const input = () => h.find(node => node.type === 'input');
-            assert.equal(input().props.placeholder, inline ? `Min: ${text} · k/m/b` : text);
+            assert.equal(input().props.placeholder, inline ? `Min: ${text} · k/m/b` : `${text} · Full amounts or k/m/b shorthand.`);
             input().props.onChange({ target: { value: String(expected - 1) } }); h.render();
             await h.find(node => node.type === 'form').props.onSubmit({ preventDefault() {} }); h.render();
             assert.equal(bids.length, 0);

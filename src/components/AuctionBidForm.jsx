@@ -97,11 +97,10 @@ export default function AuctionBidForm({ auction, showTerms = true, showHeading 
             <input id={inputId} type="text" inputMode="decimal" autoComplete="off"
                 value={amount} onChange={(event) => { setAmount(event.target.value); setError(''); setMessage(''); }}
                 onBlur={() => setAmount(value => normalizeAuctionAmount(value, { meat: true }))}
-                placeholder={minimumText} disabled={pending || minimum === null}
+                placeholder={minimum === null ? minimumText : `${minimumText} · Full amounts or k/m/b shorthand.`} disabled={pending || minimum === null}
                 aria-invalid={Boolean(error)} aria-describedby={`${inputId}-help${error ? ` ${inputId}-error` : ''}`}
                 className={`w-full min-w-0 rounded border border-gray-400 bg-white text-gray-900 ${compact ? 'min-h-10 px-3 py-2 text-sm' : 'min-h-11 p-3 text-base'}`} />
-            <p id={`${inputId}-help`} className="text-xs text-gray-600">{minimum === null ? minimumText : `Next minimum bid: ${minimumText} Meat. Full amounts or k/m/b shorthand.`}</p>
-            {auction.instantPurchasePrice && <p className="text-xs text-gray-700">Buy the entire listing immediately at this price.</p>}
+            <p id={`${inputId}-help`} className="text-xs text-gray-600">{minimum === null ? minimumText : `Next minimum bid: ${minimumText} Meat.`}</p>
             <button type="submit" disabled={pending || minimum === null} className={`w-full rounded bg-blue-600 px-4 font-semibold text-white hover:bg-blue-700 disabled:opacity-50 ${compact ? 'min-h-9 py-2 text-sm' : 'min-h-11 py-3'}`}>
                 {pending ? 'Submitting…' : 'Place Bid'}
             </button>
