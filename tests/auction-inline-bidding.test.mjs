@@ -349,7 +349,7 @@ test('auction type button cycles the current Buy & Sell, Sell and Buy views with
     }
 });
 
-test('advanced filters retain selections while disabled price limits are ignored', () => {
+test('advanced filters expand inside the toolbar and retain URL selections when collapsed', () => {
     const previousTrading = trading;
     try {
         trading = { priceBounds: { min: 100, max: 9000000000 } };
@@ -369,12 +369,12 @@ test('advanced filters retain selections while disabled price limits are ignored
         filters().props.onRangeChange({ min: 200, max: 500 }); h.render();
         assert.equal(params.has('page'), false);
         assert.equal(params.get('minPrice'), '200'); assert.equal(params.get('maxPrice'), '500');
-        assert.equal(toggle().props.count, 3);
+        assert.equal(toggle().props.count, 4);
         const selected = params.toString();
         toggle().props.onToggle(); h.render(); assert.equal(filters(), undefined);
         toggle().props.onToggle(); h.render();
         assert.equal(params.toString(), selected);
-        assert.equal(filters().props.minPrice, null); assert.equal(filters().props.maxPrice, null);
+        assert.equal(filters().props.minPrice, 200); assert.equal(filters().props.maxPrice, 500);
         filters().props.onClear(); h.render();
         for (const key of ['status', 'trade', 'minPrice', 'maxPrice']) assert.equal(params.has(key), false);
         assert.equal(params.toString(), '');

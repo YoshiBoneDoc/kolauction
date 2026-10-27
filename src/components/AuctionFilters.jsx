@@ -3,7 +3,7 @@ import { auctionFilters } from '../lib/auctionBrowsing';
 import AuctionPriceRange from './AuctionPriceRange';
 
 // Temporary switch: also disables URL/session price constraints in All Auctions.
-export const AUCTION_PRICE_RANGE_ENABLED = false;
+export const AUCTION_PRICE_RANGE_ENABLED = true;
 
 export function AuctionFiltersButton({ open, controls, count, onToggle }) {
     return (

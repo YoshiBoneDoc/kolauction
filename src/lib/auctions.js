@@ -159,8 +159,8 @@ export function createAuctionService(client) {
             throw new Error('The auction list changed while refreshing. We will retry shortly.');
         },
         async load({ view = 'browse', id = null, sellerId = null, excludeOwn = false, kind = 'all', search = '', status = 'active', sort = resolveAuctionSort(status), trade = 'all', page = 1, minPrice = null, maxPrice = null } = {}) {
-            const { error } = await requireClient().rpc('finalize_expired_auctions');
-            if (error) throw databaseError(error);
+            // Browsing is read-only. The existing bot tick expires all auction
+            // types; write RPCs independently validate deadlines under their locks.
             async function readPage(pageNumber, completed = false, highValue = false) {
                 // The historical home endpoint returns only four rows. Use the
                 // existing privacy-filtered browse pages for the complete strip.
