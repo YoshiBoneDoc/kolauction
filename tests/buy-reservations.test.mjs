@@ -91,12 +91,12 @@ test('Buy fees and cost explanations are private to the creator and administrato
  }
  for(const [user,auction] of [[{id:'buyer'},listing],[{id:'admin'},{...listing,buyAdmin:true}]]){
   const html=harness(auction,user).html();assert.match(html,/Tiered Fee \(5%\): 100 Meat/);assert.match(html,/Remaining escrow/);assert.match(html,/Fees range from 1–5%/);
-  if(user.id==='buyer')assert.match(html,/Delivery: As items are acquired/);
+  if(user.id==='buyer')assert.match(readable(html),/Delivery: As items are acquired/);
   else assert.doesNotMatch(html,/>Delivery:/);
  }
  assert.doesNotMatch(harness({...listing,buyAdmin:true},null).html(),/Tiered Fee|Remaining escrow|Gift expenses|>Delivery:/);
  const finished={...listing,deliveryMode:'finished'};
- assert.match(harness(finished,{id:'buyer'}).html(),/Delivery: When the order is fully filled, expires, or is canceled/);
+ assert.match(readable(harness(finished,{id:'buyer'}).html()),/Delivery: When the order is fully filled, expires, or is canceled/);
  assert.doesNotMatch(harness(finished,{id:'seller'}).html(),/>Delivery:/);
 });
 
@@ -187,9 +187,14 @@ test('compact Buy layout keeps sub-percent progress, exact timing, outlined reso
 });
 
 test('pending funding and owner controls survive the Buy layout redesign',()=>{
- const listing={...order,status:'pending_escrow',fundingRequired:21000};
+ const listing={...order,status:'pending_escrow',fundingRequired:21000,balanceMeat:0,purchaseMeat:0,buyCommissionMeat:0,refundedMeat:0,heldQuantity:0};
  const owner=harness(listing,{id:'buyer'}).html();
  assert.match(owner,/Starts after funding/);assert.match(owner,/FUND 1200/);assert.match(owner,/Cancel remaining order/);
+ assert.match(readable(owner),/Send 21,000 Meat to kHub \(#3888760\) via KMail\. Include the command below in the message body\. Attach no items\./);
+ assert.match(readable(owner),/Purchase funds: 20,000 Meat · Fee reserve \(5%\): 1,000 Meat/);
+ assert.match(owner,/<h2 class="mb-4 text-2xl font-bold leading-tight">Fund your order<\/h2>/);
+ assert.match(readable(owner),/Deposit within 24 hours\. Your auction starts once funding is accepted\./);
+ assert.doesNotMatch(owner,/Commission reserve|Remaining escrow|Purchased items still held/);
  for(const user of [null,{id:'other'},{id:'buyer',isBanned:true}])assert.doesNotMatch(harness(listing,user).html(),/FUND 1200|Cancel remaining order|reserve-quantity/);
 });
 

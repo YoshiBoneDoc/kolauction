@@ -148,6 +148,62 @@ with tempfile.TemporaryDirectory(prefix='khub-intake-performance-',dir='/tmp') a
         assert sql(f"select public.bot_mail_cleanup(array['{rejected['id']}']);")=='[]'
         print('PASS: rejected funded mail keeps one refund obligation and remains subject to the unchanged source-retention policy')
 
+        # Real normalizer + corrected parser -> actual financial RPCs. Synthetic
+        # mail only: no live KoL fetch/send or production identifiers are used.
+        parser_root=ROOT/'bot/src' if (ROOT/'bot/src/mail-parser.mjs').exists() else ROOT/'src'
+        raw_mails=[]
+        for _ in range(2):
+            raw=mail(buy,'unknown',actor=48889602)['raw']
+            raw['message']='<center><table><tr><td><img src="https://images.kingdomofloathing.com/itemimages/meat.gif" alt="Meat"></td><td>You gain 15,750,000 Meat.</td></tr></table></center>'
+            raw_mails.append(dict(raw,type='normal'))
+        script="import {parseKmail} from "+json.dumps((parser_root/'mail-parser.mjs').as_uri())+";import {normalizeMail} from "+json.dumps((parser_root/'protocol.mjs').as_uri())+";let input='';for await(const chunk of process.stdin)input+=chunk;console.log(JSON.stringify(JSON.parse(input).map(raw=>normalizeMail(raw,parseKmail))));"
+        parsed=subprocess.run(['node','--input-type=module','-e',script],input=json.dumps(raw_mails),text=True,capture_output=True,check=True)
+        blank_mails=json.loads(parsed.stdout)
+        for payload in blank_mails:
+            assert payload['command']=={'type':'unknown'} and payload['meat']==15750000
+            assert payload['raw'] in raw_mails
+            assert ingest(payload)!='accepted'
+        blank_ids=','.join(lit(m['id']) for m in blank_mails)
+        refunds=json.loads(sql(f"select jsonb_agg(jsonb_build_object('id',id,'recipient',recipient_id,'meat',meat) order by id) from khub_bot.deliveries where receipt_id in ({blank_ids}) and kind='refund';"))
+        assert len(refunds)==2 and sum(d['meat'] for d in refunds)==31500000
+        assert all(d['recipient']==48889602 and d['meat']==15750000 for d in refunds)
+        for payload in blank_mails:assert ingest(payload)=='duplicate'
+        assert set(handled(blank_mails))=={m['id'] for m in blank_mails}
+        assert sql(f"select count(*) from khub_bot.deliveries where receipt_id in ({blank_ids}) and kind='refund';")=='2'
+        for delivery in refunds:
+            attempt=sql(f"update khub_bot.deliveries set state='sending',attempt=gen_random_uuid() where id='{delivery['id']}' returning attempt;")
+            sql(f"select public.bot_ack_delivery('{delivery['id']}','{attempt}',true,'Synthetic local acknowledgment; no game transfer.');")
+        for payload in blank_mails:assert ingest(payload)=='duplicate'
+        assert sql(f"select count(*) from khub_bot.deliveries where receipt_id in ({blank_ids}) and kind='refund';")=='2'
+        print('PASS: two parsed Meat-only mails queue exactly 31.5M in refunds to the numeric sender; replay before/after simulated acknowledgment cannot pay twice')
+
+        # Use unchanged public upstream KMail samples and a verbatim archived
+        # game-response attachment, not only kHub's reconstructed HTML.
+        fixture_root=ROOT/'bot/tests/fixtures' if (ROOT/'bot/tests/fixtures').exists() else ROOT/'tests/fixtures'
+        formats=json.loads((fixture_root/'kmail-formats.json').read_text())
+        selected=[row for row in formats['upstream'] if row['name'] in ('item-with-message','items-without-message','ordinary-meat','items-and-meat')]
+        selected.append({'message':formats['archived_gift_attachment']['message'],
+            'expected':{'meat':0,'items':[formats['archived_gift_attachment']['expected']]}})
+        raw_samples=[]
+        for index,sample in enumerate(selected):
+            raw=mail(buy,'unknown')['raw'];raw['message']=sample['message']
+            raw['fromname']=['true','false','null','undefined','Fixture sender'][index]
+            raw_samples.append(raw)
+        parsed=subprocess.run(['node','--input-type=module','-e',script],input=json.dumps(raw_samples),text=True,capture_output=True,check=True)
+        for incoming,sample in zip(json.loads(parsed.stdout),selected):
+            assert incoming['meat']==sample['expected']['meat'] and incoming['items']==sample['expected']['items']
+            assert incoming['sender_id']==48889602 and incoming['command']['type']=='unknown'
+            assert ingest(incoming)!='accepted'
+            mid=incoming['id']
+            returns=json.loads(sql(f"select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d where receipt_id='{mid}' and kind='refund';"))
+            assert all(d['recipient_id']==48889602 for d in returns)
+            assert sum(d['meat'] for d in returns)==incoming['meat']
+            assert sorted([{'id':d['item_id'],'quantity':d['quantity']} for d in returns if d['item_id']],key=lambda x:x['id'])==incoming['items']
+            fingerprint=sql(f"select md5(jsonb_agg(to_jsonb(d) order by id)::text) from khub_bot.deliveries d where receipt_id='{mid}';")
+            assert ingest(incoming)=='duplicate' and handled([incoming])==[mid]
+            assert fingerprint==sql(f"select md5(jsonb_agg(to_jsonb(d) order by id)::text) from khub_bot.deliveries d where receipt_id='{mid}';")
+        print('PASS: public upstream Meat/item/mixed KMail samples and archived gift-item HTML refund exact assets to numeric IDs, including literal boolean/null-like names; no duplicate financial rows')
+
         sql(f"update khub_bot.inbox_bid_mail set processed=false where mail_id='{fill['id']}';")
         assert handled([fill])==[]
         recovery_scan=json.loads(sql('select public.bot_begin_inbox_scan();'))['id']
@@ -252,5 +308,112 @@ with tempfile.TemporaryDirectory(prefix='khub-intake-performance-',dir='/tmp') a
             plan=json.loads(sql('explain(analyze,format json) select id from khub_bot.deliveries where '+predicate+" and state not in ('sent','cancelled');"))[0]['Plan']
             assert index in json.dumps(plan),plan
         print('PASS: receipt/state and auction/state lookup plans use their targeted partial indexes against 10,000 unrelated notifications')
+        # Reconstructed centered, blank-note gift layout, not a saved capture.
+        # Exercise the real JS envelope/contents parsers through durable SQL
+        # opening proof, donation accounting and exact-payload replay checks.
+        original=mail(buy,'donation')['raw']
+        original['type']='giftshop'
+        original['message']='<center><table><tr><td><table class="item" rel="id=1167&n=1"><tr><td><img title="plain brown wrapper"></td></tr></table></td></tr></table></center>'
+        opened=dict(original,message=original['message']+'<p>Inside Note:<p><center><table><tr><td><img src="/itemimages/meat.gif"></td><td>You gain 150 Meat.</td></tr></table></center><table class="item" rel="id=2&n=3"><tr><td><img title="seal tooth"></td></tr></table>')
+        script="import {giftEnvelope,openedGiftPayload} from "+json.dumps((parser_root/'incoming-gifts.mjs').as_uri())+";let input='';for await(const chunk of process.stdin)input+=chunk;const {original,opened}=JSON.parse(input);const envelope=giftEnvelope(original);console.log(JSON.stringify({envelope,payload:openedGiftPayload(envelope,opened)}));"
+        parsed=subprocess.run(['node','--input-type=module','-e',script],input=json.dumps({'original':original,'opened':opened}),text=True,capture_output=True,check=True)
+        result=json.loads(parsed.stdout);envelope=result['envelope'];donated=result['payload']
+        assert envelope['wrapper_id']==1167 and not envelope['opened']
+        assert donated['sender_id']==48889602 and donated['meat']==150 and donated['items']==[{'id':2,'quantity':3}]
+        assert donated['raw']['gift_original']==opened
+        assert handled([donated])==[]
+        ingest(donated,error='not been verified')
+        sql('select public.bot_register_gift_mail('+lit(json.dumps([envelope]))+');')
+        snapshot={'meat':'1000000000','items':{'1167':'1','2':'1000'},'reserve':1000}
+        attempt=json.loads(sql('select public.bot_claim_gift_open('+lit(json.dumps(snapshot))+');'))
+        snapshot['meat']='1000000150';snapshot['items']={'1167':'0','2':'1003'}
+        sql('select public.bot_finish_gift_open('+lit(attempt['id'])+','+lit(json.dumps(donated))+','+lit(json.dumps(snapshot))+');')
+        assert sql('select public.bot_ingest_donation('+lit(json.dumps(donated))+');')=='accepted'
+        donation_id=donated['id']
+        fingerprint=sql(f"select md5(jsonb_agg(to_jsonb(c) order by id)::text) from khub_bot.closet_transfers c where receipt_id='{donation_id}';")
+        assert sql(f"select sum(meat) from khub_bot.closet_transfers where receipt_id='{donation_id}';")=='150'
+        assert sql(f"select sum(quantity) from khub_bot.closet_transfers where receipt_id='{donation_id}' and item_id=2;")=='3'
+        assert sql(f"select count(*) from khub_bot.closet_transfers where receipt_id='{donation_id}' and item_id=1167;")=='0'
+        for _ in range(2):
+            assert sql('select public.bot_ingest_donation('+lit(json.dumps(donated))+');')=='duplicate'
+            assert handled([donated])==[donation_id]
+        assert fingerprint==sql(f"select md5(jsonb_agg(to_jsonb(c) order by id)::text) from khub_bot.closet_transfers c where receipt_id='{donation_id}';")
+        print('PASS: centered blank-note gift parses through current SQL proof and donation ledger; exact Meat/items once, numeric sender preserved, consumed wrapper excluded')
+
+        # An inside command is intent for a rejected return, NEVER an accepted
+        # auction command or donation. All assets must first have durable proof.
+        inside_reservation=json.loads(call(f"select public.reserve_buy_quantity('{buy}',1);"))
+        financial_state="""select md5(jsonb_build_object(
+            'auctions',(select jsonb_agg(to_jsonb(a) order by id) from public.auctions a),
+            'bids',(select jsonb_agg(to_jsonb(b) order by id) from public.bids b),
+            'orders',(select jsonb_agg(to_jsonb(o) order by auction_id) from khub_bot.buy_orders o),
+            'fills',(select jsonb_agg(to_jsonb(f) order by receipt_id) from khub_bot.buy_fulfillments f),
+            'reservations',(select jsonb_agg(to_jsonb(r) order by id) from khub_bot.buy_reservations r),
+            'closet',(select jsonb_agg(to_jsonb(c) order by id) from khub_bot.closet_transfers c)
+        )::text);"""
+        for case_index,(command,intended,description,empty) in enumerate([
+            ('BID 1075','bid','place a bid',False),
+            ('LIST 1075','list','deposit items for a Sell auction',False),
+            ('BUY 1075','buy','buy an auction listing',False),
+            ('FUND 1075','fund','fund a Buy auction',False),
+            (f"FILL {buy} {inside_reservation['id']}",'fill','fulfill a Buy order',False),
+            ('BID 1075 500','bid_help','place a bid',False),
+            ('BID 1075','bid','place a bid',True),
+            ('<br><b>BID</b><br>1075','bid','place a bid',False),
+            ('BID 1075 please','bid','place a bid',False),
+            ('<pre>FILL 1075 invalid-token</pre>','fill','fulfill a Buy order',False),
+        ]):
+            original=mail(buy,'donation')['raw']
+            original['type']='giftshop'
+            original['message']='test5<table class="item" rel="id=1167&n=1"><tr><td><img title="plain brown wrapper"></td></tr></table>'
+            contents='' if empty else '<center>You gain 100 Meat</center><table class="item" rel="id=2&n=3"><tr><td><img title="seal tooth"></td></tr></table>'+formats['archived_gift_attachment']['message']
+            if intended=='fill':
+                # Otherwise valid fulfillment contents and a live reservation:
+                # putting this command inside must still never fulfill it.
+                contents='<table class="item" rel="id=2&n=1"><tr><td><img title="seal tooth"></td></tr></table>'
+            separator=['<p>Inside Note:<p>','<P class="note"> Inside Note: </P>\n<P>','<p> inside   note: <p>'][case_index%3]
+            opened=dict(original,message=original['message']+separator+command+contents)
+            parsed=subprocess.run(['node','--input-type=module','-e',script],input=json.dumps({'original':original,'opened':opened}),text=True,capture_output=True,check=True)
+            result=json.loads(parsed.stdout);envelope=result['envelope'];returned=result['payload'];mid=returned['id']
+            assert returned['command']=={'type':'gift_command_inside','intended':intended}
+            assert returned['raw']['gift_original']==opened
+            ingest(returned,error='not been verified')
+            assert sql(f"select count(*) from khub_bot.receipts where mail_id='{mid}';")=='0'
+            sql('select public.bot_register_gift_mail('+lit(json.dumps([envelope]))+');')
+            before_open={'meat':'1000000000','items':{'1167':'1','2':'1000','10881':'1000'},'reserve':1000}
+            attempt=json.loads(sql('select public.bot_claim_gift_open('+lit(json.dumps(before_open))+');'))
+            after_open={'meat':str(1000000000+returned['meat']),'items':{'1167':'0','2':'1000','10881':'1000'},'reserve':1000}
+            for item in returned['items']:
+                after_open['items'][str(item['id'])]=str(1000+item['quantity'])
+            if case_index==0:
+                tampered=json.loads(json.dumps(returned))
+                tampered['raw']['gift_original']['message']=original['message']
+                sql('select public.bot_finish_gift_open('+lit(attempt['id'])+','+lit(json.dumps(tampered))+','+lit(json.dumps(after_open))+');',error='Gift proof does not match')
+            sql('select public.bot_finish_gift_open('+lit(attempt['id'])+','+lit(json.dumps(returned))+','+lit(json.dumps(after_open))+');')
+            before_transaction=sql(financial_state)
+            reason=ingest(returned)
+            assert reason=='Gift command is inside: '+intended
+            assert sql(financial_state)==before_transaction
+            rows=json.loads(sql(f"select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d where receipt_id='{mid}';"))
+            assert len(rows)==max(1,int(returned['meat']>0)+len(returned['items']))
+            assert all(d['recipient_id']==48889602 and d['auction_id'] is None for d in rows)
+            assert sum(d['meat'] for d in rows)==returned['meat']
+            assert sorted([{'id':d['item_id'],'quantity':d['quantity']} for d in rows if d['item_id']],key=lambda x:x['id'])==returned['items']
+            messages=json.loads(sql(f"select jsonb_agg(khub_bot.friendly_message(d)) from khub_bot.deliveries d where receipt_id='{mid}';"))
+            assert all(description in message and "outside message" in message for message in messages)
+            assert all(command not in message for message in messages) # No reservation/token/command echo.
+            if intended=='bid' and not empty:
+                pg('-l',str(Path(folder)/'postgres.log'),'-m','fast','-w','restart')
+            assert handled([returned])==[mid] and ingest(returned)=='duplicate'
+            for d in rows:
+                attempt_id=sql(f"update khub_bot.deliveries set state='sending',attempt=gen_random_uuid() where id='{d['id']}' returning attempt;")
+                sql(f"select public.bot_ack_delivery('{d['id']}','{attempt_id}',true,'Local simulated return acknowledgment; no real game transfer.');")
+            assert ingest(returned)=='duplicate'
+            assert int(sql(f"select count(*) from khub_bot.deliveries where receipt_id='{mid}';"))==len(rows)
+        fake=mail(buy,'gift_command_inside',meat=100)
+        fake['command']={'type':'gift_command_inside','intended':'bid'}
+        ingest(fake,error='requires verified gift contents')
+        assert sql(f"select count(*) from khub_bot.receipts where mail_id='{fake['id']}';")=='0'
+        print('PASS: inside BID/LIST/BUY/FUND/FILL commands and empty packages return exact contents once with tailored outside-message instructions; no auction, order or donation side effects; gift proof required')
     finally:
         if started:pg('-m','fast','-w','stop')

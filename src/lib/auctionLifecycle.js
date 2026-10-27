@@ -35,6 +35,16 @@ export function isUnclassifiedDepositClosure(auction) {
     return auction.status === 'cancelled' && auction.escrowMode && auction.itemEscrowedAt === null && !auction.closureReason;
 }
 
+// Match the database's abandoned-draft visibility rule. Missing metadata alone
+// is not proof: retain historical auctions with bids or other funding evidence.
+export function isAbandonedEscrowDraft(auction) {
+    return auction.escrowMode === true && ['cancelled', 'expired', 'voided'].includes(auction.status)
+        && auction.itemEscrowedAt === null
+        && !(auction.currentBid > 0) && !auction.highestBidderId && !auction.winnerId && !auction.hasWinner
+        && !(auction.bidCount > 0) && !(auction.bids?.length > 0)
+        && !(auction.purchasedQuantity > 0) && !(auction.purchaseMeat > 0) && !(auction.refundedMeat > 0);
+}
+
 export function getAuctionResult(auction, now = Date.now()) {
     const status = getAuctionStatus(auction, now);
     if (auction.auctionKind === 'buy') {

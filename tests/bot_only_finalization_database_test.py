@@ -177,5 +177,70 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         for _ in range(3):sql('set role service_role;select public.bot_tick();')
         assert ledger==sql("select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d;")
         print('PASS: only delivery acknowledgments complete escrow outcomes; repeated ticks do not duplicate refunds or payouts')
+
+        # Exact high-value scenario: one Nuge crossbow and a 200M funded bid.
+        # Everything is synthetic/local; no KoL connection or actual asset send.
+        parser_root=ROOT/'bot/src' if (ROOT/'bot/src/mail-parser.mjs').exists() else ROOT/'src'
+        parse_script="import {parseKmail} from "+json.dumps((parser_root/'mail-parser.mjs').as_uri())+";import {normalizeMail} from "+json.dumps((parser_root/'protocol.mjs').as_uri())+";let input='';for await(const chunk of process.stdin)input+=chunk;console.log(JSON.stringify(JSON.parse(input).map(raw=>normalizeMail(raw,parseKmail))));"
+        for uncertain in [False,True]:
+            high=call('select public.create_auction('+lit("The Nuge's favorite crossbow")+",1,100,24,null,null,7201,true);",seller)
+            number=row(high)['auction_number']
+            deposit=mail(high,'list',actor=48889601)['raw']
+            deposit['message']=f'LIST {number}<center><table class="item" rel="id=7201&n=1&t=1&g=0"><tr><td><img src="/itemimages/nugebow.gif" title="The Nuge crossbow"></td><td>You acquire an item: <b>The Nuge crossbow</b></td></tr></table></center>'
+            funded_bid=mail(high,'bid')['raw']
+            funded_bid['message']=f'BID {number}<center><table><tr><td><img src="/itemimages/meat.gif"></td><td>You gain 200,000,000 Meat.</td></tr></table></center>'
+            parsed=json.loads(subprocess.run(['node','--input-type=module','-e',parse_script],input=json.dumps([deposit,funded_bid]),text=True,capture_output=True,check=True).stdout)
+            assert parsed[0]['items']==[{'id':7201,'quantity':1}] and parsed[1]['meat']==200000000
+            assert ingest(parsed[0])=='accepted'
+            stage([parsed[1]]);assert ingest(parsed[1])=='accepted'
+            assert row(high)['current_bid']==200000000 and row(high)['highest_bidder_id']==buyer
+            held=json.loads(sql('select public.bot_liabilities();'))
+            assert int(held['meat'])>=200000000 and int(held['items']['7201'])>=1
+            set_end(high,"clock_timestamp()-interval '120 seconds'")
+            close_scan=stage([])
+            sql(f"select public.bot_finish_inbox_scan('{close_scan}');select public.bot_tick();")
+            settled=row(high)
+            assert settled['status']=='settling' and settled['final_price']==200000000
+            assert settled['fee_policy']=='tiered_v1' and settled['fee_meat']==5110000
+            asset_rows=json.loads(sql(f"select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d where auction_id='{high}' and kind in ('sale_item','sale_meat');"))
+            assert len(asset_rows)==2
+            winner=[d for d in asset_rows if d['kind']=='sale_item'][0]
+            payout=[d for d in asset_rows if d['kind']=='sale_meat'][0]
+            assert winner['recipient_id']==48889602 and winner['item_id']==7201 and winner['quantity']==1
+            assert payout['recipient_id']==48889601 and payout['meat']==194890000
+            assert payout['meat']+settled['fee_meat']==200000000
+            frozen_count=sql(f"select count(*) from khub_bot.deliveries where auction_id='{high}';")
+            for _ in range(3):sql('select public.bot_tick();')
+            assert sql(f"select count(*) from khub_bot.deliveries where auction_id='{high}';")==frozen_count
+            uncertain_row=None;seen=set()
+            for _ in range(100):
+                result=sql('set role service_role;select public.bot_claim_delivery(5);')
+                if not result:break
+                delivery=json.loads(result)
+                assert delivery['id'] not in seen;seen.add(delivery['id'])
+                assert delivery['delivery_reference'].startswith('D-')
+                if uncertain and delivery['id']==payout['id']:
+                    uncertain_row=delivery
+                    sql(f"select public.bot_ack_delivery('{delivery['id']}','{delivery['attempt']}',false,'Local simulated lost send acknowledgment; no game transfer.');")
+                    result=json.loads(sql(f"select public.bot_record_mailbox_check('{delivery['id']}','{delivery['attempt']}',"+lit(json.dumps({'status':'check_failed','candidate_ids':[]}))+');'))
+                    assert result['status']=='isolated'
+                else:
+                    sql(f"select public.bot_ack_delivery('{delivery['id']}','{delivery['attempt']}',true,'Local simulated confirmed transfer; no game transfer.');")
+            else:raise AssertionError('Local delivery queue did not drain')
+            assert winner['id'] in seen and payout['id'] in seen
+            if uncertain:
+                assert uncertain_row and row(high)['status']=='settling'
+                assert sql(f"select state from khub_bot.deliveries where id='{payout['id']}';")=='unknown'
+                pg('-l',str(Path(folder)/'postgres.log'),'-m','fast','-w','restart')
+                assert sql(f"select state from khub_bot.deliveries where id='{payout['id']}';")=='unknown'
+                assert sql('select public.bot_claim_delivery(5);')==''
+                verified={'status':'verified','candidate_ids':['99900001'],'message_id':'99900001','message_hash':'a'*64}
+                sql(f"select public.bot_record_mailbox_check('{payout['id']}','{uncertain_row['attempt']}',"+lit(json.dumps(verified))+');')
+            assert row(high)['status']=='completed'
+            assert ingest(parsed[0])=='duplicate' and ingest(parsed[1])=='duplicate'
+            for _ in range(3):sql('select public.bot_tick();')
+            assert sql(f"select count(*) from khub_bot.deliveries where auction_id='{high}';")==frozen_count
+            assert int(sql(f"select sum(meat) from khub_bot.closet_transfers where auction_id='{high}' and source='sale_fee';"))==5110000
+        print('PASS: 200M Nuge crossbow settlement preserves both assets, pays exact numeric recipients (194,890,000 seller / 5,110,000 fee), claims once, and survives uncertain payout/restart/recovery without resending')
     finally:
         if started:pg('-m','fast','-w','stop')

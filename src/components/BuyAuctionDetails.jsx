@@ -1,7 +1,7 @@
 import AuctionEndedTime from './AuctionEndedTime';
 import MarketPrice from './MarketPrice';
 import { feeLabel, effectiveFeePercent } from '../lib/feeDisplay';
-import { buyFunding, buyFee } from '../lib/buyOrders';
+import { buyFunding } from '../lib/buyOrders';
 import { useContext, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
@@ -15,6 +15,7 @@ import EscrowProtection from './EscrowProtection';
 import CopyMessage from './CopyMessage';
 import SellerLink from './SellerLink';
 import ItemResources from './ItemResources';
+import AuctionItemImage from './AuctionItemImage';
 
 const fulfillmentColumns = 'grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,.7fr)_minmax(0,1.1fr)] gap-x-2 sm:gap-x-3';
 
@@ -45,6 +46,8 @@ export default function BuyAuctionDetails({ auction, now, backLink }) {
     const canViewSellers = Boolean(currentUser && !currentUser.isBanned && auction.usernamesVisible !== false);
     const canViewFees = Boolean(currentUser && !currentUser.isBanned && auction.usernamesVisible !== false && (owns || auction.buyAdmin));
     const result = getAuctionResult(auction, now);
+    const funding = owns && canViewFees && result.status === 'pending_escrow'
+        ? buyFunding(auction.pricePerItem, auction.quantity) : null;
     const active = result.status === 'active';
     const closed = Boolean(auction.buyClosingReason) || ['completed', 'cancelled', 'expired', 'voided', 'settling'].includes(result.status);
     const canCancel = owns && !currentUser.isBanned && !auction.buyClosingReason && ['active','pending_escrow'].includes(auction.status);
@@ -85,7 +88,7 @@ export default function BuyAuctionDetails({ auction, now, backLink }) {
     return <main className="site-page-background flex-1 bg-[#F1F3F5] px-4 py-6 sm:px-6">{backLink}
         <div className="buy-auction-detail mx-auto max-w-4xl space-y-5 rounded-xl border border-[#E8DDD7] bg-[#FFFAF7] p-4 shadow-sm sm:p-6">
             <header className="flex items-start gap-3 border-b border-[#E8DDD7] pb-4">
-                {auction.image && <img src={auction.image} alt="" className="h-12 w-12 shrink-0 object-contain sm:h-16 sm:w-16 [image-rendering:pixelated]" />}
+                {auction.image && <AuctionItemImage key={auction.id} src={auction.image} item={auction.item} compact />}
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                         <p className="text-xs text-[#64748B]">Buy Auction · #{auction.auctionNumber}</p>
@@ -122,6 +125,7 @@ export default function BuyAuctionDetails({ auction, now, backLink }) {
                                 && Number.isFinite(auctionEndTime(auction)) && auctionEndTime(auction) <= now
                                 && <AuctionEndedTime auction={auction} compact={false} />}
                         </>}
+                        {owns && canViewFees && <p className={`text-xs text-[#64748B] ${result.status === 'pending_escrow' ? '!mt-[0.333rem]' : ''}`}><strong>Delivery:</strong> {auction.deliveryMode === 'finished' ? 'When the order is fully filled, expires, or is canceled.' : 'As items are acquired.'}</p>}
                     </div>
                 </div>
                 <progress aria-label="Order fulfillment" value={purchased} max={target || 1}
@@ -129,13 +133,19 @@ export default function BuyAuctionDetails({ auction, now, backLink }) {
                     className="buy-card-progress block h-2 w-full accent-blue-500" />
                 {active && !closed && <p className="text-xs text-[#64748B]">{(available ?? 0).toLocaleString('en-US')} available · {(auction.reservedQuantity || 0).toLocaleString('en-US')} reserved</p>}
                 {auction.buyClosingReason && auction.reservedQuantity > 0 && ['active', 'settling'].includes(result.status) && <p className="text-xs text-[#64748B]">Honoring existing reservations</p>}
-                {owns && canViewFees && <p className="text-xs text-[#64748B]">Delivery: {auction.deliveryMode === 'finished' ? 'When the order is fully filled, expires, or is canceled.' : 'As items are acquired.'}</p>}
             </section>
-            {owns && canViewFees && result.status === 'pending_escrow' && <section aria-label="Fund buy auction" className="buy-detail-action space-y-3 rounded-lg bg-[#F0F5FF] p-4">
-                <h2 className="font-semibold">Fund your order</h2><p>Send <strong>{auction.fundingRequired?.toLocaleString('en-US')} Meat</strong> (purchase funds plus fee reserve) to <strong>kHub (#3888760)</strong>, with no items.</p>
-                <p className="text-sm">Purchase funds: {buyFunding(auction.pricePerItem, auction.quantity).purchase.toLocaleString('en-US')} Meat · Estimated {feeLabel(buyFee(auction.pricePerItem, auction.quantity), BigInt(auction.pricePerItem) * BigInt(auction.quantity))}: {buyFee(auction.pricePerItem, auction.quantity).toLocaleString('en-US')} Meat · Commission reserve ({effectiveFeePercent(buyFunding(auction.pricePerItem, auction.quantity).feeReserve, BigInt(auction.pricePerItem) * BigInt(auction.quantity))}): {buyFunding(auction.pricePerItem, auction.quantity).feeReserve.toLocaleString('en-US')} Meat</p>
-                <CopyMessage text={`FUND ${auction.auctionNumber || auction.id}`} label="funding command" />
-                <p className="text-sm">The bot must accept your deposit within 24 hours of creating this listing. Your full auction timer starts when funding is accepted.</p>
+            {owns && canViewFees && result.status === 'pending_escrow' && <section aria-label="Fund buy auction" className="buy-detail-action rounded-lg bg-[#F0F5FF] px-4 py-3">
+                <h2 className="mb-4 text-2xl font-bold leading-tight">Fund your order</h2>
+                <p className="w-full text-base font-normal leading-6">Send <strong className="buy-funding-highlight font-semibold text-[#B4232D]">{auction.fundingRequired?.toLocaleString('en-US')} Meat</strong> to <strong className="buy-funding-highlight font-semibold text-[#B4232D]">kHub (#3888760)</strong> via KMail. Include the command below in the message body. Attach no items.</p>
+                <CopyMessage text={`FUND ${auction.auctionNumber || auction.id}`} label="funding command" className="mt-4 mb-3 w-full lg:max-w-[60%] [&_code]:text-lg [&_code]:font-medium" />
+                <p className="buy-funding-breakdown flex flex-wrap gap-x-1 gap-y-1 text-sm text-[#526279]">
+                    <span className="whitespace-nowrap">Purchase funds: <strong className="font-semibold text-gray-900">{funding.purchase.toLocaleString('en-US')} Meat</strong></span>
+                    <span className="whitespace-nowrap">· Fee reserve ({effectiveFeePercent(funding.feeReserve, BigInt(funding.purchase))}): <strong className="font-semibold text-gray-900">{funding.feeReserve.toLocaleString('en-US')} Meat</strong></span>
+                </p>
+                <p className="mt-2 flex items-start gap-1.5 text-[13px] leading-5 text-[#64748B]">
+                    <svg aria-hidden="true" className="mt-0.5 shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 7h.01" /></svg>
+                    <span>Deposit within 24 hours. Your auction starts once funding is accepted.</span>
+                </p>
             </section>}
             {(active || reservation) && !owns && <section aria-label="Fulfill buy auction" className={`buy-detail-action rounded-lg bg-[#F0F5FF] ${reservationConfirmed ? 'space-y-2 p-3' : 'space-y-3 p-4'}`}>
                 {!reservationConfirmed && <div className="space-y-1">
@@ -194,7 +204,7 @@ export default function BuyAuctionDetails({ auction, now, backLink }) {
             {notice && <p role="status" className="text-sm text-green-700">{notice}</p>}
 
             {auction.status === 'settling' && <p>The order has closed. Payments, purchased items, and unused funds are being delivered. Settlement completes once all deliveries are confirmed.</p>}
-            {canViewFees && auction.balanceMeat != null && <section aria-label="Your buy escrow" className="text-sm"><p>Remaining escrow: {auction.balanceMeat.toLocaleString('en-US')} Meat · Purchased: {auction.purchaseMeat.toLocaleString('en-US')} Meat · {feeLabel(auction.buyCommissionMeat, auction.purchaseMeat)}: {auction.buyCommissionMeat.toLocaleString('en-US')} Meat · Refund queued/returned: {auction.refundedMeat.toLocaleString('en-US')} Meat</p><p>Purchased items still held before delivery: {auction.heldQuantity.toLocaleString('en-US')}. Queued deliveries are tracked separately.</p></section>}
+            {canViewFees && auction.status !== 'pending_escrow' && auction.balanceMeat != null && <section aria-label="Your buy escrow" className="text-sm"><p>Remaining escrow: {auction.balanceMeat.toLocaleString('en-US')} Meat · Purchased: {auction.purchaseMeat.toLocaleString('en-US')} Meat · {feeLabel(auction.buyCommissionMeat, auction.purchaseMeat)}: {auction.buyCommissionMeat.toLocaleString('en-US')} Meat · Refund queued/returned: {auction.refundedMeat.toLocaleString('en-US')} Meat</p><p>Purchased items still held before delivery: {auction.heldQuantity.toLocaleString('en-US')}. Queued deliveries are tracked separately.</p></section>}
             {canCancel && <button disabled={pending} onClick={cancel} className="button-red rounded border px-4 py-2 disabled:opacity-50">{pending ? 'Canceling…' : 'Cancel remaining order'}</button>}
             {error && <p role="alert" className="text-red-700">{error}</p>}
             {canSendTradeQuery(auction, currentUser) && <p><Link to={`/auction/${auction.id}/trade-query`} className="text-sm text-blue-700 underline">Contact an administrator about this order</Link></p>}

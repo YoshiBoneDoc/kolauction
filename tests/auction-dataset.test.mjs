@@ -10,6 +10,21 @@ const row = i => ({id:`id-${i}`,seller_id:i%2?'viewer':'other',seller_username:'
     market_value_meat:i===40?'210000000':'500',bid_count:i});
 const pageData=(rows,total=rows.length)=>({privacy_version:1,rows,bids:[],total});
 
+test('cached counts and price bounds exclude closed unfunded escrow drafts', async () => {
+    const rows = [
+        { ...row(0), status:'cancelled', escrow_mode:true, item_escrowed_at:null, current_bid:0, bid_count:0, market_value_meat:'9000000000' },
+        { ...row(1), status:'cancelled', escrow_mode:true, item_escrowed_at:'2026-10-27T12:00:00Z', current_bid:0, bid_count:0 },
+        { ...row(2), status:'pending_escrow', escrow_mode:true, item_escrowed_at:null, current_bid:0, bid_count:0 },
+    ];
+    let calls = 0;
+    const service = createAuctionService({ async rpc() { calls++; return { data:pageData(rows) }; } });
+    const data = await service.loadDataset();
+    assert.deepEqual(data.auctions.map(auction => auction.id), ['id-1','id-2']);
+    assert.equal(data.total, 2);
+    assert.equal(data.priceBounds.max, 500);
+    assert.equal(calls, 1);
+});
+
 test('fetches the full authorized dataset sequentially with server market values, without filtered or financial RPCs',async()=>{
     const rows=Array.from({length:51},(_,i)=>row(i)),calls=[];let running=0,max=0;
     const service=createAuctionService({async rpc(name,args){

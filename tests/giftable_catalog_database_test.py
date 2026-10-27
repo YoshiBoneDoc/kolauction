@@ -88,6 +88,19 @@ with tempfile.TemporaryDirectory(prefix='khub-giftable-catalog-',dir='/tmp') as 
                 'meat':meat,'items':[{'id':2,'quantity':quantity}] if quantity else [],
                 'raw':{'id':mid,'fromid':str(actor),'fromname':'Timing fixture','type':'normal','message':kind.upper()+' '+ident,'azunixtime':str(received)}}
         def ingest(m,error=None):return sql('set role service_role;select public.bot_ingest_mail('+lit(json.dumps(m))+');',error=error)
+        parser_root=ROOT/'bot/src' if (ROOT/'bot/src/mail-parser.mjs').exists() else ROOT/'src'
+        parser_script="import {parseKmail} from "+json.dumps((parser_root/'mail-parser.mjs').as_uri())+";import {normalizeMail} from "+json.dumps((parser_root/'protocol.mjs').as_uri())+";let input='';for await(const chunk of process.stdin)input+=chunk;console.log(JSON.stringify(normalizeMail(JSON.parse(input),parseKmail)));"
+        def parsed_collectible(template,item_id,quantity,command=None):
+            # Constructed layout variant using current catalog IDs/images and
+            # KoL table.item/rel acquisition markup, not a claimed raw capture.
+            item=next(item for item in catalog if item['id']==item_id)
+            raw=dict(template['raw'])
+            prefix=raw['message'] if command is None else command
+            raw['message']=prefix+f'''<center><table><tr><td><table class="item" rel="id={item_id}&g=1&t=0&n={quantity}"><tr><td><img src="/itemimages/{item['image']}" title="{item['name']}"></td><td>You acquire {quantity} {item['name']}</td></tr></table></td></tr></table></center>'''
+            result=json.loads(subprocess.run(['node','--input-type=module','-e',parser_script],input=json.dumps(raw),text=True,capture_output=True,check=True).stdout)
+            assert result and result['raw']==raw and result['raw']['type']=='normal'
+            assert 'gift_original' not in result['raw']
+            return result
         def stage(mails):
             scan=json.loads(sql('select public.bot_begin_inbox_scan();'))['id']
             sql(f"select public.bot_stage_inbox_scan('{scan}',"+lit(json.dumps(mails))+');')
@@ -124,8 +137,7 @@ with tempfile.TemporaryDirectory(prefix='khub-giftable-catalog-',dir='/tmp') as 
         # Ordinary KMail is sufficient for gift items. No special-case transport,
         # new wrapping charge, or change to deposit validation is introduced.
         aid=call("select public.create_auction('stuffed Hodgman',2,100,24,null,null,3116,true);",seller)
-        deposit=mail(aid,'list',quantity=2,actor=48889601)
-        deposit['items'][0]['id']=3116
+        deposit=parsed_collectible(mail(aid,'list',actor=48889601),3116,2)
         assert ingest(deposit)=='accepted' and row(aid)['status']=='active'
         bid_mail=mail(aid,'bid',200)
         stage([bid_mail]);assert ingest(bid_mail)=='accepted'
@@ -141,9 +153,7 @@ with tempfile.TemporaryDirectory(prefix='khub-giftable-catalog-',dir='/tmp') as 
         funding=int(sql(f"select funding_required from khub_bot.buy_orders where auction_id='{buy}';"))
         assert ingest(mail(buy,'fund',funding,actor=48889601))=='accepted'
         reservation=json.loads(call(f"select public.reserve_buy_quantity('{buy}',2);"))
-        fill=mail(buy,'fill',quantity=2)
-        fill['items'][0]['id']=1511
-        fill['command']['reservation_id']=reservation['id']
+        fill=parsed_collectible(mail(buy,'fill'),1511,2,f"FILL {buy} {reservation['id']}")
         stage([fill]);assert ingest(fill)=='accepted' and ingest(fill)=='duplicate'
         assert sql(f"select purchased_quantity from khub_bot.buy_orders where auction_id='{buy}';")=='2'
         assert sql(f"select sum(meat) from khub_bot.deliveries where receipt_id='{fill['id']}' and kind='sale_meat';")=='400'
@@ -152,6 +162,13 @@ with tempfile.TemporaryDirectory(prefix='khub-giftable-catalog-',dir='/tmp') as 
         call(f"select public.cancel_auction('{buy}');",seller)
         assert sql(f"select sum(quantity) from khub_bot.deliveries where auction_id='{buy}' and item_id=1511;")=='2'
         print('PASS: Buy reservation and partial fulfillment pay the full seller amount and create one gift-item obligation without duplication')
+
+        blank=parsed_collectible(mail(buy,'unknown'),3116,2,'')
+        assert blank['command']=={'type':'unknown'} and blank['items']==[{'id':3116,'quantity':2}]
+        assert ingest(blank)!='accepted' and ingest(blank)=='duplicate'
+        assert sql(f"select count(*) from khub_bot.deliveries where receipt_id='{blank['id']}' and recipient_id=48889602 and item_id=3116 and quantity=2;")=='1'
+        assert sql(f"select count(*) from khub_bot.closet_transfers where receipt_id='{blank['id']}';")=='0'
+        print('PASS: real JS parsing of ordinary collectible LIST/FILL and blank-note returns preserves numeric recipients, exact assets and once-only accounting without gift-package classification')
 
         # Invalid reference metadata cannot partially replace the good snapshot.
         before=sql('select public.read_item_catalog();')

@@ -46,7 +46,8 @@ with tempfile.TemporaryDirectory(prefix='khub-private-drafts-',dir='/tmp') as fo
         ''')
         migrations=sorted([*ROOT.glob('supabase/migrations/*.sql'),*ROOT.glob('supabase/migrations/queue/*.sql')],key=lambda p:p.name)
         assert len({p.name for p in migrations})==len(migrations)
-        # Historical 085 behavior; reservation/gift upgrades have their own suite.
+        # Seed before 092 to verify that its visibility change preserves records,
+        # then load all later migrations before testing today's read paths.
         for migration in migrations:
             if migration.name<'202610230092_': sql(migration.read_text())
         catalog_path=ROOT/'src/data/items.json'
@@ -124,7 +125,14 @@ with tempfile.TemporaryDirectory(prefix='khub-private-drafts-',dir='/tmp') as fo
         hidden += [seed() for _ in range(30)]
         fresh=seed('pending_escrow')
         def whole():return sql("select jsonb_build_object('auctions',(select jsonb_agg(to_jsonb(a) order by id) from public.auctions a),'orders',(select jsonb_agg(to_jsonb(o) order by auction_id) from khub_bot.buy_orders o),'deliveries',(select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d),'receipts',(select jsonb_agg(to_jsonb(r) order by mail_id) from khub_bot.receipts r));")
-        before=whole();sql(next(p for p in migrations if p.name.startswith('202610230092_')).read_text());assert whole()==before
+        visibility_migration=next(p for p in migrations if p.name.startswith('202610230092_'))
+        before=whole();sql(visibility_migration.read_text());assert whole()==before
+        for migration in migrations:
+            if migration.name>visibility_migration.name:sql(migration.read_text())
+        manual=seed('pending_escrow')
+        call(f"select public.cancel_auction('{manual}');")
+        assert auction(manual)['status']=='cancelled'
+        hidden.append(manual)
         def read(view='browse',ident=None,uid=None,page=1,extra='',status='all'):
             role='authenticated' if uid else 'anon';arg=lit(ident)+'::uuid' if ident else 'null'
             return json.loads(sql(f"set role {role};select public.read_auction_page('{view}',{arg},'','{status}','newest',{page}{extra});",uid))
@@ -142,6 +150,11 @@ with tempfile.TemporaryDirectory(prefix='khub-private-drafts-',dir='/tmp') as fo
             assert {r['id'] for r in first['rows']+second['rows']}==set(visible)
             profile=read('seller',buyer,extra=extra)
             assert profile['seller']['stats']['cancelled']==len(visible),profile
+        for uid in [None,buyer,admin]:
+            role='authenticated' if uid else 'anon'
+            result=json.loads(sql(f"set role {role};select public.read_filtered_auction_page('browse',null,'','cancelled','newest',1,'all','all',null,null);",uid))
+            assert result['total']==len(visible)
+            assert not set(hidden)&{r['id'] for r in result['rows']}
         assert fresh in {r['id'] for r in read('profile',uid=buyer)['rows']}
         for ident in hidden:assert auction(ident)['id']==ident
         # A user's public seller page should not reveal that hidden drafts exist.

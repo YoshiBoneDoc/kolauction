@@ -344,6 +344,8 @@ html[data-theme="dark"] [class~="hover:bg-yellow-900"]:hover { background-color:
 html[data-theme="dark"] .buy-auction-detail { background-color: var(--theme-panel); border-color: var(--theme-border); }
 html[data-theme="dark"] .buy-auction-detail :is(header, details, li) { border-color: var(--theme-border); }
 html[data-theme="dark"] .buy-detail-action { background-color: #172e4d; }
+html[data-theme="dark"] .buy-funding-breakdown { color: #9FAEC2; }
+html[data-theme="dark"] .buy-funding-highlight { color: #FB7185; }
 html[data-theme="dark"] :is(.buy-detail-title, .buy-detail-price) { color: var(--theme-text); }
 html[data-theme="dark"] .buy-auction-detail [class~="text-[#64748B]"] { color: var(--theme-muted); }
 html[data-theme="dark"] .buy-detail-active-badge { color: #fbbf24; background-color: #372d17; }

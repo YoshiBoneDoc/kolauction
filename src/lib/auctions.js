@@ -1,6 +1,7 @@
 import { parsePrice, auctionPriceBounds } from './auctionPriceRange.js';
 import { resolveAuctionSort, highRollerValue, HIGH_ROLLER_MIN_PRICE } from './auctionBrowsing.js';
 import { observeAuctionServerTime, auctionClockRequestStarted } from './auctionClock.js';
+import { isAbandonedEscrowDraft } from './auctionLifecycle.js';
 export function mapAuction(row, bidRows) {
     const bids = bidRows.filter((bid) => bid.auction_id === row.id)
         .sort((a, b) => Number(a.amount) - Number(b.amount))
@@ -149,7 +150,8 @@ export function createAuctionService(client) {
                     if (page * 24 >= expected) {
                         if (rows.size !== expected) { changed = true; break; }
                         const bidRows = [...bids.values()];
-                        const auctions = [...rows.values()].map(row => mapAuction(row, bidRows));
+                        const auctions = [...rows.values()].map(row => mapAuction(row, bidRows))
+                            .filter(auction => !isAbandonedEscrowDraft(auction));
                         return { auctions, total: auctions.length, priceBounds: auctionPriceBounds(auctions) };
                     }
                     if (!data.rows.length) { changed = true; break; }

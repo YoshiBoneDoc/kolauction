@@ -1,6 +1,6 @@
 export { auctionPrice } from './auctionPriceRange.js';
 import { auctionPrice, auctionFilterPrice } from './auctionPriceRange.js';
-import { getAuctionStatus } from './auctionLifecycle.js';
+import { getAuctionStatus, isAbandonedEscrowDraft } from './auctionLifecycle.js';
 
 export const auctionFilters = [
     ['active', 'Active'],
@@ -35,6 +35,7 @@ export function auctionEndTime(auction) {
 export function browseAuctions(auctions, { search = '', status = 'active', sort = resolveAuctionSort(status), trade = 'all', kind = 'all', minPrice = null, maxPrice = null, now = Date.now() } = {}) {
     const query = search.trim().toLocaleLowerCase();
     return auctions.filter((auction) => {
+        if (isAbandonedEscrowDraft(auction)) return false;
         const lifecycle = getAuctionStatus(auction, now);
         const matchesStatus = status === 'all'
             || (status === 'ended' ? !['active', 'finalizing', 'pending_escrow', 'on_hold', 'bidding_closed'].includes(lifecycle)

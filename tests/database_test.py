@@ -2700,7 +2700,9 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
                 identity_data jsonb not null,provider text not null,created_at timestamptz,updated_at timestamptz,unique(provider_id,provider));
         ''')
         sql("insert into khub_bot.catalog(id,name) values(364,'asbestos ore'),(2,'seal tooth'),(3,'helmet turtle'),(10,'disco ball'),(8684,'Cold Fang') on conflict(id) do update set name=excluded.name;")
-        seed_sql=(ROOT/'supabase/testing/seed_test_accounts.sql').read_text()
+        seed_path=ROOT/'supabase/testing/seed_test_accounts.sql'
+        if not seed_path.exists(): seed_path=ROOT/'tests/fixtures/seed_test_accounts.sql'
+        seed_sql=seed_path.read_text()
         original_financial=sql("select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d where kind<>'notice';")
         deliveries_before=set(json.loads(sql('select coalesce(jsonb_agg(id),\'[]\') from khub_bot.deliveries;')))
         sql(seed_sql)
@@ -2893,7 +2895,10 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         for role in ['anon','authenticated']:
             sql("select public.bot_replace_item_catalog('[]',now(),repeat('a',64));",competitor if role=='authenticated' else None,role,error='permission denied')
             sql('select public.bot_item_catalog_state();',competitor if role=='authenticated' else None,role,error='permission denied')
-        source_items=json.loads((ROOT/'src/data/items.json').read_text())
+        catalog_path=ROOT/'src/data/items.json'
+        if not catalog_path.exists(): catalog_path=ROOT/'catalog/items.json'
+        source_items=[item for item in json.loads(catalog_path.read_text())
+            if (item['tradeable'] or item.get('giftable')) and not item.get('is_gift_package')]
         complete_catalog=source_items+[
             {'id':26,'name':"Dolphin King map fixture",'image':'map.gif','tradeable':False},
             {'id':43,'name':'worthless trinket','image':'trinket.gif','tradeable':False},
@@ -2911,7 +2916,10 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         catalog_import()
         assert sql("select md5((select jsonb_agg(to_jsonb(a) order by id)::text from public.auctions a)||coalesce((select jsonb_agg(to_jsonb(d) order by id)::text from khub_bot.deliveries d),''));")==catalog_business_fingerprint
         listed=json.loads(sql('select public.read_item_catalog();',role='anon'))
-        assert listed['ready'] and len(listed['items'])==len(source_items)
+        # This stage tests migration 052, before gift eligibility (118).
+        # Today's fallback catalog also contains gift-only rows; 052 must still
+        # expose exactly its tradeable subset, rather than every source row.
+        assert listed['ready'] and len(listed['items'])==sum(item['tradeable'] for item in source_items)
         assert all(item['tradeable'] for item in listed['items'])
         assert not any(item['id'] in (26,43,2000000000) for item in listed['items'])
         assert next(item for item in listed['items'] if item['id']==6618)['image']=='otherimages/folders/folder01.gif'

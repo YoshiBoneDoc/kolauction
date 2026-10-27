@@ -16,6 +16,25 @@ const listings = [
 ];
 const ids = (values) => values.map((value) => value.id);
 
+test('closed unfunded escrow drafts do not become cancelled, expired or ended auction cards', () => {
+    const draft = { ...base, escrowMode: true, itemEscrowedAt: null, currentBid: 0, bids: [] };
+    const rows = [
+        { ...draft, id: 'cancelled-draft', status: 'cancelled', closureReason: 'seller_cancelled' },
+        { ...draft, id: 'expired-draft', status: 'expired', closureReason: 'deposit_expired' },
+        { ...draft, id: 'legacy-draft', status: 'cancelled' },
+        { ...draft, id: 'unfunded-buy', auctionKind: 'buy', status: 'cancelled' },
+        { ...draft, id: 'awaiting-deposit', status: 'pending_escrow' },
+        { ...draft, id: 'funded-sell', status: 'cancelled', itemEscrowedAt: '2026-10-27T12:00:00Z' },
+        { ...draft, id: 'funded-buy', auctionKind: 'buy', status: 'cancelled', itemEscrowedAt: '2026-10-27T12:00:00Z' },
+        { ...draft, id: 'direct', status: 'cancelled', escrowMode: false },
+        { ...draft, id: 'historical-bid', status: 'cancelled', bidCount: 1 },
+    ];
+    assert.deepEqual(ids(browseAuctions(rows, { status: 'cancelled', now })).sort(), ['direct', 'funded-buy', 'funded-sell', 'historical-bid']);
+    assert.deepEqual(ids(browseAuctions(rows, { status: 'expired', now })), []);
+    assert.equal(browseAuctions(rows, { status: 'all', now }).length, 5);
+    assert.equal(browseAuctions(rows, { status: 'ended', now }).length, 4);
+});
+
 test('Explore selects a unique item after ranking the full pool for each tab, without affecting All Auctions', () => {
     const pool = [
         { ...base, id: 'popular', itemId: 1, bidCount: 9, createdAt: 100, endTime: 19000 },

@@ -114,11 +114,13 @@ with tempfile.TemporaryDirectory(prefix='khub-custom-ending-',dir='/tmp') as fol
             sql(f"set role authenticated;select public.create_auction('seal tooth',1,100,24,null,null,2,true,{lit(deadline)}::timestamptz);",seller,error='Choose an ending time')
         sql("set role authenticated;select public.create_auction('seal tooth',1,100,24,null,null,2,true,null::timestamptz);",seller,error='Choose an ending time')
         sql(f"set role anon;select public.create_auction('seal tooth',1,100,24,null,null,2,false,{lit(ending)}::timestamptz);",error='permission denied')
-        sql(f"set role authenticated;select public.create_auction('seal tooth',1,1000001,24,null,null,2,true,{lit(ending)}::timestamptz);",seller,error='Escrow is limited')
+        # The later escrow-cap removal applies to custom deadlines too.
+        uncapped=sql(f"set role authenticated;select public.create_auction('seal tooth',1,1000001,24,null,null,2,true,{lit(ending)}::timestamptz);",seller)
+        assert row(uncapped)['min_bid_meat']==1000001
         sql(f"set role authenticated;select public.create_auction('seal tooth',1,100,24,null,null,43,false,{lit(ending)}::timestamptz);",seller,error='current catalog item')
-        sql(f"set role authenticated;select public.create_auction('Untradeable fixture 0',1,100,24,null,null,1900000,false,{lit(ending)}::timestamptz);",seller,error='Only tradeable items')
+        sql(f"set role authenticated;select public.create_auction('Untradeable fixture 0',1,100,24,null,null,1900000,false,{lit(ending)}::timestamptz);",seller,error='tradeable or giftable')
         sql("insert into khub_bot.account_bans(kol_player_id,username,reason) values(48889801,'Schedule Seller','Fixture ban');")
         sql(f"set role authenticated;select public.create_auction('seal tooth',1,100,24,null,null,2,false,{lit(ending)}::timestamptz);",seller,error='restricted')
-        print('PASS: server-side bounds, null/infinite/past timestamps, guest/ban protections, current-catalog checks and escrow limits')
+        print('PASS: server-side bounds, null/infinite/past timestamps, guest/ban protections, current-catalog checks and uncapped escrow creation')
     finally:
         if started: pg('-m','fast','-w','stop')
