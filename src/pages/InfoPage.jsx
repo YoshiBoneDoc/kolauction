@@ -29,7 +29,7 @@ const auctionTypeComparison = [
     },
     {
         heading: 'PROTECTION',
-        escrow: 'Items and leading bid Meat are secured by the bot. Verified losses caused by errors in kHub’s automated escrow system are fully reimbursed, without a cap. Malicious exploits and external interference are excluded.',
+        escrow: <>Items and leading bid Meat are secured by the bot. Verified losses caused by errors in kHub’s automated escrow system are <Link to="/auction-item#escrow-protection" className="text-blue-700 underline">fully reimbursed, without a cap</Link>. Malicious exploits and external interference are excluded.</>,
         direct: 'Players trade at their own risk. kHub cannot guarantee payment or delivery.',
     },
 ];
@@ -78,7 +78,6 @@ const InfoPage = () => {
                 <p id="gift-packages" className="mb-6 scroll-mt-4">
                     <strong>Gift packages:</strong> Packages sent without a valid auction command are treated as <Link to="/donate" className="text-blue-600 hover:underline">donations</Link>. To place a bid or deposit items using a gift package, include the exact command provided on the auction page in the package’s outside message.
                 </p>
-
 
                 <h2 className={`${sectionHeadingClass} mb-2`}>
                     Creating an Auction

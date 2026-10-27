@@ -3,7 +3,7 @@ import { escrowFee } from '../lib/escrowFees';
 import { buyFunding } from '../lib/buyOrders';
 import TradeTypeBadge from '../components/TradeTypeBadge';
 import { useState, useContext, useDeferredValue, useEffect, useMemo, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AuctionsContext } from '../context/AuctionsContext';
 import { UserContext } from '../context/UserContext';
 import items from '../data/items.json';
@@ -25,6 +25,7 @@ export default function AuctionAnItem() {
     const { currentUser } = useContext(UserContext);
     const kolIdentity = useKolIdentity();
     const navigate = useNavigate();
+    const { hash } = useLocation();
     const [catalogItems, setCatalogItems] = useState(items);
     useEffect(() => {
         let active = true;
@@ -55,6 +56,26 @@ export default function AuctionAnItem() {
     const previewHeading = useRef(null);
     const publishDialog = useRef(null);
     const submitting = useRef(false);
+    const protectionSection = useRef(null);
+    const protectionLinkHandled = useRef(null);
+    const protectionLink = hash === '#escrow-protection';
+    useEffect(() => {
+        if (!protectionLink) { protectionLinkHandled.current = null; return; }
+        const viewer = currentUser?.id || 'guest';
+        if (protectionLinkHandled.current === viewer) return;
+        if (isBuy || !escrowMode || preview) {
+            setAuctionKind('sell');
+            setEscrowMode(true);
+            setPreview(null);
+            return;
+        }
+        const section = protectionSection.current;
+        if (!section) return;
+        const details = section.querySelector('details');
+        if (details) details.open = true;
+        section.scrollIntoView({ block: 'start' });
+        protectionLinkHandled.current = viewer;
+    }, [protectionLink, isBuy, escrowMode, preview, currentUser?.id]);
     const deferredSearch = useDeferredValue(itemSearch);
     const hasItemSearch = Boolean(itemSearch.trim());
     const matchingItems = useMemo(() => {
@@ -121,6 +142,9 @@ export default function AuctionAnItem() {
                 <h1 className="text-2xl font-bold text-red-700">You must be logged in to create an auction.</h1>
                 <Link to="/login" className="inline-flex min-h-11 items-center text-lg text-blue-700 underline">Log In</Link>
                 <p>Don’t have an account? <Link to="/register" className="text-blue-700 underline">Register</Link></p>
+                {protectionLink && <section id="escrow-protection" ref={protectionSection} className="scroll-mt-4 text-left">
+                    <EscrowProtection />
+                </section>}
             </div>
         </main>
     );
@@ -205,7 +229,7 @@ export default function AuctionAnItem() {
                         </div>
                         {isBuy && <p className="mt-2 text-xs text-gray-600">For now, creating a Buy auction is limited to Escrow</p>}
                     </fieldset>
-                    <div className="mb-5">
+                    <div id="escrow-protection" ref={protectionSection} className="mb-5 scroll-mt-4">
                         {escrowMode ? <EscrowProtection forListing buy={isBuy} minimumPrice={minimumValue} /> : <DirectTradeHelp forListing />}
                         {escrowMode && !isBuy && <p className="my-4 rounded-[6px] border-l-[3px] border-[#22C55E] bg-[#F0FDF4] px-4 py-3 text-xs leading-[1.4] text-[#334155]"><strong className="font-bold text-[#15803D]">Escrow Protection Guarantee:</strong> In the unlikely event of a verified loss caused by an error in kHub’s automated escrow system, we guarantee full reimbursement without a cap. Losses resulting from malicious exploits, fraudulent activity, or circumstances outside kHub’s reasonable control are excluded.</p>}
                         {!escrowMode && <p className="mt-2 text-xs leading-[1.4] text-red-600">Failure to honor a valid, completed auction is a violation of kHub policy and will likely get you banned. We take these very seriously.</p>}

@@ -59,6 +59,20 @@ test('listing form defaults to escrow and offers direct settlement before publis
     assert.doesNotMatch(html, /listing-amount-help|Use whole numbers or k\/m\/b shorthand/);
 });
 
+test('guarantee links point to the full creation-page explanation, available to guests', () => {
+    const updates = render({ path: '/update-log', user: null });
+    assert.match(updates, /href="\/auction-item#escrow-protection"[^>]*>View the updated policy ↗<\/a>/);
+    const info = render({ path: '/info', user: null });
+    assert.match(info, /href="\/auction-item#escrow-protection"[^>]*>fully reimbursed, without a cap<\/a>/);
+    assert.doesNotMatch(info, /id="escrow-protection-guarantee"/);
+    const guide = render({ path: '/auction-item#escrow-protection', user: null });
+    assert.match(guide, /id="escrow-protection"/);
+    assert.match(guide, /Escrow Protection — How It Works/);
+    assert.match(guide, /full reimbursement without a cap/);
+    assert.match(guide, /malicious exploits, fraudulent activity, or circumstances outside kHub’s reasonable control are excluded/);
+    assert.doesNotMatch(guide, /<form/);
+});
+
 test('personal trade cards appear above auctions on home and browse, including all pages', () => {
     for (const path of ['/', '/auctions']) {
         const html = render({path,pendingTrades:[auction],pendingTotal:15});

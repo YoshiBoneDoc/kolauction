@@ -27,7 +27,7 @@ const hooks = { ...React, useState: slot, useRef: value => slot({ current: value
 const compiled = { exports: {} };
 const requireModule = createRequire(import.meta.url);
 new Function('require', 'module', 'exports', outputFiles[0].text)(name => name === 'react' ? hooks
-    : name === 'react-router-dom' ? { ...router, useNavigate: () => active.navigate } : requireModule(name), compiled, compiled.exports);
+    : name === 'react-router-dom' ? { ...router, useNavigate: () => active.navigate, useLocation: () => ({ hash: '' }) } : requireModule(name), compiled, compiled.exports);
 const { AuctionAnItem, UserContext, AuctionsContext } = compiled.exports;
 function nodes(element) {
     if (!element || typeof element !== 'object') return [];
