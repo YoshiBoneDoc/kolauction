@@ -14,6 +14,7 @@ export const auctionStatusLabels = {
 };
 
 export function auctionCardBackground(status) {
+    if (status === 'pending_escrow') return 'bg-[#FFF0CC]';
     if (status === 'completed') return 'bg-green-50';
     if (['cancelled', 'voided'].includes(status)) return 'bg-[#ECEDEF]';
     if (['awaiting_trade', 'settling'].includes(status)) return 'bg-yellow-50';

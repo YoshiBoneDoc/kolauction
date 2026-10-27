@@ -45,7 +45,7 @@ html:not([data-theme="dark"]) .auction-card[class~="bg-[#F8F6F4]"] { background-
 html:not([data-theme="dark"]) .auction-card[class~="bg-green-50"] { background-color: var(--light-completed); }
 
 html:not([data-theme="dark"]) .bid-kmail-instructions { background-color: var(--light-input); }
-html:not([data-theme="dark"]) .bid-kmail-instructions .copy-message-field { background-color: #FFFFFF; }
+html:not([data-theme="dark"]) .copy-message-field { background-color: var(--light-input); }
 
 /* Tables use solid surfaces, including tables without explicit color classes. */
 html:not([data-theme="dark"]) table { background-color: var(--light-surface); }
@@ -112,6 +112,7 @@ html[data-theme="dark"] [class~="bg-[#F1F3F6]"] { background-color: var(--theme-
 html[data-theme="dark"] [class~="bg-white"],
 html[data-theme="dark"] [class~="bg-white/70"],
 html[data-theme="dark"] [class~="bg-[#F8F6F4]"],
+html[data-theme="dark"] [class~="bg-[#FFF0CC]"],
 html[data-theme="dark"] [class~="bg-gray-50"],
 html[data-theme="dark"] [class~="bg-gray-50/50"] { background-color: var(--theme-panel); }
 
