@@ -1,7 +1,9 @@
 {
   "source": "https://raw.githubusercontent.com/kolmafia/kolmafia/main/src/main/resources/data/items.txt",
-  "fetched_at": "2026-10-21T15:25:37.164Z",
+  "fetched_at": "2026-10-27T06:06:55.750Z",
   "sha256": "1c4bfef2b6e2d3e057b767f8d408dec6e846bed09e14c3f61bd0a78523e36f35",
   "known_items": 12098,
-  "tradeable_items": 8535
+  "tradeable_items": 8535,
+  "gift_only_items": 212,
+  "auctionable_items": 8747
 }

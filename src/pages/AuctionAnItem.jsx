@@ -8,7 +8,7 @@ import { AuctionsContext } from '../context/AuctionsContext';
 import { UserContext } from '../context/UserContext';
 import items from '../data/items.json';
 import { supabase } from '../lib/supabase';
-import { createItemCatalogService, itemImageUrl } from '../lib/itemCatalog';
+import { createItemCatalogService, itemImageUrl, isAuctionableItem } from '../lib/itemCatalog';
 import { parseAuctionAmount, parseMeatAmount, normalizeAuctionAmount } from '../lib/auctionInputs';
 import useKolIdentity from '../hooks/useKolIdentity';
 import EscrowProtection from '../components/EscrowProtection';
@@ -31,7 +31,7 @@ export default function AuctionAnItem() {
         catalog.load().then(updated => { if (active) setCatalogItems(updated); });
         return () => { active = false; };
     }, []);
-    const sortedItems = useMemo(() => catalogItems.filter(item => item.tradeable === true)
+    const sortedItems = useMemo(() => catalogItems.filter(isAuctionableItem)
         .sort((a, b) => a.name.localeCompare(b.name))
         .map(item => ({ ...item, searchName: item.name.toLocaleLowerCase() })), [catalogItems]);
     const [itemSearch, setItemSearch] = useState('');
@@ -76,7 +76,7 @@ export default function AuctionAnItem() {
 
     function showPreview(event) {
         event.preventDefault();
-        const item = catalogItems.find(entry => String(entry.id) === selectedItem && entry.tradeable === true);
+        const item = catalogItems.find(entry => String(entry.id) === selectedItem && isAuctionableItem(entry));
         const count = parseAuctionAmount(quantity, 5000000000);
         const minimum = parseMeatAmount(minBidMeat);
         const purchasePrice = !isBuy && instantPrice.trim() ? parseMeatAmount(instantPrice) : null;
@@ -217,7 +217,7 @@ export default function AuctionAnItem() {
                     <select id="item" required value={selectedItem} onChange={(event) => setSelectedItem(event.target.value)} aria-describedby="listing-search-help" className={fieldClass}>
                         <option value="" disabled>Select an item</option>
                         {selectedItem && !searchResults.some(item => String(item.id) === selectedItem)
-                            && catalogItems.some(item => String(item.id) === selectedItem && item.tradeable === true)
+                            && catalogItems.some(item => String(item.id) === selectedItem && isAuctionableItem(item))
                             && <option value={selectedItem}>{catalogItems.find(item => String(item.id) === selectedItem).name}</option>}
                         {searchResults.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
                     </select>
