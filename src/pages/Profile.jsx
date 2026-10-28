@@ -172,14 +172,14 @@ const Profile = () => {
             <div className="mx-auto max-w-7xl space-y-4">
                 <h1 className="text-center text-5xl font-bold text-blue-700">Account Profile</h1>
                 <header className="rounded-xl border border-gray-200 bg-white px-5 py-2 shadow-sm sm:px-6">
-                    <nav aria-label="Profile links" className="flex min-h-11 flex-wrap items-center justify-center gap-x-6 gap-y-1 text-sm">
-                        <Link to="/change-password" className="text-blue-700 underline">Change password</Link>
-                        {selling.some(auction => auction.status !== 'pending_escrow') && <Link to={`/seller/${currentUser.id}`} className="text-blue-700 underline">Public seller profile</Link>}
-                    </nav>
-                    <div className="mt-0.5 text-left">
-                        <p className="mb-0.5 text-xs font-semibold uppercase leading-4 tracking-wider text-gray-500">Account overview</p>
-                        <p className="border-t border-gray-200 pt-1.5 text-2xl font-bold leading-tight text-blue-700">{currentUser.khubUsername}</p>
+                    <div className="grid grid-cols-1 gap-y-2 border-b border-gray-200 pb-1.5 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-end">
+                        <p className="order-2 text-xs font-semibold uppercase leading-4 tracking-wider text-gray-500 sm:order-none">Account overview</p>
+                        <nav aria-label="Profile links" className="order-1 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm leading-4 sm:order-none">
+                            <Link to="/change-password" className="text-blue-700 underline">Change password</Link>
+                            {selling.some(auction => auction.status !== 'pending_escrow') && <><span aria-hidden="true" className="text-xl leading-4 text-black">·</span><Link to={`/seller/${currentUser.id}`} className="text-blue-700 underline">Public seller profile</Link></>}
+                        </nav>
                     </div>
+                    <p className="pt-1.5 text-left text-2xl font-bold leading-tight text-blue-700">{currentUser.khubUsername}</p>
                 </header>
 
                 <div className="profile-dashboard space-y-[18px]">
