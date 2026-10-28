@@ -1,5 +1,5 @@
 import { useContext } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { AuctionsContext } from '../context/AuctionsContext';
 import { UserContext } from '../context/UserContext';
 import PublicProfileAuctionCard from '../components/PublicProfileAuctionCard';
@@ -13,6 +13,8 @@ const number = value => BigInt(value ?? 0).toLocaleString('en-US');
 export default function SellerProfile() {
     const { currentUser } = useContext(UserContext);
     const { seller, auctions, total, isLoading, error, refreshAuctions } = useContext(AuctionsContext);
+    const { id: sellerId } = useParams();
+    const isOwnProfile = Boolean(currentUser?.id && currentUser.id === sellerId);
     const [params, setParams] = useSearchParams();
     const [search, setSearch] = useAuctionSearch();
     const now = useNow();
@@ -46,7 +48,7 @@ export default function SellerProfile() {
             <div className="public-profile-container mx-auto">
                 <header className={`public-profile-header ${detailed ? 'is-detailed' : ''}`}>
                     <div className="public-profile-header-content">
-                        <Link to="/auctions" className="public-profile-back">← Back to Auctions</Link>
+                        <Link to={isOwnProfile ? '/profile' : '/auctions'} className="public-profile-back">← Back to {isOwnProfile ? 'Account Profile' : 'Auctions'}</Link>
                         <h1 className="public-profile-player-name">{currentUser && !currentUser.isBanned && seller.usernames_visible !== false ? seller.username : 'Player profile'}</h1>
                         {(!currentUser || currentUser.isBanned || seller.usernames_visible === false) && <p className="public-profile-login-note text-sm text-gray-600">Log in with an unrestricted account to see usernames.</p>}
                         <nav aria-label="Seller profile views" className="public-profile-tabs">

@@ -13,7 +13,7 @@ ROOT=Path(__file__).resolve().parents[1]
 BIN=Path(subprocess.check_output(['pg_config','--bindir'],text=True).strip())
 with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') as folder:
     data=Path(folder)/'data'
-    subprocess.run([str(BIN/'initdb'),'-D',str(data),'-A','trust','--no-locale'],check=True,capture_output=True)
+    subprocess.run([str(BIN/'initdb'),'-D',str(data),'-A','trust','--no-locale','--encoding=UTF8'],check=True,capture_output=True)
     def pg(*args):
         return subprocess.run([str(BIN/'pg_ctl'),'-D',str(data),*args],check=True,capture_output=True)
     started=False
@@ -32,6 +32,11 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
             return r.stdout.strip()
         def lit(value): return "'"+value.replace("'","''")+"'"
         sql('''create role anon;create role authenticated;create role service_role bypassrls;
+            create schema storage;
+            create table storage.buckets(id text primary key,public boolean);
+            insert into storage.buckets values('creator-photos',false);
+            create table storage.objects(bucket_id text,name text);
+            alter table storage.objects enable row level security;
             create schema auth;
             create table auth.users(id uuid primary key,instance_id uuid,aud text,role text,email text unique,encrypted_password text,
                 email_confirmed_at timestamptz,raw_app_meta_data jsonb default '{}',raw_user_meta_data jsonb default '{}',
@@ -77,14 +82,15 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         def create(escrow=True,buyout='null',items=None):
             return call('select public.create_bundle_auction('+lit(json.dumps(parts if items is None else items))+f",100,24,{buyout},{str(escrow).lower()});")
         ids=iter(range(98100,99000))
-        def ingest(aid,kind,meat=0,items=None,actor=48889601):
+        def ingest(aid,kind,meat=0,items=None,actor=48889601,reservation=None):
             mid=str(next(ids))
             epoch=sql('select floor(extract(epoch from clock_timestamp()))::bigint;')
             received=sql(f'select to_timestamp({epoch});')
             payload={'id':mid,'sender_id':actor,'sender_name':'Bundle fixture','received_at':received,
                 'command':{'type':kind,'auction_id':aid},'meat':meat,'items':items or [],
                 'raw':{'id':mid,'fromid':str(actor),'fromname':'Bundle fixture','type':'normal','message':kind.upper()+' '+aid,'azunixtime':epoch}}
-            if kind in ('bid','buy'):
+            if reservation: payload['command']['reservation_id']=reservation
+            if kind in ('bid','buy','fill'):
                 scan=json.loads(sql('select public.bot_begin_inbox_scan();'))['id']
                 sql(f"select public.bot_stage_inbox_scan('{scan}',"+lit(json.dumps([payload]))+');')
             query='set role service_role;select public.bot_ingest_mail('+lit(json.dumps(payload))+');'
@@ -100,7 +106,15 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         call('select public.create_bundle_auction('+lit(json.dumps([{'id':1900000,'quantity':1},parts[1]]))+',100,24);',error='catalog')
         sql('set role anon;select public.create_bundle_auction('+lit(json.dumps(parts))+',100,24);',error='permission denied')
         print('PASS: invalid, duplicate, ineligible, out-of-range and anonymous bundles rejected')
-        lot=create(buyout='5000');assert row(lot)['status']=='pending_escrow'
+        for title in ['x'*101, 'bad\nname', '<b>name</b>', 'bad\u202ename']:
+            call('select public.create_bundle_auction('+lit(json.dumps(parts))+',100,24,p_title=>'+lit(title)+');',error='Bundle title')
+        lot=call('select public.create_bundle_auction('+lit(json.dumps(parts))+",100,24,5000,p_title=>'  Friends & Collectibles  ',p_image_item_id=>364);")
+        assert row(lot)['item']=='Bundle: Friends & Collectibles'
+        assert row(lot)['status']=='pending_escrow'
+        sql(f"update public.auctions set item='changed' where id='{lot}';",error='cannot change')
+        assert row(lot)['image']==row(lot)['bundle_items'][1]['image']
+        call('select public.create_bundle_auction('+lit(json.dumps(parts))+',100,24,p_image_item_id=>1);',error='cover image')
+        print('PASS: optional title validated, trimmed and immutable; cover must be a real component')
         frozen=row(lot)['bundle_items'];assert len(frozen)==2 and row(lot)['quantity']==1
         for wrong,meat,actor in [([{'id':2,'quantity':1}],0,48889601),([parts[0]],0,48889601),([*parts,{'id':1,'quantity':1}],0,48889601),(parts,1,48889601),(parts,0,48889602)]:
             mid,result,_=ingest(lot,'list',meat,wrong,actor)
@@ -188,5 +202,40 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         assert sql(f"select count(*) from khub_bot.deliveries where auction_id='{large}' and kind='return_item' and item_id=2;")=='5'
         assert sql(f"select max(quantity) from khub_bot.deliveries where auction_id='{large}' and kind='return_item';")=='1000000000'
         print('PASS: bundle statistics count actual units; 5-billion component splits into exact safe delivery chunks')
+        # New read-only sort applies before pagination, with explicit sorts retained.
+        sort_lots=[]
+        for index,hours in enumerate([48,20,72,1]):
+            aid=call('select public.create_bundle_auction('+lit(json.dumps(parts))+f",100,24,p_escrow_mode=>false,p_title=>'Sort fixture {index}');")
+            sql(f"update public.auctions set end_time=clock_timestamp()+interval '{hours} hours',created_at=clock_timestamp()-interval '{4-index} hours' where id='{aid}';")
+            sort_lots.append(aid)
+        result=json.loads(call("select public.read_filtered_auction_page('browse',null,'Sort fixture','active','recommended',1,'all','all',null,null);",buyer))
+        assert [r['id'] for r in result['rows']]==[sort_lots[3],sort_lots[1],sort_lots[2],sort_lots[0]]
+        result=json.loads(call("select public.read_filtered_auction_page('browse',null,'Sort fixture','active','newest',1,'all','all',null,null);",buyer))
+        assert [r['id'] for r in result['rows']]==list(reversed(sort_lots))
+        print('PASS: urgent auctions first, then newest; explicit newest sorting unchanged')
+        order=call("select public.create_buy_auction(2,10,200,24,'finished');")
+        required=int(sql(f"select funding_required from khub_bot.buy_orders where auction_id='{order}';"))
+        assert ingest(order,'fund',required)[1]=='accepted'
+        reservation=json.loads(call(f"select public.reserve_buy_quantity('{order}',2);",buyer))
+        mid,result,_=ingest(order,'fill',items=[{'id':2,'quantity':2}],actor=48889602,reservation=reservation['id'])
+        assert result=='accepted',result
+        stats=json.loads(sql(f"select khub_bot.buy_profile_totals('{seller}');"))
+        assert stats['buy_orders_created']=='1' and stats['buy_orders_bought_units']=='0'
+        sql(f"update khub_bot.deliveries set state='sent',sent_at=clock_timestamp() where receipt_id='{mid}' and dedupe_key like 'buy-fill-payment:%';")
+        stats=json.loads(sql(f"select khub_bot.buy_profile_totals('{seller}');"))
+        assert stats['buy_orders_bought_units']=='2'
+        assert int(stats['buy_orders_spent'])==int(sql(f"select payment_meat+commission_meat from khub_bot.buy_fulfillments where receipt_id='{mid}';"))
+        stats=json.loads(sql(f"select khub_bot.buy_profile_totals('{buyer}');"))
+        assert stats['buy_order_sales']=='1' and stats['buy_order_units']=='2' and stats['buy_orders_created']=='0'
+        print('PASS: created/fulfilled Buy order stats distinguish players and exclude unpaid fulfillments')
+        mid,result,replay=ingest(gift_lot,'bid',0,actor=48889602)
+        assert result=='bid_help',result
+        reply=sql(f"select coalesce(d.display_message,khub_bot.friendly_message(d)) from khub_bot.deliveries d where receipt_id='{mid}';")
+        assert 'No attached Meat or items were detected.' in reply and 'Your request was not accepted.' in reply
+        before=sql(f"select count(*) from khub_bot.deliveries where receipt_id='{mid}';")
+        sql(replay)
+        assert sql(f"select count(*) from khub_bot.deliveries where receipt_id='{mid}';")==before
+        assert sql(f"select count(*) from public.bids where auction_id='{gift_lot}';")=='0'
+        print('PASS: no-attachment bids receive the existing concise reply once; never become funded bids')
     finally:
         if started:pg('-m','immediate','stop')

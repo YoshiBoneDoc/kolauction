@@ -59,6 +59,6 @@ export default function AdminBanner() {
             <p className="text-sm text-gray-600">Everyone can see the banner and dismiss it with ×. Changing a published message or publishing it again shows it to everyone again.</p>
             {currentUser ? <BannerManager key={currentUser.id} /> : <p><Link to="/login" className="text-blue-700 underline">Log in</Link> with your administrator account to manage announcements.</p>}
         </main>
-        <SiteFooter showReportLink={false} />
+        <SiteFooter />
     </div>;
 }

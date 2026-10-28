@@ -173,7 +173,7 @@ test('closed auction filters request newest endings before pagination on browse 
             assert.equal(auctionReadRequest(path, `?status=${status}&sort=invalid`).sort, 'ended-desc');
             assert.equal(auctionReadRequest(path, `?status=${status}&sort=price-desc`).sort, 'price-desc');
         }
-        assert.equal(auctionReadRequest(path).sort, 'ending');
+        assert.equal(auctionReadRequest(path).sort, path === '/auctions' ? 'recommended' : 'ending');
     }
 });
 
@@ -185,4 +185,16 @@ test('public polling adds bounded positive jitter without delaying initial reads
     random=.5;await f.tick();assert.equal([...f.queue.values()][0].ms,66000);
     random=1;await f.tick();assert.equal([...f.queue.values()][0].ms,72000);
     stop();
+});
+
+
+test('public browse default prioritizes urgent auctions while preserving explicit sorts and profile defaults', async () => {
+    const {browseAuctions} = await import('../src/lib/auctionBrowsing.js');
+    const now=100000000;
+    const lot=(id,hours,created) => ({id,item:'fixture',status:'active',endTime:now+hours*3600000,createdAt:created});
+    const rows=[lot('older',48,1),lot('later',20,2),lot('newer',72,4),lot('soon',1,3)];
+    assert.deepEqual(browseAuctions(rows,{sort:'recommended',now}).map(a=>a.id),['soon','later','newer','older']);
+    assert.equal(auctionReadRequest('/auctions').sort,'recommended');
+    assert.equal(auctionReadRequest('/auctions','?sort=newest').sort,'newest');
+    assert.equal(auctionReadRequest('/seller/seller').sort,'ending');
 });

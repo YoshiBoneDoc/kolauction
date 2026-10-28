@@ -315,6 +315,8 @@ const InfoPage = () => {
                     </section>
                 </div>
 
+                <hr className="info-contact-divider mx-auto mb-5 w-2/3 max-w-lg" />
+
                 <h2 className={`${sectionHeadingClass} mb-1 text-center`}>
                     Contact Us
                 </h2>

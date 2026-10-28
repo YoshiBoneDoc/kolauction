@@ -3,14 +3,9 @@
 Remaining work only. Updated October 27, 2026. Verify current state before starting.
 
 # BUGS TO ADDRESS ASAP:
-- Sending this (below) in a message currently queues the mail for us instead of handling it.
-- BID 1110 
-- You gain 11 Meat.
+- need to further improve handling heavy traffic
 - 
-
 # Small Quick fixes:
-- fix UI of profile and own history auction cards etc
-- Clarify trade-history help: completed Direct trades require both parties’ responses, including reviewed resolutions.
 
 - YOUR PROFILE STUFF:
 - in your profile -> Buy order fulfillments -> show how many YOU sold

@@ -26,12 +26,24 @@ const requireModule=createRequire(import.meta.url);
 new Function('require','module','exports',outputFiles[0].text)(name=>name==='react-router-dom'?router:requireModule(name),compiled,compiled.exports);
 const {render}=compiled.exports;
 
-test('homepage footer has Donate, bullet separator and Report a Bug link',()=>{
-    const html=render();
-    assert.match(html,/aria-label="Footer links"/);
-    assert.match(html,/href="\/donate"[^>]*>Donate/);
-    assert.match(html,/>•<\/span>/);
-    assert.match(html,/href="\/report-a-bug"[^>]*>Report a Bug/);
+test('shared footers show the same destinations and mark the current page',()=>{
+    for (const path of ['/', '/donate', '/report-a-bug', '/meet-the-creator', '/update-log']) {
+        const footer=render(path).match(/<nav aria-label="Footer links"[\s\S]*?<\/nav>/)?.[0];
+        assert.ok(footer, path);
+        for (const [href,label] of [['/donate','Donate'],['/report-a-bug','Report a Bug'],['/meet-the-creator','Meet the Creator']]) {
+            const link=[...footer.matchAll(/<a\b[^>]*>[^<]*<\/a>/g)].map(match=>match[0]).find(item=>item.includes(`href="${href}"`));
+            assert.ok(link?.includes(`>${label}</a>`), `${path}: ${label}`);
+            assert.equal(link.includes('aria-current="page"'), path===href, `${path}: ${href}`);
+        }
+    }
+});
+
+test('creator page displays all six creator photo slots while images load',()=>{
+    const gallery=render('/meet-the-creator').match(/<section aria-label="Photo journal"[\s\S]*?<\/section>/)?.[0];
+    assert.ok(gallery);
+    for (const label of ['Casual group photo', 'Graduation photo', 'Operating room photo', 'Waterfront photo', 'Savannah photo', 'Yosemite photo']) assert.ok(gallery.includes(label), label);
+    assert.doesNotMatch(gallery, /OFFICIAL APPROVAL/);
+    assert.doesNotMatch(gallery, /<img\b/);
 });
 
 test('anonymous users get login/contact guidance, signed-in users get a private report form',()=>{
@@ -107,7 +119,7 @@ test('admin reads and status changes use server-checked RPCs and expose safe den
     await assert.rejects(cooldown.submit('id','A valid report description.'),/wait a minute/);
 });
 
-test('shared inbox has category tabs and no bug-report submission link', () => {
+test('shared inbox has category tabs and keeps report submission in the shared footer', () => {
     const html=render('/admin/inbox',{id:'normal'});
     assert.match(html,/Administrator inbox/);
     assert.match(html,/Inbox categories/);
@@ -115,7 +127,10 @@ test('shared inbox has category tabs and no bug-report submission link', () => {
     assert.match(html,/Trade queries/);
     assert.match(html,/Ban appeals/);
     assert.match(html,/Other/);
-    assert.doesNotMatch(html,/href="\/report-a-bug"|Open administrator bug inbox/);
+    const main=html.match(/<main\b[\s\S]*?<\/main>/)?.[0];
+    assert.ok(main);
+    assert.doesNotMatch(main,/href="\/report-a-bug"|Open administrator bug inbox/);
+    assert.match(html,/href="\/report-a-bug"[^>]*>Report a Bug/);
     assert.doesNotMatch(render('/',{id:'normal'}),/href="\/admin\/inbox"/);
 });
 

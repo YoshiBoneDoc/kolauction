@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import CopyMessage from '../components/CopyMessage';
+import SiteFooter from '../components/SiteFooter';
 
 const DonatePage = () => {
     return (
@@ -37,9 +38,10 @@ const DonatePage = () => {
                 Thank you for your support!
             </p>
         </div>
-        <footer className="site-page-background bg-gray-50 px-6 pt-6 pb-12 text-center">
+        <div className="site-page-background bg-gray-50 px-6 pt-6 pb-12 text-center">
             <p className="text-[15px] leading-6 text-gray-700">Questions? <Link to="/support" className="text-blue-600 hover:underline">We’re here to help</Link>.</p>
-        </footer>
+        </div>
+        <SiteFooter />
         </>
     );
 };

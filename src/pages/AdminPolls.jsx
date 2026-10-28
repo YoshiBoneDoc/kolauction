@@ -121,6 +121,6 @@ export default function AdminPolls() {
             <p className="text-sm text-gray-600">Multiple polls can be live. Players answer them in publication order. Yes/No and multiple-choice results appear after voting; written responses stay private in your inbox.</p>
             {currentUser ? <PollManager key={currentUser.id} /> : <p><Link to="/login" className="text-blue-700 underline">Log in</Link> with your administrator account to manage polls.</p>}
         </main>
-        <SiteFooter showReportLink={false} />
+        <SiteFooter />
     </div>;
 }

@@ -27,6 +27,11 @@ export function resolveAuctionSort(status, sort) {
         : ['ended', 'completed', 'cancelled', 'expired'].includes(status) ? 'ended-desc' : 'ending';
 }
 
+// Public browse default only; seller profiles and explicit sorts stay unchanged.
+export function resolveBrowseSort(status, sort) {
+    return sort === 'recommended' ? sort : !sort && ['active', 'all'].includes(status) ? 'recommended' : resolveAuctionSort(status, sort);
+}
+
 export function auctionEndTime(auction) {
     if (['cancelled', 'voided'].includes(auction.status)) {
         // Cancellation is a distinct event and can happen before the deadline.
@@ -56,6 +61,10 @@ export function browseAuctions(auctions, { search = '', status = 'active', sort 
         if (sort === 'activity') {
             if (a.latestBidAt == null || b.latestBidAt == null) comparison = a.latestBidAt == null ? (b.latestBidAt == null ? 0 : 1) : -1;
             else comparison = b.latestBidAt - a.latestBidAt;
+        }
+        if (sort === 'recommended') {
+            const urgent = auction => getAuctionStatus(auction, now) === 'active' && auction.endTime > now && auction.endTime - now <= 86400000;
+            comparison = Number(urgent(b)) - Number(urgent(a)) || (urgent(a) && urgent(b) ? a.endTime - b.endTime : b.createdAt - a.createdAt);
         }
         if (sort === 'newest') comparison = b.createdAt - a.createdAt;
         if (sort === 'ending') comparison = a.endTime - b.endTime;

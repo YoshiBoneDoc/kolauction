@@ -238,6 +238,7 @@ test('bundle creation preserves the complete reviewed contents through the publi
     assert.equal(page.find(node => node.type === 'label' && node.props.htmlFor === 'listing-item-search').props.children, 'Find an item');
     assert.equal(page.find(node => node.type === 'label' && node.props.htmlFor === 'quantity').props.children, 'Quantity:');
     assert.ok(nodes(page.tree).some(node => node.type === 'h2' && node.props.children === 'Bundle contents'));
+    page.input('bundleTitle', 'Crimbo & Collectibles');
     assert.equal(page.button('Sell Items').props['aria-pressed'], true);
     page.button('Sell Items').props.onClick(); page.render();
     assert.equal(choice('bundle').props.checked, true);
@@ -250,6 +251,9 @@ test('bundle creation preserves the complete reviewed contents through the publi
     choice('bundle').props.onChange(); page.render();
     assert.equal(page.find(node => node.props?.['aria-label'] === 'Quantity of asbestos ore').props.value, '5');
     assert.equal(page.find(node => node.props?.['aria-label'] === 'Quantity of seal tooth').props.value, '3');
+    page.find(node => node.props?.['aria-label'] === 'Use asbestos ore as bundle image').props.onClick(); page.render();
+    page.find(node => node.props?.['aria-label'] === 'Increase quantity of asbestos ore').props.onClick(); page.render();
+    page.find(node => node.props?.['aria-label'] === 'Decrease quantity of asbestos ore').props.onClick(); page.render();
     page.input('minBidMeat', '100');
     const original = globalThis.requestAnimationFrame;
     globalThis.requestAnimationFrame = callback => callback();
@@ -257,12 +261,17 @@ test('bundle creation preserves the complete reviewed contents through the publi
     finally { if (original) globalThis.requestAnimationFrame = original; else delete globalThis.requestAnimationFrame; }
     page.render();
     const contents = page.find(node => node.type?.name === 'BundleContents').props.items;
+    assert.ok(nodes(page.tree).some(node => node.type === 'h3' && node.props.children === 'Bundle: Crimbo & Collectibles'));
     assert.deepEqual(contents.map(({id,quantity})=>({id,quantity})), [{id:2,quantity:3},{id:364,quantity:5}]);
     assert.equal(writes.length, 0);
     page.button('Continue to Publish').props.onClick(); page.render();
     await page.button('Publish Auction').props.onClick();
     assert.equal(writes.length, 1);
     assert.equal(writes[0].quantity, 1);
+    assert.equal(writes[0].item, 'Bundle: Crimbo & Collectibles');
+    assert.equal(writes[0].bundleTitle, 'Crimbo & Collectibles');
+    assert.equal(writes[0].bundleImageItemId, 364);
+    assert.equal(writes[0].image, contents.find(item => item.id === 364).image);
     assert.deepEqual(writes[0].bundleItems, contents);
     assert.deepEqual(page.locations, ['/auction/bundle-id']);
 });

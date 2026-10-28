@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { prepareBundle, bundleTitle, bundleConfirmation } from '../src/lib/bundles.js';
+import { prepareBundle, bundleTitle, bundleConfirmation, normalizeBundleTitle } from '../src/lib/bundles.js';
 import { createAuctionService, mapAuction } from '../src/lib/auctions.js';
 
 const catalog = [
@@ -28,6 +28,22 @@ test('bundle RPC sends only item IDs/quantities and lot terms; server owns names
     const mapped=mapAuction({id:'bundle-id',quantity:1,bundle_items:bundleItems},[]);
     assert.equal(mapped.isBundle,true);assert.deepEqual(mapped.bundleItems,bundleItems);
     assert.equal(mapAuction({quantity:3},[]).isBundle,false);
+});
+
+test('optional bundle titles are normalized, validated and sent separately from catalog item names',async()=>{
+    const entries=prepareBundle([{id:2,quantity:1},{id:364,quantity:2}],catalog);
+    assert.equal(bundleTitle(entries,'  Crimbo & Collectibles  '),'Bundle: Crimbo & Collectibles');
+    assert.match(bundleTitle(entries,'   '),/^Bundle: seal tooth/);
+    assert.equal(normalizeBundleTitle('x'.repeat(100)).length,100);
+    for(const title of ['x'.repeat(101),'two\nlines','<b>title</b>','title\u202E','title\u0085'])assert.throws(()=>normalizeBundleTitle(title),/plain text on one line/);
+    let request;
+    const service=createAuctionService({async rpc(name,params){request={name,params};return {data:'titled-bundle'};}});
+    await service.create({bundleItems:entries,bundleTitle:'  Crimbo & Collectibles  ',minBidMeat:100,auctionTime:'24',escrowMode:true});
+    assert.equal(request.params.p_title,'Crimbo & Collectibles');
+    assert.deepEqual(request.params.p_items,[{id:2,quantity:1},{id:364,quantity:2}]);
+    request=null;
+    await assert.rejects(service.create({bundleItems:entries,bundleTitle:'<b>bad</b>'}),/plain text on one line/);
+    assert.equal(request,null);
 });
 
 test('bundle confirmations enumerate every item and quantity, single items stay unchanged',()=>{

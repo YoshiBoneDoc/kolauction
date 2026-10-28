@@ -42,7 +42,7 @@ export default function CompactAuctionCard({ auction, now, expanded = false, onT
                 </h2>
             </Link>
             <div className="flex max-w-[45%] shrink-0 flex-col items-end gap-1.5 text-right">
-                {active ? <p className={`text-[11px] leading-3 tabular-nums ${auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-500'}`}>
+                {active ? <p className={`text-[11px] leading-3 tabular-nums ${auction.endTime - now <= 10800000 ? 'text-red-700' : auction.endTime - now <= 86400000 ? 'text-amber-700' : 'text-gray-500'}`}>
                     <time dateTime={new Date(auction.endTime).toISOString()} title={`Ends ${new Date(auction.endTime).toLocaleString()}`}>{timeRemaining(auction.endTime, now)}</time> left
                 </p> : <p title={status.label} className={`max-w-full truncate leading-3 text-xs font-semibold ${status.color}`}>{status.label}</p>}
                 <TradeTypeBadge escrow={auction.escrowMode} compact short />

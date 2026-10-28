@@ -33,6 +33,15 @@ const auction = { id: 'lot', sellerId: 'seller', owner: 'Seller', item: 'Test lo
     winner: 'Bidder 1', finalPrice: 300, endTime: 1, bids: [] };
 const seller = { id: 'seller', username: 'Seller', stats: { escrow_buys:0,direct_bought_value:'20000000',escrow_bought_value:'0',seller_confirmed:1,buyer_confirmed:0,seller_incomplete:0,buyer_incomplete:0,seller_positive:0,seller_negative:0,buyer_positive:0,buyer_negative:0,escrow_sales: 2, escrow_value: '9007199254740993', escrow_units: '4', active: 0, pending: 1, unsold: 3, cancelled: 0, legacy_sales: 1, legacy_value: '300', buy_order_sales: 2, buy_order_units: 1326, buy_order_value: '561200' } };
 
+test('seller profile back link goes to the owner account only for the signed-in owner', () => {
+    for (const path of ['/seller/seller', '/seller/seller?view=stats']) {
+        const state = { path, seller, auctions: [], total: 0 };
+        assert.match(render({ ...state, user: { id: 'seller' } }), /href="\/profile"[^>]*>← Back to Account Profile<\/a>/);
+        assert.match(render({ ...state, user: { id: 'viewer', khubUsername: 'Seller' } }), /href="\/auctions"[^>]*>← Back to Auctions<\/a>/);
+        assert.match(render(state), /href="\/auctions"[^>]*>← Back to Auctions<\/a>/);
+    }
+});
+
 test('public seller route renders history, separate sale evidence and compact large totals without login', () => {
     const html = render({ seller, auctions: [auction], total: 25 });
     assert.match(html, /Escrow Trades/);
@@ -352,4 +361,19 @@ test('Buy item images appear on browse, home and auction view, not the Seller Pr
  const profile=render({path:'/seller/seller?view=stats',user:{id:'seller'},seller,auctions:[buy],total:1});
  assert.match(profile,/aria-label="Trade History"/);
  assert.doesNotMatch(profile,/itemimages\/tooth.gif|Test lot|public-profile-auction-list|Seller auctions/);
+});
+
+
+test('Seller Profile separates funded Buy orders created from orders fulfilled without changing sidebar', () => {
+    const data = {...seller, stats: {...seller.stats, buy_orders_created: '3', buy_orders_bought_units: '77', buy_orders_spent: '123000'}};
+    const html = render({path:'/seller/seller?view=stats', seller:data, auctions:[], total:0});
+    assert.match(html, /Buy Orders Created/);
+    assert.match(html, /Orders created/);
+    assert.match(html, /Items bought/);
+    assert.match(html, /123k Meat/);
+    assert.match(html, /Buy Orders Fulfilled/);
+    assert.match(html, /Orders fulfilled/);
+    assert.match(html, /561.2k Meat/);
+    const sidebar = render({path:'/seller/seller', seller:data, auctions:[], total:0});
+    assert.doesNotMatch(sidebar, /Buy Orders Created|Buy Orders Fulfilled/);
 });

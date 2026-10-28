@@ -70,11 +70,18 @@ function DetailedTradeHistory({ stats, reputation }) {
                 <DashboardStat label="Meat sold" value={amount(stats.escrow_value)} />
                 <DashboardStat label="Meat bought" value={amount(stats.escrow_bought_value)} />
             </DashboardCard>
-            <DashboardCard title="Buy Orders">
+            <div className="public-profile-buy-order-stack">
+            <DashboardCard title="Buy Orders Created">
+                <DashboardStat label="Orders created" value={count(stats.buy_orders_created)} positive />
+                <DashboardStat label="Items bought" value={count(stats.buy_orders_bought_units)} />
+                <DashboardStat label="Meat spent" value={amount(stats.buy_orders_spent)} />
+            </DashboardCard>
+            <DashboardCard title="Buy Orders Fulfilled">
                 <DashboardStat label="Orders fulfilled" value={count(stats.buy_order_sales)} positive />
                 <DashboardStat label="Items sold" value={count(stats.buy_order_units)} />
                 <DashboardStat label="Meat earned" value={amount(stats.buy_order_value)} />
             </DashboardCard>
+            </div>
         </div>
 
         <section className="public-profile-trade-feedback" aria-label="Trade feedback">

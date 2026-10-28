@@ -1,6 +1,7 @@
 import { parsePrice } from './auctionPriceRange.js';
 import { resolveAuctionSort } from './auctionBrowsing.js';
 import { observeAuctionServerTime, auctionClockRequestStarted } from './auctionClock.js';
+import { normalizeBundleTitle } from './bundles.js';
 export function mapAuction(row, bidRows) {
     const bids = bidRows.filter((bid) => bid.auction_id === row.id)
         .sort((a, b) => Number(a.amount) - Number(b.amount))
@@ -47,7 +48,7 @@ export function mapAuction(row, bidRows) {
         sellerId: row.seller_id,
         owner: row.usernames_visible === false ? (row.auction_kind === 'buy' ? 'Buyer' : 'Seller') : row.seller_username,
         usernamesVisible: row.usernames_visible !== false,
-        item: row.item,
+        item: Array.isArray(row.bundle_items) && row.bundle_items.length > 1 && row.item && !row.item.startsWith('Bundle:') ? `Bundle: ${row.item}` : row.item,
         quantity: Number(row.quantity),
         minBidMeat: Number(row.min_bid_meat),
         itemId: row.item_id,
@@ -175,11 +176,14 @@ export function createAuctionService(client) {
         },
         async create(auction) {
             if (auction.bundleItems?.length) {
+                const title = normalizeBundleTitle(auction.bundleTitle ?? '');
                 const { data, error } = await requireClient().rpc('create_bundle_auction', {
                     p_items: auction.bundleItems.map(({ id, quantity }) => ({ id, quantity })),
                     p_min_bid_meat: auction.minBidMeat, p_duration_hours: Number(auction.auctionTime),
                     p_instant_purchase_price: auction.instantPurchasePrice ?? null, p_escrow_mode: auction.escrowMode !== false,
                     p_custom_end_at: auction.customEndAt || null,
+                    ...(title ? { p_title: title } : {}),
+                    ...(auction.bundleImageItemId ? { p_image_item_id: auction.bundleImageItemId } : {}),
                 });
                 if (error) throw databaseError(error);
                 return data;

@@ -80,7 +80,7 @@ export default function BuyAuctionCard({ auction, now, inlineReserve = false, ex
                     </h2>
                 </Link>
                 <div className="flex max-w-[45%] shrink-0 flex-col items-end gap-1 text-right">
-                    {active ? <p className={`text-[11px] leading-3 tabular-nums ${auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-500'}`}>
+                    {active ? <p className={`text-[11px] leading-3 tabular-nums ${auction.endTime - now <= 10800000 ? 'text-red-700' : auction.endTime - now <= 86400000 ? 'text-amber-700' : 'text-gray-500'}`}>
                         <time dateTime={new Date(auction.endTime).toISOString()}>{timeRemaining(auction.endTime, now)}</time> left
                     </p> : <p title={status.label} className={`max-w-full truncate text-xs font-semibold leading-3 ${status.color}`}>{status.label}</p>}
                     <span className="inline-flex rounded border border-red-200 bg-red-100 px-1.5 py-0.5 text-[11px] font-medium leading-3 text-red-700">Buy</span>

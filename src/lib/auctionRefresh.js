@@ -1,5 +1,5 @@
 import { parsePrice } from './auctionPriceRange.js';
-import { auctionFilters, resolveAuctionSort } from './auctionBrowsing.js';
+import { auctionFilters, resolveAuctionSort, resolveBrowseSort } from './auctionBrowsing.js';
 
 export function auctionReadRequest(pathname, search = '', viewerId = null) {
     pathname = pathname.replace(/\/+$/, '') || '/';
@@ -20,7 +20,7 @@ export function auctionReadRequest(pathname, search = '', viewerId = null) {
         ...(!seller && parsePrice(params.get('minPrice')) != null ? { minPrice: parsePrice(params.get('minPrice')) } : {}),
         ...(!seller && parsePrice(params.get('maxPrice')) != null ? { maxPrice: parsePrice(params.get('maxPrice')) } : {}),
         ...(['escrow', 'direct', 'none'].includes(params.get('trade')) ? { trade: params.get('trade') } : {}),
-        sort: resolveAuctionSort(status, params.get('sort')),
+        sort: (seller ? resolveAuctionSort : resolveBrowseSort)(status, params.get('sort')),
         page: Math.min(1000000, Math.max(1, Number.parseInt(params.get('page'), 10) || 1)),
     };
 }

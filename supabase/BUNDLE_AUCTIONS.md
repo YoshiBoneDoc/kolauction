@@ -1,6 +1,6 @@
 # Bundle sell auctions — migration 128
 
-Create Auction now includes **Sell Bundle** alongside Buy Items and Sell Items.
+Create Auction includes **Sale type: Single item / Bundle** underneath Sell Items.
 Choose 2–10 distinct catalog items, set each quantity, and review the complete
 contents before publishing. One bid or buyout purchases the entire lot. Both
 Escrow and Direct settlement reuse their existing rules. Buy orders remain
@@ -73,3 +73,7 @@ and incoming-gift suite also passed locally. The frontend build and focused
 auction tests passed. The full frontend suite retains seven failures reproduced
 on the unchanged HEAD snapshot (profile rendering/filter expectations and market
 wording); these are unrelated to the bundle implementation.
+
+Bundle titles are optional (up to 100 characters of single-line plain text). Blank titles retain the automatic catalog-based name. Titles and contents are frozen on creation. Apply migration 131 before deploying the title field.
+
+Migration 132 adds the `Bundle:` prefix and optional cover selection from the canonical bundle components. It accepts only an item ID already in the bundle, never an arbitrary image URL. Existing component accounting is unchanged. Apply 132 before deploying cover selection.

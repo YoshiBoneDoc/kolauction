@@ -136,6 +136,6 @@ export default function BugReportInbox() {
             </div>
             {currentUser ? <Inbox key={currentUser.id} /> : <p><Link to="/login" className="text-blue-700 underline">Log in</Link> with an administrator account to open this inbox.</p>}
         </main>
-        <SiteFooter showReportLink={false} />
+        <SiteFooter />
     </div>;
 }

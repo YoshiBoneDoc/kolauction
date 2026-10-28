@@ -4,7 +4,7 @@ import { useContext, useEffect, useId, useState } from 'react';
 import useAuctionBrowseSession from '../hooks/useAuctionBrowseSession';
 import { AuctionsContext } from '../context/AuctionsContext';
 import { UserContext } from '../context/UserContext';
-import { auctionFilters, resolveAuctionSort } from '../lib/auctionBrowsing';
+import { auctionFilters, resolveBrowseSort } from '../lib/auctionBrowsing';
 import { useNow } from '../hooks/useNow';
 import CompactAuctionCard from '../components/CompactAuctionCard';
 import PendingTrades from '../components/PendingTrades';
@@ -27,7 +27,7 @@ export default function AllAuctions() {
     const othersOnly = Boolean(currentUser && params.get('mine') === 'others');
     const ownershipFiltered = mineOnly || othersOnly;
     const status = auctionFilters.some(([value]) => value === params.get('status')) ? params.get('status') : 'active';
-    const sort = resolveAuctionSort(status, params.get('sort'));
+    const sort = resolveBrowseSort(status, params.get('sort'));
     const deadlineSort = ['ended', 'completed', 'cancelled', 'expired'].includes(status)
         ? ['ended-desc', 'Recently Ended'] : ['ending', 'Ending Soon'];
     const kind = ['buy', 'sell'].includes(params.get('kind')) ? params.get('kind') : 'all';
@@ -101,6 +101,7 @@ export default function AllAuctions() {
                             {[
                                 [deadlineSort, ['newest', 'Newest'], ['activity', 'Recent Activity']],
                                 [
+                                    ['recommended', 'Recommended'],
                                     [sort === 'bids-desc' ? 'bids-asc' : 'bids-desc', `Most Bids ${sort === 'bids-desc' ? '▴' : sort === 'bids-asc' ? '▾' : '▴▾'}`],
                                     [sort === 'price-desc' ? 'price-asc' : 'price-desc', `Price ${sort === 'price-desc' ? '▴' : sort === 'price-asc' ? '▾' : '▴▾'}`],
                                 ],

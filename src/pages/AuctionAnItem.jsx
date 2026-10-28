@@ -1,5 +1,5 @@
 import BundleContents from '../components/BundleContents';
-import { prepareBundle, bundleTitle, MAX_BUNDLE_ITEMS } from '../lib/bundles';
+import { prepareBundle, bundleTitle, normalizeBundleTitle, MAX_BUNDLE_ITEMS, MAX_BUNDLE_TITLE_LENGTH } from '../lib/bundles';
 import { effectiveFeePercent, feeLabel } from '../lib/feeDisplay';
 import { escrowFee } from '../lib/escrowFees';
 import { buyFunding } from '../lib/buyOrders';
@@ -46,6 +46,7 @@ export default function AuctionAnItem() {
     const buyoutInput = useRef(null);
     const [auctionTime, setAuctionTime] = useState('24');
     const [customDuration, setCustomDuration] = useState(false);
+    const durationInput = useRef(null);
     const [customEndTime, setCustomEndTime] = useState('');
     const endingTimeInput = useRef(null);
     const [escrowMode, setEscrowMode] = useState(true);
@@ -54,7 +55,24 @@ export default function AuctionAnItem() {
     const isBuy = auctionKind === 'buy';
     const isBundle = auctionKind === 'bundle';
     const [bundleEntries, setBundleEntries] = useState([]);
+    const [bundleImageItemId, setBundleImageItemId] = useState(null);
+    const [bundleTitleText, setBundleTitleText] = useState('');
     const [preview, setPreview] = useState(null);
+    useEffect(() => {
+        const select = durationInput.current;
+        if (!select) return;
+        let lastStep = -Infinity;
+        function scrollDuration(event) {
+            if (customDuration || !event.deltaY || event.ctrlKey) return;
+            event.preventDefault();
+            if (performance.now() - lastStep < 160) return;
+            lastStep = performance.now();
+            const options = ['6', '12', '24', '72', '168', '336', '720'];
+            setAuctionTime(current => options[Math.max(0, Math.min(options.length - 1, options.indexOf(current) + (event.deltaY > 0 ? 1 : -1)))]);
+        }
+        select.addEventListener('wheel', scrollDuration, { passive: false });
+        return () => select.removeEventListener('wheel', scrollDuration);
+    }, [customDuration, preview]);
     const [error, setError] = useState('');
     const [pending, setPending] = useState(false);
     const previewHeading = useRef(null);
@@ -106,8 +124,9 @@ export default function AuctionAnItem() {
         const minimum = parseMeatAmount(minBidMeat);
         const purchasePrice = !isBuy && instantPrice.trim() ? parseMeatAmount(instantPrice) : null;
         let contents = null;
+        let customTitle = '';
         if (isBundle) {
-            try { contents = prepareBundle(bundleEntries, catalogItems); }
+            try { contents = prepareBundle(bundleEntries, catalogItems); customTitle = normalizeBundleTitle(bundleTitleText); }
             catch (failure) { setError(failure.message); return; }
         }
         if (!isBundle && !item) { setError('Please select an item to auction.'); return; }
@@ -122,8 +141,8 @@ export default function AuctionAnItem() {
             try { customEndAt = customAuctionEnd(customEndTime); }
             catch (failure) { setError(failure.message); return; }
         }
-        setPreview({ item: contents ? bundleTitle(contents) : item.name, itemId: contents ? contents[0].id : item.id, quantity: contents ? 1 : count, ...(contents ? { bundleItems: contents } : {}), minBidMeat: minimum, instantPurchasePrice: purchasePrice, auctionTime, escrowMode, ...(customEndAt ? { customEndAt } : {}),
-            image: contents ? contents[0].image : itemImageUrl(item.image), ...(isBuy ? { auctionKind, deliveryMode } : {}) });
+        setPreview({ item: contents ? bundleTitle(contents, customTitle) : item.name, itemId: contents ? contents[0].id : item.id, quantity: contents ? 1 : count, ...(contents ? { bundleItems: contents, bundleTitle: customTitle || null, bundleImageItemId: contents.some(entry => entry.id === bundleImageItemId) ? bundleImageItemId : null } : {}), minBidMeat: minimum, instantPurchasePrice: purchasePrice, auctionTime, escrowMode, ...(customEndAt ? { customEndAt } : {}),
+            image: contents ? (contents.find(entry => entry.id === bundleImageItemId) || contents[0]).image : itemImageUrl(item.image), ...(isBuy ? { auctionKind, deliveryMode } : {}) });
         setError('');
         requestAnimationFrame(() => previewHeading.current?.focus());
     }
@@ -193,7 +212,8 @@ export default function AuctionAnItem() {
                             <div className="flex flex-wrap items-center justify-between gap-3">
                                 <div>
                                     <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#647084]">Bundle auction</p>
-                                    <h3 className="mt-1 text-lg font-semibold leading-snug text-gray-900">One listing · {preview.bundleItems.length} item types</h3>
+                                    <h3 className="mt-1 break-words text-lg font-semibold leading-snug text-gray-900">{(preview.bundleTitle ? preview.item : null) || `One listing · ${preview.bundleItems.length} item types`}</h3>
+                                    {preview.bundleTitle && <p className="mt-1 text-xs text-gray-600">One listing · {preview.bundleItems.length} item types</p>}
                                 </div>
                                 <span className="bundle-preview-badge rounded-full border border-[#E9BFA9] bg-[#FFFAF7] px-3 py-1 text-xs font-semibold text-[#7C5140]">Sold together</span>
                             </div>
@@ -233,10 +253,10 @@ export default function AuctionAnItem() {
                     </dl>
                     {preview.auctionKind === 'buy' && <p className="text-xs text-gray-500">The reserve rounds up to whole Meat. Actual fees are rounded down per fulfillment; unused reserve is refunded.</p>}
                     <div className={preview.bundleItems
-                        ? '-mx-4 -mb-4 mt-5 grid grid-cols-1 gap-2 rounded-b-lg border-t border-[#EADBD3] bg-[#FFF7F2] p-4 dark:border-gray-700 dark:bg-gray-800/60 sm:-mx-8 sm:-mb-8 sm:grid-cols-[0.85fr_1.15fr] sm:gap-3 sm:p-5'
+                        ? 'bundle-preview-footer -mx-4 -mb-4 mt-5 grid grid-cols-1 gap-2 rounded-b-lg border-t border-[#EADBD3] bg-[#FFF7F2] p-4 dark:border-gray-700 dark:bg-gray-800/60 sm:-mx-8 sm:-mb-8 sm:grid-cols-[0.85fr_1.15fr] sm:gap-3 sm:p-5'
                         : 'mt-4 grid grid-cols-2 gap-3 border-t border-gray-100 pt-4'}>
                         <button type="button" onClick={() => { setPreview(null); setError(''); }} disabled={pending} className={preview.bundleItems
-                            ? 'min-h-12 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800'
+                            ? 'bundle-preview-back min-h-12 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800'
                             : 'min-h-12 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 disabled:opacity-50'}>Back to Edit</button>
                         <button type="button" aria-haspopup="dialog" aria-controls="publish-auction-dialog" onClick={() => { setError(''); publishDialog.current.showModal(); }} disabled={pending} className={preview.bundleItems
                             ? 'button-green min-h-12 rounded-lg border border-green-700 bg-green-700 px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:border-green-800 hover:bg-green-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 disabled:opacity-50'
@@ -276,6 +296,13 @@ export default function AuctionAnItem() {
                         {escrowMode ? <EscrowProtection forListing buy={isBuy} minimumPrice={minimumValue} /> : <DirectTradeHelp forListing />}
                         {!escrowMode && <p className="mt-2 text-xs leading-[1.4] text-red-600">Failure to honor a valid, completed auction is a violation of kHub policy and will likely get you banned. We take these very seriously.</p>}
                     </div>
+                    {isBundle && <>
+                        <label htmlFor="bundleTitle" className="mb-2 block text-sm font-bold">Bundle title <span className="font-normal text-gray-600">(optional)</span></label>
+                        <input id="bundleTitle" type="text" value={bundleTitleText} maxLength={MAX_BUNDLE_TITLE_LENGTH} autoComplete="off"
+                            onChange={event => setBundleTitleText(event.target.value)} onBlur={() => setBundleTitleText(value => value.trim())}
+                            placeholder="e.g. The Mime Science Collection" aria-describedby="bundle-title-help" className={fieldClass} />
+                        <p id="bundle-title-help" className="-mt-2 mb-4 text-xs text-gray-600">Leave blank for an automatic title. Up to {MAX_BUNDLE_TITLE_LENGTH} characters.</p>
+                    </>}
                     <label htmlFor="listing-item-search" className="mb-2 block text-sm font-bold">Find an item</label>
                     <input id="listing-item-search" type="search" value={itemSearch} onChange={(event) => setItemSearch(event.target.value)} placeholder="Start typing an item name…" aria-describedby={hasItemSearch ? 'listing-search-help' : undefined} className={fieldClass} />
                     {(hasItemSearch || selectedItem) && <>
@@ -288,7 +315,7 @@ export default function AuctionAnItem() {
                         {searchResults.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
                     </select>
                     </>}
-                    {hasItemSearch && <p id="listing-search-help" className="mb-4 text-sm text-gray-600">{itemSearch !== deferredSearch ? 'Searching items…' : matchingItems.length > resultLimit ? `Showing the first ${resultLimit} of ${matchingItems.length.toLocaleString('en-US')} matches. Keep typing to narrow the list.` : `${matchingItems.length} matching items.`}</p>}
+                    {hasItemSearch && <p id="listing-search-help" className="-mt-3 mb-3 text-xs text-gray-600">{itemSearch !== deferredSearch ? 'Searching items…' : matchingItems.length > resultLimit ? `Showing the first ${resultLimit} of ${matchingItems.length.toLocaleString('en-US')} matches. Keep typing to narrow the list.` : `${matchingItems.length} matching items.`}</p>}
                     {hasItemSearch && itemSearch === deferredSearch && searchResults.length === 0 && <p role="status" className="mb-4 text-sm text-gray-600">No items match your search.{selectedItem ? ' Your previous selection is still selected.' : ''}</p>}
                     <label htmlFor="quantity" className="mb-2 block text-sm font-bold">Quantity:</label>
                     <div className="mb-4 flex gap-2">
@@ -302,13 +329,13 @@ export default function AuctionAnItem() {
                                     stepQuantity(event.key === 'ArrowUp' ? 1 : -1);
                                 }
                             }}
-                            className={`block w-full min-w-0 rounded border border-gray-400 bg-white text-base text-gray-900 ${isBundle ? 'min-h-10 px-3 py-2 leading-5' : 'min-h-11 p-3'}`} />
+                            className={`block w-full min-w-0 rounded border border-gray-400 bg-white text-base text-gray-900 h-9 px-3 py-1.5 leading-5`} />
                         <button type="button" aria-label="Increase quantity" title="Increase quantity by 1"
                             disabled={quantityValue === 5000000000 || (quantityValue === null && quantity.trim() !== '')}
-                            onClick={() => stepQuantity(1)} className={`${isBundle ? 'min-h-10' : 'min-h-11'} min-w-11 shrink-0 rounded border border-gray-400 bg-white px-3 text-gray-900 disabled:opacity-40`}>▲</button>
+                            onClick={() => stepQuantity(1)} className={`h-9 min-w-11 shrink-0 rounded border border-gray-400 bg-white px-3 text-gray-900 disabled:opacity-40`}>▲</button>
                         <button type="button" aria-label="Decrease quantity" title="Decrease quantity by 1"
                             disabled={quantityValue === null || quantityValue <= 1}
-                            onClick={() => stepQuantity(-1)} className={`${isBundle ? 'min-h-10' : 'min-h-11'} min-w-11 shrink-0 rounded border border-gray-400 bg-white px-3 text-gray-900 disabled:opacity-40`}>▼</button>
+                            onClick={() => stepQuantity(-1)} className={`h-9 min-w-11 shrink-0 rounded border border-gray-400 bg-white px-3 text-gray-900 disabled:opacity-40`}>▼</button>
                     </div>
                     {isBundle && <section aria-label="Build your bundle" className="bundle-builder-panel mb-5 rounded-xl border border-[#EADBD3] bg-[#FFFAF7] p-3 sm:p-4">
                         <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
@@ -329,15 +356,25 @@ export default function AuctionAnItem() {
                         {bundleEntries.length > 0 ? <ul className="mt-3 space-y-2">
                             {bundleEntries.map(entry => {
                                 const item = catalogItems.find(candidate => candidate.id === entry.id);
-                                return <li key={entry.id} className="bundle-builder-item flex min-w-0 items-center gap-2 rounded-lg border border-[#EEE1DA] bg-white px-2.5 py-2">
+                                return <li key={entry.id} className="bundle-builder-item flex min-w-0 flex-wrap items-center gap-2 rounded-lg border border-[#EEE1DA] bg-white px-2.5 py-2">
                                     {item?.image && <img src={itemImageUrl(item.image)} alt="" className="h-8 w-8 shrink-0 object-contain [image-rendering:pixelated]" />}
                                     <span className="min-w-0 flex-1 break-words text-sm font-medium leading-snug text-gray-900">{item?.name || `Item #${entry.id}`}</span>
+                                    <button type="button" aria-label={`Use ${item?.name || entry.id} as bundle image`} aria-pressed={bundleImageItemId === entry.id}
+                                        onClick={() => setBundleImageItemId(entry.id)} className="bundle-image-choice rounded border border-gray-300 px-1.5 py-1 text-[11px] text-gray-700 hover:bg-blue-50" title="Use this item as the bundle image">{bundleImageItemId === entry.id ? '✓ Cover' : 'Cover'}</button>
                                     <label className="flex shrink-0 items-center gap-1.5 text-xs text-gray-700">
-                                        Qty
+                                        Qty:
                                         <input aria-label={`Quantity of ${item?.name || entry.id}`} inputMode="decimal" value={entry.quantity}
                                         onChange={event => setBundleEntries(entries => entries.map(row => row.id === entry.id ? { ...row, quantity: event.target.value } : row))}
                                         className="bundle-quantity-input w-[4.5rem] rounded-md border border-gray-300 bg-[#FFFCFA] px-2 py-1.5 text-sm tabular-nums text-gray-900 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-200" />
                                     </label>
+                                    <span className="flex flex-col">
+                                        {[1, -1].map(step => <button key={step} type="button" aria-label={`${step > 0 ? 'Increase' : 'Decrease'} quantity of ${item?.name || entry.id}`} className="rounded px-1.5 text-[10px] leading-4 text-gray-700 hover:bg-blue-50"
+                                            onClick={() => setBundleEntries(entries => entries.map(row => {
+                                                if (row.id !== entry.id) return row;
+                                                const current = parseAuctionAmount(row.quantity, 5000000000);
+                                                return current === null ? row : { ...row, quantity: String(Math.max(1, Math.min(5000000000, current + step))) };
+                                            }))}>{step > 0 ? '▲' : '▼'}</button>)}
+                                    </span>
                                     <button type="button" aria-label={`Remove ${item?.name || entry.id}`} onClick={() => setBundleEntries(entries => entries.filter(row => row.id !== entry.id))}
                                         className="bundle-remove-button min-h-9 rounded-md px-2 text-xs font-medium text-red-800 transition-colors hover:bg-red-50">Remove</button>
                                 </li>;
@@ -368,9 +405,9 @@ export default function AuctionAnItem() {
                                 <p className="mt-2">Gift packaging for Hardcore/Ronin players is covered by kHub. Immediate deliveries are combined until at least 1,000 items below 50 Meat each, 100 items at 50–999 Meat, or 10 items at 1,000–49,999 Meat have accumulated. Items priced at 50,000 Meat or more are sent immediately. Each delivery includes all accumulated items, and any remainder is delivered when your order ends.</p>
                             </details>
                         </div></>}
-                    <label htmlFor="auctionTime" className="mb-2 block text-sm font-bold">Auction Duration:</label>
+                    <label htmlFor="auctionTime" className="mb-2 block text-sm font-bold">Duration:</label>
                     <div className="mb-4 flex min-w-0 gap-2">
-                        <select id="auctionTime" value={auctionTime} disabled={customDuration} onChange={(event) => setAuctionTime(event.target.value)} className="block min-h-11 w-full min-w-0 flex-1 rounded border border-gray-400 bg-white p-3 text-base text-gray-900 disabled:bg-gray-100 disabled:text-gray-500">
+                        <select ref={durationInput} title="Scroll to adjust the duration, or click to choose." id="auctionTime" value={auctionTime} disabled={customDuration} onChange={(event) => setAuctionTime(event.target.value)} className="block min-h-11 w-full min-w-0 flex-1 rounded border border-gray-400 bg-white p-3 text-base text-gray-900 disabled:bg-gray-100 disabled:text-gray-500">
                             <option value="6">6 Hours</option><option value="12">12 Hours</option>
                             <option value="24">1 Day</option><option value="72">3 Days</option>
                             <option value="168">7 Days</option><option value="336">14 Days</option>
