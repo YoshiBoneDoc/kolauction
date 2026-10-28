@@ -79,12 +79,12 @@ export const AuctionsProvider = ({ children }) => {
 
     useEffect(() => {
         if (!key || networkRequest.view === 'profile' && !currentUser?.id) return;
-        const delay = () => auctionRefreshDelay(networkRequest, cache.snapshot(key).data?.auctions || [], auctionNow());
+        const delay = () => Math.max(auctionRefreshDelay(networkRequest, cache.snapshot(key).data?.auctions || [], auctionNow()), cache.retryAfter(key));
         const previous = cache.snapshot(key);
-        const initialDelay = previous.error ? Math.max(0, 5000 - (Date.now() - previous.attemptedAt))
+        const initialDelay = previous.error ? cache.retryAfter(key)
             : previous.updatedAt == null ? 0 : Math.max(0, delay() - (Date.now() - previous.updatedAt));
         return startAuctionRefresh({
-            refresh: () => cache.load(key, { maxAge: Math.min(5000, delay()) }),
+            refresh: () => cache.load(key, { maxAge: networkRequest.view === 'browse' ? 60000 : Math.min(5000, delay()) }),
             delay, document, initialDelay,
         });
     }, [cache, key, networkRequest, currentUser?.id]);

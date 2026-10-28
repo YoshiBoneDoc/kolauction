@@ -14,7 +14,7 @@ test('routes scope auction reads and preserve browsing filters/page', () => {
         view:'browse',search:'hat',status:'completed',sort:'price-desc',page:3,
     });
     assert.equal(auctionReadRequest('/auctions','?page=-2').page,1);
-    assert.equal(auctionRefreshDelay(auctionReadRequest('/')),30000);
+    assert.equal(auctionRefreshDelay(auctionReadRequest('/')),60000);
     assert.equal(auctionRefreshDelay(auctionReadRequest('/auction/abc')),10000);
 });
 
@@ -30,8 +30,17 @@ function fixture(hidden=false) {
     return {document,window,timers,queue,tick};
 }
 
+test('public dataset polling stays at one minute even with imminent deadlines; auction details remain fast',()=>{
+    const now=1000000;
+    for(const remaining of [500,30000,60000,120000,-1000]) {
+        const auctions=[{status:'active',auctionKind:'sell',endTime:now+remaining}];
+        for(const view of ['home','browse']) assert.equal(auctionRefreshDelay({view},auctions,now),60000);
+    }
+    assert.equal(auctionRefreshDelay({view:'detail'},[{status:'active',endTime:now+30000}],now),5000);
+});
+
 test('final-minute Sell auctions poll every five seconds and revert after an extension or settlement', () => {
-    const request = {view: 'browse'};
+    const request = {view: 'seller'};
     const now = 1000000;
     const auction = {status: 'active', auctionKind: 'sell', endTime: now + 60000};
     assert.equal(auctionRefreshDelay(request, [auction], now), 5000);
@@ -53,7 +62,7 @@ test('simultaneous deadlines trigger one shared refresh and an extension restore
     let auctions = ['a', 'b', 'c'].map(id => ({id, status: 'active', endTime: now + 1200}));
     let calls = 0;
     const stop = startAuctionRefresh({...f,
-        delay: () => auctionRefreshDelay({view: 'browse'}, auctions, now),
+        delay: () => auctionRefreshDelay({view: 'seller'}, auctions, now),
         refresh: async () => {
             calls++;
             if (calls === 2) auctions = auctions.map(a => ({...a, endTime: now + 120000}));

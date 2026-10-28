@@ -51,6 +51,20 @@ test('write invalidation discards a pre-write response and queues a new read',as
     assert.equal(cache.snapshot('dataset').data.auctions[0].id,'new');
 });
 
+test('repeated database failures increase cooldown to one minute and successful forced reads reset it',async()=>{
+    let now=100,calls=0,fail=true;
+    const cache=createAuctionReadCache(async()=>{calls++;if(fail)throw new Error('timeout');return {auctions:[]};},{now:()=>now});
+    for(const wait of [5000,10000,20000,40000,60000,60000]) {
+        await cache.load('dataset');
+        assert.equal(cache.retryAfter('dataset'),wait);
+        const before=calls;
+        now+=wait-1;await cache.load('dataset');assert.equal(calls,before);
+        now++;
+    }
+    fail=false;await cache.load('dataset',{force:true});assert.equal(cache.retryAfter('dataset'),0);
+    fail=true;now+=30000;await cache.load('dataset');assert.equal(cache.retryAfter('dataset'),5000);
+});
+
 test('authorization changes abort, erase all snapshots and suppress late old-viewer responses',async()=>{
     const late=deferred();let signal;
     const cache=createAuctionReadCache(async(key,s)=>{if(key==='slow'){signal=s;return late.promise;}return {privateViewer:'A'};});

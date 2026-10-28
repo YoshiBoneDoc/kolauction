@@ -26,6 +26,9 @@ export function auctionReadRequest(pathname, search = '', viewerId = null) {
 }
 
 export function auctionRefreshDelay(request, auctions = [], now = Date.now()) {
+    // Public browsing loads the full shared dataset. A deadline on any one
+    // listing must not make every visitor repeatedly download all history.
+    if (['home', 'browse'].includes(request?.view)) return 60000;
     let delay = request?.view === 'detail' ? 10000 : 30000;
     for (const auction of auctions) {
         if (auction.status !== 'active') continue;
