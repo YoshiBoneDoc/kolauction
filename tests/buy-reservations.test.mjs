@@ -120,6 +120,17 @@ test('escrow summary keeps dynamic amounts and only shows a held-item notice whe
  assert.doesNotMatch(harness(listing,{id:'seller'}).html(),/Escrow Summary|Available funds|Commission paid|held for delivery/);
 });
 
+test('only an unrestricted administrator sees the miniature escrow summary on another player’s active Buy order',()=>{
+ const listing={...order,buyAdmin:true,balanceMeat:16800,purchaseMeat:4000,buyCommissionMeat:200,heldQuantity:0};
+ const html=harness(listing,{id:'admin'}).html();
+ assert.match(html,/aria-label="Administrator escrow summary"/);
+ assert.match(readable(html),/60 available · 20 reserved Escrow Summary Available funds 16,800 Meat Refundable fee reserve 800 Meat Spent on purchases 4,000 Meat Commission paid 200 Meat/);
+ for(const user of [null,{id:'admin',isBanned:true},{id:'buyer'}])
+  assert.doesNotMatch(harness(listing,user).html(),/aria-label="Administrator escrow summary"/);
+ assert.doesNotMatch(harness({...listing,buyAdmin:false},{id:'other'}).html(),/aria-label="Administrator escrow summary"|Refundable fee reserve/);
+ assert.doesNotMatch(harness({...listing,usernamesVisible:false},{id:'admin'}).html(),/aria-label="Administrator escrow summary"/);
+});
+
 test('closed Buy orders show the actual outcome and concise sales without claiming queued payments were received',()=>{
  const fill={seller:'Anrath1',quantity:15,price_per_item:100,payment_meat:1500,payment_sent:true,created_at:'2026-10-22T23:17:58Z'};
  for(const [status,reason,label] of [['completed','filled','Trade completed'],['cancelled','cancel','Canceled early'],['expired','deadline','Expired'],['voided',null,'Cancelled by administrator'],['settling','cancel','Closing — cancelled']]){

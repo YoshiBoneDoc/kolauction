@@ -112,6 +112,27 @@ export function attachCarouselDrag({ viewport, track, moving, reducedMotion, rot
         }
     }
     function preventNativeDrag(event) { event.preventDefault(); }
+    function wheel(event) {
+        // Static strips already get native trackpad scrolling and momentum.
+        // For the animated strip, translate those same horizontal deltas into
+        // queue movement and resume auto-scrolling after the gesture settles.
+        if (!moving || gesture || event.ctrlKey) return;
+        const horizontal = event.shiftKey && !event.deltaX ? event.deltaY : event.deltaX;
+        if (!horizontal || (!event.shiftKey && Math.abs(event.deltaY || 0) >= Math.abs(horizontal))) return;
+        event.preventDefault();
+        view.cancelAnimationFrame(frame);
+        frame = 0;
+        if (!manual) beginManual();
+        const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewport.clientWidth : 1;
+        moveBy(-horizontal * unit);
+        const lastWheel = view.performance.now();
+        function settle(time) {
+            if (disposed) return;
+            if (time - lastWheel < 200) frame = view.requestAnimationFrame(settle);
+            else { frame = 0; resume(); }
+        }
+        frame = view.requestAnimationFrame(settle);
+    }
     function resized() {
         if (!manual) return;
         const progress = position / step;
@@ -129,6 +150,7 @@ export function attachCarouselDrag({ viewport, track, moving, reducedMotion, rot
     view.addEventListener('pointercancel', up);
     viewport.addEventListener('click', click, true);
     viewport.addEventListener('dragstart', preventNativeDrag);
+    viewport.addEventListener('wheel', wheel, { passive: false });
     viewport.addEventListener('focusin', focus);
     view.addEventListener('resize', resized);
     return () => {
@@ -141,6 +163,7 @@ export function attachCarouselDrag({ viewport, track, moving, reducedMotion, rot
         view.removeEventListener('pointercancel', up);
         viewport.removeEventListener('click', click, true);
         viewport.removeEventListener('dragstart', preventNativeDrag);
+        viewport.removeEventListener('wheel', wheel);
         viewport.removeEventListener('focusin', focus);
         view.removeEventListener('resize', resized);
     };

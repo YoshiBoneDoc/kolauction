@@ -91,6 +91,28 @@ test('static strips leave touch swipes native without capture, custom momentum o
     h.stop();
 });
 
+test('animated strips follow horizontal trackpad momentum and resume their loop after scrolling settles',()=>{
+    const h=fixture();
+    const start=[...h.state.order];
+    assert.equal(h.emit(h.viewport,'wheel',{deltaX:700,deltaY:0}).prevented,true);
+    assert.equal(h.track.style.animation,'none');
+    assert.notDeepEqual(h.state.order,start);
+    assert.equal(new Set(h.state.order).size,4);
+    h.tick(150);
+    assert.equal(h.track.style.animation,'none');
+    h.emit(h.viewport,'wheel',{deltaX:20,deltaY:0});
+    h.tick(150);assert.equal(h.track.style.animation,'none');
+    h.tick(100);assert.equal(h.track.style.animation,'');
+    assert.equal(h.frames.size,0);
+    assert.equal(h.emit(h.viewport,'wheel',{deltaX:0,deltaY:80}).prevented,false);
+    assert.equal(h.emit(h.viewport,'wheel',{deltaX:80,deltaY:0,ctrlKey:true}).prevented,false);
+    assert.equal(h.emit(h.viewport,'wheel',{deltaX:0,deltaY:80,shiftKey:true}).prevented,true);
+    h.stop();assert.equal(h.frames.size,0);
+    const native=fixture({moving:false});
+    assert.equal(native.emit(native.viewport,'wheel',{deltaX:80,deltaY:0}).prevented,false);
+    native.stop();
+});
+
 test('static strips retain desktop dragging and momentum while touch scrolling remains independent',()=>{
     const h=fixture({moving:false});
     h.emit(h.viewport,'pointerdown');h.emit(h.viewport,'pointermove',{clientX:-150,timeStamp:20});

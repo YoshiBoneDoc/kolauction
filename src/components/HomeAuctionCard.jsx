@@ -9,6 +9,7 @@ import { getAuctionStatus } from '../lib/auctionLifecycle';
 
 export default function HomeAuctionCard({ auction, now }) {
     const completed = auction.status === 'completed';
+    const hot = getAuctionStatus(auction, now) === 'active' && auction.isHot;
     const buy = auction.auctionKind === 'buy';
     const purchased = auction.purchasedQuantity || 0;
     const target = Math.max(purchased, auction.quantity - (auction.reducedQuantity || 0));
@@ -21,8 +22,9 @@ export default function HomeAuctionCard({ auction, now }) {
                 {auction.image && <img src={auction.image} alt="" draggable={false} loading="lazy" className="h-10 w-10 object-contain [image-rendering:pixelated]" />}
             </div>
             <h3 title={`${auction.item} ×${auction.quantity.toLocaleString('en-US')}`} className={`col-start-2 row-start-1 line-clamp-2 self-center break-words text-sm font-bold leading-4 text-[#14248A] ${buy ? 'pr-10' : ''}`}>{auction.item} <span className="text-[#5365AB]">×{auction.quantity.toLocaleString('en-US')}</span></h3>
-            <FittedPrice fitKey={`${label}:${amount}:${auction.quantity}`} title={`${label}: ${amount.toLocaleString('en-US')} Meat${buy ? ' per item' : ''}`} className={`col-start-2 row-start-2 block min-w-0 self-center text-center text-lg font-bold ${buy ? 'leading-5' : 'leading-[22px]'} text-[#112D4E]`}>
+            <FittedPrice fitKey={`${label}:${amount}:${auction.quantity}:${hot}:${auction.bidCount ?? auction.bids?.length ?? 0}`} title={`${label}: ${amount.toLocaleString('en-US')} Meat${buy ? ' per item' : ''}`} className={`col-start-2 row-start-2 block min-w-0 self-center text-center text-lg font-bold ${buy ? 'leading-5' : 'leading-[22px]'} text-[#112D4E]`}>
                 <span className="text-xs font-normal text-gray-600">{label}: </span>{buy ? <>{formatCompactMeat(amount)} Meat<span className="text-xs font-normal text-gray-600"> / item</span></> : <SellPrice amount={amount} quantity={auction.quantity} />}
+                {hot && <><span role="img" aria-label="Top 10% of active auctions by total bids" title="Top 10% of active auctions by total bids" className="ml-1 inline-block text-base">🔥</span><span className="ml-1 text-[9px] font-normal text-gray-500" aria-label={`${auction.bidCount ?? auction.bids?.length ?? 0} bids`}>({(auction.bidCount ?? auction.bids?.length ?? 0).toLocaleString('en-US')})</span></>}
             </FittedPrice>
             {buy && <progress aria-label="Order fulfillment" data-status={getAuctionStatus(auction, now)} value={purchased} max={target || 1}
                 title={`${purchased.toLocaleString('en-US')} / ${target.toLocaleString('en-US')} purchased`}

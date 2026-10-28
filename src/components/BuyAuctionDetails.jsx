@@ -46,6 +46,12 @@ export default function BuyAuctionDetails({ auction, now, backLink }) {
     const owns = currentUser?.id === auction.sellerId;
     const canViewSellers = Boolean(currentUser && !currentUser.isBanned && auction.usernamesVisible !== false);
     const canViewFees = Boolean(currentUser && !currentUser.isBanned && auction.usernamesVisible !== false && (owns || auction.buyAdmin));
+    const escrowSummary = canViewFees && auction.balanceMeat != null ? [
+        ['Available funds', auction.balanceMeat],
+        ['Refundable fee reserve', buyRefundableFeeReserve(auction)],
+        ['Spent on purchases', auction.purchaseMeat],
+        ['Commission paid', auction.buyCommissionMeat],
+    ] : null;
     const auditEvents = canViewFees && auction.buyAdmin
         ? (auction.reservationAudit || []).filter(event=>event.kind!=='reservation_expired') : [];
     const result = getAuctionResult(auction, now);
@@ -134,7 +140,18 @@ export default function BuyAuctionDetails({ auction, now, backLink }) {
                 <progress aria-label="Order fulfillment" value={purchased} max={target || 1}
                     data-status={result.status}
                     className="buy-card-progress block h-2 w-full accent-blue-500" />
-                {active && !closed && <p className="text-xs text-[#64748B]">{(available ?? 0).toLocaleString('en-US')} available · {(auction.reservedQuantity || 0).toLocaleString('en-US')} reserved</p>}
+                {active && !closed && <div className="flex flex-wrap items-start justify-between gap-4">
+                    <p className="shrink-0 text-xs text-[#64748B]">{(available ?? 0).toLocaleString('en-US')} available · {(auction.reservedQuantity || 0).toLocaleString('en-US')} reserved</p>
+                    {!owns && auction.buyAdmin && escrowSummary && <section aria-label="Administrator escrow summary" className="w-full min-w-0 sm:w-auto sm:max-w-[72%] sm:flex-1">
+                        <h2 className="mb-1 text-xs font-medium text-gray-700">Escrow Summary</h2>
+                        <dl className="grid grid-cols-2 gap-x-3 gap-y-2 lg:grid-cols-4">
+                            {escrowSummary.map(([label, value]) => <div key={label} className="min-w-0">
+                                <dt className="border-b border-[#E8DDD7] pb-1 text-[11px] leading-4 text-gray-500">{label}</dt>
+                                <dd className="break-words pt-1 text-xs font-normal tabular-nums text-gray-900">{value == null ? '—' : `${value.toLocaleString('en-US')} Meat`}</dd>
+                            </div>)}
+                        </dl>
+                    </section>}
+                </div>}
                 {auction.buyClosingReason && auction.reservedQuantity > 0 && ['active', 'settling'].includes(result.status) && <p className="text-xs text-[#64748B]">Honoring existing reservations</p>}
             </section>
             {owns && canViewFees && result.status === 'pending_escrow' && <section aria-label="Fund buy auction" className="buy-detail-action rounded-lg bg-[#F0F5FF] px-4 py-3">
@@ -209,12 +226,7 @@ export default function BuyAuctionDetails({ auction, now, backLink }) {
             {owns && canViewFees && auction.status !== 'pending_escrow' && auction.balanceMeat != null && <section aria-label="Escrow Summary" className="max-w-3xl text-sm">
                 <h2 className="mb-2.5 text-[17px] font-semibold text-gray-900">Escrow Summary</h2>
                 <dl className="grid grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-4">
-                    {[
-                        ['Available funds', auction.balanceMeat],
-                        ['Refundable fee reserve', buyRefundableFeeReserve(auction)],
-                        ['Spent on purchases', auction.purchaseMeat],
-                        ['Commission paid', auction.buyCommissionMeat],
-                    ].map(([label, value]) => <div key={label} className="min-w-0">
+                    {escrowSummary.map(([label, value]) => <div key={label} className="min-w-0">
                         <dt className="border-b border-[#E8DDD7] pb-1.5 text-[13px] font-medium text-gray-600">{label}</dt>
                         <dd className="break-words pt-1.5 font-normal tabular-nums text-gray-900">{value == null ? '—' : `${value.toLocaleString('en-US')} Meat`}</dd>
                     </div>)}
