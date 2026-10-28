@@ -83,3 +83,24 @@ test('authorization/privacy errors erase other formerly authorized resources too
         assert.equal(cache.snapshot('denied').error,'denied');
     }
 });
+
+test('canceling a superseded filter aborts it, skips queued obsolete reads and lets the latest selection proceed',async()=>{
+    const job=deferred(),calls=[];let signal;
+    const cache=createAuctionReadCache(async(key,s)=>{calls.push(key);if(key==='old'){signal=s;return job.promise;}return {key};});
+    const old=cache.load('old');await settle();
+    const obsolete=cache.load('obsolete');cache.cancel('obsolete');
+    cache.cancel('old');assert.equal(signal.aborted,true);
+    const latest=cache.load('latest');job.resolve({key:'old'});
+    await Promise.all([old,obsolete,latest]);
+    assert.deepEqual(calls,['old','latest']);assert.equal(cache.snapshot('old').data,null);
+    assert.equal(cache.snapshot('latest').data.key,'latest');
+});
+
+test('long filter histories stay bounded while visible pending data is retained',async()=>{
+    const cache=createAuctionReadCache(async key=>({key}));
+    cache.retain(['pending:1']);await cache.load('pending:1');
+    for(let i=0;i<80;i++)await cache.load(`filter:${i}`);
+    assert.equal(cache.snapshot('pending:1').data.key,'pending:1');
+    assert.equal(cache.snapshot('filter:79').data.key,'filter:79');
+    assert.equal(cache.snapshot('filter:0').data,null);
+});

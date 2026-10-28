@@ -1,20 +1,20 @@
 import AuctionFilters, { AuctionFiltersButton, AUCTION_PRICE_RANGE_ENABLED } from '../components/AuctionFilters';
 import { parsePrice } from '../lib/auctionPriceRange';
-import { useContext, useEffect, useId, useMemo, useState } from 'react';
+import { useContext, useEffect, useId, useState } from 'react';
 import useAuctionBrowseSession from '../hooks/useAuctionBrowseSession';
 import { AuctionsContext } from '../context/AuctionsContext';
 import { UserContext } from '../context/UserContext';
-import { auctionFilters, resolveAuctionSort, browseAuctions } from '../lib/auctionBrowsing';
+import { auctionFilters, resolveAuctionSort } from '../lib/auctionBrowsing';
 import { useNow } from '../hooks/useNow';
 import CompactAuctionCard from '../components/CompactAuctionCard';
 import PendingTrades from '../components/PendingTrades';
 import useAuctionSearch from '../hooks/useAuctionSearch';
 
 export default function AllAuctions() {
-    const { auctions, priceBounds, isLoading, error, hasLoaded = !isLoading && !error, refreshAuctions } = useContext(AuctionsContext);
+    const { auctions, total, priceBounds, isLoading, error, hasLoaded = !isLoading && !error, refreshAuctions } = useContext(AuctionsContext);
     const { currentUser } = useContext(UserContext);
     const { params, setParams, rememberSearch, resetSession, navigationType, locationKey } = useAuctionBrowseSession({ priceBounds: AUCTION_PRICE_RANGE_ENABLED ? priceBounds : null, isLoading, error });
-    const [searchInput, setSearchInput] = useAuctionSearch(setParams, { immediate: true });
+    const [searchInput, setSearchInput] = useAuctionSearch(setParams);
     const now = useNow();
     const [openBid, setOpenBid] = useState(null);
     const [filtersOpen, setFiltersOpen] = useState(false);
@@ -23,7 +23,6 @@ export default function AllAuctions() {
         if (navigationType !== 'REPLACE') { setFiltersOpen(false); setOpenBid(null); }
     }, [navigationType, locationKey]);
     const browseKey = params.toString();
-    const search = searchInput;
     const mineOnly = Boolean(currentUser && params.get('mine') === '1');
     const othersOnly = Boolean(currentUser && params.get('mine') === 'others');
     const ownershipFiltered = mineOnly || othersOnly;
@@ -43,10 +42,10 @@ export default function AllAuctions() {
     const minPrice = AUCTION_PRICE_RANGE_ENABLED ? parsePrice(params.get('minPrice')) : null;
     const maxPrice = AUCTION_PRICE_RANGE_ENABLED ? parsePrice(params.get('maxPrice')) : null;
     const requestedPage = Math.min(1000000, Math.max(1, Number.parseInt(params.get('page'), 10) || 1));
-    const visible = useMemo(() => browseAuctions(ownershipFiltered ? auctions.filter(auction => mineOnly ? auction.sellerId === currentUser.id : auction.sellerId !== currentUser.id) : auctions, { search, status, sort, trade, kind, minPrice, maxPrice, now }), [auctions, mineOnly, ownershipFiltered, currentUser?.id, search, status, sort, trade, kind, minPrice, maxPrice, now]);
-    const found = visible.length;
+    // The reader filters and sorts the complete matching set BEFORE pagination.
+    const found = total;
     const page = Math.min(requestedPage, Math.max(1, Math.ceil(found / 24)));
-    const pageRows = visible.slice((page - 1) * 24, page * 24);
+    const pageRows = auctions;
     useEffect(() => {
         if (hasLoaded && requestedPage !== page) setParams(previous => {
             const next = new URLSearchParams(previous);
@@ -149,7 +148,7 @@ export default function AllAuctions() {
                         {hasLoaded && <p role="status">{found} {found === 1 ? 'auction' : 'auctions'} found</p>}
                         <button onClick={clearAdvancedFilters} className="min-h-9 border-0 bg-transparent px-2 text-sm text-blue-700 underline">Reset filters</button>
                     </div>
-                    {!error && visible.length === 0 && <p className="rounded-lg border bg-white p-6">{trade === 'none' ? 'Select Escrow or Direct to show auctions.' : mineOnly ? 'No auctions of yours match these filters.' : 'No auctions match your search and filters. Try another item name or status.'}</p>}
+                    {!error && pageRows.length === 0 && <p className="rounded-lg border bg-white p-6">{trade === 'none' ? 'Select Escrow or Direct to show auctions.' : mineOnly ? 'No auctions of yours match these filters.' : 'No auctions match your search and filters. Try another item name or status.'}</p>}
                     <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         {pageRows.map((auction) => <CompactAuctionCard key={auction.id} auction={auction} now={now}
                             expanded={openBid?.id === auction.id && openBid?.browseKey === browseKey}

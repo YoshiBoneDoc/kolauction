@@ -1,7 +1,6 @@
-import { parsePrice, auctionPriceBounds } from './auctionPriceRange.js';
-import { resolveAuctionSort, highRollerValue, HIGH_ROLLER_MIN_PRICE } from './auctionBrowsing.js';
+import { parsePrice } from './auctionPriceRange.js';
+import { resolveAuctionSort } from './auctionBrowsing.js';
 import { observeAuctionServerTime, auctionClockRequestStarted } from './auctionClock.js';
-import { isAbandonedEscrowDraft } from './auctionLifecycle.js';
 export function mapAuction(row, bidRows) {
     const bids = bidRows.filter((bid) => bid.auction_id === row.id)
         .sort((a, b) => Number(a.amount) - Number(b.amount))
@@ -121,106 +120,53 @@ export function createAuctionService(client) {
     }
 
     return {
-        async loadDataset({ signal } = {}) {
-            // Use only the existing privacy-filtered RPC, never raw tables or
-            // financial maintenance. All pages belong to one atomic cache commit.
-            for (let attempt = 0; attempt < 2; attempt++) {
-                const rows = new Map(), bids = new Map();
-                let expected = null, changed = false;
-                for (let page = 1; page <= 250; page++) {
-                    signal?.throwIfAborted();
-                    const started = auctionClockRequestStarted();
-                    let request = requireClient().rpc('read_auction_page', {
-                        p_view: 'browse', p_id: null, p_search: '', p_status: 'all',
-                        p_sort: 'newest', p_page: page, p_trade: 'all', p_kind: 'all',
-                    });
-                    if (signal && request.abortSignal) request = request.abortSignal(signal);
-                    const { data, error, status: statusCode } = await request;
-                    signal?.throwIfAborted();
-                    if (error) throw databaseError({ ...error, status: error.status ?? statusCode });
-                    if (data?.privacy_version !== 1) throw Object.assign(new Error('The auction privacy policy could not be verified.'), { code: 'KHUB_PRIVACY' });
-                    if (!Array.isArray(data.rows) || !Array.isArray(data.bids)
-                        || !Number.isSafeInteger(Number(data.total)) || Number(data.total) < 0) {
-                        throw new Error('The auction list could not be verified. Please retry shortly.');
-                    }
-                    observeAuctionServerTime(data.server_time, started);
-                    if (expected == null) expected = Number(data.total);
-                    if (expected > 6000) throw new Error('The auction list is too large to refresh safely. Please contact support.');
-                    if (Number(data.total) !== expected) { changed = true; break; }
-                    for (const row of data.rows) rows.set(row.id, row);
-                    for (const bid of data.bids) bids.set(bid.id, bid);
-                    if (page * 24 >= expected) {
-                        if (rows.size !== expected) { changed = true; break; }
-                        const bidRows = [...bids.values()];
-                        const auctions = [...rows.values()].map(row => mapAuction(row, bidRows))
-                            .filter(auction => !isAbandonedEscrowDraft(auction));
-                        return { auctions, total: auctions.length, priceBounds: auctionPriceBounds(auctions) };
-                    }
-                    if (!data.rows.length) { changed = true; break; }
-                }
-                if (!changed) break;
-            }
-            throw new Error('The auction list changed while refreshing. We will retry shortly.');
-        },
-        async load({ view = 'browse', id = null, sellerId = null, excludeOwn = false, kind = 'all', search = '', status = 'active', sort = resolveAuctionSort(status), trade = 'all', page = 1, minPrice = null, maxPrice = null } = {}) {
+        async load({ view = 'browse', id = null, sellerId = null, excludeOwn = false, kind = 'all', search = '', status = 'active', sort = resolveAuctionSort(status), trade = 'all', page = 1, minPrice = null, maxPrice = null, signal } = {}) {
             // Browsing is read-only. The existing bot tick expires all auction
             // types; write RPCs independently validate deadlines under their locks.
-            async function readPage(pageNumber, completed = false, highValue = false) {
-                // The historical home endpoint returns only four rows. Use the
-                // existing privacy-filtered browse pages for the complete strip.
-                const requestStartedAt = auctionClockRequestStarted();
-                const { data, error: readError } = await requireClient().rpc(view === 'browse' ? 'read_filtered_auction_page' : 'read_auction_page', {
-                    p_view: view === 'home' ? 'browse' : view === 'browse' && excludeOwn ? 'others' : view === 'browse' && sellerId ? 'seller' : view,
-                    p_id: view === 'browse' && sellerId ? sellerId : id,
-                    p_search: view === 'home' ? '' : search, p_status: view === 'home' ? (completed ? 'completed' : 'active') : status,
-                    ...(['browse', 'seller'].includes(view) && ['escrow', 'direct', 'none'].includes(trade) ? { p_trade: trade } : {}),
-                    ...(['buy', 'sell'].includes(kind) ? { p_kind: kind, p_trade: trade } : {}),
-                    ...(view === 'browse' ? { p_trade: trade, p_kind: kind, p_min_price: minPrice, p_max_price: maxPrice } : {}),
-                    p_sort: view === 'home' ? (completed ? highValue ? 'high-rollers' : 'completed' : 'newest') : sort, p_page: pageNumber,
-                });
-                if (readError) throw databaseError(readError);
-                if (data?.privacy_version !== 1) throw Object.assign(new Error('Auctions are temporarily unavailable while a privacy update is being completed. Please try again later.'), { code: 'KHUB_PRIVACY' });
-                observeAuctionServerTime(data.server_time, requestStartedAt);
-                return data;
+            const requestStartedAt = auctionClockRequestStarted();
+            let request;
+            if (view === 'home') request = requireClient().rpc('read_home_auctions');
+            else request = requireClient().rpc(view === 'browse' ? 'read_filtered_auction_page' : 'read_auction_page', {
+                p_view: view === 'browse' && excludeOwn ? 'others' : view === 'browse' && sellerId ? 'seller' : view,
+                p_id: view === 'browse' && sellerId ? sellerId : id,
+                p_search: search, p_status: status,
+                ...(['browse', 'seller'].includes(view) && ['escrow', 'direct', 'none'].includes(trade) ? { p_trade: trade } : {}),
+                ...(['buy', 'sell'].includes(kind) ? { p_kind: kind, p_trade: trade } : {}),
+                ...(view === 'browse' ? { p_trade: trade, p_kind: kind, p_min_price: minPrice, p_max_price: maxPrice } : {}),
+                p_sort: sort, p_page: page,
+            });
+            if (signal && request.abortSignal) request.abortSignal(signal);
+            const { data, error, status: statusCode } = await request;
+            signal?.throwIfAborted();
+            if (error) throw databaseError({ ...error, status: error.status ?? statusCode });
+            if (data?.privacy_version !== 1) throw Object.assign(new Error('Auctions are temporarily unavailable while a privacy update is being completed. Please try again later.'), { code: 'KHUB_PRIVACY' });
+            if (!Array.isArray(data.rows) || !Array.isArray(data.bids)
+                || !Number.isSafeInteger(Number(data.total)) || Number(data.total) < 0
+                || (view === 'home' && (!data.sections || ['popular', 'new', 'ending', 'highRollers', 'recent'].some(key => !Array.isArray(data.sections[key]) || data.sections[key].length > 24)))
+                || (view === 'home' ? data.rows.length > 120 : ['browse', 'seller'].includes(view) && data.rows.length > 24)) {
+                throw new Error('The auction list could not be verified. Please retry shortly.');
             }
-            const data = await readPage(view === 'home' ? 1 : page);
-            const rows = [...data.rows];
-            const bids = [...data.bids];
+            observeAuctionServerTime(data.server_time, requestStartedAt);
+            const auctions = data.rows.map(row => mapAuction(row, data.bids));
+            let homeSections;
             if (view === 'home') {
-                // Bound the scan to the first response's page count. New listings
-                // arriving mid-read are picked up by the next normal refresh.
-                const pages = Math.ceil(Number(data.total) / 24);
-                for (let next = 2; next <= pages; next++) {
-                    const more = await readPage(next);
-                    rows.push(...more.rows); bids.push(...more.bids);
-                }
-                const recent = await readPage(1, true);
-                rows.push(...recent.rows); bids.push(...recent.bids);
-                // Recent trades cover the whole history when there are <=24.
-                // Otherwise read only qualifying High Rollers, filtered and
-                // ranked in the database before pagination (including market value).
-                if (Number(recent.total) > 24) {
-                    let maxPages = Math.ceil(Number(recent.total) / 24);
-                    for (let next = 1; next <= maxPages; next++) {
-                        const high = await readPage(next, true, true);
-                        maxPages = Math.min(maxPages, Math.ceil(Number(high.total) / 24));
-                        const qualifying = high.rows.filter(row => highRollerValue(mapAuction(row, [])) >= HIGH_ROLLER_MIN_PRICE);
-                        rows.push(...qualifying);
-                        const ids = new Set(qualifying.map(row => row.id));
-                        bids.push(...high.bids.filter(bid => ids.has(bid.auction_id)));
-                        if (!high.rows.length || qualifying.length < high.rows.length) break;
-                    }
-                }
+                const byId = new Map(auctions.map(auction => [auction.id, auction]));
+                homeSections = Object.fromEntries(Object.entries(data.sections).map(([key, ids]) => [key, ids.map(id => {
+                    if (!byId.has(id)) throw new Error('The homepage auction list could not be verified.');
+                    return byId.get(id);
+                })]));
             }
-            const unique = [...new Map(rows.map(row => [row.id, row])).values()];
-            const uniqueBids = [...new Map(bids.map((bid, index) => [bid.id ?? index, bid])).values()];
-            return { auctions: unique.map(row => mapAuction(row, uniqueBids)), total: Number(data.total), seller: data.seller || null,
+            return { auctions, total: Number(data.total), seller: data.seller || null,
+                ...(homeSections ? { homeSections } : {}),
                 ...(view === 'browse' ? { priceBounds: data.price_bounds && parsePrice(data.price_bounds.min) != null && parsePrice(data.price_bounds.max) != null
                     ? { min: Number(data.price_bounds.min), max: Number(data.price_bounds.max) } : null } : {}),
             };
         },
-        async pendingTrades(page = 1) {
-            const { data, error, status: statusCode } = await requireClient().rpc('read_pending_trades', { p_page: page });
+        async pendingTrades(page = 1, { signal } = {}) {
+            const request = requireClient().rpc('read_pending_trades', { p_page: page });
+            if (signal && request.abortSignal) request.abortSignal(signal);
+            const { data, error, status: statusCode } = await request;
+            signal?.throwIfAborted();
             if (error) throw databaseError({ ...error, status: error.status ?? statusCode });
             if (data?.privacy_version !== 1) throw Object.assign(new Error('Private trade details are temporarily unavailable.'), { code: 'KHUB_PRIVACY' });
             return { auctions: data.rows.map((row) => mapAuction(row, [])), total: Number(data.total) };

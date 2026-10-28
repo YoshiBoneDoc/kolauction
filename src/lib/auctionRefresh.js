@@ -26,8 +26,7 @@ export function auctionReadRequest(pathname, search = '', viewerId = null) {
 }
 
 export function auctionRefreshDelay(request, auctions = [], now = Date.now()) {
-    // Public browsing loads the full shared dataset. A deadline on any one
-    // listing must not make every visitor repeatedly download all history.
+    // Public summary/page reads keep a stable cadence during simultaneous endings.
     if (['home', 'browse'].includes(request?.view)) return 60000;
     let delay = request?.view === 'detail' ? 10000 : 30000;
     for (const auction of auctions) {
@@ -45,7 +44,7 @@ export function auctionRefreshDelay(request, auctions = [], now = Date.now()) {
 }
 
 // Schedule after each read finishes, avoiding overlapping polling requests.
-export function startAuctionRefresh({ refresh, delay, document, timers = globalThis, initialDelay = 0 }) {
+export function startAuctionRefresh({ refresh, delay, document, timers = globalThis, initialDelay = 0, jitter = 0, random = Math.random }) {
     let stopped = false;
     let running = false;
     let timer;
@@ -56,7 +55,7 @@ export function startAuctionRefresh({ refresh, delay, document, timers = globalT
         try { await refresh(); }
         finally {
             running = false;
-            if (!stopped && !document.hidden) timer = timers.setTimeout(update, typeof delay === 'function' ? delay() : delay);
+            if (!stopped && !document.hidden) timer = timers.setTimeout(update, Math.ceil((typeof delay === 'function' ? delay() : delay) * (1 + jitter * random())));
         }
     }
     function visibility() {

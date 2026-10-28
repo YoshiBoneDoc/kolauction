@@ -148,39 +148,16 @@ test('website bids above the former 20-billion limit retain their exact amount',
     assert.deepEqual(calls,[['place_bid',{p_auction_id:row.id,p_amount:50000000001}]]);
 });
 
-test('homepage loads every active page beyond four and 24 cards using existing privacy-filtered reads', async () => {
-    const requests = [];
-    const service = createAuctionService({ async rpc(name, args) {
-        requests.push([name, args]);
-        if (name === 'finalize_expired_auctions') return { error: null };
-        if (args.p_status === 'completed') {
-            assert.equal(args.p_sort, 'completed'); assert.equal(args.p_page, 1);
-            return { data: { privacy_version: 1, rows: [{ ...row, id: 'completed', status: 'completed', completed_at: '2026-10-22T12:00:00Z' }], bids: [], total: 1 }, error: null };
-        }
-        assert.equal(args.p_view, 'browse'); assert.equal(args.p_status, 'active');
-        assert.equal(args.p_search, ''); assert.equal(args.p_sort, 'newest');
-        const offset = (args.p_page - 1) * 24;
-        return { data: { privacy_version: 1, rows: Array.from({ length: Math.min(24, 53-offset) }, (_, i) => ({ ...row, id: `active-${offset+i}` })), bids: [], total: 53 }, error: null };
-    } });
-    const data = await service.load({ view: 'home' });
-    assert.equal(data.auctions.length, 54);
-    assert.equal(data.total, 53);
-    assert.equal(new Set(data.auctions.map(auction => auction.id)).size, 54);
-    assert.deepEqual(requests.filter(([name]) => name === 'read_auction_page').map(([,args]) => args.p_page), [1,2,3,1]);
-    assert.equal(requests.filter(([name]) => name === 'finalize_expired_auctions').length, 0);
-});
-
-test('home page scans deduplicate shifting rows and reject a later failed or outdated privacy response', async () => {
-    for (const failure of [null, 'network', 'privacy']) {
-        const service = createAuctionService({ async rpc(name, args) {
-            if (name === 'finalize_expired_auctions') return { error: null };
-            if (args.p_page === 2 && failure === 'network') return { error: { message: 'Could not load page two' } };
-            return { error: null, data: { privacy_version: args.p_page === 2 && failure === 'privacy' ? 0 : 1,
-                rows: [{ ...row, id: 'same-row' }], bids: [], total: 25 } };
-        } });
-        if (failure) await assert.rejects(service.load({ view: 'home' }), failure === 'network' ? /page two/ : /privacy update/);
-        else assert.equal((await service.load({ view: 'home' })).auctions.length, 1);
-    }
+test('homepage is one bounded read independent of total history, with exact section membership', async () => {
+    const calls=[];
+    const service=createAuctionService({rpc:async(name,args)=>{
+        calls.push([name,args]);
+        return {data:{privacy_version:1,rows:[row],bids:[],total:10000,sections:{popular:[row.id],new:[row.id],ending:[row.id],highRollers:[],recent:[]}}};
+    }});
+    const data=await service.load({view:'home'});
+    assert.equal(data.total,10000);assert.equal(data.auctions.length,1);
+    assert.equal(data.homeSections.popular[0].id,row.id);
+    assert.deepEqual(calls,[['read_home_auctions',undefined]]);
 });
 
 test('My Auctions uses server-side seller filtering before pagination and preserves returned totals', async () => {
@@ -243,25 +220,6 @@ test('Others uses an authenticated server-side view before pagination, including
     assert.equal(result.total,55);
 });
 
-
-test('homepage reads older High Rollers by server-side market-or-price filtering without scanning unrelated history',async()=>{
-    const requests=[];
-    const high=Array.from({length:26},(_,i)=>({...row,id:'high-'+i,status:'completed',final_price:String(100000000-i),completed_at:'2026-01-01T00:00:00Z'}));
-    const market={...row,id:'market',status:'completed',final_price:'1000',market_value_meat:'50000000'};
-    const recent=[high[0],...Array.from({length:23},(_,i)=>({...row,id:'recent-'+i,status:'completed',final_price:'1000',completed_at:'2026-10-24T00:00:00Z'}))];
-    const bid={id:'winning',auction_id:'high-0',amount:'100000000',created_at:'2026-01-01T00:00:00Z'};
-    const service=createAuctionService({rpc:async(name,args)=>{
-        if(name==='finalize_expired_auctions')return{error:null};
-        requests.push(args);
-        const rows=args.p_status==='active'?[]:args.p_sort==='completed'?recent:args.p_page===1?high.slice(0,24):[...high.slice(24),market];
-        return{data:{privacy_version:1,rows,bids:rows.some(r=>r.id===bid.auction_id)?[bid]:[],total:args.p_status==='active'?0:args.p_sort==='high-rollers'?27:100}};
-    }});
-    const data=await service.load({view:'home'});
-    assert.equal(data.auctions.length,50);assert.equal(data.auctions.filter(a=>a.id.startsWith('high-')).length,26);
-    assert.equal(data.auctions.find(a=>a.id==='high-0').bids.length,1);
-    assert.equal(data.auctions.find(a=>a.id==='market').marketValueMeat,50000000);
-    assert.deepEqual(requests.map(r=>[r.p_status,r.p_sort,r.p_page]),[['active','newest',1],['completed','completed',1],['completed','high-rollers',1],['completed','high-rollers',2]]);
-});
 
 
 test('detail, seller and profile browsing never require financial maintenance or its lock', async () => {

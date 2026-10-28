@@ -12,13 +12,23 @@ const { outputFiles } = buildSync({
             import { renderToStaticMarkup } from 'react-dom/server';
             import { StaticRouter } from 'react-router-dom';
             import App from './src/App.jsx';
+            import { browseAuctions } from './src/lib/auctionBrowsing.js';
+            import { auctionReadRequest } from './src/lib/auctionRefresh.js';
             import { AuctionsContext } from './src/context/AuctionsContext.jsx';
             import { UserContext } from './src/context/UserContext.jsx';
             export function render(path, auctions, user = null, state = {}) {
+                let total = auctions.length;
+                if (path.split('?')[0] === '/auctions') {
+                    const r = auctionReadRequest('/auctions', path.includes('?') ? path.slice(path.indexOf('?')) : '', user?.id);
+                    const pool = r.sellerId ? auctions.filter(a => a.sellerId === r.sellerId) : r.excludeOwn ? auctions.filter(a => a.sellerId !== user?.id) : auctions;
+                    const filtered = browseAuctions(pool, r);
+                    total = filtered.length;
+                    auctions = filtered.slice((r.page - 1) * 24, r.page * 24);
+                }
                 return renderToStaticMarkup(
                     <StaticRouter location={path}>
                         <UserContext.Provider value={{currentUser: user}}>
-                            <AuctionsContext.Provider value={{auctions, isLoading: false, error: '', ...state}}><App /></AuctionsContext.Provider>
+                            <AuctionsContext.Provider value={{auctions, total, isLoading: false, error: '', ...state}}><App /></AuctionsContext.Provider>
                         </UserContext.Provider>
                     </StaticRouter>
                 );
@@ -308,14 +318,14 @@ test('individual auction pages display the exact hybrid minimum in Direct inputs
             const html = render('/auction/active', [listing], { id: 'buyer' });
             if (escrowMode) assert.ok(html.includes(`Attach at least ${minimum} Meat, with no items.`), `Escrow at ${currentBid}`);
             else {
-                assert.ok(html.includes(`placeholder="${minimum}"`), `Direct at ${currentBid}`);
+                assert.ok(html.includes(`placeholder="${minimum} · Full amounts or k/m/b shorthand."`), `Direct at ${currentBid}`);
                 assert.ok(html.includes(`Next minimum bid: ${minimum} Meat.`));
             }
         }
     }
 });
 
-test('homepage has one See all auctions link beside Explore Auctions and retains the entire open-auction strip', () => {
+test('homepage has one See all auctions link beside Explore Auctions and caps the Explore strip with navigation to the full list', () => {
     const listings = Array.from({ length: 31 }, (_, i) => ({ ...auctions[0], id: `carousel-${i}`, item: `Carousel item ${i}`, bidCount: 31-i }));
     const html = render('/', listings);
     assert.equal((html.match(/>See all auctions<\/a>/g) || []).length, 1);
@@ -324,9 +334,9 @@ test('homepage has one See all auctions link beside Explore Auctions and retains
     assert.match(html, /role="tablist" aria-label="Explore auction sorting"/);
     assert.match(html, /aria-selected="true"[^>]*>Popular<\/button>/);
     assert.match(html, /href="\/auctions\?status=active&amp;sort=bids-desc"/);
-    assert.equal((html.match(/<li class="w-64 shrink-0"/g) || []).length, 31);
+    assert.equal((html.match(/<li class="w-64 shrink-0"/g) || []).length, 24);
     assert.doesNotMatch(html, /Pause auction scrolling/);
-    for (const listing of listings) assert.equal((html.match(new RegExp(`>${listing.item} <span`, 'g')) || []).length, 1);
+    for (const listing of listings.slice(0,24)) assert.equal((html.match(new RegExp(`>${listing.item} <span`, 'g')) || []).length, 1);
 });
 
 
@@ -577,7 +587,7 @@ test('cancelled Sell and Buy cards show the cancellation timestamp, not the futu
 });
 
 
-test('cached browse paginates the full locally filtered pool with accurate counts', () => {
+test('browse renders a bounded server page with accurate total and pagination', () => {
     const many = Array.from({length: 50}, (_, i) => ({...base, id: `page-${String(i).padStart(2,'0')}`, item: `Page Item ${String(i).padStart(2,'0')}`}));
     const html = render('/auctions?page=2', many);
     assert.match(html, /50 auctions found/);

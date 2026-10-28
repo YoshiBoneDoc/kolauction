@@ -3,7 +3,7 @@ const EMPTY = Object.freeze({ data: null, error: '', updatedAt: null, attemptedA
 
 export function createAuctionReadCache(read, { now = Date.now } = {}) {
     const entries = new Map(), listeners = new Set();
-    let queue = Promise.resolve(), active = true;
+    let queue = Promise.resolve(), active = true, retained = new Set();
     const entry = key => {
         if (!entries.has(key)) entries.set(key, { state: EMPTY, version: 0, request: null, controller: null, failures: 0, retryAt: 0 });
         return entries.get(key);
@@ -23,12 +23,27 @@ export function createAuctionReadCache(read, { now = Date.now } = {}) {
         subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
         snapshot(key) { return key == null ? EMPTY : entry(key).state; },
         retryAfter(key) { return key == null ? 0 : Math.max(0, entry(key).retryAt - now()); },
+        retain(keys) { retained = new Set(keys); },
+        cancel(key) {
+            const record = entries.get(key);
+            if (!record?.request) return;
+            record.version++;
+            record.controller?.abort();
+            record.request = null;
+            record.state = { ...record.state, refreshing: false };
+        },
         invalidate() { invalidate(); },
         pause() { active = false; invalidate(true); },
         resume() { active = true; },
         load(key, { maxAge = 30000, force = false } = {}) {
             if (!active || key == null) return Promise.resolve();
             const record = entry(key);
+            // Bound search/page history in long browsing sessions. In-flight
+            // requests are retained until they settle; auth changes clear all.
+            for (const [oldKey, old] of entries) {
+                if (entries.size <= 32) break;
+                if (oldKey !== key && !retained.has(oldKey) && !old.request) entries.delete(oldKey);
+            }
             if (record.request) return record.request;
             const state = record.state;
             if (!force && (state.data && state.updatedAt != null && now() - state.updatedAt < maxAge
@@ -38,7 +53,7 @@ export function createAuctionReadCache(read, { now = Date.now } = {}) {
             record.controller = controller;
             record.state = { ...state, refreshing: true };
             // Serialize different resources too: navigation/pending trades cannot
-            // start a second read alongside a paginated dataset refresh.
+            // start a second read alongside an auction page refresh.
             const task = queue.then(async () => {
                 if (!active || version !== record.version) return;
                 record.state = { ...record.state, attemptedAt: now() };

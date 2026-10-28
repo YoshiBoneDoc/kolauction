@@ -5,6 +5,8 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import * as React from 'react';
 import * as router from 'react-router-dom';
+import { browseAuctions } from '../src/lib/auctionBrowsing.js';
+import { auctionReadRequest } from '../src/lib/auctionRefresh.js';
 
 const { outputFiles } = buildSync({ stdin: { contents: `
     export { default as AllAuctions } from './src/pages/AllAuctions.jsx';
@@ -32,10 +34,17 @@ const require = createRequire(import.meta.url);
 const base = { id: 'first', item: 'Item', quantity: 3, currentBid: 200, minBidMeat: 100, instantPurchasePrice: 500,
     status: 'active', endTime: Date.now() + 600000, sellerId: 'seller' };
 const listings = [base, { ...base, id: 'second', item: 'Other item' }];
+function serverPage() {
+    const request = auctionReadRequest('/auctions', params.toString(), user?.id);
+    const owned = request.sellerId ? listings.filter(a => a.sellerId === request.sellerId)
+        : request.excludeOwn ? listings.filter(a => a.sellerId !== user?.id) : listings;
+    const rows = browseAuctions(owned, request);
+    return { auctions: rows.slice((Math.min(request.page,Math.max(1,Math.ceil(rows.length/24)))-1)*24,Math.min(request.page,Math.max(1,Math.ceil(rows.length/24)))*24), total: rows.length };
+}
 new Function('require', 'module', 'exports', outputFiles[0].text)(name => name === 'react' ? {
     ...React, useState: slot, useRef: value => slot({ current: value })[0], useId: () => 'inline-bid-test',
     useMemo: fn => fn(), useCallback: fn => fn, useEffect: () => {},
-    useContext: context => context === compiled.exports.UserContext ? { currentUser: user } : { auctions: listings, isLoading: false, ...trading },
+    useContext: context => context === compiled.exports.UserContext ? { currentUser: user } : { ...serverPage(), isLoading: false, ...trading },
 } : name === 'react-router-dom' ? {
     ...router, useNavigationType: () => 'REPLACE', useLocation: () => ({ pathname: '/auctions', search: params.toString() }),
     useSearchParams: () => [params, next => { params = typeof next === 'function' ? next(params) : new URLSearchParams(next); }],

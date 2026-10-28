@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 
-// Seller pages still debounce server searches; cached browsing updates locally.
+// Debounce server searches while updating the input immediately.
 export default function useAuctionSearch(setParamsOverride = null, { immediate = false } = {}) {
     const { pathname } = useLocation();
     const [params, routeSetParams] = useSearchParams();

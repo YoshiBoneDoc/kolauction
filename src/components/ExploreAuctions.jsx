@@ -12,10 +12,10 @@ function savedTab() {
     return 'popular';
 }
 
-export default function ExploreAuctions({ auctions, now, children }) {
+export default function ExploreAuctions({ auctions, sections, now, children }) {
     const [selected, setSelected] = useState(savedTab);
     const buttons = useRef([]);
-    const displayed = useMemo(() => exploreAuctions(auctions, selected, now), [auctions, selected, now]);
+    const displayed = useMemo(() => exploreAuctions(sections?.[selected] || auctions, selected, now).slice(0, 24), [auctions, sections, selected, now]);
     const tab = exploreAuctionTabs.find(option => option.id === selected);
     useEffect(() => {
         try { window.sessionStorage.setItem(storageKey, selected); } catch { /* Optional preference. */ }
@@ -47,4 +47,4 @@ export default function ExploreAuctions({ auctions, now, children }) {
     </StaticAuctionStrip>;
 }
 ExploreAuctions.propTypes = { auctions: PropTypes.arrayOf(PropTypes.object).isRequired,
-    now: PropTypes.number.isRequired, children: PropTypes.node };
+    sections: PropTypes.object, now: PropTypes.number.isRequired, children: PropTypes.node };

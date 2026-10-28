@@ -176,3 +176,13 @@ test('closed auction filters request newest endings before pagination on browse 
         assert.equal(auctionReadRequest(path).sort, 'ending');
     }
 });
+
+test('public polling adds bounded positive jitter without delaying initial reads or speeding up retries',async()=>{
+    const f=fixture();let random=0;
+    const stop=startAuctionRefresh({...f,delay:60000,jitter:.2,random:()=>random,refresh:async()=>{}});
+    assert.equal([...f.queue.values()][0].ms,0);
+    await f.tick();assert.equal([...f.queue.values()][0].ms,60000);
+    random=.5;await f.tick();assert.equal([...f.queue.values()][0].ms,66000);
+    random=1;await f.tick();assert.equal([...f.queue.values()][0].ms,72000);
+    stop();
+});
