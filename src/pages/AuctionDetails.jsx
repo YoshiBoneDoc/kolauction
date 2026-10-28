@@ -1,3 +1,4 @@
+import BundleContents from '../components/BundleContents';
 import AuctionEndedTime from '../components/AuctionEndedTime';
 import MarketPrice from '../components/MarketPrice';
 import SellPrice from '../components/SellPrice';
@@ -70,7 +71,7 @@ export default function AuctionDetails() {
                                 <span aria-hidden="true">·</span>
                                 <TradeTypeBadge escrow={auction.escrowMode} />
                             </div>
-                            <ItemResources item={auction.item} itemId={auction.itemId} />
+                            {auction.isBundle ? <BundleContents items={auction.bundleItems} /> : <ItemResources item={auction.item} itemId={auction.itemId} />}
                         </div>
                         <div className="space-y-3">
                             <div className={closedSale ? 'space-y-0.5 py-1' : 'space-y-1'}>
@@ -80,7 +81,7 @@ export default function AuctionDetails() {
                                 </div>
                                 {closedSale && auction.instantPurchasedAt && <p className="text-sm leading-6 text-green-700">Buyout accepted for {result.finalPrice.toLocaleString('en-US')} Meat on <span className="inline-block whitespace-nowrap">{new Date(auction.instantPurchasedAt).toLocaleString()}.</span></p>}
                             </div>
-                            {(active || result.status === 'completed') && <MarketPrice itemId={auction.itemId} auctionId={auction.id} completed={result.status === 'completed'} />}
+                            {!auction.isBundle && (active || result.status === 'completed') && <MarketPrice itemId={auction.itemId} auctionId={auction.id} completed={result.status === 'completed'} />}
                         </div>
                         {active && <InstantPurchaseAction key={`purchase-${auction.id}`} auction={auction} showTerms={false} />}
                         <div className="space-y-2 text-sm text-gray-700">

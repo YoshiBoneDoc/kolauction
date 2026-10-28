@@ -363,6 +363,24 @@ html[data-theme="dark"] .buy-detail-active-badge { color: #fbbf24; background-co
 html[data-theme="dark"] .buy-detail-login { color: #fff; }
 html[data-theme="dark"] .buy-reservation-heading { color: #86efac; }
 html[data-theme="dark"] .buy-reservation-deadline[class~="text-[#B7791F]"] { color: #fbbf24; }
+
+/* Bundle editor/preview follows kHub's selected theme, not OS dark mode. */
+html[data-theme="dark"] .bundle-builder-panel,
+html[data-theme="dark"] .bundle-contents-preview { background-color: var(--theme-panel); border-color: var(--theme-border); }
+html[data-theme="dark"] .bundle-builder-item,
+html[data-theme="dark"] .bundle-preview-item,
+html[data-theme="dark"] .bundle-preview-summary,
+html[data-theme="dark"] .bundle-preview-footer { background-color: var(--theme-raised); border-color: var(--theme-border); }
+html[data-theme="dark"] .bundle-count-badge { background-color: var(--theme-raised); color: var(--theme-text); }
+html[data-theme="dark"] .bundle-preview-badge { background-color: var(--theme-panel); border-color: var(--theme-border); color: var(--theme-text); }
+html[data-theme="dark"] .bundle-add-button { background-color: #1e3a5f; border-color: #426897; color: #dbeafe; }
+html[data-theme="dark"] .bundle-add-button:hover:not(:disabled) { background-color: #274b78; }
+html[data-theme="dark"] .bundle-quantity-input { background-color: var(--theme-page); border-color: var(--theme-border); color: var(--theme-text); }
+html[data-theme="dark"] .bundle-remove-button { color: #fda4af; }
+html[data-theme="dark"] .bundle-remove-button:hover { background-color: #3d202b; }
+html[data-theme="dark"] .bundle-empty-state { border-color: var(--theme-border); }
+html[data-theme="dark"] .bundle-preview-back { background-color: var(--theme-panel); border-color: var(--theme-border); color: var(--theme-text); }
+html[data-theme="dark"] .bundle-preview-back:hover { background-color: var(--theme-raised); }
 html[data-theme="dark"] .buy-reservation-cancel { color: #fca5a5; background-color: transparent; border-color: #88505e; }
 html[data-theme="dark"] .buy-reservation-cancel:hover:not(:disabled) { background-color: #3d202b; }
 html[data-theme="dark"] .buy-fulfillment-head { color: var(--theme-muted); }
@@ -777,3 +795,25 @@ html[data-theme="dark"] .public-seller-profile .public-profile-detail-panel { bo
   .public-seller-profile .profile-public-row-middle { grid-column:1 / -1; flex-direction:row; flex-wrap:wrap; align-items:center; gap:4px 10px; text-align:left; }
   .public-seller-profile .profile-public-row-status { justify-content:flex-start; }
 }
+
+/* Bundle controls use kHub's selected theme instead of the OS dark preference. */
+html[data-theme="dark"] .listing-shape-control { background-color: var(--theme-panel); border-color: var(--theme-border); }
+html[data-theme="dark"] .listing-shape-option { color: var(--theme-muted); }
+html[data-theme="dark"] .listing-shape-option:hover { background-color: var(--theme-hover); }
+html[data-theme="dark"] .listing-shape-option[data-selected="true"] { background-color: #263e69; color: #c7d5ff; }
+html[data-theme="dark"] .bundle-builder-panel,
+html[data-theme="dark"] .bundle-contents-preview { background-color: var(--theme-panel); border-color: var(--theme-border); }
+html[data-theme="dark"] .bundle-builder-item,
+html[data-theme="dark"] .bundle-preview-item,
+html[data-theme="dark"] .bundle-preview-summary,
+html[data-theme="dark"] .bundle-preview-footer { background-color: var(--theme-raised); border-color: var(--theme-border); }
+html[data-theme="dark"] .bundle-count-badge { background-color: var(--theme-raised); color: var(--theme-text); }
+html[data-theme="dark"] .bundle-preview-badge { background-color: var(--theme-panel); border-color: var(--theme-border); color: var(--theme-text); }
+html[data-theme="dark"] .bundle-add-button { background-color: #1e3a5f; border-color: #426897; color: #dbeafe; }
+html[data-theme="dark"] .bundle-add-button:hover:not(:disabled) { background-color: #274b78; }
+html[data-theme="dark"] .bundle-quantity-input { background-color: var(--theme-page); border-color: var(--theme-border); color: var(--theme-text); }
+html[data-theme="dark"] .bundle-remove-button { color: #fda4af; }
+html[data-theme="dark"] .bundle-remove-button:hover { background-color: #3d202b; }
+html[data-theme="dark"] .bundle-empty-state { border-color: var(--theme-border); }
+html[data-theme="dark"] .bundle-preview-back { background-color: var(--theme-panel); border-color: var(--theme-border); color: var(--theme-text); }
+html[data-theme="dark"] .bundle-preview-back:hover { background-color: var(--theme-raised); }

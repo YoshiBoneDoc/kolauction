@@ -215,6 +215,7 @@ test('Buy mode defaults from Sell, disables Direct, removes sell terms and publi
     assert.equal(page.button('Sell Items').props['aria-pressed'],true);
     page.button('Direct').props.onClick();page.render();
     page.button('Buy Items').props.onClick();page.render();
+    assert.equal(nodes(page.tree).some(n=>n.props?.name==='sell-auction-type'),false);
     assert.equal(page.button('Direct').props.disabled,true);assert.equal(page.button('Escrow').props['aria-pressed'],true);
     assert.equal(nodes(page.tree).some(n=>n.props?.children==='Set Buyout Price (optional)'),false);
     assert.equal(nodes(page.tree).some(n=>n.type==='strong'&&n.props.children==='Escrow Protection Guarantee:'),false);
@@ -224,4 +225,44 @@ test('Buy mode defaults from Sell, disables Direct, removes sell terms and publi
     page.render();assert.equal(nodes(page.tree).some(n=>n.type==='dt'&&n.props.children==='Price per item'),true);
     await page.button('Publish Auction').props.onClick();page.render();
     assert.equal(writes.length,1);assert.equal(writes[0].auctionKind,'buy');assert.equal(writes[0].deliveryMode,'finished');assert.equal(writes[0].escrowMode,true);assert.equal(writes[0].minBidMeat,2000000);assert.equal(writes[0].instantPurchasePrice,null);
+});
+
+test('bundle creation preserves the complete reviewed contents through the publish dialog', async () => {
+    const writes = [];
+    const page = harness(async listing => { writes.push(listing); return 'bundle-id'; }).render();
+    const choice = value => page.find(node => node.type === 'input' && node.props.name === 'sell-auction-type' && node.props.value === value);
+    assert.equal(choice('sell').props.checked, true);
+    assert.equal(choice('bundle').props.checked, false);
+    choice('bundle').props.onChange(); page.render();
+    assert.equal(choice('bundle').props.checked, true);
+    assert.equal(page.find(node => node.type === 'label' && node.props.htmlFor === 'listing-item-search').props.children, 'Find an item');
+    assert.equal(page.find(node => node.type === 'label' && node.props.htmlFor === 'quantity').props.children, 'Quantity:');
+    assert.ok(nodes(page.tree).some(node => node.type === 'h2' && node.props.children === 'Bundle contents'));
+    assert.equal(page.button('Sell Items').props['aria-pressed'], true);
+    page.button('Sell Items').props.onClick(); page.render();
+    assert.equal(choice('bundle').props.checked, true);
+    for (const [name, id, quantity] of [['asbestos ore', '364', '5'], ['seal tooth', '2', '3']]) {
+        page.input('listing-item-search', name).input('item', id).input('quantity', quantity);
+        page.button('Add selected item').props.onClick(); page.render();
+    }
+    choice('sell').props.onChange(); page.render();
+    assert.equal(nodes(page.tree).some(node => node.props?.['aria-label'] === 'Build your bundle'), false);
+    choice('bundle').props.onChange(); page.render();
+    assert.equal(page.find(node => node.props?.['aria-label'] === 'Quantity of asbestos ore').props.value, '5');
+    assert.equal(page.find(node => node.props?.['aria-label'] === 'Quantity of seal tooth').props.value, '3');
+    page.input('minBidMeat', '100');
+    const original = globalThis.requestAnimationFrame;
+    globalThis.requestAnimationFrame = callback => callback();
+    try { page.find(node => node.type === 'form').props.onSubmit({ preventDefault() {} }); }
+    finally { if (original) globalThis.requestAnimationFrame = original; else delete globalThis.requestAnimationFrame; }
+    page.render();
+    const contents = page.find(node => node.type?.name === 'BundleContents').props.items;
+    assert.deepEqual(contents.map(({id,quantity})=>({id,quantity})), [{id:2,quantity:3},{id:364,quantity:5}]);
+    assert.equal(writes.length, 0);
+    page.button('Continue to Publish').props.onClick(); page.render();
+    await page.button('Publish Auction').props.onClick();
+    assert.equal(writes.length, 1);
+    assert.equal(writes[0].quantity, 1);
+    assert.deepEqual(writes[0].bundleItems, contents);
+    assert.deepEqual(page.locations, ['/auction/bundle-id']);
 });

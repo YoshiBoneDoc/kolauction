@@ -52,6 +52,11 @@ test('listing form defaults to escrow and offers direct settlement before publis
     assert.match(html, /Fees start at 5%/);
     assert.match(html, /each rate applying only to its portion of the final price/);
     assert.match(html, /rounded down to whole Meat/);
+    const protection = html.match(/<details[^>]*>\s*<summary[^>]*><strong>Escrow protected<\/strong> · Full reimbursement for verified system errors<\/summary>[\s\S]*?<\/details>/)?.[0];
+    assert.ok(protection);
+    assert.match(protection, /full reimbursement without a cap/);
+    assert.match(protection, /malicious exploits, fraudulent activity, or circumstances outside kHub’s reasonable control are excluded/);
+    assert.match(html, /Escrow protected<\/strong> · Full reimbursement for verified system errors/);
     assert.doesNotMatch(html, /7\.5%/);
     assert.match(html, /Set Buyout Price \(optional\)/);
     assert.doesNotMatch(html, /id="instantPurchasePrice"|20 billion Meat/);

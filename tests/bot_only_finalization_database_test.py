@@ -187,12 +187,20 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
             number=row(high)['auction_number']
             deposit=mail(high,'list',actor=48889601)['raw']
             deposit['message']=f'LIST {number}<center><table class="item" rel="id=7201&n=1&t=1&g=0"><tr><td><img src="/itemimages/nugebow.gif" title="The Nuge crossbow"></td><td>You acquire an item: <b>The Nuge crossbow</b></td></tr></table></center>'
+            # Build the bid receipt AFTER activating the listing. Constructing
+            # it first can cross a clock-second boundary during parser startup,
+            # correctly triggering the existing before-deposit receipt guard.
+            parsed_deposit=json.loads(subprocess.run(['node','--input-type=module','-e',parse_script],input=json.dumps([deposit]),text=True,capture_output=True,check=True).stdout)[0]
+            assert parsed_deposit['items']==[{'id':7201,'quantity':1}]
+            assert ingest(parsed_deposit)=='accepted'
             funded_bid=mail(high,'bid')['raw']
             funded_bid['message']=f'BID {number}<center><table><tr><td><img src="/itemimages/meat.gif"></td><td>You gain 200,000,000 Meat.</td></tr></table></center>'
-            parsed=json.loads(subprocess.run(['node','--input-type=module','-e',parse_script],input=json.dumps([deposit,funded_bid]),text=True,capture_output=True,check=True).stdout)
-            assert parsed[0]['items']==[{'id':7201,'quantity':1}] and parsed[1]['meat']==200000000
-            assert ingest(parsed[0])=='accepted'
-            stage([parsed[1]]);assert ingest(parsed[1])=='accepted'
+            parsed_bid=json.loads(subprocess.run(['node','--input-type=module','-e',parse_script],input=json.dumps([funded_bid]),text=True,capture_output=True,check=True).stdout)[0]
+            assert parsed_bid['meat']==200000000
+            parsed=[parsed_deposit,parsed_bid]
+            stage([parsed_bid])
+            accepted=ingest(parsed_bid)
+            assert accepted=='accepted', (accepted,sql("select message from khub_bot.deliveries where receipt_id='"+parsed_bid['id']+"';"))
             assert row(high)['current_bid']==200000000 and row(high)['highest_bidder_id']==buyer
             held=json.loads(sql('select public.bot_liabilities();'))
             assert int(held['meat'])>=200000000 and int(held['items']['7201'])>=1

@@ -1,3 +1,4 @@
+import { bundleConfirmation } from '../lib/bundles';
 import SellPrice from './SellPrice';
 import { useContext, useState } from 'react';
 import PropTypes from 'prop-types';
@@ -23,7 +24,7 @@ export default function InstantPurchaseAction({ auction, compact = false, showTe
 
     async function purchase() {
         if (pending) return;
-        if (!window.confirm(`Accept ${auction.quantity.toLocaleString('en-US')} × ${auction.item} for a total of ${price} Meat? This ends bidding immediately. The in-game exchange must still be completed.`)) return;
+        if (!window.confirm(`Accept ${auction.quantity.toLocaleString('en-US')} × ${auction.item} for a total of ${price} Meat? This ends bidding immediately. The in-game exchange must still be completed.` + bundleConfirmation(auction))) return;
         setPending(true);
         setError('');
         setMessage('');

@@ -21,7 +21,7 @@ export default function EscrowProtection({ forListing = false, buy = false, show
         </div>
     </details>;
     return <details className={forListing ? 'text-left text-xs text-gray-600' : 'group w-full text-left text-xs text-gray-600'}>
-        {forListing ? <summary className="w-fit cursor-pointer">Escrow Protection — How It Works</summary> : <summary className="cursor-pointer py-1 text-sm font-semibold text-[#334155] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Escrow Protection — How It Works</summary>}
+        {forListing ? <summary className="w-fit cursor-pointer rounded-md px-3 py-2 text-xs leading-snug text-green-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-700"><strong>Escrow protected</strong> · Full reimbursement for verified system errors</summary> : <summary className="cursor-pointer py-1 text-sm font-semibold text-[#334155] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Escrow Protection — How It Works</summary>}
         <div className={forListing ? undefined : 'pt-2'}>
             <div className="mt-1 space-y-1 leading-[1.4]">
                 <p>{forListing ? 'Our bot, kHub (#3888760), holds your items and bid Meat and handles the sale automatically.' : 'Our bot, kHub (#3888760), holds the items and bid Meat and handles the exchange automatically.'}</p>
@@ -38,9 +38,9 @@ export default function EscrowProtection({ forListing = false, buy = false, show
                     At your minimum bid: estimated {feeLabel(escrowFee(minimumPrice), minimumPrice)}: {escrowFee(minimumPrice).toLocaleString('en-US')} Meat; seller proceeds {(minimumPrice - escrowFee(minimumPrice)).toLocaleString('en-US')} Meat. The actual fee uses the final sale price.
                 </p>}
             </div>
-            {!forListing && <p className="mt-4 rounded-[6px] border-l-[3px] border-[#22C55E] bg-[#F0FDF4] px-4 py-3 text-[#334155]">
+            <p className={`${forListing ? 'mt-2' : 'mt-4'} rounded-[6px] border-l-[3px] border-[#22C55E] bg-[#F0FDF4] px-4 py-3 text-[#334155]`}>
                 <strong className="font-bold text-[#15803D]">Escrow Protection Guarantee:</strong> In the unlikely event of a verified loss caused by an error in kHub’s automated escrow system, we guarantee full reimbursement without a cap. Losses resulting from malicious exploits, fraudulent activity, or circumstances outside kHub’s reasonable control are excluded.
-            </p>}
+            </p>
         </div>
     </details>;
 }

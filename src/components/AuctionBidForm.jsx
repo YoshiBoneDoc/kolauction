@@ -1,3 +1,4 @@
+import { bundleConfirmation } from '../lib/bundles';
 import { useContext, useId, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
@@ -33,7 +34,7 @@ export default function AuctionBidForm({ auction, showTerms = true, showHeading 
         const prompt = instant
             ? `Accept the buyout price of ${auction.instantPurchasePrice.toLocaleString('en-US')} Meat for the entire listing (${auction.quantity.toLocaleString('en-US')} × ${auction.item})? Bidding ends immediately at that price. The in-game exchange must still be completed.`
             : `Submit a bid of ${bid.toLocaleString('en-US')} Meat for ${auction.item}?`;
-        if (!window.confirm(prompt)) return;
+        if (!window.confirm(prompt + bundleConfirmation(auction))) return;
         setPending(true);
         setError('');
         try {

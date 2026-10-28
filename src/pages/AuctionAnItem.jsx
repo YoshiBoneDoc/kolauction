@@ -1,3 +1,5 @@
+import BundleContents from '../components/BundleContents';
+import { prepareBundle, bundleTitle, MAX_BUNDLE_ITEMS } from '../lib/bundles';
 import { effectiveFeePercent, feeLabel } from '../lib/feeDisplay';
 import { escrowFee } from '../lib/escrowFees';
 import { buyFunding } from '../lib/buyOrders';
@@ -50,6 +52,8 @@ export default function AuctionAnItem() {
     const [auctionKind, setAuctionKind] = useState('sell');
     const [deliveryMode, setDeliveryMode] = useState('immediate');
     const isBuy = auctionKind === 'buy';
+    const isBundle = auctionKind === 'bundle';
+    const [bundleEntries, setBundleEntries] = useState([]);
     const [preview, setPreview] = useState(null);
     const [error, setError] = useState('');
     const [pending, setPending] = useState(false);
@@ -101,8 +105,13 @@ export default function AuctionAnItem() {
         const count = parseAuctionAmount(quantity, 5000000000);
         const minimum = parseMeatAmount(minBidMeat);
         const purchasePrice = !isBuy && instantPrice.trim() ? parseMeatAmount(instantPrice) : null;
-        if (!item) { setError('Please select an item to auction.'); return; }
-        if (count === null) { setError('Quantity must be a whole number between 1 and 5 billion.'); return; }
+        let contents = null;
+        if (isBundle) {
+            try { contents = prepareBundle(bundleEntries, catalogItems); }
+            catch (failure) { setError(failure.message); return; }
+        }
+        if (!isBundle && !item) { setError('Please select an item to auction.'); return; }
+        if (!isBundle && count === null) { setError('Quantity must be a whole number between 1 and 5 billion.'); return; }
         if (minimum === null) { setError(isBuy ? 'Enter a valid positive price per item in Meat.' : 'Enter a valid positive minimum bid in Meat.'); return; }
         if (!isBuy && instantPrice.trim() && (purchasePrice === null || purchasePrice < minimum)) {
             setError('Buyout price must be a valid Meat amount at least as large as the minimum bid.'); return;
@@ -113,8 +122,8 @@ export default function AuctionAnItem() {
             try { customEndAt = customAuctionEnd(customEndTime); }
             catch (failure) { setError(failure.message); return; }
         }
-        setPreview({ item: item.name, itemId: item.id, quantity: count, minBidMeat: minimum, instantPurchasePrice: purchasePrice, auctionTime, escrowMode, ...(customEndAt ? { customEndAt } : {}),
-            image: itemImageUrl(item.image), ...(isBuy ? { auctionKind, deliveryMode } : {}) });
+        setPreview({ item: contents ? bundleTitle(contents) : item.name, itemId: contents ? contents[0].id : item.id, quantity: contents ? 1 : count, ...(contents ? { bundleItems: contents } : {}), minBidMeat: minimum, instantPurchasePrice: purchasePrice, auctionTime, escrowMode, ...(customEndAt ? { customEndAt } : {}),
+            image: contents ? contents[0].image : itemImageUrl(item.image), ...(isBuy ? { auctionKind, deliveryMode } : {}) });
         setError('');
         requestAnimationFrame(() => previewHeading.current?.focus());
     }
@@ -154,37 +163,65 @@ export default function AuctionAnItem() {
             <h1 className="mb-6 text-center text-3xl font-bold text-blue-600 sm:text-4xl">Create Auction</h1>
             {!preview && <p className="mx-auto mb-4 max-w-lg text-sm text-gray-700">{kolIdentity && !kolIdentity.kol_player_id && <>First <Link to="/profile" className="text-blue-700 underline">link your KoL account</Link>. </>}Choose what you want to buy or sell. The mode stays fixed after publishing.</p>}
             <div className="mx-auto max-w-lg rounded-lg bg-white p-4 shadow-md sm:p-8">
-                {!preview && <div role="group" aria-label="Auction type" className="mb-5 grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
-                    {[['buy','Buy Items'],['sell','Sell Items']].map(([value,label]) => <button key={value} type="button" aria-pressed={auctionKind === value}
-                        onClick={() => { setAuctionKind(value); if (value === 'buy') { setEscrowMode(true); setCustomDuration(false); } setError(''); }}
-                        className={`min-h-11 rounded-lg border px-4 py-2 text-sm font-semibold ${auctionKind === value ? 'border-blue-200 bg-white text-blue-800 shadow-sm' : 'border-transparent bg-transparent text-slate-500'}`}>{label}</button>)}
+                {!preview && <div className="mb-5">
+                    <div role="group" aria-label="Auction type" className="grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
+                        {[['buy','Buy Items'],['sell','Sell Items']].map(([value,label]) => {
+                            const selected = value === 'buy' ? isBuy : !isBuy;
+                            return <button key={value} type="button" aria-pressed={selected}
+                                onClick={() => { if (value === 'buy') { setAuctionKind('buy'); setEscrowMode(true); setCustomDuration(false); } else if (isBuy) setAuctionKind('sell'); setError(''); }}
+                                className={`min-h-11 rounded-lg border px-4 py-2 text-sm font-semibold ${selected ? 'border-blue-200 bg-white text-blue-800 shadow-sm' : 'border-transparent bg-transparent text-slate-500'}`}>{label}</button>;
+                        })}
+                    </div>
+                    {!isBuy && <fieldset aria-label="Sale type" className="mt-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-sm">
+                        <legend className="sr-only">Sale type</legend>
+                        <span aria-hidden="true" className="font-semibold text-gray-700">Sale type:</span>
+                        <div className="listing-shape-control inline-flex w-44 max-w-full shrink-0 rounded-lg border border-[#EADBD3] bg-[#FFFAF7] p-0.5">
+                            {[['sell', 'Single item'], ['bundle', 'Bundle']].map(([value, label]) => <label key={value} className="inline-flex min-w-0 flex-1 cursor-pointer">
+                                <input type="radio" name="sell-auction-type" value={value} checked={auctionKind === value}
+                                    onChange={() => { setAuctionKind(value); setError(''); }} className="peer sr-only" />
+                                <span data-selected={auctionKind === value} className={`listing-shape-option w-full rounded-md px-2 py-1 text-center text-xs font-semibold transition-colors peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-blue-600 ${auctionKind === value ? 'bg-[#E8EEFF] text-[#2454D8]' : 'text-[#647084] hover:bg-[#FFF0E8]'}`}>{label}</span>
+                            </label>)}
+                        </div>
+                    </fieldset>}
                 </div>}
                 {error && <p role="alert" className="mb-4 break-words font-semibold text-red-700">{error}</p>}
                 {preview ? <section aria-label="Preview auction">
                     <h2 ref={previewHeading} tabIndex={-1} className="text-xl font-bold text-gray-900">Preview Auction</h2>
                     <p className="mt-1 text-sm text-gray-500">Review your listing details before publishing.</p>
-                    <div className="my-4 flex min-w-0 items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
+                    {preview.bundleItems ? <>
+                        <div className="bundle-preview-summary my-4 rounded-xl border border-[#EADBD3] bg-[#FFF7F2] p-4">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div>
+                                    <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#647084]">Bundle auction</p>
+                                    <h3 className="mt-1 text-lg font-semibold leading-snug text-gray-900">One listing · {preview.bundleItems.length} item types</h3>
+                                </div>
+                                <span className="bundle-preview-badge rounded-full border border-[#E9BFA9] bg-[#FFFAF7] px-3 py-1 text-xs font-semibold text-[#7C5140]">Sold together</span>
+                            </div>
+                        </div>
+                        <BundleContents items={preview.bundleItems} variant="preview" />
+                        <p className="-mt-2 mb-3 text-xs leading-relaxed text-gray-600">Minimum bid and buyout apply to the full bundle.</p>
+                    </> : <div className="my-4 flex min-w-0 items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800">
                         {preview.image && <img src={preview.image} alt={preview.item} className="h-24 w-24 shrink-0 object-contain [image-rendering:pixelated]" />}
                         <div className="min-w-0">
-                            <p className="mb-1 text-xs text-gray-500">Item</p>
-                            <h3 className="break-words text-lg font-semibold leading-snug text-gray-900">{preview.item}</h3>
+                            <p className="mb-1 text-xs text-gray-500 dark:text-gray-400">Item</p>
+                            <h3 className="break-words text-lg font-semibold leading-snug text-gray-900 dark:text-gray-100">{preview.item}</h3>
                         </div>
-                    </div>
+                    </div>}
                     <dl className="divide-y divide-gray-100 text-sm">
-                        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] items-baseline gap-3 py-2.5">
+                        {!preview.bundleItems && <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] items-baseline gap-3 py-2.5">
                             <dt className="text-gray-500">Quantity</dt>
                             <dd className="min-w-0 break-words text-right font-medium tabular-nums text-gray-900">{preview.quantity.toLocaleString('en-US')}</dd>
-                        </div>
+                        </div>}
                         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] items-baseline gap-3 py-2.5">
                             <dt className="text-gray-500">Trading method</dt>
                             <dd className="text-right"><TradeTypeBadge escrow={preview.escrowMode} short /></dd>
                         </div>
                         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] items-baseline gap-3 py-2.5">
-                            <dt className="text-gray-500">{preview.auctionKind === 'buy' ? 'Price per item' : 'Minimum bid (whole listing)'}</dt>
+                            <dt className="text-gray-500">{preview.auctionKind === 'buy' ? 'Price per item' : `Minimum bid${preview.bundleItems ? '' : ' (whole listing)'}`}</dt>
                             <dd className="min-w-0 break-words text-right font-medium tabular-nums text-gray-900">{preview.minBidMeat.toLocaleString('en-US')} Meat</dd>
                         </div>
                         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] items-baseline gap-3 py-2.5">
-                            <dt className="text-gray-500">{preview.auctionKind === 'buy' ? 'Delivery' : 'Buyout price (whole listing)'}</dt>
+                            <dt className="text-gray-500">{preview.auctionKind === 'buy' ? 'Delivery' : `Buyout price${preview.bundleItems ? '' : ' (whole listing)'}`}</dt>
                             <dd className="min-w-0 break-words text-right font-medium tabular-nums text-gray-900">{preview.auctionKind === 'buy' ? (preview.deliveryMode === 'immediate' ? 'As acquired' : 'When order ends') : preview.instantPurchasePrice ? `${preview.instantPurchasePrice.toLocaleString('en-US')} Meat` : 'Not offered'}</dd>
                         </div>
                         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] items-baseline gap-3 py-2.5">
@@ -192,12 +229,18 @@ export default function AuctionAnItem() {
                             <dd className="min-w-0 break-words text-right font-medium tabular-nums text-gray-900">{preview.customEndAt ? formatAuctionEnd(preview.customEndAt) : `${preview.auctionTime} hours`}</dd>
                         </div>
                         {preview.auctionKind === 'buy' && <>{[['Purchase funds',buyFunding(preview.minBidMeat, preview.quantity).purchase],[`Commission reserve (${effectiveFeePercent(buyFunding(preview.minBidMeat, preview.quantity).feeReserve, BigInt(preview.minBidMeat) * BigInt(preview.quantity))})`,buyFunding(preview.minBidMeat, preview.quantity).feeReserve],['Required deposit, including fee reserve',buyFunding(preview.minBidMeat, preview.quantity).total]].map(([label,value]) => <div key={label} className="flex justify-between gap-3 py-3"><dt>{label}</dt><dd className="text-right font-semibold">{value.toLocaleString('en-US')} Meat</dd></div>)}</>}
-                        {preview.auctionKind !== 'buy' && preview.escrowMode && <div className="flex justify-between gap-3 py-3"><dt>Estimated {feeLabel(escrowFee(preview.minBidMeat), preview.minBidMeat)} at minimum bid</dt><dd className="text-right font-semibold">{escrowFee(preview.minBidMeat).toLocaleString('en-US')} Meat</dd></div>}
+                    {preview.auctionKind !== 'buy' && preview.escrowMode && <div className={`${preview.bundleItems ? 'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3' : 'flex justify-between gap-3'} py-3`}><dt>{preview.bundleItems ? <>Estimated fee <span className="block text-xs font-normal text-gray-500">At minimum bid · {effectiveFeePercent(escrowFee(preview.minBidMeat), preview.minBidMeat)}</span></> : `Estimated ${feeLabel(escrowFee(preview.minBidMeat), preview.minBidMeat)} at minimum bid`}</dt><dd className="shrink-0 text-right font-semibold tabular-nums">{escrowFee(preview.minBidMeat).toLocaleString('en-US')} Meat</dd></div>}
                     </dl>
                     {preview.auctionKind === 'buy' && <p className="text-xs text-gray-500">The reserve rounds up to whole Meat. Actual fees are rounded down per fulfillment; unused reserve is refunded.</p>}
-                    <div className="mt-4 grid grid-cols-2 gap-3 border-t border-gray-100 pt-4">
-                        <button type="button" onClick={() => { setPreview(null); setError(''); }} disabled={pending} className="min-h-12 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 disabled:opacity-50">Back to Edit</button>
-                        <button type="button" aria-haspopup="dialog" aria-controls="publish-auction-dialog" onClick={() => { setError(''); publishDialog.current.showModal(); }} disabled={pending} className="button-green min-h-12 rounded-lg border border-green-700 bg-green-700 px-3 py-2.5 text-sm font-semibold text-white transition-colors disabled:opacity-50">{pending ? 'Saving…' : 'Continue to Publish'}</button>
+                    <div className={preview.bundleItems
+                        ? '-mx-4 -mb-4 mt-5 grid grid-cols-1 gap-2 rounded-b-lg border-t border-[#EADBD3] bg-[#FFF7F2] p-4 dark:border-gray-700 dark:bg-gray-800/60 sm:-mx-8 sm:-mb-8 sm:grid-cols-[0.85fr_1.15fr] sm:gap-3 sm:p-5'
+                        : 'mt-4 grid grid-cols-2 gap-3 border-t border-gray-100 pt-4'}>
+                        <button type="button" onClick={() => { setPreview(null); setError(''); }} disabled={pending} className={preview.bundleItems
+                            ? 'min-h-12 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800'
+                            : 'min-h-12 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:border-gray-400 hover:bg-gray-50 disabled:opacity-50'}>Back to Edit</button>
+                        <button type="button" aria-haspopup="dialog" aria-controls="publish-auction-dialog" onClick={() => { setError(''); publishDialog.current.showModal(); }} disabled={pending} className={preview.bundleItems
+                            ? 'button-green min-h-12 rounded-lg border border-green-700 bg-green-700 px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:border-green-800 hover:bg-green-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 disabled:opacity-50'
+                            : 'button-green min-h-12 rounded-lg border border-green-700 bg-green-700 px-3 py-2.5 text-sm font-semibold text-white transition-colors disabled:opacity-50'}>{pending ? 'Saving…' : 'Continue to Publish'}</button>
                     </div>
                     <dialog ref={publishDialog} id="publish-auction-dialog" aria-labelledby="publish-auction-title" aria-describedby="publish-auction-description"
                         onCancel={event => { if (submitting.current) event.preventDefault(); }}
@@ -229,16 +272,15 @@ export default function AuctionAnItem() {
                         </div>
                         {isBuy && <p className="mt-2 text-xs text-gray-600">For now, creating a Buy auction is limited to Escrow</p>}
                     </fieldset>
-                    <div id="escrow-protection" ref={protectionSection} className="mb-5 scroll-mt-4">
+                    <div id="escrow-protection" ref={protectionSection} className={`${escrowMode && !isBuy ? 'mb-2' : 'mb-5'} scroll-mt-4`}>
                         {escrowMode ? <EscrowProtection forListing buy={isBuy} minimumPrice={minimumValue} /> : <DirectTradeHelp forListing />}
-                        {escrowMode && !isBuy && <p className="my-4 rounded-[6px] border-l-[3px] border-[#22C55E] bg-[#F0FDF4] px-4 py-3 text-xs leading-[1.4] text-[#334155]"><strong className="font-bold text-[#15803D]">Escrow Protection Guarantee:</strong> In the unlikely event of a verified loss caused by an error in kHub’s automated escrow system, we guarantee full reimbursement without a cap. Losses resulting from malicious exploits, fraudulent activity, or circumstances outside kHub’s reasonable control are excluded.</p>}
                         {!escrowMode && <p className="mt-2 text-xs leading-[1.4] text-red-600">Failure to honor a valid, completed auction is a violation of kHub policy and will likely get you banned. We take these very seriously.</p>}
                     </div>
                     <label htmlFor="listing-item-search" className="mb-2 block text-sm font-bold">Find an item</label>
-                    <input id="listing-item-search" type="search" value={itemSearch} onChange={(event) => setItemSearch(event.target.value)} placeholder="Start typing an item name…" aria-describedby="listing-search-help" className={fieldClass} />
+                    <input id="listing-item-search" type="search" value={itemSearch} onChange={(event) => setItemSearch(event.target.value)} placeholder="Start typing an item name…" aria-describedby={hasItemSearch ? 'listing-search-help' : undefined} className={fieldClass} />
                     {(hasItemSearch || selectedItem) && <>
                     <label htmlFor="item" className="mb-2 block text-sm font-bold">Select an Item:</label>
-                    <select id="item" required value={selectedItem} onChange={(event) => setSelectedItem(event.target.value)} aria-describedby="listing-search-help" className={fieldClass}>
+                    <select id="item" required={!isBundle} value={selectedItem} onChange={(event) => setSelectedItem(event.target.value)} aria-describedby={hasItemSearch ? 'listing-search-help' : undefined} className={fieldClass}>
                         <option value="" disabled>Select an item</option>
                         {selectedItem && !searchResults.some(item => String(item.id) === selectedItem)
                             && catalogItems.some(item => String(item.id) === selectedItem && isAuctionableItem(item))
@@ -246,11 +288,11 @@ export default function AuctionAnItem() {
                         {searchResults.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
                     </select>
                     </>}
-                    <p id="listing-search-help" className="mb-4 text-sm text-gray-600">{!hasItemSearch ? 'Start typing an item name…' : itemSearch !== deferredSearch ? 'Searching items…' : matchingItems.length > resultLimit ? `Showing the first ${resultLimit} of ${matchingItems.length.toLocaleString('en-US')} matches. Keep typing to narrow the list.` : `${matchingItems.length} matching items.`}</p>
+                    {hasItemSearch && <p id="listing-search-help" className="mb-4 text-sm text-gray-600">{itemSearch !== deferredSearch ? 'Searching items…' : matchingItems.length > resultLimit ? `Showing the first ${resultLimit} of ${matchingItems.length.toLocaleString('en-US')} matches. Keep typing to narrow the list.` : `${matchingItems.length} matching items.`}</p>}
                     {hasItemSearch && itemSearch === deferredSearch && searchResults.length === 0 && <p role="status" className="mb-4 text-sm text-gray-600">No items match your search.{selectedItem ? ' Your previous selection is still selected.' : ''}</p>}
                     <label htmlFor="quantity" className="mb-2 block text-sm font-bold">Quantity:</label>
                     <div className="mb-4 flex gap-2">
-                        <input id="quantity" type="text" inputMode="decimal" required autoComplete="off" value={quantity}
+                        <input id="quantity" type="text" inputMode="decimal" required={!isBundle} autoComplete="off" value={quantity}
                             role="spinbutton" aria-valuemin={1} aria-valuemax={5000000000} aria-valuenow={quantityValue ?? undefined}
                             onChange={(event) => setQuantity(event.target.value)}
                             onBlur={() => setQuantity(value => normalizeAuctionAmount(value))}
@@ -260,14 +302,48 @@ export default function AuctionAnItem() {
                                     stepQuantity(event.key === 'ArrowUp' ? 1 : -1);
                                 }
                             }}
-                            className="block min-h-11 w-full min-w-0 rounded border border-gray-400 bg-white p-3 text-base text-gray-900" />
+                            className={`block w-full min-w-0 rounded border border-gray-400 bg-white text-base text-gray-900 ${isBundle ? 'min-h-10 px-3 py-2 leading-5' : 'min-h-11 p-3'}`} />
                         <button type="button" aria-label="Increase quantity" title="Increase quantity by 1"
                             disabled={quantityValue === 5000000000 || (quantityValue === null && quantity.trim() !== '')}
-                            onClick={() => stepQuantity(1)} className="min-h-11 min-w-11 shrink-0 rounded border border-gray-400 bg-white px-3 text-gray-900 disabled:opacity-40">▲</button>
+                            onClick={() => stepQuantity(1)} className={`${isBundle ? 'min-h-10' : 'min-h-11'} min-w-11 shrink-0 rounded border border-gray-400 bg-white px-3 text-gray-900 disabled:opacity-40`}>▲</button>
                         <button type="button" aria-label="Decrease quantity" title="Decrease quantity by 1"
                             disabled={quantityValue === null || quantityValue <= 1}
-                            onClick={() => stepQuantity(-1)} className="min-h-11 min-w-11 shrink-0 rounded border border-gray-400 bg-white px-3 text-gray-900 disabled:opacity-40">▼</button>
+                            onClick={() => stepQuantity(-1)} className={`${isBundle ? 'min-h-10' : 'min-h-11'} min-w-11 shrink-0 rounded border border-gray-400 bg-white px-3 text-gray-900 disabled:opacity-40`}>▼</button>
                     </div>
+                    {isBundle && <section aria-label="Build your bundle" className="bundle-builder-panel mb-5 rounded-xl border border-[#EADBD3] bg-[#FFFAF7] p-3 sm:p-4">
+                        <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                                <h2 className="text-sm font-semibold text-gray-900">Bundle contents</h2>
+                                <p className="mt-1 text-xs leading-relaxed text-gray-700">Choose 2–{MAX_BUNDLE_ITEMS} different items. Buyers bid on the complete lot.</p>
+                            </div>
+                            <span className="bundle-count-badge rounded-full bg-[#FFF0E6] px-2.5 py-1 text-xs font-semibold tabular-nums text-[#593D31]">{bundleEntries.length} / {MAX_BUNDLE_ITEMS}</span>
+                        </div>
+                        <button type="button" disabled={bundleEntries.length >= MAX_BUNDLE_ITEMS} onClick={() => {
+                            const item = catalogItems.find(entry => String(entry.id) === selectedItem && isAuctionableItem(entry));
+                            const count = parseAuctionAmount(quantity, 5000000000);
+                            if (!item || count === null) { setError('Select an item and enter a valid quantity before adding it.'); return; }
+                            if (bundleEntries.some(entry => entry.id === item.id)) { setError('That item is already in your bundle. Adjust its quantity below.'); return; }
+                            setBundleEntries(entries => [...entries, { id: item.id, quantity: String(count) }]);
+                            setSelectedItem(''); setItemSearch(''); setQuantity('1'); setError('');
+                        }} className="bundle-add-button min-h-10 w-full rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-90">{selectedItem ? 'Add selected item' : 'Select an item above to add'}</button>
+                        {bundleEntries.length > 0 ? <ul className="mt-3 space-y-2">
+                            {bundleEntries.map(entry => {
+                                const item = catalogItems.find(candidate => candidate.id === entry.id);
+                                return <li key={entry.id} className="bundle-builder-item flex min-w-0 items-center gap-2 rounded-lg border border-[#EEE1DA] bg-white px-2.5 py-2">
+                                    {item?.image && <img src={itemImageUrl(item.image)} alt="" className="h-8 w-8 shrink-0 object-contain [image-rendering:pixelated]" />}
+                                    <span className="min-w-0 flex-1 break-words text-sm font-medium leading-snug text-gray-900">{item?.name || `Item #${entry.id}`}</span>
+                                    <label className="flex shrink-0 items-center gap-1.5 text-xs text-gray-700">
+                                        Qty
+                                        <input aria-label={`Quantity of ${item?.name || entry.id}`} inputMode="decimal" value={entry.quantity}
+                                        onChange={event => setBundleEntries(entries => entries.map(row => row.id === entry.id ? { ...row, quantity: event.target.value } : row))}
+                                        className="bundle-quantity-input w-[4.5rem] rounded-md border border-gray-300 bg-[#FFFCFA] px-2 py-1.5 text-sm tabular-nums text-gray-900 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-200" />
+                                    </label>
+                                    <button type="button" aria-label={`Remove ${item?.name || entry.id}`} onClick={() => setBundleEntries(entries => entries.filter(row => row.id !== entry.id))}
+                                        className="bundle-remove-button min-h-9 rounded-md px-2 text-xs font-medium text-red-800 transition-colors hover:bg-red-50">Remove</button>
+                                </li>;
+                            })}
+                        </ul> : <p className="bundle-empty-state mt-3 rounded-lg border border-dashed border-[#EADBD3] px-3 py-3 text-center text-xs text-gray-700">Your bundle is empty. Search for an item above and add it here.</p>}
+                    </section>}
                     <label htmlFor="minBidMeat" className="mb-2 block text-sm font-bold">{isBuy ? 'Maximum purchase price per item (Meat):' : 'Minimum Bid (Meat, whole listing):'}</label>
                     <input id="minBidMeat" type="text" inputMode="decimal" required autoComplete="off" value={minBidMeat} onChange={(event) => setMinBidMeat(event.target.value)} onBlur={() => setMinBidMeat(value => normalizeAuctionAmount(value, { meat: true }))} placeholder="e.g. 1000, 10b, 4.53m, 50k" className={fieldClass} />
                     {!isBuy && (showBuyout ? <section id="buyout-price-fields" className="mb-4">

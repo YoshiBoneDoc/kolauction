@@ -18,6 +18,8 @@ export function mapAuction(row, bidRows) {
     return {
         id: row.id,
         auctionKind: row.auction_kind || 'sell',
+        isBundle: Array.isArray(row.bundle_items) && row.bundle_items.length > 1,
+        bundleItems: Array.isArray(row.bundle_items) ? row.bundle_items.map(item => ({ ...item, id: Number(item.id), quantity: Number(item.quantity) })) : [],
         pricePerItem: Number(row.price_per_item || row.min_bid_meat),
         purchasedQuantity: Number(row.purchased_quantity || 0),
         remainingQuantity: Number(row.remaining_quantity ?? row.quantity),
@@ -172,6 +174,16 @@ export function createAuctionService(client) {
             return { auctions: data.rows.map((row) => mapAuction(row, [])), total: Number(data.total) };
         },
         async create(auction) {
+            if (auction.bundleItems?.length) {
+                const { data, error } = await requireClient().rpc('create_bundle_auction', {
+                    p_items: auction.bundleItems.map(({ id, quantity }) => ({ id, quantity })),
+                    p_min_bid_meat: auction.minBidMeat, p_duration_hours: Number(auction.auctionTime),
+                    p_instant_purchase_price: auction.instantPurchasePrice ?? null, p_escrow_mode: auction.escrowMode !== false,
+                    p_custom_end_at: auction.customEndAt || null,
+                });
+                if (error) throw databaseError(error);
+                return data;
+            }
             if (auction.auctionKind === 'buy') {
                 const { data, error } = await requireClient().rpc('create_buy_auction', { p_item_id: auction.itemId, p_quantity: auction.quantity, p_price_per_item: auction.minBidMeat, p_duration_hours: Number(auction.auctionTime), p_delivery_mode: auction.deliveryMode });
                 if (error) throw databaseError(error);
