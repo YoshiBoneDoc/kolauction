@@ -87,26 +87,38 @@ test('Buy fees and cost explanations are private to the creator and administrato
   fulfillments:[{seller:'Vendor',quantity:10,price_per_item:200,payment_meat:2000,commission_meat:100,payment_sent:true,created_at:'2026-10-22T12:00:00Z'}]};
  for(const user of [null,{id:'other'},{id:'seller'},{id:'buyer',isBanned:true}]){
   const html=harness(listing,user).html();
-  assert.doesNotMatch(html,/Tiered Fee|commission|Remaining escrow|Gift expenses|Fees start|Gift Delivery:|>Delivery:/i);
+  assert.doesNotMatch(html,/Tiered Fee|commission|Escrow Summary|Gift expenses|Fees start|Gift Delivery:|>Delivery:/i);
   assert.doesNotMatch(html,/The price applies to each item/);assert.match(readable(html),/2,000 Meat paid/);
  }
  for(const [user,auction] of [[{id:'buyer'},listing],[{id:'admin'},{...listing,buyAdmin:true}]]){
-  const html=harness(auction,user).html();assert.match(html,/Tiered Fee \(5%\): 100 Meat/);assert.match(html,/Fees range from 1–5%/);
-  if(user.id==='buyer')assert.match(html,/Remaining escrow/);
-  else {assert.doesNotMatch(html,/Remaining escrow|Purchased items still held/);assert.match(readable(html),/10\/24\/2026 3:30:30pm · User1 reserved 20 items/);}
+  const html=harness(auction,user).html();assert.match(html,/Commission: 100 Meat/);assert.match(html,/Fees range from 1–5%/);
+  if(user.id==='buyer')assert.match(html,/Escrow Summary/);
+  else {assert.doesNotMatch(html,/Escrow Summary|Purchased items still held/);assert.match(readable(html),/10\/24\/2026 3:30:30pm · User1 reserved 20 items/);}
   if(user.id==='buyer')assert.match(readable(html),/Delivery: As items are acquired/);
   else assert.doesNotMatch(html,/>Delivery:/);
  }
- assert.doesNotMatch(harness({...listing,buyAdmin:true},null).html(),/Tiered Fee|Remaining escrow|Gift expenses|>Delivery:/);
+ assert.doesNotMatch(harness({...listing,buyAdmin:true},null).html(),/Tiered Fee|Escrow Summary|Gift expenses|>Delivery:/);
  const finished={...listing,deliveryMode:'finished'};
  assert.match(readable(harness(finished,{id:'buyer'}).html()),/Delivery: When the order is fully filled, expires, or is canceled/);
  assert.doesNotMatch(harness(finished,{id:'seller'}).html(),/>Delivery:/);
- assert.match(harness({...listing,buyAdmin:true},{id:'buyer'}).html(),/Reservation and gift audit/);
- assert.doesNotMatch(harness(listing,{id:'buyer'}).html(),/Reservation and gift audit/);
+ assert.match(harness({...listing,buyAdmin:true},{id:'buyer'}).html(),/Reservation history/);
+ assert.doesNotMatch(harness(listing,{id:'buyer'}).html(),/Reservation history/);
  const withExpiry={...listing,buyAdmin:true,reservationAudit:[...listing.reservationAudit,{id:'expired',kind:'reservation_expired',created_at:'2026-10-24T16:30:30',details:{quantity:7}}]};
  assert.doesNotMatch(harness(withExpiry,{id:'admin'}).html(),/private-expiry|reservation_created|reservation_expired|expires_at|\{"quantity"/);
 });
 
+
+test('escrow summary keeps dynamic amounts and only shows a held-item notice when needed',()=>{
+ const listing={...order,quantity:50000,pricePerItem:30,purchasedQuantity:13,remainingQuantity:49987,balanceMeat:1574591,purchaseMeat:390,buyCommissionMeat:19,refundedMeat:0,heldQuantity:0};
+ const html=harness(listing,{id:'buyer'}).html();
+ assert.match(readable(html),/Escrow Summary Available funds 1,574,591 Meat Refundable fee reserve 74,981 Meat Spent on purchases 390 Meat Commission paid 19 Meat/);
+ assert.ok(html.indexOf('Escrow Summary') < html.indexOf('How Buy Auctions Work'));
+ assert.ok(html.indexOf('How Buy Auctions Work') < html.indexOf('aria-label="Fulfillment history"'));
+ assert.doesNotMatch(html,/Remaining escrow|Refund queued\/returned|Purchased items still held|Queued deliveries are tracked|held for delivery|4\.8718%/);
+ assert.match(readable(harness({...listing,heldQuantity:7},{id:'buyer'}).html()),/7 purchased items held for delivery\./);
+ assert.match(readable(harness({...listing,heldQuantity:1},{id:'buyer'}).html()),/1 purchased item held for delivery\./);
+ assert.doesNotMatch(harness(listing,{id:'seller'}).html(),/Escrow Summary|Available funds|Commission paid|held for delivery/);
+});
 
 test('closed Buy orders show the actual outcome and concise sales without claiming queued payments were received',()=>{
  const fill={seller:'Anrath1',quantity:15,price_per_item:100,payment_meat:1500,payment_sent:true,created_at:'2026-10-22T23:17:58Z'};
@@ -201,7 +213,7 @@ test('pending funding and owner controls survive the Buy layout redesign',()=>{
  assert.match(readable(owner),/Purchase funds: 20,000 Meat · Fee reserve \(5%\): 1,000 Meat/);
  assert.match(owner,/<h2 class="mb-4 text-2xl font-bold leading-tight">Fund your order<\/h2>/);
  assert.match(readable(owner),/Deposit within 24 hours\. Your auction starts once funding is accepted\./);
- assert.doesNotMatch(owner,/Commission reserve|Remaining escrow|Purchased items still held/);
+ assert.doesNotMatch(owner,/Commission reserve|Escrow Summary|Purchased items still held/);
  for(const user of [null,{id:'other'},{id:'buyer',isBanned:true}])assert.doesNotMatch(harness(listing,user).html(),/FUND 1200|Cancel remaining order|reserve-quantity/);
 });
 

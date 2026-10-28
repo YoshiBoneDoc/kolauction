@@ -60,7 +60,7 @@ export default function AuctionDetails() {
             <div className="mx-auto max-w-4xl rounded-lg border border-gray-200 bg-white p-4 shadow-lg sm:p-6">
                 <section aria-label="Auction overview" className="grid min-w-0 grid-cols-1 items-start gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:gap-6">
                     <div className="flex min-w-0 items-center justify-center sm:pt-2">
-                        {auction.image ? <AuctionItemImage key={auction.id} src={auction.image} item={auction.item} /> : <p className="text-gray-500">No Image Available</p>}
+                        {auction.image ? <AuctionItemImage key={auction.id} src={auction.image} item={auction.item} enhanceEnabled /> : <p className="text-gray-500">No Image Available</p>}
                     </div>
                     <div className="min-w-0 space-y-6 text-left">
                         <div className="space-y-1">

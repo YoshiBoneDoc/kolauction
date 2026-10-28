@@ -137,9 +137,139 @@ test('profile earnings exclude winning bids that are still awaiting trade', () =
         { ...auction, id: 'complete', status: 'completed', finalPrice: 250 },
         { ...auction, id: 'cancel', status: 'cancelled', finalPrice: null },
     ] });
-    assert.match(html, /250 Meat received/);
-    assert.doesNotMatch(html, /350 Meat received/);
+    assert.match(html, /profile-stat-total">250 <span>Meat<\/span>/);
+    assert.doesNotMatch(html, /profile-stat-total">350 <span>Meat<\/span>/);
+    assert.match(html, />Total Sales</);
+    assert.match(html, />Winning Bids</);
+    assert.match(html, />Buy Orders</);
+    assert.doesNotMatch(html, /Received from completed sales|Spent on completed purchases|Including fees and purchases awaiting delivery/);
     assert.match(html, /Awaiting settlement/);
+});
+
+test('profile transaction cards use two compact rows without progress bars', () => {
+    const buyOrder = {
+        ...auction,
+        id: 'buy-order-1',
+        auctionKind: 'buy',
+        fulfilledByMe: true,
+        mySaleQuantity: 500,
+        mySaleMeat: 100000,
+        quantity: 10000,
+        purchasedQuantity: 1975,
+        pricePerItem: 200,
+        bids: [],
+    };
+    const html = render({ page: 'profile', userId: 'seller', auctions: [buyOrder] });
+    const mobileStart = html.indexOf('<div class="lg:hidden space-y-[18px]">');
+    const buySectionStart = html.indexOf('<section class="profile-transaction-section">', mobileStart);
+    const buySectionEnd = html.indexOf('</section>', buySectionStart);
+    const buySection = html.slice(buySectionStart, buySectionEnd);
+    assert.match(buySection, /Test item[\s\S]*?× 500/);
+    assert.match(buySection, /Buy order · Escrow/);
+    assert.match(buySection, /200 Meat\/item · Earned: <strong>100k Meat<\/strong>/);
+    assert.doesNotMatch(buySection, /× 10,000|1,975 \/ 10,000 purchased/);
+    assert.doesNotMatch(html, /role="progressbar"|profile-progress/);
+});
+
+test('profile limits active and historical lists while keeping pending entries visible', () => {
+    const activeListings = Array.from({ length: 13 }, (_, index) => ({
+        ...auction, id: `active-listing-${index}`, sellerId: 'seller', status: 'active',
+        endTime: Date.now() + 60 * 60 * 1000, bids: [],
+    }));
+    const activeBids = Array.from({ length: 12 }, (_, index) => ({
+        ...auction, id: `active-bid-${index}`, sellerId: 'other', status: 'active',
+        endTime: Date.now() + 60 * 60 * 1000, bids: [{ bidderId: 'seller', amount: 100 }],
+    }));
+    const listingHistory = Array.from({ length: 7 }, (_, index) => ({
+        ...auction, id: `listing-history-${index}`, sellerId: 'seller', status: 'cancelled', bids: [],
+    }));
+    const bidHistory = Array.from({ length: 8 }, (_, index) => ({
+        ...auction, id: `bid-history-${index}`, sellerId: 'other', status: 'cancelled',
+        bids: [{ bidderId: 'seller', amount: 100 }],
+    }));
+    const html = render({ page: 'profile', userId: 'seller', auctions: [...activeListings, ...activeBids, ...listingHistory, ...bidHistory] });
+    assert.match(html, /Show 3 more ↓/); // 13 active listings: initial 10.
+    assert.match(html, /Show 2 more ↓/); // 12 active bids and 7 listing-history entries.
+    const mobileStart = html.indexOf('<div class="lg:hidden space-y-[18px]">');
+    const desktopStart = html.indexOf('<div class="hidden grid-cols-2 items-start gap-[18px] lg:grid">');
+    const mobileSections = html.slice(mobileStart, desktopStart);
+    const visibleCount = title => {
+        const titlePosition = mobileSections.indexOf(`>${title}</h2>`);
+        const sectionStart = mobileSections.lastIndexOf('<section class="profile-transaction-section">', titlePosition);
+        const sectionEnd = mobileSections.indexOf('</section>', titlePosition);
+        return (mobileSections.slice(sectionStart, sectionEnd).match(/<article\b/g) || []).length;
+    };
+    assert.equal(visibleCount('Active listings'), 10);
+    assert.equal(visibleCount('Active bids'), 10);
+    assert.equal(visibleCount('Listing history'), 5);
+    assert.equal(visibleCount('Bid history'), 5);
+
+    const pending = Array.from({ length: 12 }, (_, index) => ({
+        ...auction, id: `pending-${index}`, sellerId: 'seller', status: 'pending_escrow', bids: [],
+    }));
+    const pendingHtml = render({ page: 'profile', userId: 'seller', auctions: pending });
+    assert.match(pendingHtml, /Awaiting escrow deposit/);
+    assert.doesNotMatch(pendingHtml, /Show \d+ more/);
+    const pendingMobileStart = pendingHtml.indexOf('<div class="lg:hidden space-y-[18px]">');
+    const pendingDesktopStart = pendingHtml.indexOf('<div class="hidden grid-cols-2 items-start gap-[18px] lg:grid">');
+    assert.equal((pendingHtml.slice(pendingMobileStart, pendingDesktopStart).match(/<article\b/g) || []).length, 12);
+});
+
+test('profile sections use independent accessible collapse controls and omit escrow delivery queue', () => {
+    const html = render({ page: 'profile', userId: 'seller', auctions: [] });
+    assert.doesNotMatch(html, /Sending escrow deliveries/);
+    assert.match(html, /aria-label="Collapse Buy order fulfillments" aria-expanded="true"/);
+    assert.match(html, /aria-label="Collapse Active bids" aria-expanded="true"/);
+    assert.match(html, /profile-count-chevron/);
+    assert.equal((html.match(/aria-label="Collapse [^"]+" aria-expanded="true"/g) || []).length, 14);
+    assert.equal((html.match(/Nothing here yet\./g) || []).length, 14);
+});
+
+test('active bids and bid history outcomes use persisted bidder and winner IDs', () => {
+    const listings = [
+        { ...auction, id: 'active-winning', item: 'Active winning', status: 'active', endTime: Date.now() + 60_000,
+            highestBidderId: 'seller', viewerIsHighestBidder: true, bids: [{ bidderId: 'seller', amount: 100 }] },
+        { ...auction, id: 'active-outbid', item: 'Active outbid', status: 'active', endTime: Date.now() + 60_000,
+            highestBidderId: 'buyer', viewerIsHighestBidder: false, bids: [{ bidderId: 'seller', amount: 90 }, { bidderId: 'buyer', amount: 100 }] },
+        { ...auction, id: 'history-won', item: 'History won', status: 'completed', hasWinner: true, winnerId: 'seller', finalPrice: 100,
+            bids: [{ bidderId: 'seller', amount: 100 }] },
+        { ...auction, id: 'awaiting-won', item: 'Awaiting won', sellerId: 'buyer', status: 'awaiting_trade', hasWinner: true, winnerId: 'seller', finalPrice: 100,
+            bids: [{ bidderId: 'seller', amount: 100 }] },
+        { ...auction, id: 'history-lost', item: 'History lost', status: 'completed', hasWinner: true, winnerId: 'buyer', finalPrice: 100,
+            bids: [{ bidderId: 'seller', amount: 90 }, { bidderId: 'buyer', amount: 100 }] },
+        { ...auction, id: 'history-canceled', item: 'History canceled', status: 'cancelled', winnerId: null, hasWinner: false,
+            bids: [{ bidderId: 'seller', amount: 90 }] },
+        { ...auction, id: 'history-no-sale', item: 'History no sale', status: 'ended_no_bids', winnerId: null, hasWinner: false,
+            bids: [{ bidderId: 'seller', amount: 90 }] },
+    ];
+    const html = render({ page: 'profile', userId: 'seller', auctions: listings });
+    assert.match(html, /profile-badge-winning">Winning/);
+    assert.match(html, /profile-badge-outbid">Outbid/);
+    assert.match(html, /profile-badge-winning">Won/);
+    assert.match(html, /profile-badge-lost">Lost/);
+    assert.match(html, /profile-badge-neutral">Canceled/);
+    assert.match(html, /profile-badge-neutral">No sale/);
+    assert.match(html, /Final: <strong>100<\/strong>/);
+    assert.doesNotMatch(html, /Winner: <a[^>]*>seller<\/a>/);
+});
+
+test('profile keeps all transaction sections in reading order on mobile and independent columns on desktop', () => {
+    const html = render({ page: 'profile', userId: 'seller', auctions: [] });
+    const mobileStart = html.indexOf('<div class="lg:hidden space-y-[18px]">');
+    const desktopStart = html.indexOf('<div class="hidden grid-cols-2 items-start gap-[18px] lg:grid">');
+    assert.ok(mobileStart >= 0 && desktopStart > mobileStart);
+    assert.match(html, /flex min-w-0 flex-col gap-\[18px\]/);
+    const mobileSections = html.slice(mobileStart, desktopStart);
+    const sectionTitles = [
+        'Buy order fulfillments', 'Awaiting escrow deposit',
+        'Awaiting settlement', 'Active listings', 'Active bids', 'Listing history', 'Bid history',
+    ];
+    let previous = -1;
+    for (const title of sectionTitles) {
+        const position = mobileSections.indexOf(`>${title}</h2>`);
+        assert.ok(position > previous, `${title} should remain in original mobile reading order`);
+        previous = position;
+    }
 });
 
 
@@ -191,17 +321,17 @@ test('My Account distinguishes unavailable history from a successfully loaded em
     const unavailable = render({ page: 'profile', userId: 'seller', auctions: [], error: 'Read failed' });
     assert.match(unavailable, /Auction history unavailable/);
     assert.match(unavailable, /Try again/);
-    assert.doesNotMatch(unavailable, /0 Meat received|0 Meat spent|Nothing here yet/);
+    assert.doesNotMatch(unavailable, /profile-stat-card|Nothing here yet/);
     const stale = render({ page: 'profile', userId: 'seller', auctions: [{ ...auction, status: 'completed' }], error: 'Refresh failed' });
     assert.match(stale, /Auction history unavailable/);
-    assert.doesNotMatch(stale, /Meat received|Meat spent|Nothing here yet/);
+    assert.doesNotMatch(stale, /profile-stat-card|Nothing here yet/);
     const empty = render({ page: 'profile', userId: 'seller', auctions: [] });
-    assert.match(empty, /0 Meat received/);
+    assert.match(empty, /profile-stat-total">0 <span>Meat<\/span>/);
     assert.match(empty, /Nothing here yet/);
     assert.doesNotMatch(empty, /Auction history unavailable/);
     const loading = render({ page: 'profile', userId: 'seller', auctions: [], isLoading: true });
     assert.match(loading, /Loading your auction history/);
-    assert.doesNotMatch(loading, /Meat received|Nothing here yet/);
+    assert.doesNotMatch(loading, /profile-stat-card|Nothing here yet/);
 });
 
 test('My Account auction links and winner-profile links are independent anchors', () => {

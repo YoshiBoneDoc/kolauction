@@ -10,7 +10,7 @@ export function auctionReadRequest(pathname, search = '', viewerId = null) {
     const seller = pathname.match(/^\/seller\/([^/]+)\/?$/);
     if (pathname !== '/auctions' && !seller) return null;
     const params = new URLSearchParams(search);
-    const status = auctionFilters.some(([value]) => value === params.get('status')) ? params.get('status') : 'active';
+    const status = auctionFilters.some(([value]) => value === params.get('status')) ? params.get('status') : seller ? 'all' : 'active';
     return {
         view: seller ? 'seller' : 'browse', ...(seller ? { id: seller[1] } : {}),
         ...(!seller && viewerId && params.get('mine') === '1' ? { sellerId: viewerId } : {}),

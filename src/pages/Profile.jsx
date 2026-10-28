@@ -5,10 +5,15 @@ import { AuctionsContext } from "../context/AuctionsContext";
 import { Link } from "react-router-dom";
 import { getAuctionResult, getAuctionStatus } from "../lib/auctionLifecycle";
 import KolVerification from "../components/KolVerification";
+import AuctionItemImage from '../components/AuctionItemImage';
 import { formatCompactMeat } from '../lib/formatMeat';
 import { useNow } from "../hooks/useNow";
+import MeatStack from '../components/MeatStack';
+import { toggleProfileSection } from '../lib/profileSections';
+import { auctionEndTime } from '../lib/auctionBrowsing';
 
 const formatNumber = (number) => number.toLocaleString('en-US');
+const historyTime = auction => Date.parse(auction.completedAt) || auctionEndTime(auction) || auction.endTime || auction.createdAt;
 
 const formatTimeLeft = (endTime, now) => {
     const remaining = Math.max(0, Math.ceil((endTime - now) / 1000));
@@ -24,6 +29,8 @@ const Profile = () => {
     const { auctions, isLoading, error, refreshAuctions } = useContext(AuctionsContext);
     const now = useNow();
     const [retrying, setRetrying] = useState(false);
+    const [expandedSections, setExpandedSections] = useState({});
+    const [collapsedSections, setCollapsedSections] = useState({});
 
     if (!currentUser) {
         return (
@@ -63,76 +70,155 @@ const Profile = () => {
     const sections = [
         { title: 'Buy order fulfillments', records: auctions.filter(a => a.auctionKind === 'buy' && a.fulfilledByMe) },
         { title: 'Awaiting escrow deposit', records: selling.filter((auction) => auction.status === 'pending_escrow') },
-        { title: 'Sending escrow deliveries', records: auctions.filter((auction) => auction.status === 'settling' && (auction.sellerId === currentUser.id || auction.winnerId === currentUser.id)) },
         { title: 'Awaiting settlement', records: awaitingTrades },
         { title: 'Active listings', records: selling.filter((auction) => getAuctionStatus(auction, now) === 'active') },
-        { title: 'Active bids', records: bidding.filter((auction) => getAuctionStatus(auction, now) === 'active') },
+        { title: 'Active bids', records: bidding.filter((auction) => getAuctionStatus(auction, now) === 'active').sort((a, b) => a.endTime - b.endTime) },
         { title: 'Listing history', records: selling.filter((auction) => !['active','pending_escrow','settling'].includes(getAuctionStatus(auction, now))) },
-        { title: 'Bid history', records: bidding.filter((auction) => !['active','settling'].includes(getAuctionStatus(auction, now))) },
+        { title: 'Bid history', records: bidding.filter((auction) => !['active','settling'].includes(getAuctionStatus(auction, now))).sort((a, b) => historyTime(b) - historyTime(a)) },
     ];
 
-    return (
-        <div className="site-page-background flex-1 bg-[#F1F3F5] p-6">
-            <h1 className="text-4xl font-bold text-blue-600 my-6 text-center">{currentUser.khubUsername}&apos;s Profile</h1>
-            <p className="mb-4 text-center"><Link to="/change-password" className="text-blue-700 underline">Change password</Link></p>
-            {selling.some(auction => auction.status !== 'pending_escrow') && <p className="mb-4 text-center"><Link to={`/seller/${currentUser.id}`} className="text-blue-700 underline">View public seller profile</Link></p>}
-            <KolVerification />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-                <div className="bg-white rounded border border-gray-200 shadow p-4">
-                    <h2 className="font-semibold">Completed sales</h2>
-                    <p>{formatCompactMeat(totalMeatGain)} Meat received</p>
+    const renderAuctionSection = ({ title, records }) => {
+        const canShowMore = ['Active listings', 'Active bids', 'Listing history', 'Bid history'].includes(title);
+        const initialLimit = title === 'Active listings' || title === 'Active bids' ? 10 : 5;
+        const visibleLimit = canShowMore ? (expandedSections[title] ?? initialLimit) : records.length;
+        const visibleRecords = records.slice(0, visibleLimit);
+        const remaining = Math.max(0, records.length - visibleRecords.length);
+        const isExpanded = canShowMore && visibleLimit > initialLimit;
+        const isCollapsed = collapsedSections[title] === true;
+
+        return (
+            <section key={title} className="profile-transaction-section">
+                <div className="flex items-center justify-between gap-3 border-b pb-3 profile-divider">
+                    <h2 className="text-[17px] font-semibold profile-text">{title}</h2>
+                    <button
+                        type="button"
+                        className="profile-count-button"
+                        aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${title}`}
+                        aria-expanded={!isCollapsed}
+                        onClick={() => setCollapsedSections(previous => toggleProfileSection(previous, title))}
+                    ><span className="profile-count">{records.length}</span><span className={`profile-count-chevron${isCollapsed ? ' is-collapsed' : ''}`} aria-hidden="true" /></button>
                 </div>
-                <div className="bg-white rounded border border-gray-200 shadow p-4">
-                    <h2 className="font-semibold">Completed purchases</h2>
-                    <p>{formatCompactMeat(totalMeatSpent)} Meat spent</p>
-                </div>
-                {buyMeatSpent > 0n && <div className="bg-white rounded border border-gray-200 shadow p-4"><h2 className="font-semibold">Buy order purchases</h2><p>{formatCompactMeat(buyMeatSpent)} Meat committed, including fees</p><p className="text-xs text-gray-500">Includes secured purchases awaiting delivery.</p></div>}
-            </div>
-            <p className="text-sm text-gray-600 mb-6">Totals include completed bot deliveries (seller fees deducted) and direct trades confirmed by both parties. Pending deliveries are shown below.</p>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {sections.map(({ title, records }) => (
-                    <section key={title}>
-                        <h2 className="text-2xl font-bold border-b mb-4 pb-2">{title}</h2>
-                        {records.length === 0 && <p className="text-gray-600">Nothing here yet.</p>}
-                        <div className="space-y-3">
-                            {records.map((auction) => {
-                                const result = getAuctionResult(auction, now);
-                                const myBids = auction.bids.filter((bid) => bid.bidderId === currentUser.id);
-                                return (
-                                    <article key={auction.id} className="block rounded shadow border border-gray-200 bg-white p-4">
-                                        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                                            <div className="flex min-w-0 items-center gap-3">
-                                                {auction.auctionKind === 'buy' && auction.image && <img src={auction.image} alt="" loading="lazy" className="h-12 w-12 shrink-0 object-contain [image-rendering:pixelated]" />}
-                                                <h3 className="min-w-0 break-words font-bold"><Link to={`/auction/${auction.id}`} className="text-gray-900 hover:underline">{auction.item} × {formatNumber(auction.quantity)}</Link></h3>
-                                            </div>
-                                            {result.status === 'active' && (
-                                                <time
-                                                    dateTime={new Date(auction.endTime).toISOString()}
-                                                    title={`Ends ${new Date(auction.endTime).toLocaleString()}`}
-                                                    className={`text-sm tabular-nums ${auction.endTime - now <= 3 * 60 * 60 * 1000 ? 'text-red-600' : 'text-gray-600'}`}
-                                                >
-                                                    {formatTimeLeft(auction.endTime, now)}
-                                                </time>
-                                            )}
+                <div hidden={isCollapsed}>
+                    {records.length === 0 ? <p className="mt-3 py-2 text-[13px] profile-label">Nothing here yet.</p> : (
+                        <div className="mt-3 space-y-[5px]">
+                        {visibleRecords.map((auction) => {
+                            const result = getAuctionResult(auction, now);
+                            const myBids = auction.bids.filter((bid) => bid.bidderId === currentUser.id);
+                            const isBuy = auction.auctionKind === 'buy';
+                            const highestBid = myBids.length > 0 ? Math.max(...myBids.map((bid) => bid.amount)) : null;
+                            const personallyFulfilled = auction.mySaleQuantity;
+                            const bidStatus = title === 'Active bids' && auction.viewerIsHighestBidder != null
+                                ? auction.viewerIsHighestBidder ? { label: 'Winning', className: 'profile-badge-winning' }
+                                    : { label: 'Outbid', className: 'profile-badge-outbid' }
+                                : null;
+                            const historyOutcome = title === 'Bid history' && ['awaiting_trade', 'completed'].includes(result.status) && result.hasWinner && result.winnerId
+                                ? result.winnerId === currentUser.id ? { label: 'Won', className: 'profile-badge-winning' }
+                                    : { label: 'Lost', className: 'profile-badge-lost' }
+                                : title === 'Bid history' && !result.hasWinner && ['cancelled', 'voided', 'expired', 'ended_no_bids'].includes(result.status)
+                                    ? { label: result.status === 'ended_no_bids' ? 'No sale' : 'Canceled', className: 'profile-badge-neutral' }
+                                    : null;
+                            return (
+                                <article key={auction.id} className="profile-transaction-entry">
+                                    {auction.image ? <AuctionItemImage src={auction.image} item={auction.item} size="tiny" className="profile-entry-image" fallbackText="No image" />
+                                        : <span className="profile-entry-image profile-entry-image-fallback" role="img" aria-label={`${auction.item} image unavailable`}>No image</span>}
+                                    <div className="profile-entry-row">
+                                        <div className="profile-entry-content flex min-w-0 flex-1 items-center">
+                                            <h3 className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-[13px] leading-[18px]">
+                                                <Link to={`/auction/${auction.id}`} className="break-words font-semibold profile-text hover:underline">{auction.item}</Link>
+                                                <span className="text-xs font-medium profile-muted">× {isBuy && title === 'Buy order fulfillments' ? (personallyFulfilled == null ? '—' : formatNumber(personallyFulfilled)) : formatNumber(auction.quantity)}</span>
+                                                {bidStatus && <span className={`profile-outcome-badge ${bidStatus.className}`}>{bidStatus.label}</span>}
+                                            </h3>
                                         </div>
-                                        <p>{result.label} · {auction.escrowMode ? 'Escrow' : 'Direct settlement'}</p>
-                                        {auction.auctionKind === 'buy' && <p>Buy auction · {auction.pricePerItem.toLocaleString('en-US')} Meat / item · {auction.purchasedQuantity.toLocaleString('en-US')} / {auction.quantity.toLocaleString('en-US')} purchased</p>}
-                                        {auction.auctionKind !== 'buy' && result.status === 'active' && (
-                                            <p>Current bid: {auction.currentBid > 0 ? `${formatCompactMeat(auction.currentBid)} Meat` : 'No bids yet'}</p>
-                                        )}
-                                        {result.hasWinner && <p>Winner: <WinnerLink auction={auction} /> · Final price: {formatCompactMeat(result.finalPrice)} Meat</p>}
-                                        {myBids.length > 0 && <p>Your highest bid: {formatCompactMeat(Math.max(...myBids.map((bid) => bid.amount)))} Meat</p>}
-                                        {result.status === 'awaiting_trade' && (
-                                            <p className="text-blue-700 mt-2">{auction.sellerId === currentUser.id ? 'You are the seller.' : result.winnerId === currentUser.id ? 'You won this auction.' : 'Another bidder won.'} <Link to={`/auction/${auction.id}`} className="text-blue-700 underline">View trade details</Link></p>
-                                        )}
-                                    </article>
-                                );
-                            })}
+                                        {historyOutcome ? <span className={`profile-outcome-badge ${historyOutcome.className}`}>{historyOutcome.label}</span> : result.status === 'active' ? <time
+                                            dateTime={new Date(auction.endTime).toISOString()}
+                                            title={`Ends ${new Date(auction.endTime).toLocaleString()}`}
+                                            className="profile-entry-endtime"
+                                        >{formatTimeLeft(auction.endTime, now)}</time> : <span className="profile-entry-status">{result.label}</span>}
+                                    </div>
+
+                                    <div className="profile-entry-row">
+                                        <p className="profile-entry-secondary">{isBuy && title === 'Buy order fulfillments' ? 'Buy order · ' : result.status === 'active' ? <><span className="profile-entry-active">{result.label}</span> · </> : ''}<span>{auction.escrowMode ? 'Escrow' : 'Direct settlement'}</span></p>
+                                        <div className="profile-entry-details">
+                                            {isBuy && title === 'Buy order fulfillments' && <span>{formatNumber(auction.pricePerItem)} Meat/item · Earned: <strong>{formatCompactMeat(auction.mySaleMeat)} Meat</strong></span>}
+                                            {isBuy && title !== 'Buy order fulfillments' && <span>{formatNumber(auction.pricePerItem)} Meat / item · {formatNumber(auction.purchasedQuantity)} / {formatNumber(auction.quantity)} purchased</span>}
+                                            {!isBuy && result.status === 'active' && <span>Current bid: <strong>{auction.currentBid > 0 ? `${formatCompactMeat(auction.currentBid)} Meat` : 'No bids yet'}</strong></span>}
+                                            {result.hasWinner && <span>{result.winnerId === currentUser.id && ['awaiting_trade', 'completed'].includes(result.status) ? null : <>Winner: <WinnerLink auction={auction} /> · </>}Final: <strong>{formatCompactMeat(result.finalPrice)}</strong></span>}
+                                            {highestBid !== null && <span>Your bid: <strong>{formatCompactMeat(highestBid)} Meat</strong></span>}
+                                        </div>
+                                    </div>
+
+                                    {result.status === 'awaiting_trade' && <div className="profile-entry-extra">
+                                        <span>{auction.sellerId === currentUser.id ? 'You are the seller.' : result.winnerId === currentUser.id ? 'You won this auction.' : 'Another bidder won.'}</span>
+                                        <Link to={`/auction/${auction.id}`} className="profile-blue underline">View trade details</Link>
+                                    </div>}
+                                </article>
+                            );
+                        })}
                         </div>
+                    )}
+                {canShowMore && records.length > initialLimit && (remaining > 0 || isExpanded) && <button
+                    type="button"
+                    className="profile-show-more"
+                    aria-expanded={remaining === 0}
+                    onClick={() => setExpandedSections(previous => ({ ...previous, [title]: remaining > 0 ? visibleLimit + Math.min(5, remaining) : initialLimit }))}
+                >{remaining > 0 ? `Show ${Math.min(5, remaining)} more ↓` : 'Show less ↑'}</button>}
+                </div>
+            </section>
+        );
+    };
+
+    return (
+        <main className="site-page-background flex-1 bg-[#F1F3F5] px-4 pb-5 pt-4 sm:px-6 sm:pt-5">
+            <div className="mx-auto max-w-7xl space-y-4">
+                <h1 className="text-center text-5xl font-bold text-blue-700">Account Profile</h1>
+                <header className="rounded-xl border border-gray-200 bg-white px-5 py-2 shadow-sm sm:px-6">
+                    <nav aria-label="Profile links" className="flex min-h-11 flex-wrap items-center justify-center gap-x-6 gap-y-1 text-sm">
+                        <Link to="/change-password" className="text-blue-700 underline">Change password</Link>
+                        {selling.some(auction => auction.status !== 'pending_escrow') && <Link to={`/seller/${currentUser.id}`} className="text-blue-700 underline">Public seller profile</Link>}
+                    </nav>
+                    <div className="mt-0.5 text-left">
+                        <p className="mb-0.5 text-xs font-semibold uppercase leading-4 tracking-wider text-gray-500">Account overview</p>
+                        <p className="border-t border-gray-200 pt-1.5 text-2xl font-bold leading-tight text-blue-700">{currentUser.khubUsername}</p>
+                    </div>
+                </header>
+
+                <div className="profile-dashboard space-y-[18px]">
+                    <KolVerification />
+
+                    <section aria-label="Trade totals">
+                        <div className="mb-3">
+                            <h2 className="text-lg font-semibold profile-text">Trade totals</h2>
+                            <p className="text-xs profile-label">Totals include completed bot deliveries (seller fees deducted) and direct trades confirmed by both parties.</p>
+                        </div>
+                        <dl className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                            <div className="profile-stat-card">
+                                <dt className="profile-stat-label">Total Sales</dt>
+                                <dd className="profile-stat-value profile-stat-main"><MeatStack total={totalMeatGain} /><span className="profile-stat-total">{formatCompactMeat(totalMeatGain)} <span>Meat</span></span></dd>
+                            </div>
+                            <div className="profile-stat-card">
+                                <dt className="profile-stat-label">Winning Bids</dt>
+                                <dd className="profile-stat-value profile-stat-main"><MeatStack total={totalMeatSpent} /><span className="profile-stat-total">{formatCompactMeat(totalMeatSpent)} <span>Meat</span></span></dd>
+                            </div>
+                            <div className="profile-stat-card">
+                                <dt className="profile-stat-label">Buy Orders</dt>
+                                <dd className="profile-stat-value profile-stat-main"><MeatStack total={buyMeatSpent} /><span className="profile-stat-total">{formatCompactMeat(buyMeatSpent)} <span>Meat</span></span></dd>
+                            </div>
+                        </dl>
                     </section>
-                ))}
+
+                    <div className="lg:hidden space-y-[18px]">
+                        {sections.map(renderAuctionSection)}
+                    </div>
+                    <div className="hidden grid-cols-2 items-start gap-[18px] lg:grid">
+                        {[sections.filter((_, index) => index % 2 === 0), sections.filter((_, index) => index % 2 === 1)].map((column, index) => (
+                            <div key={index} className="flex min-w-0 flex-col gap-[18px]">
+                                {column.map(renderAuctionSection)}
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </div>
-        </div>
+        </main>
     );
 };
 

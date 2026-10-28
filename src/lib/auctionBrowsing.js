@@ -28,6 +28,11 @@ export function resolveAuctionSort(status, sort) {
 }
 
 export function auctionEndTime(auction) {
+    if (['cancelled', 'voided'].includes(auction.status)) {
+        // Cancellation is a distinct event and can happen before the deadline.
+        // If its timestamp is unavailable, don't present the deadline as one.
+        return Date.parse(auction.cancelledAt);
+    }
     return Math.min(auction.endTime,
         Date.parse(auction.finalizedAt) || Infinity, Date.parse(auction.instantPurchasedAt) || Infinity);
 }
@@ -54,7 +59,11 @@ export function browseAuctions(auctions, { search = '', status = 'active', sort 
         }
         if (sort === 'newest') comparison = b.createdAt - a.createdAt;
         if (sort === 'ending') comparison = a.endTime - b.endTime;
-        if (sort === 'ended-desc') comparison = auctionEndTime(b) - auctionEndTime(a);
+        if (sort === 'ended-desc') {
+            const leftEnd = auctionEndTime(a), rightEnd = auctionEndTime(b);
+            comparison = Number.isFinite(leftEnd) && Number.isFinite(rightEnd) ? rightEnd - leftEnd
+                : Number.isFinite(leftEnd) ? -1 : Number.isFinite(rightEnd) ? 1 : 0;
+        }
         if (sort === 'price-asc') comparison = auctionPrice(a) - auctionPrice(b);
         if (sort === 'price-desc') comparison = auctionPrice(b) - auctionPrice(a);
         return comparison || b.createdAt - a.createdAt || String(a.id).localeCompare(String(b.id));

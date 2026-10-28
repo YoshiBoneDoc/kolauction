@@ -2,7 +2,9 @@ import PropTypes from 'prop-types';
 import { auctionEndTime } from '../lib/auctionBrowsing';
 
 export default function AuctionEndedTime({ auction, compact = true }) {
-    const endedAt = new Date(auctionEndTime(auction));
+    const timestamp = auctionEndTime(auction);
+    if (!Number.isFinite(timestamp)) return null;
+    const endedAt = new Date(timestamp);
     const [label, color] = {
         completed: ['Ended', 'text-[#27804A]'],
         ended_no_bids: ['Expired', 'text-[#A85D45]'],

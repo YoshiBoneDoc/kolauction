@@ -534,7 +534,8 @@ test('closed card timestamps use outcome labels and colors', () => {
         ['cancelled', 'Cancelled', '#64748B'],
         ['voided', 'Cancelled', '#64748B'],
     ]) {
-        const html = render('/auctions?status=ended', [{ ...base, id: status, item: 'Outcome fixture', status, endTime: 2000 }]);
+        const html = render('/auctions?status=ended', [{ ...base, id: status, item: 'Outcome fixture', status, endTime: 2000,
+            cancelledAt: new Date(2000).toISOString() }]);
         assert.ok(html.includes(`text-[${color}]`));
         assert.ok(html.includes(`${label}: <time`));
     }
@@ -551,10 +552,26 @@ test('individual Sell and Buy pages share the cards’ outcome timestamp labels 
         ]) {
             if (auctionKind === 'buy' && status === 'ended_no_bids') continue;
             const listing = { ...base, id: 'outcome-detail', item: 'Outcome detail fixture', status, auctionKind,
-                pricePerItem: 100, endTime: 2000, fulfillments: [] };
+                pricePerItem: 100, endTime: 2000, cancelledAt: new Date(2000).toISOString(), fulfillments: [] };
             const html = render('/auction/outcome-detail', [listing]);
             assert.ok(html.includes(`text-sm leading-6 text-[${color}]`));
             assert.ok(html.includes(`${label}: <time dateTime="1970-01-01T00:00:02.000Z">`));
+        }
+    }
+});
+
+test('cancelled Sell and Buy cards show the cancellation timestamp, not the future deadline', () => {
+    const cancelledAt = '2026-10-24T02:40:56.070Z';
+    const deadline = '2026-10-31T02:40:11.927Z';
+    for (const auctionKind of ['sell', 'buy']) {
+        for (const status of ['cancelled', 'voided']) {
+            const listing = { ...base, id: `${auctionKind}-${status}`, item: 'Cancelled fixture', status, auctionKind,
+                pricePerItem: 100, endTime: Date.parse(deadline), cancelledAt, fulfillments: [] };
+            const card = render('/auctions?status=cancelled', [listing]);
+            assert.ok(card.includes(`Cancelled: <time dateTime="${cancelledAt}">`));
+            assert.ok(!card.includes(`dateTime="${deadline}"`));
+            const missing = render('/auctions?status=cancelled', [{ ...listing, cancelledAt: null }]);
+            assert.ok(!missing.includes('Cancelled: <time'));
         }
     }
 });

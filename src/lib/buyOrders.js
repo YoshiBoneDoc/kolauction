@@ -25,3 +25,17 @@ export function buyFunding(price, quantity) {
     if (total > BigInt(MAX_BUY_ORDER_MEAT)) throw new Error('A buy order including its fee reserve cannot exceed 20 billion Meat.');
     return { purchase: Number(purchase), feeReserve: Number(feeReserve), total: Number(total) };
 }
+
+// Only the balance above the remaining purchase principal is fee reserve.
+// SQL clears refunded money from balance_meat when queuing the refund.
+export function buyRefundableFeeReserve({ pricePerItem, remainingQuantity, balanceMeat }) {
+    if ([pricePerItem, remainingQuantity, balanceMeat].some(value => value == null)) return null;
+    try {
+        const price = BigInt(pricePerItem), quantity = BigInt(remainingQuantity), balance = BigInt(balanceMeat);
+        if (price <= 0n || quantity < 0n || balance < 0n) return null;
+        const reserve = balance - price * quantity;
+        return reserve > 0n ? reserve : 0n;
+    } catch {
+        return null;
+    }
+}

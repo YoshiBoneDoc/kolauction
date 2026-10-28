@@ -8,6 +8,7 @@ import * as router from 'react-router-dom';
 
 const { outputFiles } = buildSync({ stdin: { contents: `
     export { default as AllAuctions } from './src/pages/AllAuctions.jsx';
+    export { default as AuctionFilters } from './src/components/AuctionFilters.jsx';
     export { default as CompactAuctionCard } from './src/components/CompactAuctionCard.jsx';
     export { default as AuctionBidForm } from './src/components/AuctionBidForm.jsx';
     export { default as CopyMessage } from './src/components/CopyMessage.jsx';
@@ -39,7 +40,7 @@ new Function('require', 'module', 'exports', outputFiles[0].text)(name => name =
     ...router, useNavigationType: () => 'REPLACE', useLocation: () => ({ pathname: '/auctions', search: params.toString() }),
     useSearchParams: () => [params, next => { params = typeof next === 'function' ? next(params) : new URLSearchParams(next); }],
 } : require(name), compiled, compiled.exports);
-const { AllAuctions, CompactAuctionCard, AuctionBidForm, InstantPurchaseAction, CopyMessage } = compiled.exports;
+const { AllAuctions, AuctionFilters, CompactAuctionCard, AuctionBidForm, InstantPurchaseAction, CopyMessage } = compiled.exports;
 function nodes(tree) {
     if (!tree || typeof tree !== 'object') return [];
     return [tree, ...React.Children.toArray(tree.props?.children).flatMap(nodes)];
@@ -267,7 +268,7 @@ test('open Direct and Escrow card controls refresh their rounded minimum when li
     }
 });
 
-test('ownership choices remain in Filters while View All resets every control', () => {
+test('ownership button cycles the displayed auctions and View All resets every control', () => {
     const previousUser = user;
     const previousOwner = listings[1].sellerId;
     try {
@@ -279,17 +280,37 @@ test('ownership choices remain in Filters while View All resets every control', 
         assert.match(button().props.className,/h-9 w-36 shrink-0/);
         h.find(n => n.props?.onToggle && n.props?.controls).props.onToggle(); h.render();
         assert.equal(filters().props.ownership,'all');
-        filters().props.onUpdate('mine','1'); h.render();
-        assert.equal(params.get('mine'),'1'); assert.equal(params.has('page'),false);
+        const panel = harness(AuctionFilters, filters().props);
+        const ownership = () => panel.find(node => node.type === 'button' && node.props['aria-label']?.startsWith('Auction ownership:'));
+        assert.equal(ownership().props['aria-label'], 'Auction ownership: All Auctions');
+        assert.equal(ownership().props['aria-pressed'], false);
+        assert.ok(ownership().props.className.split(/\s+/).includes('bg-white'));
+        assert.match(ownership().props.className, /w-\[136px\]/);
+        ownership().props.onClick(); h.render(); panel.render(filters().props);
+        assert.equal(params.get('mine'),'others'); assert.equal(params.has('page'),false);
         assert.equal(params.get('q'),'Item'); assert.equal(params.get('sort'),'price-desc');
-        assert.deepEqual(nodes(h.tree).filter(n=>n.type===CompactAuctionCard).map(n=>n.props.auction.id),['first']);
-        filters().props.onUpdate('mine','others'); h.render();
         assert.equal(filters().props.ownership,'others');
+        assert.equal(ownership().props['aria-label'], 'Auction ownership: Others');
+        assert.equal(ownership().props['aria-pressed'], true);
+        assert.ok(ownership().props.className.split(/\s+/).includes('bg-blue-50'));
         assert.deepEqual(nodes(h.tree).filter(n=>n.type===CompactAuctionCard).map(n=>n.props.auction.id),['second']);
+        ownership().props.onClick(); h.render(); panel.render(filters().props);
+        assert.equal(params.get('mine'),'1');
+        assert.equal(ownership().props['aria-label'], 'Auction ownership: Mine');
+        assert.ok(ownership().props.className.split(/\s+/).includes('bg-blue-50'));
+        assert.deepEqual(nodes(h.tree).filter(n=>n.type===CompactAuctionCard).map(n=>n.props.auction.id),['first']);
+        ownership().props.onClick(); h.render(); panel.render(filters().props);
+        assert.equal(params.has('mine'),false);
+        assert.equal(ownership().props['aria-label'], 'Auction ownership: All Auctions');
+        assert.ok(ownership().props.className.split(/\s+/).includes('bg-white'));
+        assert.equal(nodes(h.tree).filter(n=>n.type===CompactAuctionCard).length,2);
+        ownership().props.onClick(); h.render();
         button().props.onClick(); h.render();
         assert.equal(params.toString(),''); assert.equal(filters().props.ownership,'all');
         assert.equal(nodes(h.tree).filter(n=>n.type===CompactAuctionCard).length,2);
         user=null; h.render(); assert.equal(filters().props.ownership,null);
+        panel.render(filters().props);
+        assert.ok(!nodes(panel.tree).some(n=>n.type==='button' && n.props['aria-label']?.startsWith('Auction ownership:')));
         assert.ok(button());
     } finally { user=previousUser; listings[1].sellerId=previousOwner; params=new URLSearchParams(); }
 });

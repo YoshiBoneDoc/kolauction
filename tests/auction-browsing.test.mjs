@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { browseAuctions, popularActiveAuctions, auctionPrice, highRollerAuctions, exploreAuctions, exploreAuctionTabs } from '../src/lib/auctionBrowsing.js';
+import { browseAuctions, popularActiveAuctions, auctionPrice, highRollerAuctions, exploreAuctions, exploreAuctionTabs, auctionEndTime } from '../src/lib/auctionBrowsing.js';
 import { parseAuctionAmount, parseMeatAmount, normalizeAuctionAmount } from '../src/lib/auctionInputs.js';
 
 const now = 10000;
@@ -205,9 +205,23 @@ test('Ended and Completed default to actual end time descending, with explicit s
         { ...base, id: 'old', status: 'completed', endTime: 2000, createdAt: 900 },
         { ...base, id: 'recent', status: 'completed', endTime: 5000, createdAt: 100 },
         { ...base, id: 'buyout', status: 'completed', endTime: 9000, instantPurchasedAt: new Date(3000).toISOString(), createdAt: 500 },
-        { ...base, id: 'cancelled', status: 'cancelled', endTime: 9000, finalizedAt: new Date(4000).toISOString() },
+        { ...base, id: 'cancelled', status: 'cancelled', endTime: 9000, cancelledAt: new Date(4000).toISOString() },
     ];
     assert.deepEqual(ids(browseAuctions(lots, { status: 'completed', now })), ['recent', 'buyout', 'old']);
     assert.deepEqual(ids(browseAuctions(lots, { status: 'ended', now })), ['recent', 'cancelled', 'buyout', 'old']);
     assert.deepEqual(ids(browseAuctions(lots, { status: 'completed', sort: 'newest', now })), ['old', 'buyout', 'recent']);
+});
+
+test('cancelled and voided auctions use the actual cancellation time for display and recent sorting', () => {
+    const deadline = Date.parse('2026-10-31T02:40:11.927Z');
+    const older = { ...base, id: 'older', status: 'cancelled', endTime: deadline,
+        cancelledAt: '2026-10-24T02:40:56.070Z', createdAt: 200 };
+    const newer = { ...base, id: 'newer', status: 'voided', endTime: deadline - 8 * 3600000,
+        cancelledAt: '2026-10-24T07:51:54.943Z', createdAt: 100 };
+    assert.equal(auctionEndTime(older), Date.parse(older.cancelledAt));
+    assert.equal(auctionEndTime(newer), Date.parse(newer.cancelledAt));
+    const unknown = { ...older, id: 'unknown', cancelledAt: null, createdAt: 999 };
+    assert.deepEqual(ids(browseAuctions([unknown, older, newer], { status: 'cancelled' })), ['newer', 'older', 'unknown']);
+    assert.ok(Number.isNaN(auctionEndTime({ ...older, cancelledAt: null })));
+    assert.ok(Number.isNaN(auctionEndTime({ ...older, cancelledAt: 'invalid' })));
 });

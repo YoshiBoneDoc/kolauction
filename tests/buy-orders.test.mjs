@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buyFee, buyFunding } from '../src/lib/buyOrders.js';
+import { buyFee, buyFunding, buyRefundableFeeReserve } from '../src/lib/buyOrders.js';
 import { createAuctionService, mapAuction } from '../src/lib/auctions.js';
 import { auctionReadRequest } from '../src/lib/auctionRefresh.js';
 import { browseAuctions } from '../src/lib/auctionBrowsing.js';
@@ -20,6 +20,15 @@ test('buy fees use individual item tiers, multiply before rounding and reserve e
     assert.throws(()=>buyFee(1.5,2),/whole/);
 });
 
+test('refundable fee reserve excludes purchase principal and historical refunds',()=>{
+    assert.equal(buyRefundableFeeReserve({pricePerItem:30,remainingQuantity:49987,balanceMeat:1574591}),74981n);
+    assert.equal(buyRefundableFeeReserve({pricePerItem:1,remainingQuantity:1,balanceMeat:2}),1n);
+    assert.equal(buyRefundableFeeReserve({pricePerItem:1,remainingQuantity:0,balanceMeat:1}),1n);
+    assert.equal(buyRefundableFeeReserve({pricePerItem:30,remainingQuantity:49987,balanceMeat:0,refundedMeat:1574591}),0n);
+    assert.equal(buyRefundableFeeReserve({pricePerItem:'30',remainingQuantity:'49987',balanceMeat:'1574591'}),74981n);
+    assert.equal(buyRefundableFeeReserve({pricePerItem:30,remainingQuantity:null,balanceMeat:100}),null);
+});
+
 test('buy creation uses its escrow-only RPC and ignores any sell buyout or fixed-deadline terms',async()=>{
     const calls=[];const service=createAuctionService({async rpc(name,args){calls.push([name,args]);return {data:'created-buy-order'};}});
     assert.equal(await service.create({auctionKind:'buy',itemId:364,quantity:100,minBidMeat:2000000,auctionTime:'72',deliveryMode:'finished',escrowMode:false,instantPurchasePrice:1,customEndAt:'2026-10-30'}),'created-buy-order');
@@ -34,8 +43,10 @@ test('buy kind filters reach the paginated database read with existing ownership
 });
 
 test('buy projections distinguish per-item prices, partial fills, no single winning bidder and participant support',()=>{
-    const a=mapAuction({id:'buy',auction_kind:'buy',item:'Item',quantity:100,min_bid_meat:200,purchased_quantity:20,remaining_quantity:80,escrow_mode:true,status:'completed',end_time:'2026-10-22T12:00:00Z',created_at:'2026-10-21T12:00:00Z',fulfilled_by_me:true,my_sale_meat:4000},[]);
+    const a=mapAuction({id:'buy',auction_kind:'buy',item:'Item',quantity:100,min_bid_meat:200,purchased_quantity:20,remaining_quantity:80,escrow_mode:true,status:'completed',end_time:'2026-10-22T12:00:00Z',created_at:'2026-10-21T12:00:00Z',fulfilled_by_me:true,my_sale_meat:4000,my_sale_quantity:20,viewer_is_highest_bidder:true},[]);
     assert.equal(a.pricePerItem,200);assert.equal(a.remainingQuantity,80);assert.equal(a.mySaleMeat,4000);
+    assert.equal(a.mySaleQuantity,20);
+    assert.equal(a.viewerIsHighestBidder,true);
     assert.equal(getAuctionResult(a).hasWinner,false);assert.equal(canSendTradeQuery(a,{id:'seller'}),true);
     assert.equal(canSendTradeQuery({...a,fulfilledByMe:false},{id:'outsider'}),false);
     assert.deepEqual(browseAuctions([a,{...a,id:'sell',auctionKind:'sell'}],{status:'all',kind:'buy'}).map(a=>a.id),['buy']);

@@ -48,7 +48,8 @@ with tempfile.TemporaryDirectory(prefix='khub-buy-orders-',dir='/tmp') as folder
         assert len({p.name for p in migrations})==len(migrations)
         # Historical 085 behavior; reservation/gift upgrades have their own suite.
         for migration in migrations:
-            if migration.name<'202610220086_': sql(migration.read_text())
+            if migration.name<'202610220086_' or migration.name=='202610270124_profile_buy_fulfillment_totals.sql':
+                sql(migration.read_text())
         catalog_path=ROOT/'src/data/items.json'
         if not catalog_path.exists(): catalog_path=ROOT/'catalog/items.json'
         catalog=json.loads(catalog_path.read_text())
@@ -171,7 +172,16 @@ with tempfile.TemporaryDirectory(prefix='khub-buy-orders-',dir='/tmp') as folder
         settle(race);assert auction(race)['status']=='completed'
         print('PASS: concurrent sellers cannot overfill or double-spend; interrupted sends retain liabilities and use existing reconciliation without duplicate payments')
         # Browser projection and profile history include sellers without exposing receipt IDs.
-        rows=projected(first,seller);assert rows[0]['fulfilled_by_me'] and rows[0]['my_sale_meat']==14000
+        rows=projected(first,seller);assert rows[0]['fulfilled_by_me'] and rows[0]['my_sale_meat']==14000 and rows[0]['my_sale_quantity']==70
+        other_seller=projected(first,seller2)[0]
+        assert other_seller['my_sale_meat']==6000 and other_seller['my_sale_quantity']==30
+        buyer_projection=projected(first,buyer)[0]
+        assert buyer_projection['my_sale_meat']==0 and buyer_projection['my_sale_quantity']==0
+        unpaid_receipt=sql(f"select receipt_id from khub_bot.buy_fulfillments where auction_id='{first}' and seller_id='{seller}' order by created_at limit 1;")
+        sql(f"update khub_bot.deliveries set state='unknown' where receipt_id='{unpaid_receipt}' and dedupe_key like 'buy-fill-payment:%';")
+        withheld=projected(first,seller)[0]
+        assert withheld['my_sale_meat']==10000 and withheld['my_sale_quantity']==50
+        sql(f"update khub_bot.deliveries set state='sent' where receipt_id='{unpaid_receipt}' and dedupe_key like 'buy-fill-payment:%';")
         assert 'balance_meat' not in rows[0] and 'receipt_id' not in rows[0]['fulfillments'][0]
         assert 'receipt_id' in projected(first,admin)[0]['fulfillments'][0]
         assert 'balance_meat' in projected(first,buyer)[0]
@@ -227,6 +237,8 @@ with tempfile.TemporaryDirectory(prefix='khub-buy-orders-',dir='/tmp') as folder
         def sell_create(escrow):return call(f"select public.create_auction({lit(sell_name)},5,100,24,null,null,{item},{str(escrow).lower()});")
         direct=sell_create(False);call(f"select public.place_bid('{direct}',100);",seller)
         assert auction(direct)['current_bid']==100 and auction(direct)['auction_kind']=='sell'
+        assert projected(direct,seller)[0]['viewer_is_highest_bidder'] is True
+        assert projected(direct,buyer)[0]['viewer_is_highest_bidder'] is False
         sell_escrow=sell_create(True);assert ingest(mail(sell_escrow,'list',quantity=5))=='accepted'
         bid=mail(sell_escrow,'bid',uid=seller,meat=100)
         epoch=sql("select floor(extract(epoch from clock_timestamp()))::bigint;")

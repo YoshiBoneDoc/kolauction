@@ -31,22 +31,26 @@ const auction = { id: 'lot', sellerId: 'seller', owner: 'Seller', item: 'Test lo
     minBidMeat: 100, currentBid: 300, escrowMode: true, feeMeat: 22, feeBps: 750,
     status: 'completed', hasWinner: true, winnerId: null, highestBidderId: null,
     winner: 'Bidder 1', finalPrice: 300, endTime: 1, bids: [] };
-const seller = { id: 'seller', username: 'Seller', stats: { escrow_buys:0,direct_bought_value:'20000000',escrow_bought_value:'0',seller_confirmed:1,buyer_confirmed:0,seller_incomplete:0,buyer_incomplete:0,seller_positive:0,seller_negative:0,buyer_positive:0,buyer_negative:0,escrow_sales: 2, escrow_value: '9007199254740993', escrow_units: '4', active: 0, pending: 1, unsold: 3, cancelled: 0, legacy_sales: 1, legacy_value: '300' } };
+const seller = { id: 'seller', username: 'Seller', stats: { escrow_buys:0,direct_bought_value:'20000000',escrow_bought_value:'0',seller_confirmed:1,buyer_confirmed:0,seller_incomplete:0,buyer_incomplete:0,seller_positive:0,seller_negative:0,buyer_positive:0,buyer_negative:0,escrow_sales: 2, escrow_value: '9007199254740993', escrow_units: '4', active: 0, pending: 1, unsold: 3, cancelled: 0, legacy_sales: 1, legacy_value: '300', buy_order_sales: 2, buy_order_units: 1326, buy_order_value: '561200' } };
 
 test('public seller route renders history, separate sale evidence and compact large totals without login', () => {
     const html = render({ seller, auctions: [auction], total: 25 });
     assert.match(html, /Escrow Trades/);
-    assert.match(html, /9,007,199.3b Sold/);
+    assert.match(html, /9,007,199\.3b[\s\S]*?Sold/);
     assert.match(html, /Trade History/);
     assert.match(html, /Direct Trades/);
     assert.match(html, /aria-label="0 thumbs up"/);
     assert.ok(html.indexOf('Direct Trades') < html.indexOf('Escrow Trades'));
+    assert.ok(html.indexOf('Escrow Trades') < html.indexOf('Buy Orders'));
+    assert.match(html, /2[\s\S]*?orders filled ·[\s\S]*?1,326[\s\S]*?items sold/);
+    assert.match(html, /561\.2k Meat[\s\S]*?earned/);
+    assert.doesNotMatch(html, /Sales to Buy Orders|fulfillments ·|Meat paid to seller/);
     assert.doesNotMatch(html, /Listing activity|Feedback score/);
-    assert.match(html, /300 Sold/);
+    assert.match(html, /300[\s\S]*?Sold/);
     assert.match(html, /<summary class="cursor-pointer">How this works<\/summary>/);
     assert.doesNotMatch(html, /<details[^>]*\sopen(?:\s|=|>)/);
     assert.doesNotMatch(html, /Reported Incomplete means/);
-    assert.match(html, /href="\/seller\/seller\?view=stats(?:&amp;|&)status=all"/);
+    assert.match(html, /href="\/seller\/seller\?view=stats"/);
     assert.match(html, /Test lot/);
     assert.match(html, /Page 1 of 2/);
     assert.match(html, /Seller auction pages/);
@@ -56,7 +60,7 @@ test('public seller route renders history, separate sale evidence and compact la
 test('escrow-only sellers have no direct-settlement track record', () => {
     const html = render({ seller: { ...seller, stats: { ...seller.stats, escrow_sales: 200, legacy_sales: 0, legacy_value: '0', seller_confirmed: 0 } }, auctions: [], total: 0 });
     assert.match(html, /<span class="font-medium text-gray-500">Sales: 0<\/span>/);
-    assert.match(html, /0 Sold/);
+    assert.match(html, /0[\s\S]*?Sold/);
     assert.match(html, /Sales: 200/);
     assert.match(html, /aria-label="0 thumbs up"/);
     assert.doesNotMatch(html, /Escrow sales do not establish a direct-settlement track record/);
@@ -68,19 +72,80 @@ test('detailed seller view explains metrics while preserving listing filters', (
     assert.match(html, /Negative feedback doesn’t necessarily mean a trade was incomplete/);
     assert.match(html, /<em>Incomplete reports may be disputed and dismissed after administrator review\.<\/em>/);
     assert.match(html, /How this works/);
-    assert.match(html, /Listing activity/);
+    assert.match(html, /aria-label="Trade History"/);
     assert.doesNotMatch(html, /Direct-settlement history|Trade confirmations|Feedback score|How to read these totals/);
     assert.match(html, /href="\/seller\/seller\?status=all&amp;q=hat&amp;page=2"/);
-    assert.match(html, /Auction history/);
-    assert.match(html, /Page 2 of 2/);
+    assert.doesNotMatch(html, /Auction history|Seller auctions|Search items|public-profile-auction-list|Listing activity|Page 2 of 2/);
+});
+
+test('switching public profile tabs preserves search, status, sorting and the active default', () => {
+    const auctions = render({ path: '/seller/seller?status=cancelled&sort=price-desc&q=boots&page=2', seller, auctions: [], total: 0 });
+    assert.match(auctions, /href="\/seller\/seller\?status=cancelled&amp;sort=price-desc&amp;q=boots&amp;page=2&amp;view=stats"/);
+    const profile = render({ path: '/seller/seller?view=stats&status=cancelled&sort=newest&q=coat&page=3', seller, auctions: [], total: 0 });
+    assert.match(profile, /href="\/seller\/seller\?status=cancelled&amp;sort=newest&amp;q=coat&amp;page=3"/);
+    const defaultAuctions = render({ path: '/seller/seller', seller, auctions: [], total: 0 });
+    assert.match(defaultAuctions, /href="\/seller\/seller\?view=stats"/);
+    assert.doesNotMatch(defaultAuctions, /href="\/seller\/seller\?view=stats&amp;status=/);
+    assert.match(defaultAuctions, /<option value="active" selected="">Active<\/option>/);
+    assert.match(defaultAuctions, /<option value="ending" selected="">Ending soon<\/option>/);
 });
 
 test('seller links on auction cards and details navigate to the public profile', () => {
-    for (const path of ['/auction/lot', '/seller/seller']) {
-        const html = render({ path, user:{id:'viewer'}, seller, auctions: [auction], total: 1 });
-        assert.match(html, /href="\/seller\/seller"[^>]*>Seller<\/a>/);
+    const detail = render({ path: '/auction/lot', user:{id:'viewer'}, seller, auctions: [auction], total: 1 });
+    assert.match(detail, /href="\/seller\/seller"[^>]*>Seller<\/a>/);
+    const profile = render({ path: '/seller/seller', user:{id:'viewer'}, seller, auctions: [auction], total: 1 });
+    for (const html of [detail, profile]) {
         assert.match(html, /Winner:|Winning bidder:/);
         assert.match(html, /Bidder 1/);
+    }
+    assert.doesNotMatch(profile.match(/<article class="public-profile-auction-row[\s\S]*?<\/article>/)[0], />Seller<\/a>/);
+});
+
+test('public profile sell and buy cards show compact auction details and actions', () => {
+    const image = 'https://images.kingdomofloathing.com/itemimages/tooth.gif';
+    const sell = { ...auction, status: 'active', hasWinner: false, winnerId: null, currentBid: 0,
+        image, endTime: Date.now() + 3600000, auctionNumber: 41 };
+    const buy = { ...sell, id: 'buy-lot', auctionKind: 'buy', pricePerItem: 400, quantity: 10,
+        purchasedQuantity: 4, reducedQuantity: 1, reservedQuantity: 2 };
+    const html = render({ path: '/seller/seller?status=all', user: { id: 'viewer' }, seller,
+        auctions: [sell, buy], total: 2 });
+
+    assert.match(html, /profile-auction-kind-sell/);
+    assert.match(html, /profile-auction-kind-buy/);
+    assert.match(html, /#41 · Min 100 Meat/);
+    assert.match(html, /No bids yet/);
+    assert.match(html, /href="\/auction\/lot"/);
+    assert.match(html, /class="profile-public-row-name"[^>]*href="\/auction\/lot"[^>]*>Test lot<\/a>/);
+    assert.match(html, /class="profile-public-row-image"[^>]*href="\/auction\/lot"[^>]*><img/);
+    assert.match(html, /<strong>400 Meat\/item<\/strong><span class="profile-public-row-label">4 \/ 9 filled/);
+    assert.match(html, /4 \/ 9 filled/);
+    assert.match(html, /5 remaining/);
+    assert.doesNotMatch(html, /profile-public-row-view/);
+    assert.match(html, /class="public-profile-auction-list"/);
+    assert.equal((html.match(new RegExp(`<img[^>]*src="${image}"`, 'g')) || []).length, 2);
+});
+
+test('public profile countdown urgency follows the one-hour and one-day thresholds', () => {
+    for (const [remaining, expectedClass] of [[30 * 60 * 1000, 'is-urgent'], [2 * 60 * 60 * 1000, 'is-soon'], [25 * 60 * 60 * 1000, '']]) {
+        const html = render({ path: '/seller/seller', seller, total: 1, auctions: [{ ...auction,
+            status: 'active', hasWinner: false, endTime: Date.now() + remaining }] });
+        assert.match(html, new RegExp(`<time class="${expectedClass}"[^>]*>·`));
+    }
+});
+
+test('public profile cards retain active, completed, canceled and unsuccessful outcome labels', () => {
+    const outcomes = [
+        ['active', 'Active'],
+        ['completed', 'Trade completed'],
+        ['cancelled', 'Cancelled'],
+        ['expired', 'Expired'],
+        ['ended_no_bids', 'Ended without bids'],
+    ];
+    for (const [status, label] of outcomes) {
+        const html = render({ path: '/seller/seller?status=all', seller, total: 1,
+            auctions: [{ ...auction, status, endTime: status === 'active' ? Date.now() + 3600000 : 1,
+                hasWinner: status === 'completed', winnerId: null }] });
+        assert.match(html, new RegExp(`profile-public-row-status[^>]*><strong>${label}<`));
     }
 });
 
@@ -125,9 +190,9 @@ test('seller reads retain filters and pagination through the scoped auction read
         return { data: { privacy_version: 1, rows: [], bids: [], total: 0, seller }, error: null };
     } });
     assert.deepEqual((await service.load(request)).seller, seller);
-    assert.equal(calls[1][1].p_view, 'seller');
-    assert.equal(calls[1][1].p_id, 'seller');
-    assert.equal(calls[1][1].p_page, 2);
+    assert.equal(calls[0][1].p_view, 'seller');
+    assert.equal(calls[0][1].p_id, 'seller');
+    assert.equal(calls[0][1].p_page, 2);
 });
 
 test('old unprotected RPC responses are rejected until the privacy migration is applied', async () => {
@@ -182,7 +247,7 @@ test('compact history groups each role on one line and keeps independent feedbac
     const html = render({ seller: { ...seller, stats }, auctions: [], total: 0 });
     assert.match(html, /<p[^>]*whitespace-nowrap[^>]*><span class="font-medium text-green-700">Sales: 24<\/span>[\s\S]*?<span class="text-xs text-red-700">Incomplete: 2<\/span><\/p>/);
     assert.match(html, /<p[^>]*whitespace-nowrap[^>]*><span class="font-medium text-green-700">Winning bids: 12<\/span>[\s\S]*?<span class="text-xs text-red-700">Incomplete: 3<\/span><\/p>/);
-    assert.match(html, /99b Sold/);
+    assert.match(html, /99b[\s\S]*?Sold/);
     assert.match(html, /aria-label="12 thumbs up"[^>]*>12<svg/);
     assert.match(html, /aria-label="3 thumbs down"[^>]*><svg[\s\S]*?<\/svg>3<\/span>/);
     assert.doesNotMatch(html, /Listing activity|How to read these totals/);
@@ -205,14 +270,14 @@ test('direct and escrow Meat totals show separate sold and bought values with di
     const stats = { ...seller.stats, legacy_value: '55000000', direct_bought_value: '20000000', escrow_value: '1200000000', escrow_bought_value: '34000000' };
     const html = render({ seller: { ...seller, stats }, auctions: [], total: 0 });
     assert.equal((html.match(/>Meat Totals<\/h4>/g) || []).length, 2);
-    assert.match(html, /<span>55m Sold<\/span>[\s\S]*?<span>Bought 20m<\/span>/);
-    assert.match(html, /<span>1.2b Sold<\/span>[\s\S]*?<span>Bought 34m<\/span>/);
+    assert.match(html, /55m[\s\S]*?Sold[\s\S]*?Bought[\s\S]*?20m/);
+    assert.match(html, /1\.2b[\s\S]*?Sold[\s\S]*?Bought[\s\S]*?34m/);
     assert.match(html, /aria-label="Escrow trades" class="space-y-2 border-t border-gray-200 pt-5"/);
     assert.doesNotMatch(html, /Violations|meat in direct trades/);
 });
 
 
-test('detailed profile shares the compact trade history and adds role feedback and listing activity', () => {
+test('detailed profile shows expanded trade history without auction content', () => {
     const stats = { ...seller.stats, seller_confirmed: 24, buyer_confirmed: 12, seller_incomplete: 2, buyer_incomplete: 0, legacy_value: '55000000', direct_bought_value: '20000000', escrow_value: '1200000000', escrow_bought_value: '34000000' };
     for (const path of ['/seller/seller', '/seller/seller?view=stats']) {
         const html = render({ path, seller: { ...seller, stats }, auctions: [], total: 0 });
@@ -225,14 +290,15 @@ test('detailed profile shares the compact trade history and adds role feedback a
             assert.match(html, /1.2b Meat/);
             assert.match(html, /34m Meat/);
             assert.match(html, /Independent feedback by trading role/);
-            assert.match(html, /grid items-start gap-5 md:grid-cols-2/);
-            assert.match(html, /aria-label="Listing activity"/);
+            assert.match(html, /grid items-start gap-x-6 gap-y-5 md:grid-cols-2/);
+            assert.match(html, /2[\s\S]*?orders filled ·[\s\S]*?1,326[\s\S]*?items sold/);
+            assert.doesNotMatch(html, /aria-label="Listing activity"|Seller auctions|Search items|public-profile-auction-list/);
             assert.match(html, /4 item units sold · Bot-verified trades/);
         } else {
-            assert.match(html, /55m Sold/);
-            assert.match(html, /Bought 20m/);
-            assert.match(html, /1.2b Sold/);
-            assert.match(html, /Bought 34m/);
+            assert.match(html, /55m[\s\S]*?Sold/);
+            assert.match(html, /Bought[\s\S]*?20m/);
+            assert.match(html, /1\.2b[\s\S]*?Sold/);
+            assert.match(html, /Bought[\s\S]*?34m/);
             assert.doesNotMatch(html, /Direct trade counts and values|Independent feedback by trading role|aria-label="Listing activity"/);
         }
     }
@@ -269,18 +335,21 @@ test('escrow shows completed sales and winning bids in both views with values un
             assert.doesNotMatch(html, /Canceled \(before bids\)|Cancelled before receiving a valid bid/);
         } else {
             assert.match(escrow, /Meat Totals/);
-            assert.match(escrow, /1.2b Sold/);
-            assert.match(escrow, /Bought 34m/);
+            assert.match(escrow, /1\.2b[\s\S]*?Sold/);
+            assert.match(escrow, /Bought[\s\S]*?34m/);
         }
     }
 });
 
 
-test('Buy item images appear on browse, home, both seller views and personal auction histories',()=>{
+test('Buy item images appear on browse, home and auction view, not the Seller Profile tab',()=>{
  const buy={...auction,auctionKind:'buy',pricePerItem:100,purchasedQuantity:2,remainingQuantity:0,availableQuantity:0,reservedQuantity:0,reducedQuantity:0,fulfilledByMe:true,mySaleMeat:200,image:'https://images.kingdomofloathing.com/itemimages/tooth.gif',completedAt:'2026-10-23T12:00:00Z'};
- for(const path of ['/', '/auctions?status=all', '/seller/seller', '/seller/seller?view=stats', '/profile']){
+ for(const path of ['/', '/auctions?status=all', '/seller/seller']){
   const html=render({path,user:{id:'seller'},seller,auctions:[buy],total:1});
   assert.match(html,/<img[^>]*src="https:\/\/images.kingdomofloathing.com\/itemimages\/tooth.gif"[^>]*loading="lazy"/);
   assert.match(html,/Test lot/);
  }
+ const profile=render({path:'/seller/seller?view=stats',user:{id:'seller'},seller,auctions:[buy],total:1});
+ assert.match(profile,/aria-label="Trade History"/);
+ assert.doesNotMatch(profile,/itemimages\/tooth.gif|Test lot|public-profile-auction-list|Seller auctions/);
 });

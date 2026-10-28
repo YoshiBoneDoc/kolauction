@@ -91,7 +91,7 @@ export default function AllAuctions() {
             <main className="mx-auto max-w-7xl">
                 <h1 className="my-4 text-center text-3xl font-bold text-[#7695FF] sm:text-4xl">All Auctions</h1>
                 <PendingTrades />
-                <section aria-label="Find auctions" className="mb-1 rounded-lg border border-gray-200 bg-white px-3 py-3">
+                <section aria-label="Find auctions" className={`mb-1 rounded-lg border border-gray-200 bg-white px-3 pt-3 ${filtersOpen ? 'pb-1' : 'pb-3'}`}>
                     <div className="flex flex-wrap items-end gap-3">
                         <div className="min-w-32 flex-1">
                             <label htmlFor="auction-search" className="sr-only">Search item names</label>

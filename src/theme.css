@@ -4,6 +4,15 @@
   border-radius: 6px;
   background-color: #F1F5EE;
 }
+.auction-image-enhance-controls { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:10px; margin-top:16px; }
+.auction-image-enhance-button { display:inline-flex; align-items:center; gap:6px; border:1px solid #C5B0E0; border-radius:8px; background:#F0E7FF; color:#67429B; padding:6px 12px; box-shadow:0 3px 0 #B8A2D9; font-size:11px; font-weight:600; line-height:18px; cursor:pointer; }
+.auction-image-enhance-button:hover:not(:disabled) { background:#E6D6FF; }
+.auction-image-enhance-button:active:not(:disabled) { transform:translateY(2px); box-shadow:0 1px 0 #B8A2D9; }
+.auction-image-enhance-button:focus-visible { outline:2px solid #8560B5; outline-offset:4px; }
+.auction-image-enhance-button:disabled { cursor:wait; opacity:.5; }
+html[data-theme="dark"] .auction-image-enhance-button { background:#2D2241; border-color:#745894; color:#D9C5FF; box-shadow:0 3px 0 #171020; }
+html[data-theme="dark"] .auction-image-enhance-button:hover:not(:disabled) { background:#403054; }
+html[data-theme="dark"] .auction-image-enhance-button:active:not(:disabled) { box-shadow:0 1px 0 #171020; }
 html[data-theme="dark"] .approval-announcement {
   background-color: #1B302B;
   border-left-color: #6EE7B7;
@@ -46,6 +55,8 @@ html:not([data-theme="dark"]) .auction-card[class~="bg-green-50"] { background-c
 
 html:not([data-theme="dark"]) .bid-kmail-instructions { background-color: var(--light-input); }
 html:not([data-theme="dark"]) .copy-message-field { background-color: var(--light-input); }
+html .copy-message-field { border: 1px solid #E9BFA9; }
+html[data-theme="dark"] .copy-message-field { border-color: #8A634C; }
 
 /* Tables use solid surfaces, including tables without explicit color classes. */
 html:not([data-theme="dark"]) table { background-color: var(--light-surface); }
@@ -359,6 +370,7 @@ html[data-theme="dark"] .auction-advanced-filters { border-color: var(--theme-bo
 html[data-theme="dark"] .auction-filters-button { background-color: var(--theme-raised); border-color: var(--theme-border); color: var(--theme-text); }
 html[data-theme="dark"] .auction-filters-active { background-color: #422c25; border-color: #956047; color: #f0b89b; }
 html[data-theme="dark"] .auction-advanced-filters [class~="text-[#A65332]"] { color: #F5B08C; }
+html[data-theme="dark"] .auction-ownership-filter[aria-pressed="true"] { background-color: #243f63; }
 html[data-theme="dark"] .auction-price-range { background: transparent; }
 
 html[data-theme="dark"] .auction-price-control {
@@ -367,4 +379,401 @@ html[data-theme="dark"] .auction-price-control {
   --auction-range-handle-fill: #F5B08C;
   --auction-range-label: #F5B08C;
   --auction-range-track: #40516A;
+}
+
+/* Account profile dashboard surfaces use a warm, low-contrast palette. */
+.profile-dashboard {
+  --profile-card: #FFFAF7;
+  --profile-nested: #FFF7F2;
+  --profile-hover: #FFF0E8;
+  --profile-border: #EADBD3;
+  --profile-divider: #EEE1DA;
+  --profile-text: #202632;
+  --profile-muted: #647084;
+  --profile-label: #778294;
+  --profile-blue: #2454D8;
+  --profile-blue-hover: #1D46B8;
+  --profile-blue-accent: #EEF3FF;
+  --profile-green: #16834A;
+  --profile-green-bg: #EAF7EE;
+}
+
+html[data-theme="dark"] .profile-dashboard {
+  --profile-card: #131e2f;
+  --profile-nested: #1e2c40;
+  --profile-hover: #293b52;
+  --profile-border: #41516a;
+  --profile-divider: #34455F;
+  --profile-text: #e2e8f0;
+  --profile-muted: #b2bfd1;
+  --profile-label: #94A3B8;
+  --profile-blue: #a5b4fc;
+  --profile-blue-hover: #c7d2fe;
+  --profile-blue-accent: #172e4d;
+  --profile-green: #86efac;
+  --profile-green-bg: #123326;
+}
+
+.profile-dashboard :is(.profile-panel, .profile-stat-card, .profile-transaction-section) {
+  border: 1px solid var(--profile-border);
+  border-radius: 14px;
+  background: var(--profile-card);
+  box-shadow: 0 2px 6px rgb(70 45 30 / 3.5%);
+}
+.profile-dashboard .profile-verification { padding: 14px 20px; }
+.profile-dashboard .profile-stat-card { padding: 14px 22px; }
+.profile-dashboard .profile-stat-main { display: flex; align-items: center; justify-content: flex-start; gap: 12px; }
+.profile-dashboard .profile-stat-label {
+  color: var(--profile-label);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.profile-dashboard .profile-stat-value {
+  margin-top: 10px;
+  color: var(--profile-green);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+.profile-dashboard .profile-stat-value .profile-stat-total { font-size: inherit; font-weight: inherit; }
+.profile-dashboard .profile-stat-value .profile-stat-total > span { font-size: 15px; font-weight: 500; }
+.profile-dashboard .profile-meat-stack { display: block; width: 44px; flex: 0 0 44px; overflow: visible; }
+.profile-dashboard .profile-meat-stack image { image-rendering: pixelated; }
+.profile-dashboard .profile-transaction-section { min-width: 0; padding: 18px; }
+.profile-dashboard .profile-transaction-entry {
+  position: relative;
+  border: 1px solid var(--profile-border);
+  border-radius: 8px;
+  background: var(--profile-nested);
+  padding: 5px 12px 5px 52px;
+  transition: background-color 150ms ease, border-color 150ms ease;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.profile-dashboard .profile-transaction-entry:hover {
+  border-color: #DCC7BC;
+  background: var(--profile-hover);
+}
+html[data-theme="dark"] .profile-dashboard .profile-transaction-entry:hover { border-color: #66758b; }
+.profile-dashboard .profile-entry-content { min-width: 0; }
+.profile-dashboard .profile-entry-image {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  display: flex;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-50%);
+}
+.profile-dashboard .profile-entry-image img { display: block; width: 32px; height: 32px; object-fit: contain; image-rendering: pixelated; }
+.profile-dashboard .profile-entry-image-fallback { color: var(--profile-muted); font-size: 8px; line-height: 9px; text-align: center; }
+.profile-dashboard .profile-entry-row {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px 12px;
+}
+.profile-dashboard .profile-entry-endtime,
+.profile-dashboard .profile-entry-status { color: var(--profile-label); font-size: 11px; line-height: 14px; }
+.profile-dashboard .profile-entry-endtime { flex: 0 0 auto; white-space: nowrap; }
+.profile-dashboard .profile-entry-status { margin-left: auto; text-align: right; }
+.profile-dashboard .profile-entry-secondary { color: var(--profile-muted); font-size: 11px; line-height: 14px; }
+.profile-dashboard .profile-entry-active { color: #2563EB; }
+html[data-theme="dark"] .profile-dashboard .profile-entry-active { color: #60A5FA; }
+.profile-dashboard .profile-entry-details {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 2px 10px;
+  color: var(--profile-text);
+  font-size: 12px;
+  line-height: 14px;
+  text-align: right;
+}
+.profile-dashboard .profile-entry-details strong { color: var(--profile-text); font-size: 12px; font-weight: 600; }
+.profile-dashboard .profile-entry-extra {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 2px 10px;
+  color: var(--profile-muted);
+  font-size: 12px;
+}
+.profile-dashboard .profile-show-more {
+  display: block;
+  width: 100%;
+  height: 32px;
+  margin-top: 7px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--profile-blue);
+  font-size: 12px;
+  font-weight: 600;
+  transition: background-color 150ms ease;
+}
+.profile-dashboard .profile-show-more:hover { background: var(--profile-hover); color: var(--profile-blue-hover); }
+.profile-dashboard .profile-show-more:focus-visible { outline: 2px solid var(--profile-blue); outline-offset: 2px; }
+.profile-dashboard .profile-count {
+  display: inline-flex;
+  min-width: 28px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #F0F1F4;
+  color: var(--profile-muted);
+  padding: 0 7px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.profile-dashboard .profile-count-button {
+  display: inline-flex;
+  min-width: 42px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 0;
+  border-radius: 999px;
+  background: #F0F1F4;
+  color: var(--profile-muted);
+  padding: 0 8px;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+.profile-dashboard .profile-count-button:hover { background: #E4E8EF; }
+.profile-dashboard .profile-count-button:focus-visible { outline: 2px solid var(--profile-blue); outline-offset: 2px; }
+.profile-dashboard .profile-count-button .profile-count { min-width: 0; height: auto; border-radius: 0; background: transparent; padding: 0; }
+.profile-dashboard .profile-count-chevron { width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-1px) rotate(45deg); transition: transform 150ms ease; }
+.profile-dashboard .profile-count-chevron.is-collapsed { transform: translateY(1px) rotate(225deg); }
+html[data-theme="dark"] .profile-dashboard .profile-count-button { background: #252b34; }
+html[data-theme="dark"] .profile-dashboard .profile-count-button:hover { background: #394555; }
+.profile-dashboard .profile-outcome-badge { display: inline-flex; flex: 0 0 auto; align-items: center; border-radius: 999px; padding: 1px 6px; font-size: 10px; font-weight: 600; line-height: 14px; white-space: nowrap; }
+.profile-dashboard .profile-badge-winning { background: #E8F6ED; color: #23834A; }
+.profile-dashboard .profile-badge-outbid { background: #FFF1DB; color: #A66A16; }
+.profile-dashboard .profile-badge-lost { background: #FCE9E7; color: #B64B43; }
+.profile-dashboard .profile-badge-neutral { background: #F0F1F4; color: #647084; }
+html[data-theme="dark"] .profile-dashboard .profile-badge-winning { background: #123326; color: #86efac; }
+html[data-theme="dark"] .profile-dashboard .profile-badge-outbid { background: #3b2e1e; color: #f4c36d; }
+html[data-theme="dark"] .profile-dashboard .profile-badge-lost { background: #3b2527; color: #f2a39b; }
+html[data-theme="dark"] .profile-dashboard .profile-badge-neutral { background: #252b34; color: #b2bfd1; }
+.profile-dashboard .profile-divider { border-color: var(--profile-divider); }
+.profile-dashboard .profile-text { color: var(--profile-text); }
+.profile-dashboard .profile-muted { color: var(--profile-muted); }
+.profile-dashboard .profile-label { color: var(--profile-label); }
+.profile-dashboard .profile-blue { color: var(--profile-blue); }
+.profile-dashboard .profile-warning-text { color: #A65332; }
+html[data-theme="dark"] .profile-dashboard .profile-warning-text { color: #fcd34d; }
+.profile-dashboard .profile-verified-badge {
+  border-radius: 999px;
+  background: var(--profile-green-bg);
+  color: var(--profile-green);
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.profile-dashboard .profile-verification-button {
+  margin-top: 8px;
+  border: 1px solid var(--profile-blue);
+  border-radius: 8px;
+  background: var(--profile-blue-accent);
+  color: var(--profile-blue);
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.profile-dashboard .profile-verification-button:hover:not(:disabled) { background: var(--profile-hover); }
+.profile-dashboard .profile-verification-button:disabled { cursor: not-allowed; opacity: .55; }
+@media (max-width: 767px) {
+  .profile-dashboard .profile-verification { padding-right: 16px; padding-left: 16px; }
+  .profile-dashboard .profile-stat-card { padding-right: 18px; padding-left: 18px; }
+  .profile-dashboard .profile-transaction-section { padding: 16px; }
+  .profile-dashboard .profile-entry-details { flex-basis: 100%; justify-content: flex-start; text-align: left; }
+  .profile-dashboard .profile-entry-extra { justify-content: flex-start; }
+}
+
+/* Public player profile only; All Auctions and the private profile stay untouched. */
+.public-seller-profile {
+  --pp-surface: #FFFAF7; --pp-card: #FFF7F2; --pp-hover: #FFF0E8;
+  --pp-border: #EADBD3; --pp-text: #202632; --pp-muted: #647084;
+  --pp-label: #778397; --pp-blue: #2454D8;
+  --pp-auction-columns: minmax(0,2fr) minmax(110px,1fr) minmax(145px,1fr);
+  --pp-toolbar: #FFFAF7; --pp-input: #FFFCFA; --pp-sidebar: #FFF5EF;
+  --pp-table-header: #FFF0E6; --pp-table-header-text: #647084;
+}
+html[data-theme="dark"] .public-seller-profile {
+  --pp-surface: #131e2f; --pp-card: #1e2c40; --pp-hover: #293b52;
+  --pp-border: #41516a; --pp-text: #e2e8f0; --pp-muted: #b2bfd1;
+  --pp-label: #94A3B8; --pp-blue: #a5b4fc;
+  --pp-toolbar: #131e2f; --pp-input: #131e2f; --pp-sidebar: #131e2f;
+  --pp-table-header: #1e2c40; --pp-table-header-text: #94A3B8;
+}
+html:not([data-theme="dark"]) .public-seller-profile { background-color:#FFF1E9; }
+.public-seller-profile .public-profile-back { display:flex; width:fit-content; min-height:0; align-items:center; margin:0 0 8px; color:#586F9D; font-size:13px; line-height:20px; text-decoration:none; }
+html[data-theme="dark"] .public-seller-profile .public-profile-back { color:#a5b4fc; }
+.public-seller-profile .public-profile-back:hover { text-decoration:underline; }
+.public-seller-profile .public-profile-player-name { margin:0 0 12px; overflow-wrap:anywhere; color:var(--pp-blue); font-size:28px; font-weight:700; line-height:1.2; }
+.public-seller-profile .public-profile-login-note { margin:0 0 8px; }
+.public-seller-profile .public-profile-tabs { display:flex; width:fit-content; max-width:100%; flex-wrap:wrap; gap:2px; margin:0 0 20px; border:1px solid var(--pp-border); border-radius:10px; background:var(--pp-surface); padding:4px; }
+.public-seller-profile .public-profile-header.is-detailed .public-profile-tabs { margin-bottom:0; }
+.public-seller-profile .public-profile-tab { display:inline-flex; min-height:36px; align-items:center; border-radius:7px; color:var(--pp-muted); padding:0 15px; font-size:14px; font-weight:600; text-decoration:none; transition:background-color 150ms,color 150ms; }
+.public-seller-profile .public-profile-tab:hover { background:var(--pp-hover); }
+.public-seller-profile .public-profile-tab.is-active { background:#E8EEFF; color:#2454D8; }
+html[data-theme="dark"] .public-seller-profile .public-profile-tab.is-active { background:#243f63; color:#a5b4fc; }
+.public-seller-profile :is(.public-profile-tab,.profile-public-row-image,.profile-public-row-name,.profile-public-row-bid,.public-profile-filter :is(input,select)):focus-visible { outline:2px solid var(--pp-blue); outline-offset:2px; }
+.public-seller-profile .public-profile-container { max-width:950px; }
+.public-seller-profile .public-profile-layout { display:grid; width:100%; max-width:1324px; margin-inline:auto; grid-template-columns:minmax(0,1fr); align-items:start; gap:12px 24px; }
+.public-seller-profile .public-profile-header-content { width:100%; max-width:52rem; margin-left:auto; }
+.public-seller-profile :is(.public-profile-section-heading,.public-profile-toolbar,.public-profile-auctions) { width:100%; max-width:52rem; justify-self:end; }
+@media (min-width:1200px) {
+  .public-seller-profile .public-profile-container { max-width:1324px; }
+  .public-seller-profile .public-profile-layout { grid-template-columns:minmax(0,19fr) minmax(300px,7fr); }
+  .public-seller-profile .public-profile-header { display:grid; grid-template-columns:minmax(0,19fr) minmax(300px,7fr); column-gap:24px; }
+  .public-seller-profile .public-profile-header-content { grid-column:1; justify-self:end; }
+  .public-seller-profile .public-profile-section-heading { grid-column:1; grid-row:1; }
+  .public-seller-profile .public-profile-toolbar { grid-column:1; grid-row:2; }
+  .public-seller-profile .public-profile-auctions { grid-column:1; grid-row:3; }
+  .public-seller-profile .public-profile-layout > aside { grid-column:2; grid-row:3; }
+}
+.public-seller-profile .public-profile-auctions { display:flex; min-width:0; flex-direction:column; gap:12px; }
+.public-seller-profile .public-profile-section-heading { display:flex; min-width:0; align-items:baseline; justify-content:space-between; gap:12px; }
+.public-seller-profile .public-profile-section-heading h2 { color:var(--pp-text); font-size:20px; font-weight:700; line-height:1.25; }
+.public-seller-profile .public-profile-section-heading p { margin-right:10px; color:var(--pp-label); font-size:12px; white-space:nowrap; transform:translateY(8px); }
+.public-seller-profile .public-profile-buy-stat { color:#778397; font-size:13px; font-weight:400; }
+html[data-theme="dark"] .public-seller-profile .public-profile-buy-stat { color:#94A3B8; }
+.public-seller-profile .public-profile-trade-stat { color:#475569; }
+.public-seller-profile .public-profile-trade-label { color:#778397; }
+html[data-theme="dark"] .public-seller-profile .public-profile-trade-stat { color:#CBD5E1; }
+html[data-theme="dark"] .public-seller-profile .public-profile-trade-label { color:#94A3B8; }
+.public-seller-profile .public-profile-layout > aside .public-profile-buy-orders { margin-top:12px; }
+.public-seller-profile .public-profile-toolbar { display:grid; grid-template-columns:minmax(0,2fr) minmax(140px,1fr) minmax(145px,1fr); gap:10px; border-radius:11px; background:var(--pp-toolbar); padding:12px; }
+.public-seller-profile .public-profile-filter { display:block; min-width:0; color:var(--pp-muted); font-size:11px; font-weight:600; }
+.public-seller-profile .public-profile-filter :is(input,select) { display:block; width:100%; height:36px; margin-top:4px; border:1px solid var(--pp-border); border-radius:7px; background:var(--pp-input); color:var(--pp-text); padding:0 10px; font-size:13px; font-weight:400; }
+.public-seller-profile .public-profile-auction-list { overflow:hidden; border-radius:12px; background:var(--pp-surface); }
+.public-seller-profile .public-profile-layout > aside { background-color:var(--pp-sidebar); }
+.public-seller-profile .public-profile-toolbar,
+.public-seller-profile .public-profile-auction-list { border:1px solid #E9BFA9; }
+.public-seller-profile .public-profile-layout > aside[aria-label="Seller statistics"] { border:1px solid #E9BFA9 !important; }
+.public-seller-profile .public-profile-detail-panel { position:relative; left:max(0px, calc(100% - 52rem)); width:100%; max-width:1000px; margin:24px auto 0; border:1px solid #E9BFA9 !important; border-radius:0.5rem; background-color:var(--pp-sidebar); }
+@media (min-width:1200px) {
+  .public-seller-profile .public-profile-detail-panel { left:calc(max(0px, calc(73.0769% - 849.54px)) - max(0px, calc((100% - 1000px) / 2))); }
+}
+.public-seller-profile .public-profile-detailed-trade-history { color:var(--pp-text); }
+.public-seller-profile .public-profile-detailed-trade-history > h2 { margin:0 0 14px; color:var(--pp-text); font-size:22px; font-weight:600; line-height:1.25; }
+.public-seller-profile .public-profile-trade-feedback > h3 { margin:0; color:var(--pp-text); font-size:22px; font-weight:600; line-height:1.3; }
+.public-seller-profile .public-profile-dashboard-cards { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; align-items:stretch; }
+.public-seller-profile .public-profile-dashboard-card { min-width:0; align-self:stretch; border:1px solid var(--pp-border); border-radius:12px; background:var(--pp-surface); padding:16px 20px; }
+.public-seller-profile .public-profile-dashboard-card h3 { margin:0 0 12px; border-bottom:1px solid var(--pp-border); padding-bottom:8px; color:var(--pp-text); font-size:18px; font-weight:600; line-height:1.3; }
+.public-seller-profile .public-profile-dashboard-stat-list { display:grid; gap:10px; margin:0; }
+.public-seller-profile .public-profile-dashboard-stat { display:flex; min-width:0; align-items:baseline; justify-content:space-between; gap:12px; }
+.public-seller-profile .public-profile-dashboard-stat dt { color:var(--pp-label); font-size:14px; font-weight:400; line-height:1.35; }
+.public-seller-profile .public-profile-dashboard-stat dd { margin:0; color:var(--pp-text); font-size:14px; font-weight:500; line-height:1.2; text-align:right; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.public-seller-profile .public-profile-dashboard-stat dd.is-positive { color:#23834A; }
+.public-seller-profile .public-profile-trade-feedback { margin-top:16px; border-top:1px solid var(--pp-border); padding-top:14px; }
+.public-seller-profile .public-profile-feedback-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:10px; }
+.public-seller-profile .public-profile-feedback-group { min-width:0; border:1px solid var(--pp-border); border-radius:10px; background:var(--pp-surface); padding:11px 12px; }
+.public-seller-profile .public-profile-feedback-group h4 { margin:0 0 6px; color:var(--pp-text); font-size:15px; font-weight:600; }
+.public-seller-profile .public-profile-feedback-counts { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; }
+.public-seller-profile .public-profile-feedback-counts > span { display:inline-flex; align-items:center; gap:5px; color:var(--pp-label); font-size:14px; font-weight:400; }
+.public-seller-profile .public-profile-feedback-counts > span.is-positive { color:#23834A; }
+.public-seller-profile .public-profile-feedback-counts > span.is-negative { color:var(--pp-muted); }
+.public-seller-profile .public-profile-feedback-counts svg { width:16px; height:16px; flex:0 0 16px; }
+.public-seller-profile .public-profile-feedback-note,
+.public-seller-profile .public-profile-feedback-unavailable { margin:8px 0 0; color:var(--pp-label); font-size:12px; line-height:1.45; }
+.public-seller-profile .public-profile-trade-feedback details { margin-top:8px; color:var(--pp-muted); font-size:12px; }
+.public-seller-profile .public-profile-trade-feedback summary { width:fit-content; cursor:pointer; font-weight:600; }
+html[data-theme="dark"] .public-seller-profile .public-profile-dashboard-stat dd.is-positive,
+html[data-theme="dark"] .public-seller-profile .public-profile-feedback-counts > span.is-positive { color:#86efac; }
+@media (max-width: 900px) {
+  .public-seller-profile .public-profile-dashboard-cards { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .public-seller-profile .public-profile-feedback-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 600px) {
+  .public-seller-profile .public-profile-detail-panel { padding:16px; }
+  .public-seller-profile .public-profile-dashboard-cards,
+  .public-seller-profile .public-profile-feedback-grid { grid-template-columns:minmax(0,1fr); }
+  .public-seller-profile .public-profile-dashboard-card { padding:18px; }
+}
+.public-seller-profile .public-profile-auction-grid { display:grid; grid-template-columns:var(--pp-auction-columns); gap:10px; }
+.public-seller-profile .public-profile-auction-header { min-height:34px; align-items:center; border-bottom:1px solid var(--pp-border); background:var(--pp-table-header); color:var(--pp-table-header-text); padding:0 12px; font-size:11px; font-weight:600; line-height:15px; }
+.public-seller-profile .public-profile-auction-header > :nth-child(2) { text-align:center; }
+@media (min-width:768px) {
+  .public-seller-profile .public-profile-auction-header > :nth-child(2),
+  .public-seller-profile .profile-public-row-middle { transform:translateX(15%); }
+}
+.public-seller-profile .public-profile-auction-header-price { padding-right:8px; text-align:right; }
+.public-seller-profile .public-profile-empty { margin:0; background:var(--pp-surface); color:var(--pp-muted); padding:14px; font-size:13px; }
+.public-seller-profile .public-profile-auction-row { border-bottom:1px solid #EEE1DA; background:var(--pp-surface); transition:background-color 150ms; }
+html[data-theme="dark"] .public-seller-profile .public-profile-auction-row { border-color:#34445a; }
+.public-seller-profile .public-profile-auction-row:last-child { border-bottom:0; }
+.public-seller-profile .public-profile-auction-row:hover { background:var(--pp-hover); }
+.public-seller-profile .public-profile-auction-row-main { grid-template-columns:var(--pp-auction-columns); align-items:center; min-height:60px; padding:8px 12px; }
+.public-seller-profile .profile-public-row-item { min-width:0; }
+.public-seller-profile .profile-public-row-identity { display:flex; min-width:0; align-items:center; gap:10px; }
+.public-seller-profile .profile-public-row-image { display:inline-flex; flex:0 0 38px; cursor:pointer; }
+.public-seller-profile .profile-public-row-identity img { width:38px; height:38px; flex:0 0 38px; object-fit:contain; image-rendering:pixelated; }
+.public-seller-profile .profile-public-row-item-text { display:block; min-width:0; }
+.public-seller-profile .profile-public-row-title { display:block; color:var(--pp-text); font-size:14px; font-weight:600; letter-spacing:-.01em; line-height:19px; overflow-wrap:anywhere; }
+.public-seller-profile .profile-public-row-name { color:inherit; text-decoration:none; cursor:pointer; }
+.public-seller-profile .profile-public-row-name:hover { color:var(--pp-blue); text-decoration:underline; }
+.public-seller-profile .profile-public-row-quantity { color:var(--pp-muted); font-size:12px; font-weight:400; letter-spacing:0; }
+.public-seller-profile .profile-public-row-number { display:block; margin-top:2px; color:var(--pp-label); font-size:11.5px; font-weight:400; line-height:15px; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.public-seller-profile .profile-public-row-middle { display:flex; min-width:0; flex-direction:column; align-items:center; gap:4px; text-align:center; }
+.public-seller-profile .profile-public-row-type { display:flex; min-width:0; align-items:center; gap:5px; white-space:nowrap; }
+.public-seller-profile .profile-public-row-trade { color:var(--pp-label); font-size:11px; font-weight:500; }
+.public-seller-profile .profile-auction-kind { display:inline-flex; align-items:center; border-radius:5px; padding:2px 6px; font-size:11px; font-weight:600; line-height:1.25; }
+.public-seller-profile .profile-auction-kind-sell { background:#EAF6EF; color:#23834A; }
+.public-seller-profile .profile-auction-kind-buy { background:#FCEEEB; color:#B64B43; }
+html[data-theme="dark"] .public-seller-profile .profile-auction-kind-sell { background:#123326; color:#86efac; }
+html[data-theme="dark"] .public-seller-profile .profile-auction-kind-buy { background:#3b2527; color:#f2a39b; }
+.public-seller-profile .profile-public-row-price-area { display:grid; min-width:0; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:8px; padding-right:8px; }
+.public-seller-profile .profile-public-row-value { grid-column:2; display:flex; width:100%; min-width:0; flex-direction:column; align-items:flex-end; gap:3px; text-align:right; }
+.public-seller-profile .profile-public-row-label { color:var(--pp-label); font-size:11px; font-weight:400; line-height:14px; }
+.public-seller-profile .profile-public-row-value strong { max-width:100%; color:var(--pp-text); font-size:15px; font-weight:700; letter-spacing:-.015em; line-height:19px; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.public-seller-profile .profile-public-row-value strong.profile-public-row-neutral { color:var(--pp-muted); font-size:15px; font-weight:600; letter-spacing:-.015em; }
+.public-seller-profile .profile-public-row-value strong > span { color:var(--pp-muted); font-size:.72em; font-weight:500; }
+.public-seller-profile .profile-public-row-status { display:flex; min-width:0; flex-wrap:wrap; align-items:baseline; justify-content:center; gap:1px 4px; }
+.public-seller-profile .profile-public-row-status > strong { color:var(--pp-muted); font-size:11.5px; font-weight:600; line-height:16px; overflow-wrap:anywhere; }
+.public-seller-profile .profile-public-row-status > time { color:var(--pp-label); font-size:11px; font-weight:400; line-height:16px; font-variant-numeric:tabular-nums; }
+.public-seller-profile .profile-public-row-status > time.is-soon { color:#B66A12; }
+.public-seller-profile .profile-public-row-status > time.is-urgent { color:#DC3545; }
+.public-seller-profile .profile-public-row-status.is-completed > strong { color:#23834A; }
+.public-seller-profile .profile-public-row-status.is-active > strong { color:#2563EB; }
+.public-seller-profile .profile-public-row-status.is-cancelled > strong { color:var(--pp-label); }
+.public-seller-profile .profile-public-row-status > small { flex-basis:100%; color:var(--pp-muted); font-size:11px; line-height:15px; overflow-wrap:anywhere; }
+html[data-theme="dark"] .public-seller-profile .profile-public-row-status.is-completed > strong { color:#86efac; }
+html[data-theme="dark"] .public-seller-profile .profile-public-row-status.is-active > strong { color:#60A5FA; }
+html[data-theme="dark"] .public-seller-profile .profile-public-row-status > time.is-soon { color:#f1c47b; }
+html[data-theme="dark"] .public-seller-profile .profile-public-row-status > time.is-urgent { color:#fda4af; }
+html[data-theme="dark"] .public-seller-profile .public-profile-toolbar,
+html[data-theme="dark"] .public-seller-profile .public-profile-auction-list,
+html[data-theme="dark"] .public-seller-profile .public-profile-layout > aside[aria-label="Seller statistics"] { border-color:#45566e !important; }
+html[data-theme="dark"] .public-seller-profile .public-profile-detail-panel { border-color:#45566e !important; }
+.public-seller-profile .profile-public-row-actions { grid-column:1; display:flex; min-width:0; flex-wrap:wrap; align-items:center; justify-content:flex-start; gap:5px; }
+.public-seller-profile .profile-public-row-bid { border:1px solid var(--pp-border); border-radius:5px; background:var(--pp-surface); color:var(--pp-text); padding:3px 6px; font-size:10px; font-weight:600; }
+.public-seller-profile .profile-public-row-actions > section { width:auto; margin:0; border:0; padding:0; }
+.public-seller-profile .profile-public-row-actions > section > div { flex-direction:column; align-items:flex-end; gap:2px; text-align:right; }
+.public-seller-profile .profile-public-row-actions > section p { color:var(--pp-muted); font-size:9px; line-height:11px; }
+.public-seller-profile .profile-public-row-actions .button-green { height:24px; border-radius:5px; padding:0 6px; font-size:10px; }
+.public-seller-profile .profile-public-row-expanded { border-top:1px solid var(--pp-border); padding:8px 14px; }
+@media (max-width:767px) {
+  .public-seller-profile .public-profile-toolbar { grid-template-columns:minmax(0,1fr); }
+  .public-seller-profile .public-profile-auction-header { display:none; }
+  .public-seller-profile .profile-public-auction-row-main { grid-template-columns:minmax(0,1fr) minmax(115px,auto); gap:6px 10px; padding:10px 12px; }
+  .public-seller-profile .profile-public-row-item { grid-column:1; }
+  .public-seller-profile .profile-public-row-price-area { grid-column:2; grid-row:1; }
+  .public-seller-profile .profile-public-row-middle { grid-column:1 / -1; flex-direction:row; flex-wrap:wrap; align-items:center; gap:4px 10px; text-align:left; }
+  .public-seller-profile .profile-public-row-status { justify-content:flex-start; }
 }

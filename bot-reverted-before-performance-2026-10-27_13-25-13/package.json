@@ -1,0 +1,23 @@
+{
+  "name": "khub-escrow-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24.0.0" },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/supervisor.mjs",
+    "health": "node src/health.mjs",
+    "inspect": "node --env-file-if-exists=.env src/cli.mjs inspect",
+    "stats": "node --env-file-if-exists=.env src/cli.mjs stats",
+    "retry-delivery": "node --env-file-if-exists=.env src/cli.mjs retry-delivery",
+    "lookup": "node --env-file-if-exists=.env src/cli.mjs lookup",
+    "sync-catalog": "node --env-file-if-exists=.env src/cli.mjs sync-catalog",
+    "test": "node --test tests/*.test.mjs",
+    "bundle": "node tools/bundle.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.118.0",
+    "kol.js": "0.15.4",
+    "data-of-loathing": "4.3.2"
+  }
+}
