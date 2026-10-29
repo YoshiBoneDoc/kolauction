@@ -151,6 +151,7 @@ test('profile transaction cards use two compact rows without progress bars', () 
         ...auction,
         id: 'buy-order-1',
         auctionKind: 'buy',
+        escrowMode: true,
         fulfilledByMe: true,
         mySaleQuantity: 500,
         mySaleMeat: 100000,
@@ -165,7 +166,7 @@ test('profile transaction cards use two compact rows without progress bars', () 
     const buySectionEnd = html.indexOf('</section>', buySectionStart);
     const buySection = html.slice(buySectionStart, buySectionEnd);
     assert.match(buySection, /Test item[\s\S]*?× 500/);
-    assert.match(buySection, /Buy order · Escrow/);
+    assert.match(buySection.replace(/<[^>]+>/g, ''), /Buy order · Escrow/);
     assert.match(buySection, /200 Meat\/item · Earned: <strong>100k Meat<\/strong>/);
     assert.doesNotMatch(buySection, /× 10,000|1,975 \/ 10,000 purchased/);
     assert.doesNotMatch(html, /role="progressbar"|profile-progress/);
@@ -356,4 +357,43 @@ test('escrow outcomes explain automatic deposit expiry without claiming a seller
     assert.match(legacy, /Closed before deposit/);
     assert.match(legacy, /may have been canceled or reached its deposit deadline/);
     assert.doesNotMatch(legacy, /deposit has been returned/);
+});
+
+function profileSection(html, title) {
+    const mobile = html.slice(html.indexOf('<div class="lg:hidden'), html.indexOf('<div class="hidden grid-cols-2'));
+    const heading = mobile.indexOf(`>${title}</h2>`);
+    return mobile.slice(mobile.lastIndexOf('<section', heading), mobile.indexOf('</section>', heading));
+}
+
+test('account bids consolidate by auction identity and show only the latest personal bid per row', () => {
+    const first = { ...auction, id: 'rebid', sellerId: 'other', item: 'Rebid item', status: 'active', endTime: Date.now()+3600000,
+        currentBid: 100, bids: [{ id: 'b1', bidderId: 'seller', amount: 100, timestamp: 1000 }] };
+    const latest = { ...first, currentBid: 200, bids: [...first.bids, { id: 'b2', bidderId: 'seller', amount: 200, timestamp: 2000 }] };
+    const html = render({ page: 'profile', userId: 'seller', auctions: [latest, first] });
+    const section = profileSection(html, 'Active bids');
+    assert.equal((section.match(/<article\b/g) || []).length, 1);
+    assert.match(section, /Your bid: <strong>200 Meat/);
+    assert.doesNotMatch(section, /Your bid: <strong>100 Meat/);
+});
+
+test('listing history sorts by most recent conclusion and applies direction/outcome styling with cancellation override', () => {
+    const fixtures = [
+        { ...auction, id: 'old-sell', item: 'Old Sell', auctionKind: 'sell', status: 'completed', completedAt: '2026-01-01T00:00:00Z' },
+        { ...auction, id: 'cancel-buy', item: 'Canceled Buy', auctionKind: 'buy', status: 'cancelled', cancelledAt: '2026-01-04T00:00:00Z', pricePerItem: 100, purchasedQuantity: 0 },
+        { ...auction, id: 'new-buy', item: 'New Buy', auctionKind: 'buy', status: 'completed', completedAt: '2026-01-03T00:00:00Z', pricePerItem: 100, purchasedQuantity: 2 },
+        { ...auction, id: 'expired', item: 'Expired Sell', status: 'expired', endTime: Date.parse('2026-01-02T00:00:00Z') },
+    ];
+    const html = render({ page: 'profile', userId: 'seller', auctions: fixtures });
+    const section = profileSection(html, 'Listing history');
+    assert.ok(section.indexOf('Canceled Buy') < section.indexOf('New Buy'));
+    assert.ok(section.indexOf('New Buy') < section.indexOf('Expired Sell'));
+    assert.ok(section.indexOf('Expired Sell') < section.indexOf('Old Sell'));
+    assert.match(section, /profile-history-entry is-cancelled/);
+    assert.match(section, /profile-history-entry is-buy/);
+    assert.match(section, /profile-history-entry is-sell/);
+    assert.match(section, /profile-entry-status is-completed">Trade completed/);
+    assert.match(section, /profile-entry-status is-cancelled">Cancelled/);
+    assert.match(section, /profile-entry-status is-expired">Expired/);
+    assert.match(profileSection(html, 'Bid history'), />Ended Auctions<\/span>/);
+    assert.doesNotMatch(profileSection(html, 'Active listings'), /profile-history-entry/);
 });

@@ -35,7 +35,7 @@ export function createAuctionReadCache(read, { now = Date.now } = {}) {
         invalidate() { invalidate(); },
         pause() { active = false; invalidate(true); },
         resume() { active = true; },
-        load(key, { maxAge = 30000, force = false } = {}) {
+        load(key, { maxAge = 30000, force = false, fresh = false } = {}) {
             if (!active || key == null) return Promise.resolve();
             const record = entry(key);
             // Bound search/page history in long browsing sessions. In-flight
@@ -58,7 +58,7 @@ export function createAuctionReadCache(read, { now = Date.now } = {}) {
                 if (!active || version !== record.version) return;
                 record.state = { ...record.state, attemptedAt: now() };
                 try {
-                    const data = await read(key, controller.signal);
+                    const data = await read(key, controller.signal, { force, fresh });
                     if (active && version === record.version) {
                         record.failures = 0;
                         record.retryAt = 0;

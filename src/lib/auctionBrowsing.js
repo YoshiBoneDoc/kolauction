@@ -63,7 +63,7 @@ export function browseAuctions(auctions, { search = '', status = 'active', sort 
             else comparison = b.latestBidAt - a.latestBidAt;
         }
         if (sort === 'recommended') {
-            const urgent = auction => getAuctionStatus(auction, now) === 'active' && auction.endTime > now && auction.endTime - now <= 86400000;
+            const urgent = auction => getAuctionStatus(auction, now) === 'active' && auction.endTime > now && auction.endTime - now <= 10800000;
             comparison = Number(urgent(b)) - Number(urgent(a)) || (urgent(a) && urgent(b) ? a.endTime - b.endTime : b.createdAt - a.createdAt);
         }
         if (sort === 'newest') comparison = b.createdAt - a.createdAt;
@@ -132,7 +132,8 @@ export function highRollerAuctions(auctions, now = Date.now()) {
         && highRollerValue(auction) >= HIGH_ROLLER_MIN_PRICE)
         .sort((a, b) => {
             const aSoon = auctionEndingSoon(a, now), bSoon = auctionEndingSoon(b, now);
-            return Number(bSoon) - Number(aSoon) || (aSoon && bSoon ? a.endTime - b.endTime : 0)
+            return Number(a.status === 'completed') - Number(b.status === 'completed')
+                || Number(bSoon) - Number(aSoon) || (aSoon && bSoon ? a.endTime - b.endTime : 0)
                 || highRollerValue(b) - highRollerValue(a) || String(a.id).localeCompare(String(b.id));
         });
 }

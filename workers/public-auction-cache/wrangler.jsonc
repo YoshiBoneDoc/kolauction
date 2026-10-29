@@ -1,0 +1,10 @@
+{
+  "name": "khub-public-auction-cache",
+  "main": "index.js",
+  "compatibility_date": "2026-10-28",
+  "workers_dev": false,
+  "durable_objects": {
+    "bindings": [{ "name": "PUBLIC_AUCTION_CACHE", "class_name": "PublicAuctionCache" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["PublicAuctionCache"] }]
+}

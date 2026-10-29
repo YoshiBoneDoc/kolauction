@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "include": ["/api/public-auctions", "/api/public-auctions/invalidate", "/api/public-banner"],
+  "exclude": []
+}

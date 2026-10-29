@@ -57,6 +57,8 @@ export default function AuctionAnItem() {
     const [bundleEntries, setBundleEntries] = useState([]);
     const [bundleImageItemId, setBundleImageItemId] = useState(null);
     const [bundleTitleText, setBundleTitleText] = useState('');
+    const [bundleTitleConflict, setBundleTitleConflict] = useState(false);
+    const bundleTitleInput = useRef(null);
     const [preview, setPreview] = useState(null);
     useEffect(() => {
         const select = durationInput.current;
@@ -144,6 +146,7 @@ export default function AuctionAnItem() {
         setPreview({ item: contents ? bundleTitle(contents, customTitle) : item.name, itemId: contents ? contents[0].id : item.id, quantity: contents ? 1 : count, ...(contents ? { bundleItems: contents, bundleTitle: customTitle || null, bundleImageItemId: contents.some(entry => entry.id === bundleImageItemId) ? bundleImageItemId : null } : {}), minBidMeat: minimum, instantPurchasePrice: purchasePrice, auctionTime, escrowMode, ...(customEndAt ? { customEndAt } : {}),
             image: contents ? (contents.find(entry => entry.id === bundleImageItemId) || contents[0]).image : itemImageUrl(item.image), ...(isBuy ? { auctionKind, deliveryMode } : {}) });
         setError('');
+        setBundleTitleConflict(false);
         requestAnimationFrame(() => previewHeading.current?.focus());
     }
 
@@ -158,6 +161,12 @@ export default function AuctionAnItem() {
             navigate(id ? `/auction/${id}` : '/auctions');
         } catch (failure) {
             setError(failure.message);
+            if (failure.code === 'PBT01') {
+                publishDialog.current?.close();
+                setPreview(null);
+                setBundleTitleConflict(true);
+                requestAnimationFrame(() => bundleTitleInput.current?.focus());
+            }
         } finally {
             submitting.current = false;
             setPending(false);
@@ -203,7 +212,7 @@ export default function AuctionAnItem() {
                         </div>
                     </fieldset>}
                 </div>}
-                {error && <p role="alert" className="mb-4 break-words font-semibold text-red-700">{error}</p>}
+                {error && <p id="listing-error" role="alert" className="mb-4 break-words font-semibold text-red-700">{error}</p>}
                 {preview ? <section aria-label="Preview auction">
                     <h2 ref={previewHeading} tabIndex={-1} className="text-xl font-bold text-gray-900">Preview Auction</h2>
                     <p className="mt-1 text-sm text-gray-500">Review your listing details before publishing.</p>
@@ -298,9 +307,10 @@ export default function AuctionAnItem() {
                     </div>
                     {isBundle && <>
                         <label htmlFor="bundleTitle" className="mb-2 block text-sm font-bold">Bundle title <span className="font-normal text-gray-600">(optional)</span></label>
-                        <input id="bundleTitle" type="text" value={bundleTitleText} maxLength={MAX_BUNDLE_TITLE_LENGTH} autoComplete="off"
-                            onChange={event => setBundleTitleText(event.target.value)} onBlur={() => setBundleTitleText(value => value.trim())}
-                            placeholder="e.g. The Mime Science Collection" aria-describedby="bundle-title-help" className={fieldClass} />
+                        <input ref={bundleTitleInput} id="bundleTitle" type="text" value={bundleTitleText} maxLength={MAX_BUNDLE_TITLE_LENGTH} autoComplete="off"
+                            onChange={event => { setBundleTitleText(event.target.value); if (bundleTitleConflict) { setBundleTitleConflict(false); setError(''); } }} onBlur={() => setBundleTitleText(value => value.trim())}
+                            placeholder="e.g. The Mime Science Collection" aria-invalid={bundleTitleConflict || undefined}
+                            aria-describedby={`bundle-title-help${bundleTitleConflict ? ' listing-error' : ''}`} className={fieldClass} />
                         <p id="bundle-title-help" className="-mt-2 mb-4 text-xs text-gray-600">Leave blank for an automatic title. Up to {MAX_BUNDLE_TITLE_LENGTH} characters.</p>
                     </>}
                     <label htmlFor="listing-item-search" className="mb-2 block text-sm font-bold">Find an item</label>

@@ -6,6 +6,8 @@ Remaining work only. Updated October 27, 2026. Verify current state before start
 - need to further improve handling heavy traffic
 - 
 # Small Quick fixes:
+- filter for auctions with a buyout price
+- filter bundles yes/no
 
 - YOUR PROFILE STUFF:
 - in your profile -> Buy order fulfillments -> show how many YOU sold

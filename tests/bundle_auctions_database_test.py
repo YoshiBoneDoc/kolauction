@@ -4,6 +4,8 @@ credentials, network, real bot, KoL account or live database is used.
 Run: python3 tests/bundle_auctions_database_test.py
 """
 import json
+import hashlib
+import hmac
 from pathlib import Path
 import subprocess
 import tempfile
@@ -111,6 +113,9 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         lot=call('select public.create_bundle_auction('+lit(json.dumps(parts))+",100,24,5000,p_title=>'  Friends & Collectibles  ',p_image_item_id=>364);")
         assert row(lot)['item']=='Bundle: Friends & Collectibles'
         assert row(lot)['status']=='pending_escrow'
+        assert json.loads(call(f"select public.read_auction_card_context(array['{lot}']::uuid[]);"))['rows']==[]
+        sql(f"set role anon;select public.read_auction_card_context(array['{lot}']::uuid[]);",error='permission denied')
+        call(f"select public.read_auction_card_context(array_fill('{lot}'::uuid,array[25]));",error='at most 24')
         sql(f"update public.auctions set item='changed' where id='{lot}';",error='cannot change')
         assert row(lot)['image']==row(lot)['bundle_items'][1]['image']
         call('select public.create_bundle_auction('+lit(json.dumps(parts))+',100,24,p_image_item_id=>1);',error='cover image')
@@ -124,6 +129,13 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         baseline=json.loads(sql('select public.bot_liabilities();'))['items']
         mid,result,replay=ingest(lot,'list',items=parts);assert result=='accepted',result
         assert row(lot)['status']=='active'
+        listing_count=sql('select count(*) from public.auctions;')
+        for escrow in ['true','false']:
+            call('select public.create_bundle_auction('+lit(json.dumps(parts))+f",100,24,p_escrow_mode=>{escrow},p_title=>'  Friends & Collectibles  ');",error='live bundle auction already uses this exact name')
+        assert sql('select count(*) from public.auctions;')==listing_count
+        case_distinct=call('select public.create_bundle_auction('+lit(json.dumps(parts))+",100,24,p_title=>'friends & collectibles');")
+        assert row(case_distinct)['status']=='pending_escrow'
+        print('PASS: exact live custom bundle names rejected before creating records; trimming and case-sensitive matches respected')
         liabilities=json.loads(sql('select public.bot_liabilities();'))['items']
         for p in parts:assert int(liabilities[str(p['id'])])-int(baseline.get(str(p['id']),0))==p['quantity']
         before=sql('select count(*) from khub_bot.deliveries;');sql(replay);assert sql('select count(*) from khub_bot.deliveries;')==before
@@ -138,10 +150,46 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         page=json.loads(call(f"select public.read_auction_page('seller','{seller}',{lit(frozen[1]['name'])},'all','ending',1);",buyer))
         assert any(r['id']==lot for r in page['rows'])
         home=json.loads(call('select public.read_home_auctions();',buyer));assert home['privacy_version']==1
+        context=json.loads(call(f"select public.read_auction_card_context(array['{lot}','{lot}']::uuid[]);",buyer))
+        assert len(context['rows'])==1 and context['rows'][0]['seller_id']==seller
+        assert context['rows'][0]['seller_username']=='Bundle Seller'
+        assert context['rows'][0]['bundle_items']==frozen
+        assert 'bid_count' not in context['rows'][0]
         sql("insert into khub_bot.market_prices(item_id,price_meat,observed_at,checked_at,available) values(2,1000,clock_timestamp(),clock_timestamp(),true),(364,2000,clock_timestamp(),clock_timestamp(),true) on conflict(item_id) do update set price_meat=excluded.price_meat,available=true;")
         assert sql(f"select khub_bot.lot_market_value(a) from public.auctions a where id='{lot}';")=='13000'
         print('PASS: public/private/home projections, component search and full-lot market valuation')
-        assert ingest(lot,'bid',200,actor=48889603)[1]=='accepted'
+        # The cache hook is optional and failures cannot reject accepted funds.
+        cache_secret='ab'*32
+        sql("insert into khub_bot.public_cache_webhook_config(id,endpoint,signing_secret) values(true,'https://cache.example/api/public-auctions/invalidate',"+lit(cache_secret)+');')
+        for role in ['anon','authenticated','service_role']:
+            sql('set role '+role+';select * from khub_bot.public_cache_webhook_config;',error='permission denied')
+            sql('set role '+role+';select khub_bot.send_public_cache_invalidation();',error='permission denied')
+        cache_revision=int(sql('select revision from khub_bot.public_cache_revision;'))
+        first_mid,first_result,first_replay=ingest(lot,'bid',200,actor=48889603)
+        assert first_result=='accepted' and row(lot)['current_bid']==200
+        assert int(sql('select revision from khub_bot.public_cache_revision;'))==cache_revision+1
+        assert int(sql('select enqueue_failures from khub_bot.public_cache_revision;'))==1
+        sql(first_replay)
+        assert int(sql('select revision from khub_bot.public_cache_revision;'))==cache_revision+1
+        # Offline pg_net boundary: enqueue is transactional, without any real HTTP.
+        sql('''create schema net;
+            create table net.fixture_requests(id bigserial primary key,url text,body jsonb,headers jsonb,timeout_milliseconds integer);
+            create function net.http_post(url text,body jsonb,headers jsonb,timeout_milliseconds integer) returns bigint
+            language sql as $$insert into net.fixture_requests(url,body,headers,timeout_milliseconds)
+                values(url,body,headers,timeout_milliseconds) returning id;$$;
+            select khub_bot.send_public_cache_invalidation();''')
+        hook=json.loads(sql('select body from net.fixture_requests order by id desc limit 1;'))
+        assert set(hook)=={'revision','signature'}
+        assert hook['revision']==str(cache_revision+1)
+        assert hook['signature']==hmac.new(cache_secret.encode(),('khub-public-auctions:v1:'+hook['revision']).encode(),hashlib.sha256).hexdigest()
+        assert cache_secret not in sql('select to_jsonb(r) from net.fixture_requests r order by id desc limit 1;')
+        print('PASS: bot accepted bids invalidate once; replays do not; hook failure preserves accepted funds; only signed revision queued')
+        own_context=json.loads(call(f"select public.read_auction_card_context(array['{lot}']::uuid[]);",other))['rows'][0]
+        other_context=json.loads(call(f"select public.read_auction_card_context(array['{lot}']::uuid[]);",buyer))['rows'][0]
+        assert own_context['highest_bidder_id']==other
+        assert other_context['highest_bidder_id'] is None
+        assert other_context['highest_bidder_username'].startswith('Bidder ')
+        print('PASS: private card context rejects anonymous/unbounded/draft reads; preserves names and viewer-specific bidder privacy')
         mid,result,replay=ingest(lot,'bid',6000,actor=48889602);assert result=='accepted',result
         assert row(lot)['status']=='active' and row(lot)['escrow_buyout_received_at'] is not None
         expire(lot)  # Simulate elapsed grace, then complete a new scan; never bypass authorization.
@@ -162,6 +210,15 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         assert row(lot)['status']=='settling'
         sql(f"select public.bot_reconcile_delivery('{held}',true,'Disposable local test verified recipient and exact assets.');")
         assert row(lot)['status']=='completed'
+        reused=call('select public.create_bundle_auction('+lit(json.dumps(parts))+",100,24,p_title=>'Friends & Collectibles');")
+        assert row(reused)['id']!=lot and row(reused)['item']==row(lot)['item']
+        # Two concurrent Direct creations must not both pass a live-name check.
+        query="set request.jwt.claim.sub="+lit(seller)+";set role authenticated;select public.create_bundle_auction("+lit(json.dumps(parts))+",100,24,p_escrow_mode=>false,p_title=>'Concurrent custom title');"
+        processes=[subprocess.Popen([str(BIN/'psql'),'-h',folder,'-d','postgres','-X','-qAt','-v','ON_ERROR_STOP=1','-c',query],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True) for _ in range(2)]
+        outputs=[p.communicate(timeout=15) for p in processes]
+        assert sorted(p.returncode for p in processes)==[0,1],outputs
+        assert any('live bundle auction already uses this exact name' in err for out,err in outputs)
+        print('PASS: historical bundle names reusable; concurrent live Direct title creation permits exactly one auction')
         assert sql(f"select available from khub_bot.auction_market_prices where auction_id='{lot}';")=='f'
         seller_stats=json.loads(call(f"select public.read_auction_page('seller','{seller}','','all','ending',1);",buyer))['seller']['stats']
         assert int(seller_stats['escrow_units'])==8 and int(seller_stats['escrow_sales'])==1
@@ -204,19 +261,35 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         print('PASS: bundle statistics count actual units; 5-billion component splits into exact safe delivery chunks')
         # New read-only sort applies before pagination, with explicit sorts retained.
         sort_lots=[]
-        for index,hours in enumerate([48,20,72,1]):
+        for index,hours in enumerate([48,20,72,1,2,3,4]):
             aid=call('select public.create_bundle_auction('+lit(json.dumps(parts))+f",100,24,p_escrow_mode=>false,p_title=>'Sort fixture {index}');")
-            sql(f"update public.auctions set end_time=clock_timestamp()+interval '{hours} hours',created_at=clock_timestamp()-interval '{4-index} hours' where id='{aid}';")
+            sql(f"update public.auctions set end_time=clock_timestamp()+interval '{hours} hours',created_at=clock_timestamp()-interval '{8-index} hours' where id='{aid}';")
             sort_lots.append(aid)
         result=json.loads(call("select public.read_filtered_auction_page('browse',null,'Sort fixture','active','recommended',1,'all','all',null,null);",buyer))
-        assert [r['id'] for r in result['rows']]==[sort_lots[3],sort_lots[1],sort_lots[2],sort_lots[0]]
+        assert [r['id'] for r in result['rows']]==[sort_lots[i] for i in [3,4,5,6,2,1,0]]
         result=json.loads(call("select public.read_filtered_auction_page('browse',null,'Sort fixture','active','newest',1,'all','all',null,null);",buyer))
         assert [r['id'] for r in result['rows']]==list(reversed(sort_lots))
+        before_revision=int(sql('select revision from khub_bot.public_cache_revision;'))
+        before_requests=int(sql('select count(*) from net.fixture_requests;'))
+        call(f"select public.place_bid('{sort_lots[0]}',100);",buyer)
+        assert int(sql('select revision from khub_bot.public_cache_revision;'))==before_revision+1
+        assert int(sql('select count(*) from net.fixture_requests;'))==before_requests+1
+        call(f"select public.place_bid('{sort_lots[0]}',1);",other,error='at least')
+        sql(f"begin;set role authenticated;select public.place_bid('{sort_lots[1]}',100);rollback;",buyer)
+        assert int(sql('select revision from khub_bot.public_cache_revision;'))==before_revision+1
+        assert int(sql('select count(*) from net.fixture_requests;'))==before_requests+1
+        print('PASS: website bids invalidate; rejected and rolled-back bids queue nothing; private hook configuration denied to API roles')
         print('PASS: urgent auctions first, then newest; explicit newest sorting unchanged')
         order=call("select public.create_buy_auction(2,10,200,24,'finished');")
         required=int(sql(f"select funding_required from khub_bot.buy_orders where auction_id='{order}';"))
         assert ingest(order,'fund',required)[1]=='accepted'
         reservation=json.loads(call(f"select public.reserve_buy_quantity('{order}',2);",buyer))
+        owner_card=json.loads(call(f"select public.read_auction_card_context(array['{order}']::uuid[]);",seller))['rows'][0]
+        buyer_card=json.loads(call(f"select public.read_auction_card_context(array['{order}']::uuid[]);",buyer))['rows'][0]
+        unrelated_card=json.loads(call(f"select public.read_auction_card_context(array['{order}']::uuid[]);",other))['rows'][0]
+        assert 'balance_meat' in owner_card and 'balance_meat' not in buyer_card and 'balance_meat' not in unrelated_card
+        assert buyer_card['my_reservation']['id']==reservation['id'] and unrelated_card['my_reservation'] is None
+        print('PASS: uncached Buy context keeps balances owner-only and reservations isolated per viewer')
         mid,result,_=ingest(order,'fill',items=[{'id':2,'quantity':2}],actor=48889602,reservation=reservation['id'])
         assert result=='accepted',result
         stats=json.loads(sql(f"select khub_bot.buy_profile_totals('{seller}');"))
@@ -228,6 +301,7 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         stats=json.loads(sql(f"select khub_bot.buy_profile_totals('{buyer}');"))
         assert stats['buy_order_sales']=='1' and stats['buy_order_units']=='2' and stats['buy_orders_created']=='0'
         print('PASS: created/fulfilled Buy order stats distinguish players and exclude unpaid fulfillments')
+        no_attachment_revision=sql('select revision from khub_bot.public_cache_revision;')
         mid,result,replay=ingest(gift_lot,'bid',0,actor=48889602)
         assert result=='bid_help',result
         reply=sql(f"select coalesce(d.display_message,khub_bot.friendly_message(d)) from khub_bot.deliveries d where receipt_id='{mid}';")
@@ -236,6 +310,18 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         sql(replay)
         assert sql(f"select count(*) from khub_bot.deliveries where receipt_id='{mid}';")==before
         assert sql(f"select count(*) from public.bids where auction_id='{gift_lot}';")=='0'
+        assert sql('select revision from khub_bot.public_cache_revision;')==no_attachment_revision
         print('PASS: no-attachment bids receive the existing concise reply once; never become funded bids')
+        # Higher-valued completed lots must not displace lower-valued active lots.
+        high_active=call('select public.create_bundle_auction('+lit(json.dumps([{'id':2,'quantity':1},{'id':364,'quantity':1}]))+",60000000,24,p_escrow_mode=>false);")
+        sql('update khub_bot.market_prices set price_meat=50000000 where item_id=2;')
+        high_home=json.loads(call('select public.read_home_auctions();',buyer))
+        high_ids=high_home['sections']['highRollers']
+        assert lot in high_ids and high_active in high_ids
+        assert high_ids.index(high_active)<high_ids.index(lot)
+        by_id={r['id']:r for r in high_home['rows']}
+        completed_flags=[by_id[aid]['status']=='completed' for aid in high_ids]
+        assert completed_flags==sorted(completed_flags)
+        print('PASS: homepage High Rollers selects all active lots before completed trades, even when completed values are higher')
     finally:
         if started:pg('-m','immediate','stop')

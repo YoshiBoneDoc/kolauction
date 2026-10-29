@@ -11,6 +11,7 @@ import { useNow } from "../hooks/useNow";
 import MeatStack from '../components/MeatStack';
 import { toggleProfileSection } from '../lib/profileSections';
 import { auctionEndTime } from '../lib/auctionBrowsing';
+import { profileBidAuctions, latestProfileBid } from '../lib/profileBids';
 
 const formatNumber = (number) => number.toLocaleString('en-US');
 const historyTime = auction => Date.parse(auction.completedAt) || auctionEndTime(auction) || auction.endTime || auction.createdAt;
@@ -56,7 +57,7 @@ const Profile = () => {
     </main>;
 
     const selling = auctions.filter((auction) => auction.sellerId === currentUser.id);
-    const bidding = auctions.filter((auction) => auction.bids.some((bid) => bid.bidderId === currentUser.id));
+    const bidding = profileBidAuctions(auctions, currentUser.id);
     const awaitingTrades = auctions.filter((auction) => {
         const result = getAuctionResult(auction, now);
         return result.status === 'awaiting_trade'
@@ -73,7 +74,7 @@ const Profile = () => {
         { title: 'Awaiting settlement', records: awaitingTrades },
         { title: 'Active listings', records: selling.filter((auction) => getAuctionStatus(auction, now) === 'active') },
         { title: 'Active bids', records: bidding.filter((auction) => getAuctionStatus(auction, now) === 'active').sort((a, b) => a.endTime - b.endTime) },
-        { title: 'Listing history', records: selling.filter((auction) => !['active','pending_escrow','settling'].includes(getAuctionStatus(auction, now))) },
+        { title: 'Listing history', records: selling.filter((auction) => !['active','pending_escrow','settling'].includes(getAuctionStatus(auction, now))).sort((a, b) => historyTime(b) - historyTime(a) || b.createdAt - a.createdAt) },
         { title: 'Bid history', records: bidding.filter((auction) => !['active','settling'].includes(getAuctionStatus(auction, now))).sort((a, b) => historyTime(b) - historyTime(a)) },
     ];
 
@@ -89,7 +90,10 @@ const Profile = () => {
         return (
             <section key={title} className="profile-transaction-section">
                 <div className="flex items-center justify-between gap-3 border-b pb-3 profile-divider">
-                    <h2 className="text-[17px] font-semibold profile-text">{title}</h2>
+                    <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                        <h2 className="text-[17px] font-semibold profile-text">{title}</h2>
+                        {title === 'Bid history' && <span className="text-[11px] font-normal profile-label">Ended Auctions</span>}
+                    </div>
                     <button
                         type="button"
                         className="profile-count-button"
@@ -103,9 +107,13 @@ const Profile = () => {
                         <div className="mt-3 space-y-[5px]">
                         {visibleRecords.map((auction) => {
                             const result = getAuctionResult(auction, now);
-                            const myBids = auction.bids.filter((bid) => bid.bidderId === currentUser.id);
                             const isBuy = auction.auctionKind === 'buy';
-                            const highestBid = myBids.length > 0 ? Math.max(...myBids.map((bid) => bid.amount)) : null;
+                            const personalBid = latestProfileBid(auction, currentUser.id);
+                            const historyRow = title === 'Listing history';
+                            const cancelled = ['cancelled', 'voided'].includes(result.status);
+                            const historyClass = historyRow ? ` profile-history-entry ${cancelled ? 'is-cancelled' : isBuy ? 'is-buy' : 'is-sell'}` : '';
+                            const historyStatus = historyRow ? result.status === 'completed' ? ' is-completed'
+                                : cancelled ? ' is-cancelled' : ['expired', 'ended_no_bids'].includes(result.status) ? ' is-expired' : '' : '';
                             const personallyFulfilled = auction.mySaleQuantity;
                             const bidStatus = title === 'Active bids' && auction.viewerIsHighestBidder != null
                                 ? auction.viewerIsHighestBidder ? { label: 'Winning', className: 'profile-badge-winning' }
@@ -118,7 +126,7 @@ const Profile = () => {
                                     ? { label: result.status === 'ended_no_bids' ? 'No sale' : 'Canceled', className: 'profile-badge-neutral' }
                                     : null;
                             return (
-                                <article key={auction.id} className="profile-transaction-entry">
+                                <article key={auction.id} className={`profile-transaction-entry${historyClass}`}>
                                     {auction.image ? <AuctionItemImage src={auction.image} item={auction.item} size="tiny" className="profile-entry-image" fallbackText="No image" />
                                         : <span className="profile-entry-image profile-entry-image-fallback" role="img" aria-label={`${auction.item} image unavailable`}>No image</span>}
                                     <div className="profile-entry-row">
@@ -133,7 +141,7 @@ const Profile = () => {
                                             dateTime={new Date(auction.endTime).toISOString()}
                                             title={`Ends ${new Date(auction.endTime).toLocaleString()}`}
                                             className="profile-entry-endtime"
-                                        >{formatTimeLeft(auction.endTime, now)}</time> : <span className="profile-entry-status">{result.label}</span>}
+                                        >{formatTimeLeft(auction.endTime, now)}</time> : <span className={`profile-entry-status${historyStatus}`}>{result.label}</span>}
                                     </div>
 
                                     <div className="profile-entry-row">
@@ -143,7 +151,7 @@ const Profile = () => {
                                             {isBuy && title !== 'Buy order fulfillments' && <span>{formatNumber(auction.pricePerItem)} Meat / item · {formatNumber(auction.purchasedQuantity)} / {formatNumber(auction.quantity)} purchased</span>}
                                             {!isBuy && result.status === 'active' && <span>Current bid: <strong>{auction.currentBid > 0 ? `${formatCompactMeat(auction.currentBid)} Meat` : 'No bids yet'}</strong></span>}
                                             {result.hasWinner && <span>{result.winnerId === currentUser.id && ['awaiting_trade', 'completed'].includes(result.status) ? null : <>Winner: <WinnerLink auction={auction} /> · </>}Final: <strong>{formatCompactMeat(result.finalPrice)}</strong></span>}
-                                            {highestBid !== null && <span>Your bid: <strong>{formatCompactMeat(highestBid)} Meat</strong></span>}
+                                            {personalBid && <span>Your bid: <strong>{formatCompactMeat(personalBid.amount)} Meat</strong></span>}
                                         </div>
                                     </div>
 

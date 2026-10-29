@@ -116,19 +116,21 @@ function databaseError(error) {
     return Object.assign(failure || new Error(error.message || 'The database request failed. Please try again.'), { code: error.code, status: error.status });
 }
 
-export function createAuctionService(client) {
+export function createAuctionService(client, { publicReader = null } = {}) {
     function requireClient() {
         if (!client) throw new Error('Auction storage is not configured yet.');
         return client;
     }
 
     return {
-        async load({ view = 'browse', id = null, sellerId = null, excludeOwn = false, kind = 'all', search = '', status = 'active', sort = resolveAuctionSort(status), trade = 'all', page = 1, minPrice = null, maxPrice = null, signal } = {}) {
+        async load({ view = 'browse', id = null, sellerId = null, excludeOwn = false, kind = 'all', search = '', status = 'active', sort = resolveAuctionSort(status), trade = 'all', page = 1, minPrice = null, maxPrice = null, signal, fresh = false } = {}) {
             // Browsing is read-only. The existing bot tick expires all auction
             // types; write RPCs independently validate deadlines under their locks.
             const requestStartedAt = auctionClockRequestStarted();
+            const sharedRequest = { view, sellerId, excludeOwn, kind, search, status, sort, trade, page, minPrice, maxPrice, signal, fresh };
             let request;
-            if (view === 'home') request = requireClient().rpc('read_home_auctions');
+            if (await publicReader?.accepts(sharedRequest)) request = publicReader.load(sharedRequest).then(data => ({ data }));
+            else if (view === 'home') request = requireClient().rpc('read_home_auctions');
             else request = requireClient().rpc(view === 'browse' ? 'read_filtered_auction_page' : 'read_auction_page', {
                 p_view: view === 'browse' && excludeOwn ? 'others' : view === 'browse' && sellerId ? 'seller' : view,
                 p_id: view === 'browse' && sellerId ? sellerId : id,
@@ -160,6 +162,7 @@ export function createAuctionService(client) {
                 })]));
             }
             return { auctions, total: Number(data.total), seller: data.seller || null,
+                ...(data.public_snapshot ? { publicSnapshot: data.public_snapshot } : {}),
                 ...(homeSections ? { homeSections } : {}),
                 ...(view === 'browse' ? { priceBounds: data.price_bounds && parsePrice(data.price_bounds.min) != null && parsePrice(data.price_bounds.max) != null
                     ? { min: Number(data.price_bounds.min), max: Number(data.price_bounds.max) } : null } : {}),

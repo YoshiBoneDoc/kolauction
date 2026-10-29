@@ -52,3 +52,10 @@ test('bundle confirmations enumerate every item and quantity, single items stay 
     assert.match(text,/3 × seal tooth/);assert.match(text,/5 × asbestos ore/);
     assert.equal(bundleConfirmation({item:'seal tooth'}),'');
 });
+
+test('live bundle title conflicts preserve their database code and friendly validation message',async()=>{
+    const message='A live bundle auction already uses this exact name. Please choose a different bundle title.';
+    const service=createAuctionService({rpc:async()=>({error:{code:'PBT01',message}})});
+    await assert.rejects(service.create({bundleItems:prepareBundle([{id:2,quantity:1},{id:364,quantity:1}],catalog),
+        bundleTitle:'Taken title',minBidMeat:100,auctionTime:'24',escrowMode:true}),error=>error.code==='PBT01'&&error.message===message);
+});

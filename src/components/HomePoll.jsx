@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase';
 import { createPollService } from '../lib/polls';
 import PollResults from './PollResults';
 import PollVoters from './PollVoters';
-import { startAuctionRefresh } from '../lib/auctionRefresh';
+import { startPrivateRefresh } from '../lib/privateRefresh';
 
 const polls = createPollService(supabase);
 
@@ -44,11 +44,11 @@ export function PollPanel({ service = polls, featuredTarget }) {
                     setFeed(data); setError('');
                     if (!data?.can_manage && !data?.poll?.can_manage && data?.poll?.active && !data.poll.has_voted) setFeatured(true);
                 }
-            } catch (failure) { if (!cancelled && request === generation.current) setError(failure.message); }
+            } catch (failure) { if (!cancelled && request === generation.current) setError(failure.message); return false; }
         }
         const stop = typeof document === 'undefined'
             ? (refresh(), () => {})
-            : startAuctionRefresh({ refresh, delay: 30000, document, window });
+            : startPrivateRefresh({ refresh, document, window });
         return () => { cancelled = true; stop(); };
     }, [service, attempt]);
 

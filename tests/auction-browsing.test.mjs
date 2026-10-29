@@ -5,6 +5,23 @@ import { parseAuctionAmount, parseMeatAmount, normalizeAuctionAmount } from '../
 
 const now = 10000;
 const base = { item: 'Mr. Accessory', status: 'active', createdAt: 100, endTime: 20000, currentBid: 0, minBidMeat: 100, bids: [] };
+
+test('Recommended puts only red countdowns first for Buy and Sell, then all others newest first', () => {
+    const hours = 3600000;
+    const rows = [
+        { ...base, id: 'amber', endTime: now + 18 * hours, createdAt: 400 },
+        { ...base, id: 'red-sell', endTime: now + hours, createdAt: 100 },
+        { ...base, id: 'gray', endTime: now + 48 * hours, createdAt: 500 },
+        { ...base, id: 'red-buy', auctionKind: 'buy', endTime: now + 2 * hours, createdAt: 200 },
+        { ...base, id: 'boundary', endTime: now + 3 * hours, createdAt: 300 },
+        { ...base, id: 'outside', endTime: now + 3 * hours + 1, createdAt: 600 },
+        { ...base, id: 'ended', status: 'completed', endTime: now - hours, createdAt: 700 },
+    ];
+    assert.deepEqual(browseAuctions(rows, { status: 'all', sort: 'recommended', now }).map(a => a.id),
+        ['red-sell', 'red-buy', 'boundary', 'ended', 'outside', 'gray', 'amber']);
+    assert.deepEqual(browseAuctions(rows, { status: 'active', sort: 'newest', now }).map(a => a.id),
+        ['outside', 'gray', 'amber', 'boundary', 'red-buy', 'red-sell']);
+});
 const listings = [
     { ...base, id: 'a', endTime: 12000, createdAt: 200, minBidMeat: 300 },
     { ...base, id: 'b', item: 'tiny plastic sword', currentBid: 200, createdAt: 300, bids: [{}] },
@@ -170,7 +187,7 @@ test('High Rollers requires at least 50M and active or confirmed completion, wit
         {...base,id:'cheap-order',status:'active',auctionKind:'buy',pricePerItem:100,quantity:1000000},
         {...base,id:'expensive-order',status:'active',auctionKind:'buy',pricePerItem:80000000},
         {...base,id:'direct',status:'active',escrowMode:false,minBidMeat:50000001});
-    assert.deepEqual(highRollerAuctions(rows,1000).map(a=>a.id),['expensive-order','completed','active','direct','boundary']);
+    assert.deepEqual(highRollerAuctions(rows,1000).map(a=>a.id),['expensive-order','active','direct','boundary','completed']);
 });
 
 
@@ -182,9 +199,9 @@ test('High Rollers prioritizes red countdowns by ending time and reorders after 
         {...base,id:'soonest',endTime:now+hours},
         {...base,id:'three-hour-boundary',endTime:now+3*hours},
         {...base,id:'completed',status:'completed',endTime:now-hours,finalPrice:1000000000}];
-    assert.deepEqual(highRollerAuctions(rows,now).map(a=>a.id),['soonest','urgent','three-hour-boundary','completed','later']);
+    assert.deepEqual(highRollerAuctions(rows,now).map(a=>a.id),['soonest','urgent','three-hour-boundary','later','completed']);
     const extended=rows.map(a=>a.id==='soonest'?{...a,endTime:now+5*hours}:a);
-    assert.deepEqual(highRollerAuctions(extended,now).map(a=>a.id),['urgent','three-hour-boundary','completed','later','soonest']);
+    assert.deepEqual(highRollerAuctions(extended,now).map(a=>a.id),['urgent','three-hour-boundary','later','soonest','completed']);
 });
 
 
@@ -197,7 +214,7 @@ test('High Rollers qualifies by current total market value OR auction price, inc
         {...base,id:'order',auctionKind:'buy',pricePerItem:100,quantity:100000,marketValueMeat:90000000},
         {...base,id:'completed-market',status:'completed',finalPrice:1000,marketValueMeat:55000000},
         {...base,id:'canceled',status:'cancelled',marketValueMeat:1000000000}];
-    assert.deepEqual(highRollerAuctions(rows,now).map(a=>a.id),['order','both','bid-only','completed-market','market-only']);
+    assert.deepEqual(highRollerAuctions(rows,now).map(a=>a.id),['order','both','bid-only','market-only','completed-market']);
 });
 
 test('Ended and Completed default to actual end time descending, with explicit sorts preserved', () => {

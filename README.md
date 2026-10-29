@@ -62,6 +62,8 @@ New accounts do not require SMTP.
 
 - [Outstanding work](ROADMAP.md)
 - [Database setup](supabase/README.md)
+- [Shared public auction cache setup](docs/SHARED_AUCTION_CACHE.md)
+- [Traffic resilience Batch 1](docs/TRAFFIC_BATCH1.md)
 - [Item catalog and automatic weekly updates](supabase/ITEM_CATALOG.md)
 - [Bot operation and troubleshooting](bot/README.md)
 - [Bot packaging and deployment](bot/DEPLOYMENT.md)

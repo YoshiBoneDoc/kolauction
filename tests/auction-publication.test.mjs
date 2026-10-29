@@ -275,3 +275,36 @@ test('bundle creation preserves the complete reviewed contents through the publi
     assert.deepEqual(writes[0].bundleItems, contents);
     assert.deepEqual(page.locations, ['/auction/bundle-id']);
 });
+
+test('duplicate live bundle names return to the form with red validation and preserve its contents',async()=>{
+    const message='A live bundle auction already uses this exact name. Please choose a different bundle title.';
+    let attempts=0;
+    const page=harness(async listing=>{
+        if(++attempts===1)throw Object.assign(new Error(message),{code:'PBT01'});
+        assert.equal(listing.bundleTitle,'Different title');return 'renamed-bundle';
+    }).render();
+    page.find(node=>node.type==='input'&&node.props.name==='sell-auction-type'&&node.props.value==='bundle').props.onChange();page.render();
+    page.input('bundleTitle','Taken title');
+    for(const [name,id] of [['seal tooth','2'],['asbestos ore','364']]){
+        page.input('listing-item-search',name).input('item',id).input('quantity','3');
+        page.button('Add selected item').props.onClick();page.render();
+    }
+    page.input('minBidMeat','100');
+    const original=globalThis.requestAnimationFrame;globalThis.requestAnimationFrame=callback=>callback();
+    try{
+        page.find(node=>node.type==='form').props.onSubmit({preventDefault(){}});page.render();
+        page.button('Continue to Publish').props.onClick();page.render();
+        await page.button('Publish Auction').props.onClick();page.render();
+        assert.equal(page.dialog.open,false);assert.equal(page.locations.length,0);
+        const error=page.find(node=>node.props?.id==='listing-error');
+        assert.equal(error.props.children,message);assert.match(error.props.className,/text-red-700/);
+        assert.equal(page.find(node=>node.props?.id==='bundleTitle').props['aria-invalid'],true);
+        assert.equal(page.find(node=>node.props?.['aria-label']==='Quantity of seal tooth').props.value,'3');
+        page.input('bundleTitle','Different title');
+        assert.equal(page.find(node=>node.props?.id==='bundleTitle').props['aria-invalid'],undefined);
+        page.find(node=>node.type==='form').props.onSubmit({preventDefault(){}});page.render();
+        page.button('Continue to Publish').props.onClick();page.render();
+        await page.button('Publish Auction').props.onClick();
+        assert.deepEqual(page.locations,['/auction/renamed-bundle']);
+    }finally{if(original)globalThis.requestAnimationFrame=original;else delete globalThis.requestAnimationFrame;}
+});

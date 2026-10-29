@@ -51,6 +51,8 @@ amplify/backend/.temp
 build/
 dist/
 node_modules/
+.wrangler/
+**/.dev.vars
 aws-exports.js
 awsconfiguration.json
 amplifyconfiguration.json

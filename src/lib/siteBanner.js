@@ -1,4 +1,4 @@
-export function createSiteBannerService(client) {
+export function createSiteBannerService(client, { publicRead = null } = {}) {
     async function call(name, args) {
         if (!client) throw new Error('Site announcements are temporarily unavailable.');
         const { data, error } = await client.rpc(name, args);
@@ -6,7 +6,7 @@ export function createSiteBannerService(client) {
         return data;
     }
     return {
-        read: () => call('read_site_banner'),
+        read: () => publicRead ? publicRead() : call('read_site_banner'),
         manage: () => call('read_admin_site_banner'),
         save: (message, active) => call('save_site_banner', { p_message: message, p_active: active }),
     };

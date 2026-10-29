@@ -7,9 +7,12 @@ import { UserContext } from "./UserContext";
 import { auctionReadRequest, auctionRefreshDelay, startAuctionRefresh } from '../lib/auctionRefresh';
 import { auctionNow } from '../lib/auctionClock';
 import { createAuctionReadCache } from '../lib/auctionReadCache';
+import { createPublicAuctionReader } from '../lib/publicAuctionReader';
 
 export const AuctionsContext = createContext();
-const storage = createAuctionService(supabase);
+const storage = createAuctionService(supabase, {
+    publicReader: createPublicAuctionReader(supabase, { enabled: import.meta.env.VITE_SHARED_AUCTION_CACHE === 'true' }),
+});
 
 export const AuctionsProvider = ({ children }) => {
     const { currentUser, signedInUserId } = useContext(UserContext);
@@ -18,9 +21,9 @@ export const AuctionsProvider = ({ children }) => {
     const request = useMemo(() => auctionReadRequest(pathname, search, currentUser?.id), [pathname, search, currentUser?.id]);
     const [authRevision, setAuthRevision] = useState(0);
     const scope = JSON.stringify([viewerId ?? null, currentUser?.isBanned ?? false, currentUser?.khubUsername ?? null, authRevision]);
-    const cache = useMemo(() => createAuctionReadCache((key, signal) => {
+    const cache = useMemo(() => createAuctionReadCache((key, signal, { fresh } = {}) => {
         if (key.startsWith('pending:')) return storage.pendingTrades(Number(key.slice(8)), { signal });
-        return storage.load({ ...JSON.parse(key), signal });
+        return storage.load({ ...JSON.parse(key), signal, fresh });
     }, { scope }), [scope]);
     const cacheRef = useRef(cache);
     const authToken = useRef(null);
@@ -62,6 +65,7 @@ export const AuctionsProvider = ({ children }) => {
     const hasLoaded = snapshot.data != null;
     const isLoading = Boolean(key && !hasLoaded && !error);
     const isRefreshing = snapshot.refreshing;
+    const publicDataDelayed = snapshot.data?.publicSnapshot?.delayed === true;
 
     const [pendingSelection, setPendingSelection] = useState({ scope, page: 1 });
     const pendingPage = pendingSelection.scope === scope ? pendingSelection.page : 1;
@@ -110,20 +114,23 @@ export const AuctionsProvider = ({ children }) => {
     // Only explicit refreshes and completed/failed write attempts invalidate the
     // cache. A post-write refresh queues after any older read, so it cannot be
     // satisfied by a response whose request preceded the write.
-    const refreshAuctions = useCallback(async () => {
+    const refreshReads = useCallback(async (fresh = false) => {
         // A write may finish after navigation. Refresh the currently selected
         // resource rather than refetching the page where the write began.
         const { cache, key, pendingKey } = activeRead.current;
         cache.invalidate();
-        await cache.load(key, { force: true });
+        await cache.load(key, { force: true, fresh });
         if (pendingKey) await cache.load(pendingKey, { force: true });
     }, []);
+    // Retry buttons still use the shared cache. Only action refreshes bypass it.
+    const refreshAuctions = useCallback(() => refreshReads(), [refreshReads]);
+    const refreshAfterAction = () => refreshReads(true);
 
     const addAuction = async (auction) => {
         const id = await storage.create(auction);
         // A failed follow-up read must not turn a successful write into an
         // apparent failure and cause the user to submit the listing twice.
-        await refreshAuctions();
+        await refreshAfterAction();
         return id;
     };
 
@@ -131,65 +138,65 @@ export const AuctionsProvider = ({ children }) => {
         try {
             await storage.bid(auctionId, amount);
         } catch (failure) {
-            await refreshAuctions();
+            await refreshAfterAction();
             throw failure;
         }
-        await refreshAuctions();
+        await refreshAfterAction();
     };
 
     const confirmTrade = async (auctionId) => {
         try {
             await storage.confirmTrade(auctionId);
         } catch (failure) {
-            await refreshAuctions();
+            await refreshAfterAction();
             throw failure;
         }
-        await refreshAuctions();
+        await refreshAfterAction();
     };
 
     const rateTrade = async (auctionId, rating) => {
         await storage.rateTrade(auctionId, rating);
-        await refreshAuctions();
+        await refreshAfterAction();
     };
 
     const purchaseAuction = async (auctionId) => {
         try {
             await storage.purchase(auctionId);
         } catch (failure) {
-            await refreshAuctions();
+            await refreshAfterAction();
             throw failure;
         }
-        await refreshAuctions();
+        await refreshAfterAction();
     };
 
     const reserveBuyQuantity = async (auctionId, quantity) => {
         try {
             const reservation = await storage.reserveBuy(auctionId, quantity);
-            await refreshAuctions();
+            await refreshAfterAction();
             return reservation;
-        } catch (failure) { await refreshAuctions(); throw failure; }
+        } catch (failure) { await refreshAfterAction(); throw failure; }
     };
 
     const cancelBuyReservation = async (reservationId) => {
         try {
             const result = await storage.cancelBuyReservation(reservationId);
-            await refreshAuctions();
+            await refreshAfterAction();
             return result;
-        } catch (failure) { await refreshAuctions(); throw failure; }
+        } catch (failure) { await refreshAfterAction(); throw failure; }
     };
 
     const cancelAuction = async (auctionId) => {
         try {
             await storage.cancel(auctionId);
         } catch (failure) {
-            await refreshAuctions();
+            await refreshAfterAction();
             throw failure;
         }
-        await refreshAuctions();
+        await refreshAfterAction();
     };
 
     return (
-        <AuctionsContext.Provider value={{ auctions, total, homeSections, priceBounds, seller, isLoading, isRefreshing, hasLoaded, error, pendingTrades, pendingTotal, pendingPage, setPendingPage, pendingError, pendingHasLoaded, addAuction, placeBid, purchaseAuction, confirmTrade, rateTrade, reserveBuyQuantity, cancelBuyReservation, cancelAuction, refreshAuctions }}>
+        <AuctionsContext.Provider value={{ auctions, total, homeSections, priceBounds, seller, isLoading, isRefreshing, hasLoaded, publicDataDelayed, error, pendingTrades, pendingTotal, pendingPage, setPendingPage, pendingError, pendingHasLoaded, addAuction, placeBid, purchaseAuction, confirmTrade, rateTrade, reserveBuyQuantity, cancelBuyReservation, cancelAuction, refreshAuctions }}>
             {children}
         </AuctionsContext.Provider>
     );

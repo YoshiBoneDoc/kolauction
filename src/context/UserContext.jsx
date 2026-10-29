@@ -5,6 +5,7 @@ import { createAuthService } from "../lib/auth";
 import { recoveryUserForEvent } from "../lib/authLinks";
 import BannedAccount from "../components/BannedAccount";
 import { Link, useNavigate, useLocation } from "react-router-dom";
+import { startPrivateRefresh } from '../lib/privateRefresh';
 
 export const UserContext = createContext();
 const auth = createAuthService(supabase);
@@ -45,7 +46,14 @@ export const UserProvider = ({ children }) => {
             if (recoveryUser && (event === 'PASSWORD_RECOVERY' || (event === 'INITIAL_SESSION' && initialAuthLink.type === 'recovery'))) {
                 navigateRef.current('/reset-password', { replace: true });
             }
-            setSession(nextSession ? { ...nextSession } : null);
+            setSession(previous => {
+                // Focus can announce the same session again. Preserve its polling
+                // lifecycle; actual token/user changes still trigger a fresh read.
+                if (previous && nextSession && ['INITIAL_SESSION', 'SIGNED_IN', 'TOKEN_REFRESHED'].includes(event)
+                    && previous?.user?.id === nextSession?.user?.id
+                    && previous?.access_token === nextSession?.access_token) return previous;
+                return nextSession ? { ...nextSession } : null;
+            });
             if (event === 'SIGNED_OUT') navigateRef.current('/', { replace: true });
         });
         return () => subscription.unsubscribe();
@@ -61,27 +69,23 @@ export const UserProvider = ({ children }) => {
             return;
         }
         setCurrentUser((previous) => previous?.id === session.user.id ? previous : null);
-        let checking = false;
         async function refresh() {
-            if (checking) return;
-            checking = true;
             try {
                 const user = await auth.loadProfile(session.user);
                 if (!cancelled) { setCurrentUser(user); setAuthError(""); }
+                return true;
             } catch (error) {
                 if (!cancelled) {
                     setCurrentUser(previous => previous?.id === session.user.id && previous.isBanned ? previous : null);
                     setAuthError(error.message);
                 }
+                return false;
             } finally {
-                checking = false;
                 if (!cancelled) { setLoadedUserId(session.user.id); setHasLoaded(true); }
             }
         }
-        refresh();
-        const timer = setInterval(refresh, 15000);
-        window.addEventListener('focus', refresh);
-        return () => { cancelled = true; clearInterval(timer); window.removeEventListener('focus', refresh); };
+        const stop = startPrivateRefresh({ refresh, document, window });
+        return () => { cancelled = true; stop(); };
     }, [session]);
 
     const clearRecovery = () => {

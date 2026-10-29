@@ -3,8 +3,11 @@ import PropTypes from 'prop-types';
 import { supabase } from '../lib/supabase';
 import { createSiteBannerService, readBannerDismissal, dismissBanner } from '../lib/siteBanner';
 import { startAuctionRefresh } from '../lib/auctionRefresh';
+import { readPublicBanner } from '../lib/publicBannerReader';
 
-const announcements = createSiteBannerService(supabase);
+const announcements = createSiteBannerService(supabase, {
+    publicRead: import.meta.env.VITE_SHARED_AUCTION_CACHE === 'true' ? readPublicBanner : null,
+});
 
 export default function SiteBanner({ service = announcements }) {
     const [banner, setBanner] = useState(null);
@@ -12,11 +15,13 @@ export default function SiteBanner({ service = announcements }) {
     useEffect(() => {
         let stopped = false;
         try { setDismissed(readBannerDismissal(window.localStorage)); } catch { /* Storage can be disabled. */ }
-        const stop = startAuctionRefresh({ document, window, delay: 30000, refresh: async () => {
+        let failures = 0;
+        const stop = startAuctionRefresh({ document, window, delay: () => Math.min(300000, 60000 * 2 ** Math.min(failures, 3)), jitter: 0.2, refresh: async () => {
             try {
                 const next = await service.read();
                 if (!stopped) setBanner(next);
-            } catch { /* An unavailable announcement must not block the marketplace. */ }
+                failures = 0;
+            } catch { failures++; /* An unavailable announcement must not block the marketplace. */ }
         } });
         function syncDismissal(event) {
             if (event.key === 'khub.dismissed-site-banner' || event.key === null) {

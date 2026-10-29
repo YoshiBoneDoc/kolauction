@@ -878,3 +878,25 @@ html[data-theme="dark"] hr.info-contact-divider {
   border-top: 1px solid #6B7280;
   background: transparent;
 }
+
+/* Account Profile listing history only; all other transaction sections retain their surfaces. */
+.profile-dashboard .profile-history-entry { --profile-label: #647084; --profile-muted: #596579; }
+.profile-dashboard .profile-history-entry.is-buy { background-color: #F0F7F1; }
+.profile-dashboard .profile-history-entry.is-sell { background-color: #FFF1EE; }
+.profile-dashboard .profile-history-entry.is-cancelled { background-color: #F2F3F5; }
+.profile-dashboard .profile-history-entry.is-buy:hover { background-color: #E7F1EA; }
+.profile-dashboard .profile-history-entry.is-sell:hover { background-color: #F9E8E2; }
+.profile-dashboard .profile-history-entry.is-cancelled:hover { background-color: #E9EBEF; }
+.profile-dashboard .profile-history-entry .profile-entry-status.is-completed { color: #16834A; }
+.profile-dashboard .profile-history-entry .profile-entry-status.is-cancelled { color: #B64B43; }
+.profile-dashboard .profile-history-entry .profile-entry-status.is-expired { color: #A66A15; }
+html[data-theme="dark"] .profile-dashboard .profile-history-entry { --profile-label: #B2BFD1; --profile-muted: #B2BFD1; }
+html[data-theme="dark"] .profile-dashboard .profile-history-entry.is-buy { background-color: #202E28; }
+html[data-theme="dark"] .profile-dashboard .profile-history-entry.is-sell { background-color: #342624; }
+html[data-theme="dark"] .profile-dashboard .profile-history-entry.is-cancelled { background-color: #282D35; }
+html[data-theme="dark"] .profile-dashboard .profile-history-entry.is-buy:hover { background-color: #293D31; }
+html[data-theme="dark"] .profile-dashboard .profile-history-entry.is-sell:hover { background-color: #44302D; }
+html[data-theme="dark"] .profile-dashboard .profile-history-entry.is-cancelled:hover { background-color: #343C48; }
+html[data-theme="dark"] .profile-dashboard .profile-history-entry .profile-entry-status.is-completed { color: #7BD5A0; }
+html[data-theme="dark"] .profile-dashboard .profile-history-entry .profile-entry-status.is-cancelled { color: #EDA09A; }
+html[data-theme="dark"] .profile-dashboard .profile-history-entry .profile-entry-status.is-expired { color: #E4BA76; }
