@@ -10,6 +10,7 @@ import PollVoters from './PollVoters';
 import { startPrivateRefresh } from '../lib/privateRefresh';
 
 const polls = createPollService(supabase);
+const RESULTS_HIDDEN_KEY = 'khub:poll-results-hidden';
 
 export function PollPanel({ service = polls, featuredTarget }) {
     const [feed, setFeed] = useState(null);
@@ -17,7 +18,14 @@ export function PollPanel({ service = polls, featuredTarget }) {
     const [error, setError] = useState('');
     const [attempt, setAttempt] = useState(0);
     const [selectedResult, setSelectedResult] = useState(null);
-    const [resultsHidden, setResultsHidden] = useState(false);
+    const [resultsHidden, setResultsHidden] = useState(() => {
+        try { return localStorage.getItem(RESULTS_HIDDEN_KEY) === 'true'; }
+        catch { return false; }
+    });
+    useEffect(() => {
+        try { localStorage.setItem(RESULTS_HIDDEN_KEY, String(resultsHidden)); }
+        catch { /* The toggle still works when browser storage is unavailable. */ }
+    }, [resultsHidden]);
     const resultsContentId = useId();
     const [drafts, setDrafts] = useState({});
     const [repeatId, setRepeatId] = useState(null);
