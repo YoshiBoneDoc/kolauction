@@ -337,6 +337,72 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         print('PASS: Bundle All/Yes/No combines with Buyout and preserves pagination and single-item listings')
         for fixture in [*buyout_lots,no_buyout]: call(f"select public.cancel_auction('{fixture}');")
         print('PASS: buyout filters preserve full counts, pagination, ownership filtering and anonymous privacy')
+        # 148/149: shared display work never becomes financial authority.
+        sql("update khub_bot.public_discovery_snapshot set refreshed_at=clock_timestamp()-interval '61 seconds';")
+        public_args=f"'seller','{seller}','Sort fixture','active','newest',1,'all','all',null,null"
+        public_page=json.loads(call('select public.read_public_auction_page('+public_args+');',buyer))
+        original_page=json.loads(call('select public.read_filtered_auction_page('+public_args+');',buyer))
+        assert public_page['seller'] is None and public_page['bids']==[]
+        assert public_page['total']==original_page['total']
+        assert [r['id'] for r in public_page['rows']]==[r['id'] for r in original_page['rows']]
+        cached=sql('select refreshed_at::text from khub_bot.public_discovery_snapshot;')
+        for term in ['Sort fixture','tooth','ore','']:
+            call(f"select public.read_public_auction_page('browse',null,{lit(term)},'active','newest',1,'all','all',null,null);",buyer)
+        assert sql('select refreshed_at::text from khub_bot.public_discovery_snapshot;')==cached
+        assert sql('select price_bounds=khub_bot.public_auction_price_bounds() from khub_bot.public_discovery_snapshot;')=='t'
+        # Another aggregate builder cannot make public readers wait on its lock,
+        # and it never owns the financial advisory lock.
+        sql("update khub_bot.public_discovery_snapshot set refreshed_at=clock_timestamp()-interval '61 seconds';")
+        stale_time=sql('select refreshed_at::text from khub_bot.public_discovery_snapshot;')
+        holder=subprocess.Popen([str(BIN/'psql'),'-h',folder,'-d','postgres','-X','-qAt','-v','ON_ERROR_STOP=1','-c',"begin;select pg_advisory_xact_lock(3888763);select pg_sleep(2);commit;"],stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
+        try:
+            import time
+            for _ in range(100):
+                if sql("select exists(select 1 from pg_locks where locktype='advisory' and objid=3888763 and granted);")=='t':break
+                time.sleep(.01)
+            else:raise AssertionError('Aggregate fixture did not acquire its lock')
+            call('select public.read_public_auction_page('+public_args+');',buyer)
+            assert sql('select refreshed_at::text from khub_bot.public_discovery_snapshot;')==stale_time
+            assert sql('select pg_try_advisory_xact_lock(3888760);')=='t'
+        finally:
+            holder.communicate(timeout=5)
+            assert holder.returncode==0
+        sql('select public.bot_refresh_public_discovery();')
+
+        private=json.loads(call(f"select public.read_seller_auction_context('{seller}',array['{sort_lots[0]}']::uuid[]);",buyer))
+        assert private['seller']==original_page['seller'] and private['rows'][0]['seller_id']==seller
+        anon=json.loads(sql(f"set role anon;select public.read_seller_auction_context('{seller}',array[]::uuid[]);"))
+        assert anon['rows']==[] and anon['seller']['username']=='Player profile'
+        assert anon['seller']['stats']==original_page['seller']['stats']
+        call(f"select public.read_seller_auction_context('{seller}',array_fill('{sort_lots[0]}'::uuid,array[25]));",buyer,error='at most 24')
+        sql('set role anon;select * from khub_bot.public_discovery_snapshot;',error='permission denied')
+        sql('set role anon;select public.bot_read_work_queue();',error='permission denied')
+        access=json.loads(call('select public.read_my_account_access();'))
+        assert access['kol_player_id']==48889601 and access['kol_player_name'] is not None
+        sql('set role anon;select public.read_my_account_access();',error='permission denied')
+        hints=json.loads(sql('set role service_role;select public.bot_read_work_queue();'))
+        assert isinstance(hints['deliveries_pending'],bool) and isinstance(hints['buy_groups'],list)
+        print('PASS: public snapshots reused across filter keys; public seller rows match existing pagination; summaries/private context and identity stay uncached and permission-checked')
+
+        # Representative selective search: verify literal equivalence AND an
+        # actual index plan on a disposable dataset, without production statistics.
+        sql("create table public.efficiency_search_fixture(id integer primary key,item text,bundle_items jsonb);")
+        sql("insert into public.efficiency_search_fixture select x,'Ordinary item '||x,'[]'::jsonb from generate_series(1,6000) x;")
+        search_rows=[(6001,'NeedleCase 100%_value\\path',[]),(6002,'A bundle',[{'name':'Another NeedleCase','quantity':1},{'name':'other','quantity':2}]),(6003,'No joined match',[{'name':'left','quantity':1},{'name':'right','quantity':1}])]
+        for key,name,contents in search_rows:
+            sql(f"insert into public.efficiency_search_fixture values({key},{lit(name)},{lit(json.dumps(contents))});")
+        ns=sql("select n.nspname from pg_extension e join pg_namespace n on n.oid=e.extnamespace where e.extname='pg_trgm';")
+        sql(f"create index efficiency_name_idx on public.efficiency_search_fixture using gin(lower(item) {ns}.gin_trgm_ops);create index efficiency_bundle_idx on public.efficiency_search_fixture using gin(khub_bot.bundle_search_names(bundle_items) {ns}.gin_trgm_ops);analyze public.efficiency_search_fixture;")
+        for term in ['NeedleCase','  needlecase  ','100%','_value','\\path','left'+chr(31)+'right','']:
+            old=f"(strpos(lower(a.item),lower(btrim({lit(term)})))>0 or exists(select 1 from jsonb_array_elements(a.bundle_items) c where strpos(lower(c->>'name'),lower(btrim({lit(term)})))>0))"
+            new=f"(lower(a.item) like khub_bot.literal_auction_pattern({lit(term)}) or (khub_bot.bundle_search_names(a.bundle_items) like khub_bot.literal_auction_pattern({lit(term)}) and exists(select 1 from jsonb_array_elements(a.bundle_items) c where strpos(lower(c->>'name'),lower(btrim({lit(term)})))>0)))"
+            assert sql('select array_agg(id order by id) from public.efficiency_search_fixture a where '+old)==sql('select array_agg(id order by id) from public.efficiency_search_fixture a where '+new),term
+        plan=json.loads(sql("explain (analyze,buffers,format json) select id from public.efficiency_search_fixture a where lower(a.item) like khub_bot.literal_auction_pattern('NeedleCase') or (khub_bot.bundle_search_names(a.bundle_items) like khub_bot.literal_auction_pattern('NeedleCase') and exists(select 1 from jsonb_array_elements(a.bundle_items) c where strpos(lower(c->>'name'),'needlecase')>0));"))
+        assert 'efficiency_name_idx' in json.dumps(plan) and 'efficiency_bundle_idx' in json.dumps(plan)
+        assert plan[0]['Plan']['Actual Rows']==2
+        sql('drop table public.efficiency_search_fixture;')
+        print('PASS: indexed substring search preserves case, whitespace, wildcard, backslash and component boundaries; selective EXPLAIN ANALYZE uses both GIN indexes')
+
 
         order=call("select public.create_buy_auction(2,10,200,24,'finished');")
         required=int(sql(f"select funding_required from khub_bot.buy_orders where auction_id='{order}';"))
@@ -599,6 +665,18 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         # are never changed by installing the migration itself.
         sql("update khub_bot.deliveries set state='sent',sent_at=clock_timestamp() where state not in ('sent','cancelled'); update khub_bot.closet_transfers set state='moved' where state<>'moved'; update khub_bot.gift_mail_reviews set resolved_at=clock_timestamp(),resolution='local fixture reset' where resolved_at is null;")
         big_snapshot={'meat':'9000000000000000','closetMeat':'1000','items':{},'closetItems':{}}
+        # Display metadata travels with the claim; no extra bot read per transfer.
+        for context_auction,is_bundle,total in [(plain,False,None),(large,True,'5000000005')]:
+            sql("select khub_bot.queue_closet('logging-context-"+context_auction+"','sale_fee',null,'"+context_auction+"',700,'[]');")
+            context=json.loads(sql('set role service_role;select public.bot_claim_closet_transfer_v2('+lit(json.dumps(big_snapshot))+"::jsonb,0,0,'{}');"))
+            listing=row(context_auction)
+            assert context['auction_id']==context_auction and context['auction_number']==listing['auction_number']
+            assert context['auction_item']==listing['item'] and context['auction_quantity']==str(listing['quantity'])
+            assert context['auction_is_bundle'] is is_bundle and context['auction_bundle_units']==total
+            assert 'recovery' in context and 'soft_retry' in context
+            sql("select public.bot_arm_closet_transfer('"+context['id']+"','"+context['attempt']+"');")
+            sql("select public.bot_ack_closet_transfer('"+context['id']+"','"+context['attempt']+"',true,'local verified logging fixture');")
+        print('PASS: commission claims include canonical auction number, title, quantity and exact large bundle total while preserving recovery metadata')
         counter=0
         def recovery_claim():
             global counter

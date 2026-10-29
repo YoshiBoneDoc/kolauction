@@ -123,13 +123,14 @@ export function createAuctionService(client, { publicReader = null } = {}) {
     }
 
     return {
-        async load({ view = 'browse', id = null, sellerId = null, excludeOwn = false, kind = 'all', buyout = 'any', bundle = 'any', search = '', status = 'active', sort = resolveAuctionSort(status), trade = 'all', page = 1, minPrice = null, maxPrice = null, signal, fresh = false } = {}) {
+        async load({ view = 'browse', id = null, sellerId = null, excludeOwn = false, kind = 'all', buyout = 'any', bundle = 'any', summaryOnly = false, search = '', status = 'active', sort = resolveAuctionSort(status), trade = 'all', page = 1, minPrice = null, maxPrice = null, signal, fresh = false } = {}) {
             // Browsing is read-only. The existing bot tick expires all auction
             // types; write RPCs independently validate deadlines under their locks.
             const requestStartedAt = auctionClockRequestStarted();
-            const sharedRequest = { view, sellerId, excludeOwn, kind, buyout, bundle, search, status, sort, trade, page, minPrice, maxPrice, signal, fresh };
+            const sharedRequest = { view, sellerId, excludeOwn, kind, buyout, bundle, summaryOnly, search, status, sort, trade, page, minPrice, maxPrice, signal, fresh };
             let request;
             if (await publicReader?.accepts(sharedRequest)) request = publicReader.load(sharedRequest).then(data => ({ data }));
+            else if (view === 'seller' && summaryOnly) request = requireClient().rpc('read_seller_auction_context', { p_seller_id: id, p_ids: [] });
             else if (view === 'home') request = requireClient().rpc('read_home_auctions');
             else request = requireClient().rpc(view === 'browse' ? 'read_filtered_auction_page' : 'read_auction_page', {
                 p_view: view === 'browse' && excludeOwn ? 'others' : view === 'browse' && sellerId ? 'seller' : view,

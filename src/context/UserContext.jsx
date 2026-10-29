@@ -84,7 +84,7 @@ export const UserProvider = ({ children }) => {
                 if (!cancelled) { setLoadedUserId(session.user.id); setHasLoaded(true); }
             }
         }
-        const stop = startPrivateRefresh({ refresh, document, window });
+        const stop = startPrivateRefresh({ refresh, document, window, refreshEvent: 'khub:refresh-account' });
         return () => { cancelled = true; stop(); };
     }, [session]);
 

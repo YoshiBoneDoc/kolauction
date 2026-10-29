@@ -79,6 +79,7 @@ export function createAuthService(client, { origin } = {}) {
                 throw new Error("Your profile could not be loaded. Please sign out and sign in again. If this continues, contact support.");
             }
             return { id: data.id, khubUsername: data.khub_username, email: data.account_method === 'kmail' ? null : user.email,
+                kolPlayerId: data.kol_player_id ?? null, kolPlayerName: data.kol_player_name ?? null,
                 accountMethod: data.account_method, isBanned: data.is_banned, banExpiresAt: data.ban_expires_at || null,
                 serverOffset: Date.parse(data.server_now) - Date.now() };
 

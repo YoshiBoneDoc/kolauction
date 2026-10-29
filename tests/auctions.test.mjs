@@ -236,3 +236,13 @@ test('detail, seller and profile browsing never require financial maintenance or
         assert.equal(calls[0][1].p_view,request.view);
     }
 });
+
+
+test('Seller Profile statistics tab reads summary only, without loading auction pages', async () => {
+    const calls = [];
+    const service = createAuctionService({ rpc(name, args) { calls.push([name,args]); return Promise.resolve({ data: {privacy_version:1,rows:[],bids:[],total:0,seller:{id:'seller',stats:{escrow_value:'123'}}} }); } });
+    const result = await service.load({view:'seller',id:'seller',summaryOnly:true});
+    assert.deepEqual(calls,[['read_seller_auction_context',{p_seller_id:'seller',p_ids:[]}]]);
+    assert.equal(result.seller.stats.escrow_value,'123');
+    assert.deepEqual(result.auctions,[]);
+});

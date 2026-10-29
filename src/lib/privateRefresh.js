@@ -1,5 +1,5 @@
 // Per-viewer polling only. No shared/persistent profile or voting data.
-export function startPrivateRefresh({ refresh, document, window, timers = globalThis, now = Date.now, random = Math.random }) {
+export function startPrivateRefresh({ refresh, document, window, timers = globalThis, now = Date.now, random = Math.random, interval = 60000, refreshEvent = null }) {
     let stopped = false, running = false, failures = 0, timer, lastAttempt = -Infinity, retryAt = 0;
     const clear = () => timers.clearTimeout(timer);
     const schedule = ms => { clear(); if (!stopped && !document.hidden) timer = timers.setTimeout(update, ms); };
@@ -13,7 +13,7 @@ export function startPrivateRefresh({ refresh, document, window, timers = global
         finally {
             running = false;
             failures = success ? 0 : failures + 1;
-            const base = success ? 60000 : Math.min(300000, 60000 * 2 ** Math.min(failures - 1, 3));
+            const base = success ? interval : Math.min(300000, 60000 * 2 ** Math.min(failures - 1, 3));
             const delay = Math.ceil(base * (1 + 0.2 * random()));
             retryAt = success ? 0 : now() + delay;
             schedule(delay);
@@ -27,6 +27,7 @@ export function startPrivateRefresh({ refresh, document, window, timers = global
     }
     document.addEventListener('visibilitychange', wake);
     window.addEventListener('focus', wake);
+    if (refreshEvent) window.addEventListener(refreshEvent, wake);
     schedule(0);
-    return () => { stopped = true; clear(); document.removeEventListener('visibilitychange', wake); window.removeEventListener('focus', wake); };
+    return () => { stopped = true; clear(); document.removeEventListener('visibilitychange', wake); window.removeEventListener('focus', wake); if (refreshEvent) window.removeEventListener(refreshEvent, wake); };
 }

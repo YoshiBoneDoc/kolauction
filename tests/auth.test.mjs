@@ -54,10 +54,11 @@ function profileClient(profile) {
 }
 
 test('bot-created profiles hide internal email and load the server-owned access state', async () => {
-    const auth = build(profileClient({ id: 'user-1', khub_username: 'Player', account_method: 'kmail', is_banned: false }));
+    const auth = build(profileClient({ id: 'user-1', khub_username: 'Player', account_method: 'kmail', is_banned: false, kol_player_id: 3552305, kol_player_name: 'Player' }));
     const user = await auth.loadProfile({ id: 'user-1', email: 'private@login.khub.invalid' });
     assert.equal(user.id, 'user-1'); assert.equal(user.khubUsername, 'Player'); assert.equal(user.email, null);
     assert.equal(user.accountMethod, 'kmail'); assert.equal(user.isBanned, false); assert.equal(user.banExpiresAt, null);
+    assert.equal(user.kolPlayerId, 3552305); assert.equal(user.kolPlayerName, 'Player');
     assert.ok(Number.isFinite(user.serverOffset));
 });
 

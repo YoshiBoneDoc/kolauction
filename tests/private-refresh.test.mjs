@@ -49,3 +49,17 @@ test('cleanup prevents a late private read from scheduling more work', async () 
     f.window.dispatchEvent(new Event('focus')); f.document.dispatchEvent(new Event('visibilitychange'));
     assert.equal(f.jobs.size, 0); assert.equal(f.calls(), 1);
 });
+
+
+test('explicit account refresh events share focus dedupe, visibility gating and error backoff', async () => {
+    let calls=0,clock=0;
+    const jobs=new Map(), document=new EventTarget(), window=new EventTarget();document.hidden=false;
+    const timers={setTimeout(fn,ms){jobs.set(1,{fn,at:clock+ms});return 1;},clearTimeout(){jobs.clear();}};
+    const stop=startPrivateRefresh({refresh:async()=>{calls++;return false;},document,window,timers,now:()=>clock,random:()=>0,refreshEvent:'account-change'});
+    const tick=async()=>{const job=jobs.get(1);jobs.clear();clock=job.at;await job.fn();};
+    await tick();assert.equal(calls,1);
+    window.dispatchEvent(new Event('account-change'));assert.equal(jobs.get(1).at,60000);
+    document.hidden=true;window.dispatchEvent(new Event('account-change'));assert.equal(jobs.size,0);
+    clock=60000;document.hidden=false;window.dispatchEvent(new Event('account-change'));await tick();assert.equal(calls,2);
+    stop();window.dispatchEvent(new Event('account-change'));assert.equal(jobs.size,0);
+});

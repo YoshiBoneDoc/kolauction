@@ -1,6 +1,6 @@
 # Shared public auction cache
 
-The homepage and general public auction browsing can reuse snapshots across visitors.
+The homepage, general public auction browsing, and eligible public seller listings can reuse snapshots across visitors.
 Cloudflare Pages sends public GET requests to one named Durable Object. It serializes
 database refreshes globally, so simultaneous visitors do not each run the same expensive
 Supabase ranking/filtering query. Public listing GET requests forward no browser JWT
@@ -31,9 +31,12 @@ Public announcements also use the shared infrastructure via `/api/public-banner`
 separate named object. Only their message and dismissal revision are cached. Profile and
 poll-feed reads remain private; see [Batch 1](TRAFFIC_BATCH1.md) for their reduced polling.
 
-Private Account Profile, Seller Profile, auction details, My Auctions, Others, and all
-transaction actions remain direct. Signed-in **All auctions** remains direct because its
-results can include unpublished drafts. Anonymous All auctions can use the public cache.
+Private Account Profile, Seller Profile statistics, auction details, My Auctions, Others, and all
+transaction actions remain direct. Eligible public seller auction lists use shared rows
+and a separate `read_seller_auction_context` response for statistics and private context.
+The public seller-profile UUID appears only as a routing key, matching its public URL. Signed-in **All auctions** remains direct because its
+results can include unpublished drafts. Anonymous All auctions can use the public cache. The same draft-preservation rule
+applies to signed-in All-status seller listings.
 Explicit refreshes after writes bypass shared snapshots so an older public result cannot
 overwrite the initiating user's newly completed action.
 
@@ -51,7 +54,9 @@ overwrite the initiating user's newly completed action.
   keys waiting/running. Identical concurrent reads share the same promise.
 - An eight-second fetch deadline and a persisted 30-second cooldown after an origin error.
   There is no automatic fallback that sends every visitor directly to Supabase.
-- At most 48 snapshots / 1 MB persisted in Cloudflare. Nothing is added to Supabase storage.
+- At most 48 listing snapshots / 1 MB persisted in Cloudflare. Migration 148 adds one
+  small internal Supabase row for reusable price bounds and popularity IDs, refreshed
+  at most once a minute, separately from financial state.
 - Public auction clocks advance from the saved timestamp instead of freezing at cache time.
 - HTTP responses use `Cache-Control: no-store`; the only shared snapshot is the controlled
   Durable Object store, not a blanket browser/CDN rule on authenticated requests.
@@ -243,3 +248,13 @@ Cloudflare references: [Pages bindings](https://developers.cloudflare.com/pages/
 [Durable Object limits](https://developers.cloudflare.com/durable-objects/platform/limits/),
 [SQLite-backed storage](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/).
 Supabase reference: [asynchronous after-commit HTTP](https://supabase.com/docs/guides/database/extensions/pg_net).
+
+
+## Read efficiency update (148–149)
+
+Deploy migrations 148–149 before the updated Worker/website. Public origin reads use
+`read_public_auction_page` and `read_public_home_auctions`, which reuse global discovery
+aggregates. Seller statistics remain direct and retain their existing calculations;
+the statistics tab no longer fetches an unused auction page. For indexing, identity
+polling, bot queue hints, deployment order, tests and the later query-statistics review,
+see [Read efficiency](TRAFFIC_READ_EFFICIENCY.md).

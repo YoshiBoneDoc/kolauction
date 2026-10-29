@@ -200,7 +200,7 @@ test('origin fetch uses only the anonymous key and fixed read-only RPC arguments
         });
         const data = await real.readOrigin(publicRequest(url));
         assert.equal(requests.length, 1);
-        assert.equal(requests[0].url, 'https://project.supabase.co/rest/v1/rpc/read_filtered_auction_page');
+        assert.equal(requests[0].url, 'https://project.supabase.co/rest/v1/rpc/read_public_auction_page');
         assert.deepEqual(requests[0].options.headers, { apikey: 'sb_publishable_fixture', 'Content-Type': 'application/json' });
         assert.equal(JSON.parse(requests[0].options.body).p_view, 'browse');
         assert.equal(JSON.parse(requests[0].options.body).p_id, null);
@@ -365,4 +365,46 @@ test('announcement Pages endpoint uses its own object and strips credentials; ad
     assert.equal(await service.read(), null); await service.manage(); await service.save('New text', true);
     assert.deepEqual(calls, ['read_admin_site_banner', 'save_site_banner']);
     await assert.rejects(readPublicBanner({ fetch: async () => new Response('busy', { status: 503 }) }), /temporarily unavailable/);
+});
+
+
+test('public seller listings have canonical shared keys; names, financial summaries and private context stay outside', async () => {
+    const sellerId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const request = { view: 'seller', id: sellerId, status: 'active', sort: 'ending', page: 1 };
+    const anon = readerFixture();
+    assert.equal(await anon.reader.accepts(request), true);
+    assert.equal(await anon.reader.accepts({ ...request, status: 'all' }), true);
+    const signedIn = readerFixture('alice');
+    assert.equal(await signedIn.reader.accepts(request), true);
+    assert.equal(await signedIn.reader.accepts({ ...request, status: 'all' }), false, 'preserve admin/owner draft pagination');
+    assert.equal(await signedIn.reader.accepts({ ...request, summaryOnly: true }), false);
+    for (const f of [anon, signedIn]) {
+        const original = f.client.rpc;
+        f.client.rpc = (name, args) => {
+            assert.equal(name, 'read_seller_auction_context');
+            assert.equal(args.p_seller_id, sellerId);
+            assert.deepEqual(args.p_ids, f === anon ? [] : [id]);
+            return original(name, args).then(response => ({ data: { ...response.data, seller: { id: sellerId, username: 'PRIVATE-NAME', stats: { value: 'PRIVATE-MONEY' } } } }));
+        };
+        const data = await f.reader.load(request);
+        assert.equal(data.seller.stats.value, 'PRIVATE-MONEY');
+        assert.equal(data.rows[0].item, 'Test item');
+        assert.doesNotMatch(JSON.stringify(f.requests), /PRIVATE|SECRET|Authorization/);
+    }
+    const parsed = publicRequest(`https://cache.test/?view=seller&id=${sellerId.toUpperCase()}`);
+    assert.equal(parsed.id, sellerId); assert.equal(parsed.status, 'all'); assert.equal(parsed.sort, 'ending');
+    for (const bad of ['view=seller', 'view=seller&id=bad', 'view=browse&id='+sellerId]) assert.throws(() => publicRequest('https://cache.test/?'+bad));
+    const projected = publicProjection({ ...source(), seller: { username: 'PRIVATE-NAME', stats: { value: 'PRIVATE-MONEY' } } }, parsed);
+    assert.equal(projected.seller, null); assert.doesNotMatch(JSON.stringify(projected), /PRIVATE|SECRET/);
+});
+
+test('a 200-visitor seller-profile burst shares one public origin read', async () => {
+    const f = await fixture();
+    const path = 'https://cache.test/?view=seller&id=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const responses = await Promise.all(Array.from({length:200}, () => f.get(path)));
+    assert.equal(f.reads(), 1);
+    assert.ok(responses.every(response => response.status === 200));
+    const data = await responses[0].json();
+    assert.equal(data.seller, null);
+    assert.doesNotMatch(JSON.stringify(data), /PRIVATE|SECRET/);
 });

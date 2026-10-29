@@ -13,6 +13,7 @@ export function auctionReadRequest(pathname, search = '', viewerId = null) {
     const status = auctionFilters.some(([value]) => value === params.get('status')) ? params.get('status') : seller ? 'all' : 'active';
     return {
         view: seller ? 'seller' : 'browse', ...(seller ? { id: seller[1] } : {}),
+        ...(seller && params.get('view') === 'stats' ? { summaryOnly: true } : {}),
         ...(!seller && viewerId && params.get('mine') === '1' ? { sellerId: viewerId } : {}),
         ...(!seller && viewerId && params.get('mine') === 'others' ? { excludeOwn: true } : {}), search: params.get('q') || '',
         ...(['buy', 'sell'].includes(params.get('kind')) ? { kind: params.get('kind') } : {}),

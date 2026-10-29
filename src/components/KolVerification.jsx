@@ -1,27 +1,24 @@
 import { useContext, useEffect, useState } from 'react';
 import { UserContext } from '../context/UserContext';
 import { supabase } from '../lib/supabase';
+import useKolIdentity from '../hooks/useKolIdentity';
+import { startPrivateRefresh } from '../lib/privateRefresh';
 import CopyMessage from './CopyMessage';
 
 export default function KolVerification() {
     const { currentUser } = useContext(UserContext);
-    const [identity, setIdentity] = useState(null);
+    const identity = useKolIdentity();
     const [challenge, setChallenge] = useState(null);
     const [error, setError] = useState('');
     const [pending, setPending] = useState(false);
+    const playerId = identity?.kol_player_id;
     useEffect(() => {
-        if (!supabase || !currentUser) return;
-        let cancelled = false;
-        async function refresh() {
-            const { data, error } = await supabase.from('profiles').select('kol_player_id,kol_player_name').eq('id', currentUser.id).single();
-            if (cancelled) return;
-            if (error) setError('KoL account linking requires the KMail escrow database migration.');
-            else { setIdentity(data); setError(''); }
-        }
-        refresh();
-        const timer = setInterval(refresh, 10000);
-        return () => { cancelled = true; clearInterval(timer); };
-    }, [currentUser]);
+        if (!challenge || playerId || !currentUser?.id) return;
+        // Only an active verification challenge needs faster checks. The shared
+        // account scheduler still deduplicates and backs off database failures.
+        return startPrivateRefresh({ refresh: () => window.dispatchEvent(new Event('khub:refresh-account')),
+            document, window, interval: 10000 });
+    }, [challenge, playerId, currentUser?.id]);
     async function request() {
         if (!supabase || pending) return;
         setPending(true); setError('');
@@ -38,7 +35,7 @@ export default function KolVerification() {
             {identity?.kol_player_id ? <p className="mt-1.5 text-[13px] profile-muted">{identity.kol_player_name} (#{identity.kol_player_id}) · Auction escrow uses this player ID.</p> : <>
                 <p className="mt-1.5 text-[13px] profile-muted">Link your account before listing or bidding. Send the code from this page by KMail from the KoL account you own.</p>
                 <button onClick={request} disabled={pending || !supabase} className="profile-verification-button">{pending ? 'Creating code…' : challenge ? 'Get a new verification code' : 'Get verification code'}</button>
-                {challenge && <div className="space-y-2"><p>KMail <strong>kHub (#3888760)</strong> with this exact message, attaching no Meat or items:</p><CopyMessage text={challenge.command} label="verification message" /><p>Valid for 20 minutes. This page checks for verification every 10 seconds while the bot is running.</p></div>}
+                {challenge && <div className="space-y-2"><p>KMail <strong>kHub (#3888760)</strong> with this exact message, attaching no Meat or items:</p><CopyMessage text={challenge.command} label="verification message" /><p>Valid for 20 minutes. This page checks for verification every 10 seconds while this tab is visible.</p></div>}
             </>}
             {error && <p role="alert" className="profile-warning-text">{error}</p>}
         </section>
