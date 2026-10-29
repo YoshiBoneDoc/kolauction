@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { PublicAuctionCache } from '../workers/public-auction-cache/index.js';
+import { cacheFailure } from '../workers/public-auction-cache/errors.js';
 import { publicProjection, publicRequest } from '../workers/public-auction-cache/protocol.js';
 import { onRequest } from '../functions/api/public-auctions.js';
 import { createPublicAuctionReader } from '../src/lib/publicAuctionReader.js';
@@ -11,6 +12,50 @@ import { onRequest as invalidateRequest } from '../functions/api/public-auctions
 import { onRequest as bannerRequest } from '../functions/api/public-banner.js';
 import { readPublicBanner } from '../src/lib/publicBannerReader.js';
 import { createSiteBannerService } from '../src/lib/siteBanner.js';
+
+test('origin failures expose fixed diagnostic categories without upstream secrets', async () => {
+    const original = globalThis.fetch;
+    const cache = new PublicAuctionCache({ blockConcurrencyWhile() {}, storage: {}, waitUntil() {} }, {
+        SUPABASE_URL: 'https://project.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_fixture',
+    });
+    try {
+        for (const [status, code, expected] of [
+            [404, 'PGRST202', 'CACHE_RPC_MISSING'], [401, 'bad_key', 'CACHE_ORIGIN_AUTH'],
+            [403, '42501', 'CACHE_ORIGIN_PERMISSION'], [500, '57014', 'CACHE_ORIGIN_TIMEOUT'],
+            [500, 'XX000', 'CACHE_ORIGIN_ERROR'],
+        ]) {
+            globalThis.fetch = async () => Response.json({ code, message: 'PRIVATE SQL AND KEY' }, { status });
+            await assert.rejects(cache.readOrigin({ view: 'home' }), error => {
+                assert.equal(error.code, expected);
+                assert.doesNotMatch(error.message, /PRIVATE|SQL|KEY/);
+                return true;
+            });
+        }
+        globalThis.fetch = async () => { throw new DOMException('PRIVATE URL', 'TimeoutError'); };
+        await assert.rejects(cache.readOrigin({ view: 'home' }), { code: 'CACHE_ORIGIN_TIMEOUT' });
+        globalThis.fetch = async () => new Response('not JSON');
+        await assert.rejects(cache.readOrigin({ view: 'home' }), { code: 'CACHE_INVALID_RESPONSE' });
+        cache.env.SUPABASE_URL = '';
+        await assert.rejects(cache.readOrigin({ view: 'home' }), { code: 'CACHE_CONFIG_URL' });
+        cache.env.SUPABASE_URL = 'https://project.supabase.co';
+        cache.env.SUPABASE_PUBLISHABLE_KEY = '';
+        await assert.rejects(cache.readOrigin({ view: 'home' }), { code: 'CACHE_CONFIG_KEY' });
+    } finally { globalThis.fetch = original; }
+});
+
+test('diagnostic reason survives cooldown and restart without another origin request', async () => {
+    const f = await fixture();
+    f.cache.readOrigin = async () => { throw cacheFailure('CACHE_RPC_MISSING'); };
+    const response = await f.get();
+    assert.equal(response.status, 503);
+    assert.equal((await response.json()).code, 'CACHE_RPC_MISSING');
+    const restarted = await fixture(f.storage);
+    assert.equal((await (await restarted.get()).json()).code, 'CACHE_RPC_MISSING');
+    assert.equal(restarted.reads(), 0);
+    restarted.cache.cooldownUntil = 0;
+    assert.equal((await restarted.get()).status, 200);
+    assert.equal(restarted.cache.lastFailureCode, 'CACHE_UNAVAILABLE');
+});
 
 const id = '12345678-1234-4123-8123-123456789abc';
 const url = 'https://site.test/api/public-auctions?view=browse';
@@ -407,4 +452,29 @@ test('a 200-visitor seller-profile burst shares one public origin read', async (
     const data = await responses[0].json();
     assert.equal(data.seller, null);
     assert.doesNotMatch(JSON.stringify(data), /PRIVATE|SECRET/);
+});
+
+test('cache Worker accepts either public-key variable name and rejects privileged keys under either name', async () => {
+    const previous = globalThis.fetch, requests = [];
+    globalThis.fetch = async (_url, options) => { requests.push(options); return Response.json(source()); };
+    try {
+        for (const name of ['SUPABASE_PUBLISHABLE_KEY', 'VITE_SUPABASE_PUBLISHABLE_KEY']) {
+            const cache = new PublicAuctionCache({ blockConcurrencyWhile() {}, storage: {}, waitUntil() {} }, {
+                SUPABASE_URL: 'https://project.supabase.co', [name]: 'sb_publishable_fixture',
+            });
+            const result = await cache.readOrigin(publicRequest(url));
+            assert.equal(requests.at(-1).headers.apikey, 'sb_publishable_fixture');
+            assert.equal(result.rows[0].item, 'Test item');
+            const before = requests.length;
+            cache.env[name] = `abc.${btoa(JSON.stringify({ role: 'service_role' }))}.sig`;
+            await assert.rejects(cache.readOrigin(publicRequest(url)), /temporarily busy/);
+            assert.equal(requests.length, before);
+        }
+        const cache = new PublicAuctionCache({ blockConcurrencyWhile() {}, storage: {}, waitUntil() {} }, {
+            SUPABASE_URL: 'https://project.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_canonical',
+            VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_alias',
+        });
+        await cache.readOrigin(publicRequest(url));
+        assert.equal(requests.at(-1).headers.apikey, 'sb_publishable_canonical');
+    } finally { globalThis.fetch = previous; }
 });

@@ -1,5 +1,6 @@
 import { CACHE_VERSION, publicRequest, publicProjection, originRequest } from './protocol.js';
 import { readInvalidation, verifyInvalidation, validRevision } from './invalidation.js';
+import { cacheFailure, cacheErrorBody, originFailureCode, safeCacheCode } from './errors.js';
 
 const FRESH_MS = 30000;
 const MAX_AGE_MS = 300000;
@@ -10,8 +11,8 @@ const MAX_BYTES = 1024 * 1024;
 const jsonBytes = value => new TextEncoder().encode(JSON.stringify(value)).byteLength;
 const MAX_PENDING = 4;
 const STORE_KEY = `public-snapshots-v${CACHE_VERSION}`;
-const unavailable = () => Object.assign(new Error('Public listings are temporarily busy. Please retry shortly.'), { status: 503 });
-const changedDuringRead = () => Object.assign(unavailable(), { code: 'CACHE_CHANGED' });
+const unavailable = cacheFailure;
+const changedDuringRead = () => unavailable('CACHE_CHANGED');
 
 // One named object for the whole site: concurrent visitors share the same reads,
 // including across Cloudflare regions. The public Worker URL exposes no API.
@@ -23,6 +24,7 @@ export class PublicAuctionCache {
         this.inflight = new Map();
         this.queue = Promise.resolve();
         this.cooldownUntil = 0;
+        this.lastFailureCode = 'CACHE_UNAVAILABLE';
         this.lastOriginAt = 0;
         this.revision = '0';
         ctx.blockConcurrencyWhile(async () => {
@@ -33,12 +35,13 @@ export class PublicAuctionCache {
                 if (now - entry.storedAt <= MAX_AGE_MS) this.entries.set(key, entry);
             }
             this.cooldownUntil = Math.min(saved?.cooldownUntil || 0, now + 30000);
+            this.lastFailureCode = safeCacheCode(saved?.failureCode);
         });
     }
 
     async persist() {
         // Capture the latest map after asynchronous refreshes finish, with bounded storage.
-        await this.ctx.storage.put(STORE_KEY, { entries: [...this.entries], cooldownUntil: this.cooldownUntil, revision: this.revision });
+        await this.ctx.storage.put(STORE_KEY, { entries: [...this.entries], cooldownUntil: this.cooldownUntil, revision: this.revision, failureCode: this.lastFailureCode });
     }
 
     async invalidate(request) {
@@ -58,38 +61,55 @@ export class PublicAuctionCache {
     }
 
     async readOrigin(request) {
-        const base = new URL(this.env.SUPABASE_URL);
-        if (base.protocol !== 'https:' || base.pathname !== '/' || base.search || base.hash || base.username || base.password) throw unavailable();
-        const key = this.env.SUPABASE_PUBLISHABLE_KEY || '';
+        let base;
+        try { base = new URL(this.env.SUPABASE_URL); }
+        catch { throw unavailable('CACHE_CONFIG_URL'); }
+        if (base.protocol !== 'https:' || base.pathname !== '/' || base.search || base.hash || base.username || base.password) throw unavailable('CACHE_CONFIG_URL');
+        // Dashboard users may copy the website's public variable name. Both
+        // names refer to the same publishable key; validate either identically.
+        const key = this.env.SUPABASE_PUBLISHABLE_KEY || this.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
         // Reject privileged keys even if configured accidentally. No service role exists here.
         let anonymous = key.startsWith('sb_publishable_');
         if (!anonymous) {
             try { anonymous = JSON.parse(atob(key.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).role === 'anon'; }
             catch { /* Invalid or privileged keys fail closed. */ }
         }
-        if (!anonymous) throw unavailable();
+        if (!anonymous) throw unavailable('CACHE_CONFIG_KEY');
         const { rpc, args } = originRequest(request);
         const headers = { apikey: key, 'Content-Type': 'application/json' };
         // Legacy anonymous JWT keys need Authorization; new publishable keys do not.
         if (!key.startsWith('sb_publishable_')) headers.Authorization = `Bearer ${key}`;
         const startedAt = Date.now();
-        const response = await fetch(new URL(`/rest/v1/rpc/${rpc}`, base), {
-            method: 'POST', headers, body: JSON.stringify(args), redirect: 'error',
-            signal: AbortSignal.timeout(8000),
-        });
-        if (!response.ok || response.headers.has('set-cookie')) throw unavailable();
-        const text = await response.text();
-        if (new TextEncoder().encode(text).byteLength > MAX_BYTES) throw unavailable();
-        const result = publicProjection(JSON.parse(text), request);
+        let response, text;
+        try {
+            response = await fetch(new URL(`/rest/v1/rpc/${rpc}`, base), {
+                method: 'POST', headers, body: JSON.stringify(args), redirect: 'error',
+                signal: AbortSignal.timeout(8000),
+            });
+            text = await response.text();
+        } catch (error) {
+            throw unavailable(['TimeoutError', 'AbortError'].includes(error?.name) ? 'CACHE_ORIGIN_TIMEOUT' : 'CACHE_ORIGIN_ERROR');
+        }
+        if (new TextEncoder().encode(text).byteLength > MAX_BYTES) throw unavailable('CACHE_RESPONSE_TOO_LARGE');
+        if (!response.ok) {
+            let databaseCode;
+            try { databaseCode = JSON.parse(text)?.code; } catch { /* No raw body is exposed. */ }
+            throw unavailable(originFailureCode(response.status, databaseCode));
+        }
+        if (response.headers.has('set-cookie')) throw unavailable('CACHE_INVALID_RESPONSE');
+        let result;
+        try { result = publicProjection(JSON.parse(text), request); }
+        catch { throw unavailable('CACHE_INVALID_RESPONSE'); }
         result.server_time = new Date(Date.parse(result.server_time) + (Date.now() - startedAt) / 2).toISOString();
         return result;
     }
 
     refresh(key, request) {
         if (this.inflight.has(key)) return this.inflight.get(key);
-        if (Date.now() < this.cooldownUntil || this.inflight.size >= MAX_PENDING) return Promise.reject(unavailable());
+        if (Date.now() < this.cooldownUntil) return Promise.reject(unavailable(this.lastFailureCode));
+        if (this.inflight.size >= MAX_PENDING) return Promise.reject(unavailable('CACHE_QUEUE_FULL'));
         const task = this.queue.then(async () => {
-            if (Date.now() < this.cooldownUntil) throw unavailable();
+            if (Date.now() < this.cooldownUntil) throw unavailable(this.lastFailureCode);
             try {
                 let entry;
                 for (let attempt = 0; attempt < 2; attempt++) {
@@ -110,13 +130,16 @@ export class PublicAuctionCache {
                     this.entries.delete(this.entries.keys().next().value);
                 }
                 this.cooldownUntil = 0;
+                this.lastFailureCode = 'CACHE_UNAVAILABLE';
                 await this.persist();
                 return entry;
             } catch (error) {
                 // A failing database gets breathing room, not a retry from every visitor.
                 if (error.code !== 'CACHE_CHANGED') this.cooldownUntil = Date.now() + 30000;
+                this.lastFailureCode = safeCacheCode(error.code);
+                console.warn(`[PUBLIC_CACHE] ${this.lastFailureCode} view=${request.view}`);
                 await this.persist();
-                throw unavailable();
+                throw unavailable(this.lastFailureCode);
             }
         });
         this.inflight.set(key, task);
@@ -138,7 +161,7 @@ export class PublicAuctionCache {
         let state = 'HIT';
         if (dirty || age > (query.view === 'banner' ? FRESH_MS : MAX_AGE_MS)) {
             try { entry = await this.refresh(key, query); state = dirty ? 'REVALIDATED' : 'MISS'; }
-            catch { return Response.json({ error: unavailable().message }, { status: 503,
+            catch (error) { return Response.json(cacheErrorBody(error.code), { status: 503,
                 headers: { 'Cache-Control': 'no-store', 'Retry-After': '30' } }); }
             // An invalidation can arrive while the refreshed snapshot is persisted.
             // Never return that older generation as a successful fresh response.

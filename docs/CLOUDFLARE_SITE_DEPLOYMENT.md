@@ -58,6 +58,10 @@ examining minified JavaScript or exposing any credentials.
    148 and 149, have been applied. This configuration correction adds no new SQL.
 2. Keep `khub-public-auction-cache` deployed in the **same Cloudflare account** as
    `kolauction`. Its Supabase URL/publishable key and invalidation secret stay there.
+   Runtime names are `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`. The Worker also
+   accepts `VITE_SUPABASE_PUBLISHABLE_KEY` as a compatibility alias when the website's
+   public variable name was copied into its settings. Both names have the same public-key
+   validation; the canonical name takes precedence when both are present.
 3. In **Cloudflare → kolauction → Settings → Builds**, check the Git production
    branch (`main`) and use these settings:
 
@@ -116,6 +120,15 @@ Wrangler configuration/build root was selected. If it returns JSON 503, the runt
 is active; inspect the cache binding, cache Worker variables and required SQL RPCs.
 
 ## References
+
+API failures include a fixed diagnostic `code`, never raw database messages or keys:
+`CACHE_CONFIG_URL` / `CACHE_CONFIG_KEY` indicate cache Worker runtime variables;
+`CACHE_ORIGIN_AUTH` indicates rejected credentials; `CACHE_RPC_MISSING` indicates
+a missing RPC or stale Supabase schema cache; `CACHE_ORIGIN_PERMISSION` indicates
+database permissions; `CACHE_ORIGIN_TIMEOUT` indicates an origin timeout.
+`CACHE_BINDING_MISSING` / `CACHE_BINDING_ERROR` indicate the website binding.
+Worker observability records these categories without query text or credentials.
+The existing 30-second failure cooldown remains in place, including after restart.
 
 - [Workers Static Assets](https://developers.cloudflare.com/workers/static-assets/)
 - [SPA routing and Worker-first API paths](https://developers.cloudflare.com/workers/static-assets/routing/single-page-application/)
