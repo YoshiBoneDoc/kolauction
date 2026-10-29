@@ -113,7 +113,7 @@ application is performed by creating these files.
 2. Deploy the cache Worker from the project root, using the Cloudflare account hosting Pages:
 
    ```bash
-   npx wrangler deploy --config workers/public-auction-cache/wrangler.jsonc
+   npx wrangler deploy --config workers/public-auction-cache/wrangler.jsonc --keep-vars
    ```
 
    The Worker is named `khub-public-auction-cache`; its Durable Object class is
@@ -258,3 +258,35 @@ aggregates. Seller statistics remain direct and retain their existing calculatio
 the statistics tab no longer fetches an unused auction page. For indexing, identity
 polling, bot queue hints, deployment order, tests and the later query-statistics review,
 see [Read efficiency](TRAFFIC_READ_EFFICIENCY.md).
+
+## Automatic Worker deployment on Git pushes
+
+The repository workflow `.github/workflows/deploy-cache-worker.yml` deploys
+`khub-public-auction-cache` on every push to `main`, after credential scanning and
+public-cache/privacy tests pass. It also supports **Actions → Deploy shared cache
+Worker → Run workflow** on `main`.
+
+One-time setup in **GitHub repository → Settings → Secrets and variables → Actions →
+New repository secret**:
+
+- `CLOUDFLARE_API_TOKEN`: a Cloudflare API token authorized to deploy Workers in the
+  account hosting `khub-public-auction-cache`. The Cloudflare **Edit Cloudflare Workers**
+  token template can be used, scoped to that account. Do not use the Global API Key.
+- `CLOUDFLARE_ACCOUNT_ID`: the ID of that same Cloudflare account.
+
+Keep the Worker's existing Supabase publishable key/URL and invalidation secret in
+Cloudflare. The deployment uses `--keep-vars` to preserve dashboard-managed variables;
+Worker secrets are preserved as well. No Supabase service-role key or bot credentials
+are needed in GitHub. Missing deployment secrets produce an explicit failed workflow.
+
+Push this workflow to GitHub after the secrets are configured. The website's existing
+Cloudflare Pages Git deployment continues independently; the workflow deploys only the
+cache Worker. Apply required SQL migrations before pushing code that depends on them.
+The workflow does not apply database migrations, modify Pages bindings, deploy the bot,
+or create the initial Supabase/cache settings. Avoid enabling a second automatic Worker
+deployment through Workers Builds for this same branch while this workflow is active.
+Concurrent deployments are serialized so an older running deployment finishes before
+the latest queued push starts. Check the GitHub **Actions** tab for success or failures.
+
+References: [Cloudflare GitHub Actions deployment](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/),
+[Wrangler GitHub Action](https://github.com/cloudflare/wrangler-action).
