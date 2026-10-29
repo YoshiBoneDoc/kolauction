@@ -165,6 +165,22 @@ with tempfile.TemporaryDirectory(prefix='khub-gift-isolation-',dir='/tmp') as fo
         assert json.loads(rpc('bot_gift_intake_state'))['reviews']==[]
         assert json.loads(rpc('bot_gift_intake_state'))['isolated']==[]
         assert json.loads(rpc('bot_refresh_gift_protection',p_snapshot=later))=={'meat':'0','items':{}}
+        # Rescanning a resolved gift is a no-op; changed contents reopen review.
+        sql(next(p for p in migrations if p.name.startswith('202610280134_')).read_text())
+        saved=json.loads(sql('select raw from khub_bot.gift_mail_reviews where mail_id='+lit(failed['id'])))
+        sql('update khub_bot.gift_asset_protection set safe_operating_meat=1234 where id;')
+        rpc('bot_review_gift_mail',p_raw=saved,p_evidence='Repeated worker scan of the same retained mail.')
+        state=json.loads(rpc('bot_gift_intake_state'))
+        assert state['reviews']==[] and any(r['mail_id']==failed['id'] for r in state['resolved_review_mail'])
+        assert int(sql('select safe_operating_meat from khub_bot.gift_asset_protection;'))==1234
+        assert sql('select resolution from khub_bot.gift_mail_reviews where mail_id='+lit(failed['id']))==evidence
+        changed={**saved,'message':saved.get('message','')+' Changed contents.'}
+        rpc('bot_review_gift_mail',p_raw=changed,p_evidence='Retained original gift message changed after resolution.')
+        assert failed['id'] in json.loads(rpc('bot_gift_intake_state'))['reviews']
+        assert int(sql('select safe_operating_meat from khub_bot.gift_asset_protection;'))==0
+        rpc('bot_resolve_gift_review',p_mail_id=failed['id'],p_evidence=evidence)
+        for role in ['anon','authenticated']:
+            sql('set role '+role+';select public.bot_gift_intake_state();',error='permission denied')
         # An untracked malformed gift must not double-count the optional reserve.
         rpc('bot_review_gift_mail',p_raw={'id':'206074099','type':'giftshop'},p_evidence='Fixture untracked malformed gift; preserve unknown contents.')
         balance={'meat':'10000','items':{},'reserve':50}

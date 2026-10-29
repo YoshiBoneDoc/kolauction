@@ -360,7 +360,7 @@ export default function AuctionAnItem() {
                                     {item?.image && <img src={itemImageUrl(item.image)} alt="" className="h-8 w-8 shrink-0 object-contain [image-rendering:pixelated]" />}
                                     <span className="min-w-0 flex-1 break-words text-sm font-medium leading-snug text-gray-900">{item?.name || `Item #${entry.id}`}</span>
                                     <button type="button" aria-label={`Use ${item?.name || entry.id} as bundle image`} aria-pressed={bundleImageItemId === entry.id}
-                                        onClick={() => setBundleImageItemId(entry.id)} className="bundle-image-choice rounded border border-gray-300 px-1.5 py-1 text-[11px] text-gray-700 hover:bg-blue-50" title="Use this item as the bundle image">{bundleImageItemId === entry.id ? '✓ Cover' : 'Cover'}</button>
+                                        onClick={() => setBundleImageItemId(entry.id)} className="bundle-image-choice rounded border border-gray-300 px-1.5 py-1 text-[11px] text-gray-700 hover:bg-blue-50" title="Use this item as the bundle image">{bundleImageItemId === entry.id ? '✓ Selected' : 'Use img'}</button>
                                     <label className="flex shrink-0 items-center gap-1.5 text-xs text-gray-700">
                                         Qty:
                                         <input aria-label={`Quantity of ${item?.name || entry.id}`} inputMode="decimal" value={entry.quantity}
