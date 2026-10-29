@@ -17,7 +17,7 @@ export function createPublicAuctionReader(client, { enabled = false, fetch: fetc
         async load(request) {
             const params = new URLSearchParams({ view: request.view });
             if (request.view === 'browse') {
-                for (const key of ['search', 'status', 'sort', 'trade', 'kind', 'page', 'minPrice', 'maxPrice']) {
+                for (const key of ['search', 'status', 'sort', 'trade', 'kind', 'buyout', 'bundle', 'page', 'minPrice', 'maxPrice']) {
                     if (request[key] != null) params.set(key, String(request[key]));
                 }
             }

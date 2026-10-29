@@ -1,3 +1,5 @@
+import RelistButton from './RelistButton';
+import { auctionQuantityLabel } from '../lib/bundles';
 import AuctionEndedTime from './AuctionEndedTime';
 import FittedPrice from './FittedPrice';
 import SellPrice from './SellPrice';
@@ -29,7 +31,7 @@ export default function CompactAuctionCard({ auction, now, expanded = false, onT
     const hasBids = bidCount > 0;
     const canBid = active && !ownsAuction && !currentUser?.isBanned;
     const showForm = expanded && canBid;
-    const itemLabel = `${auction.item} ×${auction.quantity.toLocaleString('en-US')}`;
+    const itemLabel = `${auction.item} ${auctionQuantityLabel(auction)}`;
 
     if (auction.auctionKind === 'buy') return <BuyAuctionCard auction={auction} now={now} inlineReserve expanded={expanded} onToggleReserve={onToggleBid} />;
     return <article className={`relative isolate grid h-[134px] min-w-0 self-start grid-cols-[60px_minmax(0,1fr)] grid-rows-[32px_44px_44px] gap-x-3 overflow-hidden rounded-lg border border-gray-200 ${auctionCardBackground(result.status)} px-3 py-1.5 shadow-sm transition-shadow hover:border-gray-300 hover:shadow-md [&_button]:relative [&_button]:z-10 [&_input]:relative [&_input]:z-10 [&_label]:relative [&_label]:z-10 auction-card`}>
@@ -38,7 +40,7 @@ export default function CompactAuctionCard({ auction, now, expanded = false, onT
                 className="min-w-0 flex-1 rounded text-[#14248A] after:absolute after:inset-0 after:z-0 after:cursor-pointer after:rounded-lg hover:text-[#14248A] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-blue-500">
                 <h2 className="flex min-w-0 items-start gap-1 text-base font-bold leading-5">
                     <span className="line-clamp-2 min-w-0 break-words">{auction.item}</span>
-                    <span className="shrink-0 whitespace-nowrap font-semibold text-[#5365AB]">×{auction.quantity.toLocaleString('en-US')}</span>
+                    <span className="shrink-0 whitespace-nowrap font-semibold text-[#5365AB]">{auctionQuantityLabel(auction)}</span>
                 </h2>
             </Link>
             <div className="flex max-w-[45%] shrink-0 flex-col items-end gap-1.5 text-right">
@@ -63,7 +65,7 @@ export default function CompactAuctionCard({ auction, now, expanded = false, onT
             </div>}
         </div>
         {ended ? <footer className="col-span-2 col-start-1 row-start-3 flex items-end">
-            <AuctionEndedTime auction={auction} />
+            <AuctionEndedTime auction={auction} /><div className="relative z-10 ml-auto flex shrink-0 flex-col items-center gap-0.5">{ownsAuction && <span className="text-[10px] text-gray-500">Your Listing</span>}<RelistButton auction={auction} now={now} /></div>
         </footer> : showForm ? <section id={formId} aria-label={`Bidding for ${auction.item}`} className="col-start-2 row-start-3 min-h-0 min-w-0 [&_a]:relative [&_a]:z-10">
             {currentUser ? <AuctionBidForm auction={auction} inline showTerms={false} onClose={onToggleBid} /> : <div className="flex h-full min-w-0 items-end gap-1">
                 <div role="alert" className="relative z-10 flex h-8 min-w-0 flex-1 items-center rounded-[2px] border border-red-200 bg-red-50 px-1 py-0 text-xs leading-[14px] text-red-800">

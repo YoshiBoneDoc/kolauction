@@ -42,7 +42,7 @@ export function auctionEndTime(auction) {
         Date.parse(auction.finalizedAt) || Infinity, Date.parse(auction.instantPurchasedAt) || Infinity);
 }
 
-export function browseAuctions(auctions, { search = '', status = 'active', sort = resolveAuctionSort(status), trade = 'all', kind = 'all', minPrice = null, maxPrice = null, now = Date.now() } = {}) {
+export function browseAuctions(auctions, { search = '', status = 'active', sort = resolveAuctionSort(status), trade = 'all', buyout = 'any', bundle = 'any', kind = 'all', minPrice = null, maxPrice = null, now = Date.now() } = {}) {
     const query = search.trim().toLocaleLowerCase();
     return auctions.filter((auction) => {
         if (isAbandonedEscrowDraft(auction)) return false;
@@ -53,7 +53,8 @@ export function browseAuctions(auctions, { search = '', status = 'active', sort 
                     : status === 'expired' ? ['expired', 'ended_no_bids'].includes(lifecycle)
                         : lifecycle === status || status === 'active' && lifecycle === 'finalizing');
         const price = auctionFilterPrice(auction);
-        return (minPrice == null || price >= minPrice) && (maxPrice == null || price <= maxPrice) && matchesStatus && (kind === 'all' || (auction.auctionKind || 'sell') === kind) && (trade === 'all' || trade !== 'none' && auction.escrowMode === (trade === 'escrow')) && auction.item.toLocaleLowerCase().includes(query);
+        const isBundle = (auction.bundleItems?.length || 0) > 1;
+        return (bundle === 'any' || (bundle === 'with' ? isBundle : !isBundle)) && (buyout === 'any' || (buyout === 'with' ? Number(auction.instantPurchasePrice) > 0 : !(Number(auction.instantPurchasePrice) > 0))) && (minPrice == null || price >= minPrice) && (maxPrice == null || price <= maxPrice) && matchesStatus && (kind === 'all' || (auction.auctionKind || 'sell') === kind) && (trade === 'all' || trade !== 'none' && auction.escrowMode === (trade === 'escrow')) && auction.item.toLocaleLowerCase().includes(query);
     }).sort((a, b) => {
         let comparison = 0;
         if (sort === 'bids-desc') comparison = (b.bidCount ?? b.bids?.length ?? 0) - (a.bidCount ?? a.bids?.length ?? 0);

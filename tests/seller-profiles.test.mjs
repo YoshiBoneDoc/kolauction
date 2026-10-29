@@ -27,6 +27,28 @@ const compiled = { exports: {} };
 const requireModule = createRequire(import.meta.url);
 new Function('require', 'module', 'exports', outputFiles[0].text)(name => name === 'react-router-dom' ? router : requireModule(name), compiled, compiled.exports);
 const { render } = compiled.exports;
+
+// Scope assertions to a card or feedback group, so another card's value cannot
+// accidentally satisfy a regression check. Handle nested elements explicitly.
+function groupWithHeading(html, heading, tag = 'section') {
+    const headingAt = html.indexOf(`>${heading}</h`);
+    assert.ok(headingAt >= 0, `Missing heading: ${heading}`);
+    const start = html.lastIndexOf(`<${tag} `, headingAt);
+    assert.ok(start >= 0, `Missing ${tag} for ${heading}`);
+    const elements = new RegExp(`</?${tag}\\b[^>]*>`, 'g');
+    elements.lastIndex = start;
+    let depth = 0;
+    for (let match; (match = elements.exec(html));) {
+        depth += match[0].startsWith('</') ? -1 : 1;
+        if (depth === 0) return html.slice(start, elements.lastIndex);
+    }
+    assert.fail(`Unclosed ${tag} for ${heading}`);
+}
+function expectStat(card, label, value) {
+    const rows = [...card.matchAll(/<dt>([^<]+)<\/dt><dd[^>]*>([^<]*)<\/dd>/g)];
+    assert.equal(rows.find(([, name]) => name === label)?.[2], value, label);
+}
+
 const auction = { id: 'lot', sellerId: 'seller', owner: 'Seller', item: 'Test lot', quantity: 2,
     minBidMeat: 100, currentBid: 300, escrowMode: true, feeMeat: 22, feeBps: 750,
     status: 'completed', hasWinner: true, winnerId: null, highestBidderId: null,
@@ -87,7 +109,7 @@ test('detailed seller view explains metrics while preserving listing filters', (
     assert.doesNotMatch(html, /Auction history|Seller auctions|Search items|public-profile-auction-list|Listing activity|Page 2 of 2/);
 });
 
-test('switching public profile tabs preserves search, status, sorting and the active default', () => {
+test('switching public profile tabs preserves search, status and sorting, with All auctions as the default', () => {
     const auctions = render({ path: '/seller/seller?status=cancelled&sort=price-desc&q=boots&page=2', seller, auctions: [], total: 0 });
     assert.match(auctions, /href="\/seller\/seller\?status=cancelled&amp;sort=price-desc&amp;q=boots&amp;page=2&amp;view=stats"/);
     const profile = render({ path: '/seller/seller?view=stats&status=cancelled&sort=newest&q=coat&page=3', seller, auctions: [], total: 0 });
@@ -95,7 +117,7 @@ test('switching public profile tabs preserves search, status, sorting and the ac
     const defaultAuctions = render({ path: '/seller/seller', seller, auctions: [], total: 0 });
     assert.match(defaultAuctions, /href="\/seller\/seller\?view=stats"/);
     assert.doesNotMatch(defaultAuctions, /href="\/seller\/seller\?view=stats&amp;status=/);
-    assert.match(defaultAuctions, /<option value="active" selected="">Active<\/option>/);
+    assert.match(defaultAuctions, /<option value="all" selected="">All auctions<\/option>/);
     assert.match(defaultAuctions, /<option value="ending" selected="">Ending soon<\/option>/);
 });
 
@@ -224,12 +246,14 @@ test('profiles show role-specific direct feedback and publicly closed winners li
     const feedback={...seller,stats:{...seller.stats,seller_positive:8,seller_negative:2,buyer_positive:4,buyer_negative:1}};
     const html=render({seller:feedback,auctions:[],total:0,path:'/seller/seller?view=stats'});
     assert.match(html,/Trade History/);
-    assert.match(html,/Thumbs up/);
-    assert.doesNotMatch(html,/Feedback score|>Score<|>Overall</);
-    assert.match(html,/aria-label="12 thumbs up"/);
-    assert.match(html,/aria-label="3 thumbs down"/);
-    assert.match(html,/As Seller<\/th>[\s\S]*?>8<\/td>[\s\S]*?>2<\/td>/);
-    assert.match(html,/As Buyer<\/th>[\s\S]*?>4<\/td>[\s\S]*?>1<\/td>/);
+    assert.match(html,/Trade Feedback/);
+    assert.doesNotMatch(html,/Feedback score|>Score<|<table/);
+    for (const [role, positive, negative] of [['Overall', 12, 3], ['As Seller', 8, 2], ['As Buyer', 4, 1]]) {
+        const group = groupWithHeading(html, role, 'div');
+        assert.match(group, new RegExp(`aria-label="${positive} positive feedback"`));
+        assert.match(group, new RegExp(`aria-label="${negative} negative feedback"`));
+        assert.equal((group.match(/<svg/g) || []).length, 2, `${role} retains both thumb icons`);
+    }
 
     const winner=render({path:'/auction/lot',user:{id:'viewer'},auctions:[{...auction,publicWinner:true,winnerId:'buyer',winner:'Public Buyer'}]});
     assert.match(winner,/href="\/seller\/buyer"[^>]*>Public Buyer/);
@@ -286,68 +310,73 @@ test('direct and escrow Meat totals show separate sold and bought values with di
 });
 
 
-test('detailed profile shows expanded trade history without auction content', () => {
+test('Seller Profile uses compact statistic cards and separate feedback without auction content', () => {
     const stats = { ...seller.stats, seller_confirmed: 24, buyer_confirmed: 12, seller_incomplete: 2, buyer_incomplete: 0, legacy_value: '55000000', direct_bought_value: '20000000', escrow_value: '1200000000', escrow_bought_value: '34000000' };
-    for (const path of ['/seller/seller', '/seller/seller?view=stats']) {
-        const html = render({ path, seller: { ...seller, stats }, auctions: [], total: 0 });
-        for (const text of ['Direct Trades', 'Escrow Trades', 'Sales: 24', 'Winning bids: 12', 'Incomplete: 2']) assert.ok(html.includes(text));
-        assert.match(html, /class="text-xs text-gray-500">Incomplete: 0/);
-        assert.doesNotMatch(html, /Feedback score|Direct-settlement history|Trade confirmations/);
-        if (path.includes('view=stats')) {
-            assert.match(html, /55m Meat/);
-            assert.match(html, /20m Meat/);
-            assert.match(html, /1.2b Meat/);
-            assert.match(html, /34m Meat/);
-            assert.match(html, /Independent feedback by trading role/);
-            assert.match(html, /grid items-start gap-x-6 gap-y-5 md:grid-cols-2/);
-            assert.match(html, /2[\s\S]*?orders filled ·[\s\S]*?1,326[\s\S]*?items sold/);
-            assert.doesNotMatch(html, /aria-label="Listing activity"|Seller auctions|Search items|public-profile-auction-list/);
-            assert.match(html, /4 item units sold · Bot-verified trades/);
-        } else {
-            assert.match(html, /55m[\s\S]*?Sold/);
-            assert.match(html, /Bought[\s\S]*?20m/);
-            assert.match(html, /1\.2b[\s\S]*?Sold/);
-            assert.match(html, /Bought[\s\S]*?34m/);
-            assert.doesNotMatch(html, /Direct trade counts and values|Independent feedback by trading role|aria-label="Listing activity"/);
-        }
-    }
+    const html = render({ path: '/seller/seller?view=stats', seller: { ...seller, stats }, auctions: [auction], total: 1 });
+    const direct = groupWithHeading(html, 'Direct Trades');
+    const escrow = groupWithHeading(html, 'Escrow Trades');
+    expectStat(direct, 'Sales', '24');
+    expectStat(direct, 'Winning bids', '12');
+    expectStat(direct, 'Meat sold', '55m Meat');
+    expectStat(direct, 'Meat bought', '20m Meat');
+    expectStat(escrow, 'Meat sold', '1.2b Meat');
+    expectStat(escrow, 'Meat bought', '34m Meat');
+    expectStat(escrow, 'Items sold', '4');
+    expectStat(groupWithHeading(html, 'Buy Orders Fulfilled'), 'Orders fulfilled', '2');
+    expectStat(groupWithHeading(html, 'Buy Orders Fulfilled'), 'Items sold', '1,326');
+    assert.doesNotMatch(direct, /Completion rate|Trade Feedback|thumbs|positive feedback/);
+    assert.match(html, /public-profile-dashboard-cards/);
+    assert.match(html, /Trade Feedback/);
+    assert.match(html, /How this works/);
+    assert.doesNotMatch(html, /public-profile-auction-list|Search items|Test lot|Feedback score|Direct-settlement history/);
+
+    const sidebar = render({ seller: { ...seller, stats }, auctions: [], total: 0 });
+    assert.match(sidebar, /Sales: 24/);
+    assert.match(sidebar, /Winning bids: 12/);
+    assert.match(sidebar, /Incomplete: 2/);
+    assert.match(sidebar, /55m[\s\S]*?Sold[\s\S]*?Bought[\s\S]*?20m/);
+    assert.doesNotMatch(sidebar, /public-profile-dashboard-cards|public-profile-feedback-grid/);
 });
 
-
-test('detailed direct history shows agreed values for every completed and incomplete role count', () => {
+test('detailed direct statistics keep completed totals separate from incomplete reports and feedback', () => {
     const stats = { ...seller.stats, seller_confirmed: 24, buyer_confirmed: 12, seller_incomplete: 2, buyer_incomplete: 1, legacy_value: '55000000', direct_bought_value: '20000000', seller_incomplete_value: '10000000000', buyer_incomplete_value: '10000' };
     const html = render({ path: '/seller/seller?view=stats', seller: { ...seller, stats }, auctions: [], total: 0 });
-    const values = html.split('aria-label="Direct trade counts and values"')[1].split('Meat values use the agreed price')[0];
-    assert.match(values, /Sales: 24[\s\S]*?title="55,000,000 Meat">55m Meat/);
-    assert.match(values, /Incomplete: 2[\s\S]*?title="10,000,000,000 Meat">10b Meat/);
-    assert.match(values, /Winning bids: 12[\s\S]*?title="20,000,000 Meat">20m Meat/);
-    assert.match(values, /Incomplete: 1[\s\S]*?title="10,000 Meat">10k Meat/);
+    const direct = groupWithHeading(html, 'Direct Trades');
+    expectStat(direct, 'Sales', '24');
+    expectStat(direct, 'Winning bids', '12');
+    expectStat(direct, 'Meat sold', '55m Meat');
+    expectStat(direct, 'Meat bought', '20m Meat');
+    assert.doesNotMatch(direct, /10b Meat|10k Meat|Completion rate|positive feedback/);
     const compact = render({ seller: { ...seller, stats }, auctions: [], total: 0 });
-    assert.doesNotMatch(compact, /Direct trade counts and values|10b Meat|10k Meat/);
-    const huge = render({ path: '/seller/seller?view=stats', seller: { ...seller, stats: { ...stats, seller_incomplete_value: '9007199254740993' } }, auctions: [], total: 0 });
-    assert.match(huge, /title="9,007,199,254,740,993 Meat"/);
+    assert.match(compact, /Incomplete: 2/);
+    assert.match(compact, /Incomplete: 1/);
+    assert.doesNotMatch(compact, /10b Meat|10k Meat/);
+    const huge = render({ path: '/seller/seller?view=stats', seller: { ...seller, stats: { ...stats, seller_confirmed: '9007199254740993', legacy_value: '9007199254740993' } }, auctions: [], total: 0 });
+    const hugeDirect = groupWithHeading(huge, 'Direct Trades');
+    expectStat(hugeDirect, 'Sales', '9,007,199,254,740,993');
+    expectStat(hugeDirect, 'Meat sold', '9,007,199.3b Meat');
 });
 
-
-test('escrow shows completed sales and winning bids in both views with values under detailed counts', () => {
+test('escrow displays completed sales, winning bids and their own Meat totals in both views', () => {
     const stats = { ...seller.stats, escrow_sales: 2, escrow_buys: 3, escrow_value: '1200000000', escrow_bought_value: '34000000' };
-    for (const path of ['/seller/seller', '/seller/seller?view=stats']) {
-        const html = render({ path, seller: { ...seller, stats }, auctions: [], total: 0 });
-        const escrow = html.split('aria-label="Escrow trades"')[1].split('</section>')[0];
-        assert.match(escrow, /Sales: 2/);
-        assert.match(escrow, /Winning bids: 3/);
-        assert.doesNotMatch(escrow, /completed sales|Incomplete:/);
-        if (path.includes('view=stats')) {
-            assert.match(escrow, /Sales: 2<\/p><span[^>]*title="1,200,000,000 Meat">1.2b Meat/);
-            assert.match(escrow, /Winning bids: 3<\/p><span[^>]*title="34,000,000 Meat">34m Meat/);
-            assert.doesNotMatch(escrow, /Meat Totals/);
-            assert.doesNotMatch(html, /Canceled \(before bids\)|Cancelled before receiving a valid bid/);
-        } else {
-            assert.match(escrow, /Meat Totals/);
-            assert.match(escrow, /1\.2b[\s\S]*?Sold/);
-            assert.match(escrow, /Bought[\s\S]*?34m/);
-        }
-    }
+    const html = render({ path: '/seller/seller?view=stats', seller: { ...seller, stats }, auctions: [], total: 0 });
+    const escrow = groupWithHeading(html, 'Escrow Trades');
+    expectStat(escrow, 'Sales', '2');
+    expectStat(escrow, 'Winning bids', '3');
+    expectStat(escrow, 'Meat sold', '1.2b Meat');
+    expectStat(escrow, 'Meat bought', '34m Meat');
+    assert.doesNotMatch(escrow, /Incomplete|Meat Totals|Completion rate/);
+    const zero = render({ path: '/seller/seller?view=stats', seller: { ...seller, stats: { ...stats, escrow_buys: 0, escrow_bought_value: '0' } }, auctions: [], total: 0 });
+    expectStat(groupWithHeading(zero, 'Escrow Trades'), 'Winning bids', '0');
+    expectStat(groupWithHeading(zero, 'Escrow Trades'), 'Meat bought', '0 Meat');
+
+    const compact = render({ seller: { ...seller, stats }, auctions: [], total: 0 });
+    const sidebarEscrow = groupWithHeading(compact, 'Escrow Trades');
+    assert.match(sidebarEscrow, /Sales: 2/);
+    assert.match(sidebarEscrow, /Winning bids: 3/);
+    assert.match(sidebarEscrow, /Meat Totals/);
+    assert.match(sidebarEscrow, /1\.2b[\s\S]*?Sold[\s\S]*?Bought[\s\S]*?34m/);
+    assert.doesNotMatch(sidebarEscrow, /Incomplete:/);
 });
 
 

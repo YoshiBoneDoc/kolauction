@@ -13,7 +13,7 @@ export const PUBLIC_FIELDS = [
 ];
 const statuses = ['active', 'completed', 'cancelled', 'expired', 'ended', 'all'];
 const sorts = ['recommended', 'ending', 'ended-desc', 'newest', 'price-asc', 'price-desc', 'bids-desc', 'bids-asc', 'activity', 'high-rollers'];
-const params = new Set(['view', 'search', 'status', 'sort', 'trade', 'kind', 'page', 'minPrice', 'maxPrice']);
+const params = new Set(['view', 'search', 'status', 'sort', 'trade', 'kind', 'buyout', 'bundle', 'page', 'minPrice', 'maxPrice']);
 const choose = (value, choices, fallback) => {
     if (value == null) return fallback;
     if (!choices.includes(value)) throw new Error('Unsupported public filter.');
@@ -48,7 +48,9 @@ export function publicRequest(url) {
     return { view, search, status: choose(query.get('status'), statuses, 'active'),
         sort: choose(query.get('sort'), sorts, 'recommended'),
         trade: choose(query.get('trade'), ['all', 'escrow', 'direct', 'none'], 'all'),
-        kind: choose(query.get('kind'), ['all', 'sell', 'buy'], 'all'), page,
+        kind: choose(query.get('kind'), ['all', 'sell', 'buy'], 'all'),
+        buyout: choose(query.get('buyout'), ['any', 'with', 'without'], 'any'),
+        bundle: choose(query.get('bundle'), ['any', 'with', 'without'], 'any'), page,
         minPrice: numeric('minPrice'), maxPrice: numeric('maxPrice') };
 }
 
@@ -90,6 +92,8 @@ export function originRequest(request) {
     return request.view === 'home' ? { rpc: 'read_home_auctions', args: {} } : {
         rpc: 'read_filtered_auction_page', args: { p_view: 'browse', p_id: null,
             p_search: request.search, p_status: request.status, p_sort: request.sort, p_page: request.page,
+            ...(request.buyout && request.buyout !== 'any' || request.bundle && request.bundle !== 'any' ? { p_buyout: request.buyout || 'any' } : {}),
+            ...(request.bundle && request.bundle !== 'any' ? { p_bundle: request.bundle } : {}),
             p_trade: request.trade, p_kind: request.kind, p_min_price: request.minPrice, p_max_price: request.maxPrice },
     };
 }

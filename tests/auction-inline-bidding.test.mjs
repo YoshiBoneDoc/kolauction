@@ -415,3 +415,41 @@ test('advanced filters expand inside the toolbar and retain URL selections when 
         assert.equal(filters().props.maxPrice, null);
     } finally { trading = previousTrading; params = new URLSearchParams(); }
 });
+
+test('buyout control rotates All, Yes, No and stays before ownership', () => {
+    const updates = [];
+    const props = { id: 'filters', status: 'active', trade: 'all', ownership: 'all', onUpdate: (...args) => updates.push(args), onRangeChange() {}, onClear() {} };
+    for (const [value, label, next] of [['any', 'All', 'with'], ['with', 'Yes', 'without'], ['without', 'No', '']]) {
+        const h = harness(AuctionFilters, { ...props, buyout: value });
+        const button = h.find(n => n.props?.['aria-label'] === `Buyout: ${label}`);
+        const buttons = nodes(h.tree).filter(n => n.type === 'button');
+        assert.ok(buttons.findIndex(n => n.props?.['aria-label'] === `Buyout: ${label}`) < buttons.findIndex(n => n.props?.['aria-label'] === 'Auction ownership: All Auctions'));
+        button.props.onClick(); assert.deepEqual(updates.at(-1), ['buyout', next]);
+    }
+});
+
+test('Discover retains recommended ordering and buyout selections reset pagination', () => {
+    params = new URLSearchParams('buyout=with&page=2');
+    user = { id: 'buyer' };
+    const h = harness(AllAuctions);
+    const discover = h.find(n => n.type === 'button' && n.props?.['aria-label'] === 'Discover');
+    discover.props.onClick();
+    assert.equal(params.get('sort'), 'recommended'); assert.equal(params.get('buyout'), 'with');
+    assert.equal(params.has('page'), false);
+    params = new URLSearchParams();
+});
+
+
+test('Bundle filter rotates independently beside Buyout and before ownership', () => {
+    const updates = [];
+    for (const [value, label, next] of [['any', 'All', 'with'], ['with', 'Yes', 'without'], ['without', 'No', '']]) {
+        const h = harness(AuctionFilters, { id: 'filters', status: 'active', trade: 'all', ownership: 'all', buyout: 'with', bundle: value,
+            onUpdate: (...args) => updates.push(args), onRangeChange() {}, onClear() {} });
+        const buttons = nodes(h.tree).filter(n => n.type === 'button');
+        const bundle = h.find(n => n.props?.['aria-label'] === `Bundle: ${label}`);
+        const labels = buttons.map(n => n.props?.['aria-label']);
+        assert.equal(labels.indexOf(`Bundle: ${label}`), labels.indexOf('Buyout: Yes') + 1);
+        assert.ok(labels.indexOf(`Bundle: ${label}`) < labels.indexOf('Auction ownership: All Auctions'));
+        bundle.props.onClick(); assert.deepEqual(updates.at(-1), ['bundle', next]);
+    }
+});

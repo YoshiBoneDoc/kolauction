@@ -25,7 +25,7 @@ AuctionFiltersButton.propTypes = {
     count: PropTypes.number.isRequired, onToggle: PropTypes.func.isRequired,
 };
 
-export default function AuctionFilters({ id, status, trade, bounds, minPrice, maxPrice, ownership = null, onUpdate, onRangeChange, onClear }) {
+export default function AuctionFilters({ id, status, trade, bounds, minPrice, maxPrice, ownership = null, buyout = 'any', bundle = 'any', onUpdate, onRangeChange, onClear }) {
     const ownershipLabel = ownership === 'others' ? 'Others' : ownership === '1' ? 'Mine' : 'All Auctions';
     const nextOwnership = ownership === 'all' ? 'others' : ownership === 'others' ? '1' : '';
     const nextOwnershipLabel = ownership === 'all' ? 'Others' : ownership === 'others' ? 'Mine' : 'All Auctions';
@@ -55,6 +55,12 @@ export default function AuctionFilters({ id, status, trade, bounds, minPrice, ma
                 {auctionFilters.map(([value, label]) => <option key={value} value={value}>Status: {label}</option>)}
             </select>
         </label>
+        {[[ 'buyout', 'Buyout', buyout ], [ 'bundle', 'Bundle', bundle ]].map(([name, label, value]) => <button key={name} type="button"
+            aria-label={`${label}: ${value === 'with' ? 'Yes' : value === 'without' ? 'No' : 'All'}`} aria-pressed={value !== 'any'}
+            onClick={() => onUpdate(name, value === 'any' ? 'with' : value === 'with' ? 'without' : '')}
+            className={`inline-flex h-8 shrink-0 items-center gap-2 rounded border border-blue-700 px-3 text-sm font-semibold text-blue-700 hover:bg-blue-50 ${value === 'any' ? 'bg-white' : 'bg-blue-50'}`}>
+            {label}: {value === 'with' ? 'Yes' : value === 'without' ? 'No' : 'All'}<span aria-hidden="true" className="opacity-70">↺</span>
+        </button>)}
         {ownership != null && <button type="button" aria-label={`Auction ownership: ${ownershipLabel}`} aria-pressed={ownership !== 'all'}
             title={`Showing ${ownershipLabel}. Click to show ${nextOwnershipLabel}.`}
             onClick={() => onUpdate('mine', nextOwnership)}
@@ -71,6 +77,6 @@ export default function AuctionFilters({ id, status, trade, bounds, minPrice, ma
 AuctionFilters.propTypes = {
     id: PropTypes.string.isRequired, status: PropTypes.string.isRequired, trade: PropTypes.string.isRequired,
     bounds: PropTypes.shape({ min: PropTypes.number.isRequired, max: PropTypes.number.isRequired }),
-    minPrice: PropTypes.number, maxPrice: PropTypes.number, ownership: PropTypes.oneOf(['all', '1', 'others']),
+    buyout: PropTypes.oneOf(['any', 'with', 'without']), bundle: PropTypes.oneOf(['any', 'with', 'without']), minPrice: PropTypes.number, maxPrice: PropTypes.number, ownership: PropTypes.oneOf(['all', '1', 'others']),
     onUpdate: PropTypes.func.isRequired, onRangeChange: PropTypes.func.isRequired, onClear: PropTypes.func.isRequired,
 };

@@ -1,3 +1,5 @@
+import RelistButton from '../components/RelistButton';
+import { auctionQuantityLabel } from '../lib/bundles';
 import WinnerLink from '../components/WinnerLink';
 import { useContext, useState } from "react";
 import { UserContext } from "../context/UserContext";
@@ -134,15 +136,16 @@ const Profile = () => {
                                         <div className="profile-entry-content flex min-w-0 flex-1 items-center">
                                             <h3 className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-[13px] leading-[18px]">
                                                 <Link to={`/auction/${auction.id}`} className="break-words font-semibold profile-text hover:underline">{auction.item}</Link>
-                                                <span className="text-xs font-medium profile-muted">× {isBuy && title === 'Buy order fulfillments' ? (personallyFulfilled == null ? '—' : formatNumber(personallyFulfilled)) : formatNumber(auction.quantity)}</span>
+                                                <span className="text-xs font-medium profile-muted">{isBuy && title === 'Buy order fulfillments' ? `× ${personallyFulfilled == null ? '—' : formatNumber(personallyFulfilled)}` : auctionQuantityLabel(auction)}</span>
                                                 {bidStatus && <span className={`profile-outcome-badge ${bidStatus.className}`}>{bidStatus.label}</span>}
                                             </h3>
                                         </div>
+                                        <div className="flex shrink-0 items-center gap-2">{shadedRow && <RelistButton auction={auction} now={now} />}
                                         {historyOutcome ? <span className={`profile-outcome-badge ${historyOutcome.className}`}>{historyOutcome.label}</span> : result.status === 'active' ? <time
                                             dateTime={new Date(auction.endTime).toISOString()}
                                             title={`Ends ${new Date(auction.endTime).toLocaleString()}`}
                                             className="profile-entry-endtime"
-                                        >{formatTimeLeft(auction.endTime, now)}</time> : <span className={`profile-entry-status${historyStatus}`}>{result.label}</span>}
+                                        >{formatTimeLeft(auction.endTime, now)}</time> : <span className={`profile-entry-status${historyStatus}`}>{result.label}</span>}</div>
                                     </div>
 
                                     <div className="profile-entry-row">

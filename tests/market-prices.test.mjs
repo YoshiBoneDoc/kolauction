@@ -36,7 +36,7 @@ test('invalid data and read failures do not invent prices; previous values are e
 });
 
 test('per-item display handles multiple-item listings without unsafe multiplication; age and availability differ',()=>{
-    assert.equal(marketPriceDisplay(row(),Date.parse(row().checked_at)).text,'Approximate Market Value: 1,250,000 Meat per item');
+    assert.equal(marketPriceDisplay(row(),Date.parse(row().checked_at)).text,'Market Value: 1,250,000 Meat per item');
     assert.equal(marketPriceDisplay(row(),Date.parse(row().checked_at)+86400000).stale,true);
     assert.equal(marketPriceDisplay({...row(),available:false}).text,'Market price unavailable');
     assert.equal(marketPriceDisplay(null).text,'Market price unavailable');

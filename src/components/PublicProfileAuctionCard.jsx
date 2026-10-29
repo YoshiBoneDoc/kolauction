@@ -1,3 +1,5 @@
+import RelistButton from './RelistButton';
+import { auctionQuantityLabel } from '../lib/bundles';
 import { useContext, useId, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Link, useLocation } from 'react-router-dom';
@@ -22,7 +24,7 @@ export default function PublicProfileAuctionCard({ auction, now }) {
     const result = getAuctionResult(auction, now);
     const displayStatus = getAuctionDisplayStatus(auction, result);
     const active = result.status === 'active' && !auction.buyClosingReason;
-    const itemLabel = `${auction.item} ×${itemCount(auction.quantity)}`;
+    const itemLabel = `${auction.item} ${auctionQuantityLabel(auction)}`;
     const buyPurchased = Number(auction.purchasedQuantity || 0);
     const buyTarget = Math.max(buyPurchased, Number(auction.quantity || 0) - Number(auction.reducedQuantity || 0));
     const buyRemaining = Math.max(0, buyTarget - buyPurchased);
@@ -59,7 +61,7 @@ export default function PublicProfileAuctionCard({ auction, now }) {
                 <div className="profile-public-row-identity">
                     {auction.image && <Link to={`/auction/${auction.id}`} state={linkState} aria-label={`View ${itemLabel}`} className="profile-public-row-image"><img src={auction.image} alt="" loading="lazy" /></Link>}
                     <span className="profile-public-row-item-text">
-                        <span className="profile-public-row-title"><Link to={`/auction/${auction.id}`} state={linkState} title={itemLabel} className="profile-public-row-name">{auction.item}</Link> <span className="profile-public-row-quantity">×{itemCount(auction.quantity)}</span></span>
+                        <span className="profile-public-row-title"><Link to={`/auction/${auction.id}`} state={linkState} title={itemLabel} className="profile-public-row-name">{auction.item}</Link> <span className="profile-public-row-quantity">{auctionQuantityLabel(auction)}</span></span>
                         <span className="profile-public-row-number">
                             {auction.auctionNumber ? `#${auction.auctionNumber}` : 'Auction'} · {isBuy
                                 ? <>{itemCount(buyPurchased)} / {itemCount(buyTarget)} filled{buyRemaining > 0 && <> · {itemCount(buyRemaining)} remaining</>}</>
@@ -92,6 +94,7 @@ export default function PublicProfileAuctionCard({ auction, now }) {
                     <span className="profile-public-row-label">{secondaryPrice}</span>
                 </div>
                 <div className="profile-public-row-actions">
+                    <RelistButton auction={auction} now={now} />
                     {currentUserCanBid && <button type="button" aria-expanded={showBid} aria-controls={formId} onClick={() => setShowBid(value => !value)} className="profile-public-row-bid">{showBid ? 'Close' : 'Bid'}</button>}
                     {hasBuyout && <InstantPurchaseAction auction={auction} compact dense showPrice={false} />}
                 </div>

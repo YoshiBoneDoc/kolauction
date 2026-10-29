@@ -9,6 +9,9 @@ export default function UpdateLog() {
         <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-4 py-8 sm:px-6">
             <h1 className="text-3xl font-bold text-blue-700">Update Log</h1>
             <ul className="list-disc space-y-4 pl-5 text-gray-700">
+                <li>Added a Relist option for expired, ended, or cancelled auctions, available on the All Auctions page, your account profile, and seller profile pages.</li>
+                <li>Added new filters for bundled auctions and buyout availability.</li>
+                <li>Updated default sorting to show auctions ending within 3 hours first, followed by newest listings. Select Discover to return to this sorting order.</li>
                 <li>Added bundled item auctions! Sell multiple different items together in one listing, with bids covering the entire bundle. Choose Bundle under Sale type when <Link to="/auction-item" className="text-blue-700 underline">creating a Sell auction</Link>.</li>
                 <li>Refreshed the <Link to="/profile" className="text-blue-700 underline">Account Profile</Link> and <Link to={currentUser ? `/seller/${currentUser.id}?view=stats` : '/login'} className="text-blue-700 underline">Seller Profile</Link> pages with cleaner layouts and easier navigation.</li>
                 <li>Added growing KoL Meat stacks to your <Link to="/profile" className="text-blue-700 underline">Account Profile</Link>! Watch your stack grow as your total Meat traded reaches new milestones.</li>
@@ -27,6 +30,6 @@ export default function UpdateLog() {
                 <li>Adjusted Escrow fees. See the <Link to="/info#escrow-fees-title" className="text-blue-700 underline">fee table</Link> for the updated rates.</li>
             </ul>
         </main>
-        <SiteFooter />
+        <SiteFooter className="home-footer" />
     </div>;
 }

@@ -38,6 +38,8 @@ export default function AllAuctions() {
         buy: 'border-red-300 bg-red-100 text-red-800 hover:bg-red-200',
     }[kind];
     const cycleIcon = <span aria-hidden="true" className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center text-base leading-none opacity-70">↺</span>;
+    const buyout = ['with', 'without'].includes(params.get('buyout')) ? params.get('buyout') : 'any';
+    const bundle = ['with', 'without'].includes(params.get('bundle')) ? params.get('bundle') : 'any';
     const trade = ['escrow', 'direct', 'none'].includes(params.get('trade')) ? params.get('trade') : 'all';
     const minPrice = AUCTION_PRICE_RANGE_ENABLED ? parsePrice(params.get('minPrice')) : null;
     const maxPrice = AUCTION_PRICE_RANGE_ENABLED ? parsePrice(params.get('maxPrice')) : null;
@@ -101,7 +103,7 @@ export default function AllAuctions() {
                             {[
                                 [deadlineSort, ['newest', 'Newest'], ['activity', 'Recent Activity']],
                                 [
-                                    ['recommended', 'Recommended'],
+                                    ['recommended', 'Discover'],
                                     [sort === 'bids-desc' ? 'bids-asc' : 'bids-desc', `Most Bids ${sort === 'bids-desc' ? '▴' : sort === 'bids-asc' ? '▾' : '▴▾'}`],
                                     [sort === 'price-desc' ? 'price-asc' : 'price-desc', `Price ${sort === 'price-desc' ? '▴' : sort === 'price-asc' ? '▾' : '▴▾'}`],
                                 ],
@@ -128,7 +130,7 @@ export default function AllAuctions() {
                             <span className="flex-1 text-center">{kindLabel}</span>{cycleIcon}
                         </button>
                         <AuctionFiltersButton open={filtersOpen} controls={filtersId}
-                            count={Number(status !== 'active') + Number(trade !== 'all') + Number(minPrice != null || maxPrice != null) + Number(ownershipFiltered)}
+                            count={Number(status !== 'active') + Number(trade !== 'all') + Number(minPrice != null || maxPrice != null) + Number(ownershipFiltered) + Number(buyout !== 'any') + Number(bundle !== 'any')}
                             onToggle={() => setFiltersOpen(previous => !previous)} />
                         <button type="button" aria-label="View all auctions" onClick={clearAdvancedFilters}
                             title="Reset search, sorting, and all filters"
@@ -136,7 +138,7 @@ export default function AllAuctions() {
                             <span className="flex-1 text-center">View All</span>{cycleIcon}
                         </button>
                     </div>
-                    {filtersOpen && <AuctionFilters id={filtersId} status={status} trade={trade} bounds={priceBounds} minPrice={minPrice} maxPrice={maxPrice}
+                    {filtersOpen && <AuctionFilters id={filtersId} status={status} trade={trade} buyout={buyout} bundle={bundle} bounds={priceBounds} minPrice={minPrice} maxPrice={maxPrice}
                         ownership={currentUser ? mineOnly ? '1' : othersOnly ? 'others' : 'all' : null}
                         onUpdate={update} onRangeChange={updatePriceRange} onClear={clearAdvancedFilters} />}
                 </section>

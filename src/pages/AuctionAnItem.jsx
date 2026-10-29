@@ -1,5 +1,7 @@
+import { canRelist, relistDraft } from '../lib/relistAuction';
+import { createMarketPriceService } from '../lib/marketPrices';
 import BundleContents from '../components/BundleContents';
-import { prepareBundle, bundleTitle, normalizeBundleTitle, MAX_BUNDLE_ITEMS, MAX_BUNDLE_TITLE_LENGTH } from '../lib/bundles';
+import { prepareBundle, bundleCover, bundleTitle, normalizeBundleTitle, MAX_BUNDLE_ITEMS, MAX_BUNDLE_TITLE_LENGTH } from '../lib/bundles';
 import { effectiveFeePercent, feeLabel } from '../lib/feeDisplay';
 import { escrowFee } from '../lib/escrowFees';
 import { buyFunding } from '../lib/buyOrders';
@@ -20,6 +22,7 @@ import { customAuctionEnd, localDateTimeInput, formatAuctionEnd, MAX_AUCTION_DUR
 
 const catalog = createItemCatalogService(supabase, items);
 const resultLimit = 100;
+const coverPrices = createMarketPriceService(supabase);
 const fieldClass = 'mb-4 block min-h-11 w-full min-w-0 rounded border border-gray-400 bg-white p-3 text-base text-gray-900';
 
 export default function AuctionAnItem() {
@@ -27,7 +30,8 @@ export default function AuctionAnItem() {
     const { currentUser } = useContext(UserContext);
     const kolIdentity = useKolIdentity();
     const navigate = useNavigate();
-    const { hash } = useLocation();
+    const { hash, state, key: locationKey } = useLocation();
+    const relistHandled = useRef(null);
     const [catalogItems, setCatalogItems] = useState(items);
     useEffect(() => {
         let active = true;
@@ -57,6 +61,13 @@ export default function AuctionAnItem() {
     const [bundleEntries, setBundleEntries] = useState([]);
     const [bundleImageItemId, setBundleImageItemId] = useState(null);
     const [bundleTitleText, setBundleTitleText] = useState('');
+    const [bundlePrices, setBundlePrices] = useState(new Map());
+    const bundlePriceIds = bundleEntries.map(entry => Number(entry.id)).sort((a, b) => a - b).join(',');
+    useEffect(() => {
+        let active = true;
+        if (bundlePriceIds) coverPrices.load(bundlePriceIds.split(',').map(Number)).then(prices => { if (active) setBundlePrices(prices); });
+        return () => { active = false; };
+    }, [bundlePriceIds]);
     const [bundleTitleConflict, setBundleTitleConflict] = useState(false);
     const bundleTitleInput = useRef(null);
     const [preview, setPreview] = useState(null);
@@ -100,6 +111,22 @@ export default function AuctionAnItem() {
         section.scrollIntoView({ block: 'start' });
         protectionLinkHandled.current = viewer;
     }, [protectionLink, isBuy, escrowMode, preview, currentUser?.id]);
+    useEffect(() => {
+        if (relistHandled.current === locationKey || !canRelist(state?.relist || {}, currentUser)) return;
+        relistHandled.current = locationKey;
+        const draft = relistDraft(state.relist);
+        setAuctionKind(draft.kind);
+        setSelectedItem(draft.itemId); setItemSearch(draft.kind === 'bundle' ? '' : draft.itemSearch);
+        setQuantity(draft.quantity); setMinBidMeat(draft.minimum);
+        setInstantPrice(draft.buyout); setShowBuyout(Boolean(draft.buyout));
+        setEscrowMode(draft.escrow); setDeliveryMode(draft.delivery);
+        const preset = [6, 12, 24, 72, 168, 336, 720].includes(draft.hours);
+        setAuctionTime(String(preset ? draft.hours : 24));
+        setCustomDuration(!preset);
+        setCustomEndTime(preset ? '' : localDateTimeInput(auctionNow() + draft.hours * 3600000));
+        setBundleEntries(draft.entries); setBundleTitleText(draft.title); setBundleImageItemId(draft.cover);
+        setPreview(null); setError(''); setBundleTitleConflict(false);
+    }, [locationKey, state, currentUser]);
     const deferredSearch = useDeferredValue(itemSearch);
     const hasItemSearch = Boolean(itemSearch.trim());
     const matchingItems = useMemo(() => {
@@ -144,7 +171,7 @@ export default function AuctionAnItem() {
             catch (failure) { setError(failure.message); return; }
         }
         setPreview({ item: contents ? bundleTitle(contents, customTitle) : item.name, itemId: contents ? contents[0].id : item.id, quantity: contents ? 1 : count, ...(contents ? { bundleItems: contents, bundleTitle: customTitle || null, bundleImageItemId: contents.some(entry => entry.id === bundleImageItemId) ? bundleImageItemId : null } : {}), minBidMeat: minimum, instantPurchasePrice: purchasePrice, auctionTime, escrowMode, ...(customEndAt ? { customEndAt } : {}),
-            image: contents ? (contents.find(entry => entry.id === bundleImageItemId) || contents[0]).image : itemImageUrl(item.image), ...(isBuy ? { auctionKind, deliveryMode } : {}) });
+            image: contents ? bundleCover(contents, bundleImageItemId, bundlePrices).image : itemImageUrl(item.image), ...(isBuy ? { auctionKind, deliveryMode } : {}) });
         setError('');
         setBundleTitleConflict(false);
         requestAnimationFrame(() => previewHeading.current?.focus());

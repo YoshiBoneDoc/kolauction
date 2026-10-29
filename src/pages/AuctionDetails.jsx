@@ -1,3 +1,4 @@
+import { auctionQuantityLabel } from '../lib/bundles';
 import BundleContents from '../components/BundleContents';
 import AuctionEndedTime from '../components/AuctionEndedTime';
 import MarketPrice from '../components/MarketPrice';
@@ -65,7 +66,7 @@ export default function AuctionDetails() {
                     </div>
                     <div className="min-w-0 space-y-6 text-left">
                         <div className="space-y-1">
-                            <h1 className="break-words text-3xl font-bold text-blue-600 sm:text-4xl">{auction.item} <span className="text-xl text-gray-600">×{auction.quantity.toLocaleString('en-US')}</span></h1>
+                            <h1 className="break-words text-3xl font-bold text-blue-600 sm:text-4xl">{auction.item} <span className="text-xl text-gray-600">{auctionQuantityLabel(auction)}</span></h1>
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-600">
                                 <p className="leading-6 text-gray-800">{auction.auctionNumber && <>Auction #{auction.auctionNumber} · </>}Min Bid: <span title={`${auction.minBidMeat.toLocaleString('en-US')} Meat`}>{formatCompactMeat(auction.minBidMeat)}{auction.minBidMeat < 1000 ? ' Meat' : ''}{auction.quantity > 1 && <span className="text-xs text-gray-700"> · {formatPerItemMeat(auction.minBidMeat, auction.quantity)} each</span>}</span></p>
                                 <span aria-hidden="true">·</span>

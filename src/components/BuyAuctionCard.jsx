@@ -1,3 +1,4 @@
+import RelistButton from './RelistButton';
 import AuctionEndedTime from './AuctionEndedTime';
 import { useContext, useId, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
@@ -125,7 +126,7 @@ export default function BuyAuctionCard({ auction, now, inlineReserve = false, ex
                 </div>
             </div>
             <footer className="mt-1 flex min-h-8 shrink-0 items-end justify-end gap-2">
-                {ended && !showForm ? <AuctionEndedTime auction={auction} /> : showForm ? <button type="button" onClick={onToggleReserve} disabled={pending} aria-label="Close reservation form" aria-expanded={true} aria-controls={formId} className="relative z-10 inline-flex h-8 min-w-24 shrink-0 items-center justify-center rounded-[2px] border border-gray-300 bg-white px-4 py-0 text-xs font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-500">Close</button>
+                {ended && !showForm ? <><AuctionEndedTime auction={auction} /><div className="relative z-10 ml-auto flex shrink-0 flex-col items-center gap-0.5">{owns && <span className="text-[10px] text-gray-500">Your Listing</span>}<RelistButton auction={auction} now={now} /></div></> : showForm ? <button type="button" onClick={onToggleReserve} disabled={pending} aria-label="Close reservation form" aria-expanded={true} aria-controls={formId} className="relative z-10 inline-flex h-8 min-w-24 shrink-0 items-center justify-center rounded-[2px] border border-gray-300 bg-white px-4 py-0 text-xs font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-500">Close</button>
                     : owns ? <span className="rounded bg-white/70 px-2 py-1 text-[11px] font-medium text-gray-500">Your Listing</span>
                         : inlineReserve && (active || reservation) ? <button type="button" disabled={currentUser?.isBanned || !reservation && available <= 0} onClick={onToggleReserve}
                             aria-expanded={false} aria-controls={formId} className={`relative z-10 ${actionClass}`}>{reservation ? 'View reservation' : 'Sell to this order'}</button>

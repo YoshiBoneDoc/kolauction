@@ -1,3 +1,5 @@
+import RelistButton from './RelistButton';
+import { auctionQuantityLabel } from '../lib/bundles';
 import FittedPrice from './FittedPrice';
 import SellPrice from './SellPrice';
 import BuyAuctionCard from './BuyAuctionCard';
@@ -27,7 +29,7 @@ export default function AuctionCard({ auction, now }) {
         <article className={`relative isolate flex min-w-0 flex-col rounded-lg border ${auctionCardBackground(result.status)} p-4 shadow [&_button]:relative [&_button]:z-10 [&_form]:relative [&_form]:z-10 auction-card`}>
             <Link to={`/auction/${auction.id}`} state={linkState} className="flex flex-col items-center gap-3 text-center after:absolute after:inset-0 after:z-0 after:cursor-pointer after:rounded-lg focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-blue-500">
                 {auction.image && <img src={auction.image} alt="" loading="lazy" className="h-24 w-24 object-contain" />}
-                <h2 className="w-full break-words text-xl font-bold text-[#14248A]">{auction.item} <span className="text-[#5365AB]">×{auction.quantity.toLocaleString('en-US')}</span></h2>
+                <h2 className="w-full break-words text-xl font-bold text-[#14248A]">{auction.item} <span className="text-[#5365AB]">{auctionQuantityLabel(auction)}</span></h2>
             </Link>
             {auction.auctionNumber && <p className="mt-2 text-center text-xs text-gray-600">Auction #{auction.auctionNumber}</p>}
             <p className="relative z-10 mx-auto mt-2 w-fit break-words text-center text-sm">Sold by <SellerLink auction={auction} /></p>
@@ -57,6 +59,7 @@ export default function AuctionCard({ auction, now }) {
                 ) : (
                     <button onClick={() => setShowBid(true)} className="min-h-11 w-full rounded bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700">Place Bid</button>
                 ))}
+                {!active && <RelistButton auction={auction} now={now} />}
                 {!active && <p className={`text-center text-lg font-bold ${displayStatus.color}`}>{displayStatus.label}</p>}
                 <Link to={`/auction/${auction.id}`} state={linkState} className="relative z-10 mt-2 flex min-h-11 items-center justify-center text-center text-sm text-blue-700 underline">
                     {active ? 'More Info' : 'View outcome and history'}

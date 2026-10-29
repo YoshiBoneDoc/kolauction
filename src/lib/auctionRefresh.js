@@ -17,6 +17,8 @@ export function auctionReadRequest(pathname, search = '', viewerId = null) {
         ...(!seller && viewerId && params.get('mine') === 'others' ? { excludeOwn: true } : {}), search: params.get('q') || '',
         ...(['buy', 'sell'].includes(params.get('kind')) ? { kind: params.get('kind') } : {}),
         status,
+        ...(!seller && ['with', 'without'].includes(params.get('buyout')) ? { buyout: params.get('buyout') } : {}),
+        ...(!seller && ['with', 'without'].includes(params.get('bundle')) ? { bundle: params.get('bundle') } : {}),
         ...(!seller && parsePrice(params.get('minPrice')) != null ? { minPrice: parsePrice(params.get('minPrice')) } : {}),
         ...(!seller && parsePrice(params.get('maxPrice')) != null ? { maxPrice: parsePrice(params.get('maxPrice')) } : {}),
         ...(['escrow', 'direct', 'none'].includes(params.get('trade')) ? { trade: params.get('trade') } : {}),

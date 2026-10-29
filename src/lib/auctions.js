@@ -123,11 +123,11 @@ export function createAuctionService(client, { publicReader = null } = {}) {
     }
 
     return {
-        async load({ view = 'browse', id = null, sellerId = null, excludeOwn = false, kind = 'all', search = '', status = 'active', sort = resolveAuctionSort(status), trade = 'all', page = 1, minPrice = null, maxPrice = null, signal, fresh = false } = {}) {
+        async load({ view = 'browse', id = null, sellerId = null, excludeOwn = false, kind = 'all', buyout = 'any', bundle = 'any', search = '', status = 'active', sort = resolveAuctionSort(status), trade = 'all', page = 1, minPrice = null, maxPrice = null, signal, fresh = false } = {}) {
             // Browsing is read-only. The existing bot tick expires all auction
             // types; write RPCs independently validate deadlines under their locks.
             const requestStartedAt = auctionClockRequestStarted();
-            const sharedRequest = { view, sellerId, excludeOwn, kind, search, status, sort, trade, page, minPrice, maxPrice, signal, fresh };
+            const sharedRequest = { view, sellerId, excludeOwn, kind, buyout, bundle, search, status, sort, trade, page, minPrice, maxPrice, signal, fresh };
             let request;
             if (await publicReader?.accepts(sharedRequest)) request = publicReader.load(sharedRequest).then(data => ({ data }));
             else if (view === 'home') request = requireClient().rpc('read_home_auctions');
@@ -137,6 +137,8 @@ export function createAuctionService(client, { publicReader = null } = {}) {
                 p_search: search, p_status: status,
                 ...(['browse', 'seller'].includes(view) && ['escrow', 'direct', 'none'].includes(trade) ? { p_trade: trade } : {}),
                 ...(['buy', 'sell'].includes(kind) ? { p_kind: kind, p_trade: trade } : {}),
+                ...(view === 'browse' && (buyout !== 'any' || bundle !== 'any') ? { p_buyout: buyout } : {}),
+                ...(view === 'browse' && bundle !== 'any' ? { p_bundle: bundle } : {}),
                 ...(view === 'browse' ? { p_trade: trade, p_kind: kind, p_min_price: minPrice, p_max_price: maxPrice } : {}),
                 p_sort: sort, p_page: page,
             });

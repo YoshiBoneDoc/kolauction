@@ -55,7 +55,17 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         migrations=sorted([*ROOT.glob('supabase/migrations/*.sql'),*ROOT.glob('supabase/migrations/queue/*.sql')],key=lambda p:p.name)
         assert len({p.name for p in migrations})==len(migrations)
         for migration in migrations:
+            if migration.name.startswith('202610290144_'):
+                upgrade_transfer=str(uuid4());upgrade_attempt=str(uuid4())
+                sql("insert into khub_bot.closet_transfers(id,dedupe_key,source,meat,state,attempt,before_state) values('"+upgrade_transfer+"','soft-upgrade-fixture','sale_fee',700,'unknown','"+upgrade_attempt+"','{\"inventory\":\"9000\",\"closet\":\"1000\"}');")
+                sql("insert into khub_bot.closet_recovery_attempts(attempt,transfer_id,legacy,before_state,state,deadline,reason) values('"+upgrade_attempt+"','"+upgrade_transfer+"',true,'{\"inventory\":\"9000\",\"closet\":\"1000\"}','review',clock_timestamp()-interval '1 hour','Historical attempt has no durable submission fence; elapsed time cannot authorize replay.');")
             sql(migration.read_text())
+            if migration.name.startswith('202610290144_'):
+                assert sql("select state='watching' and soft_retry_window_started_at is not null and deadline>clock_timestamp() from khub_bot.closet_recovery_attempts where attempt='"+upgrade_attempt+"';")=='t'
+                assert sql("select state from khub_bot.closet_transfers where id='"+upgrade_transfer+"';")=='unknown'
+                assert sql("select count(*) from khub_bot.closet_soft_retries where transfer_id='"+upgrade_transfer+"';")=='0'
+                sql("select public.bot_reconcile_closet_transfer('"+upgrade_transfer+"',true,'local upgrade fixture cleanup');")
+                print('PASS: upgrade re-observes an old unchanged legacy review without submitting or immediately approving a retry')
         catalog_path=ROOT/'src/data/items.json'
         if not catalog_path.exists(): catalog_path=ROOT/'catalog/items.json'
         catalog=json.loads(catalog_path.read_text())
@@ -120,6 +130,17 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         assert row(lot)['image']==row(lot)['bundle_items'][1]['image']
         call('select public.create_bundle_auction('+lit(json.dumps(parts))+',100,24,p_image_item_id=>1);',error='cover image')
         print('PASS: optional title validated, trimmed and immutable; cover must be a real component')
+        # Default cover uses highest UNIT quote, not component ID or lot quantity.
+        sql("insert into khub_bot.market_prices(item_id,price_meat,available,observed_at,checked_at) values(2,100,true,clock_timestamp(),clock_timestamp()),(364,200,true,clock_timestamp(),clock_timestamp()) on conflict(item_id) do update set price_meat=excluded.price_meat,available=true;")
+        auto_cover=create(items=[{'id':2,'quantity':1000},{'id':364,'quantity':1}])
+        assert row(auto_cover)['image']==row(auto_cover)['bundle_items'][1]['image']
+        explicit_cover=call('select public.create_bundle_auction('+lit(json.dumps(parts))+",100,24,p_image_item_id=>2);")
+        assert row(explicit_cover)['image']==row(explicit_cover)['bundle_items'][0]['image']
+        sql("delete from khub_bot.market_prices where item_id in (2,364);")
+        fallback_cover=create()
+        assert row(fallback_cover)['image']==row(fallback_cover)['bundle_items'][0]['image']
+        print('PASS: highest-priced component is default cover, explicit choice wins, unavailable quotes have stable fallback')
+
         frozen=row(lot)['bundle_items'];assert len(frozen)==2 and row(lot)['quantity']==1
         for wrong,meat,actor in [([{'id':2,'quantity':1}],0,48889601),([parts[0]],0,48889601),([*parts,{'id':1,'quantity':1}],0,48889601),(parts,1,48889601),(parts,0,48889602)]:
             mid,result,_=ingest(lot,'list',meat,wrong,actor)
@@ -280,6 +301,43 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         assert int(sql('select count(*) from net.fixture_requests;'))==before_requests+1
         print('PASS: website bids invalidate; rejected and rolled-back bids queue nothing; private hook configuration denied to API roles')
         print('PASS: urgent auctions first, then newest; explicit newest sorting unchanged')
+        # Buyout predicates apply to the full matching set before count/pagination.
+        buyout_lots=[]
+        for index in range(26):
+            aid=call('select public.create_bundle_auction('+lit(json.dumps(parts))+f",100,24,p_instant_purchase_price=>5000,p_escrow_mode=>false,p_title=>'Buyout fixture {index}');")
+            buyout_lots.append(aid)
+        no_buyout=call('select public.create_bundle_auction('+lit(json.dumps(parts))+",100,24,p_escrow_mode=>false,p_title=>'Buyout fixture without');")
+        def buyout_page(mode,page=1,uid=buyer,view='browse',target='null'):
+            return json.loads(call(f"select public.read_filtered_auction_page('{view}',{target},'Buyout fixture','active','newest',{page},'all','all',null,null,'{mode}');",uid))
+        first=buyout_page('with');second=buyout_page('with',2)
+        assert first['total']==26 and len(first['rows'])==24 and len(second['rows'])==2
+        assert all(r['instant_purchase_price']=='5000' or r['instant_purchase_price']==5000 for r in first['rows']+second['rows'])
+        assert buyout_page('without')['total']==1 and buyout_page('without')['rows'][0]['id']==no_buyout
+        assert buyout_page('any')['total']==27
+        assert buyout_page('with',uid=seller,view='seller',target=lit(seller))['total']==26
+        assert buyout_page('with',uid=seller,view='others')['total']==0
+        anonymous=json.loads(sql("set role anon;select public.read_filtered_auction_page('browse',null,'Buyout fixture','active','newest',1,'all','all',null,null,'with');"))
+        assert anonymous['total']==26 and all(r.get('usernames_visible') is False for r in anonymous['rows']), anonymous
+        assert 'Bundle Seller' not in json.dumps(anonymous)
+        # Both filters combine BEFORE pagination; ordinary listings remain in No.
+        def bundle_page(mode,buyout='any',page=1,search='Buyout fixture'):
+            return json.loads(call(f"select public.read_filtered_auction_page('browse',null,{lit(search)},'active','newest',{page},'all','all',null,null,'{buyout}','{mode}');",buyer))
+        assert bundle_page('with','with')['total']==26
+        assert len(bundle_page('with','with',2)['rows'])==2
+        assert bundle_page('with','without')['total']==1
+        assert bundle_page('without')['total']==0
+        plain=call("select public.create_auction('asbestos ore',1,100,24,null,null,364,false);")
+        singles=bundle_page('without',search='asbestos ore')
+        assert plain in [r['id'] for r in singles['rows']]
+        assert all(len(r.get('bundle_items',[]))<=1 for r in singles['rows'])
+        bundles=bundle_page('with',search='asbestos ore')
+        assert all(len(r['bundle_items'])>1 for r in bundles['rows'])
+        assert bundle_page('any',search='asbestos ore')['total']==singles['total']+bundles['total']
+        call(f"select public.cancel_auction('{plain}');")
+        print('PASS: Bundle All/Yes/No combines with Buyout and preserves pagination and single-item listings')
+        for fixture in [*buyout_lots,no_buyout]: call(f"select public.cancel_auction('{fixture}');")
+        print('PASS: buyout filters preserve full counts, pagination, ownership filtering and anonymous privacy')
+
         order=call("select public.create_buy_auction(2,10,200,24,'finished');")
         required=int(sql(f"select funding_required from khub_bot.buy_orders where auction_id='{order}';"))
         assert ingest(order,'fund',required)[1]=='accepted'
@@ -537,5 +595,217 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         sql('set role service_role;select public.bot_register_gift_mail('+lit(json.dumps([envelope]))+'::jsonb);')
         assert sql("select resolved_at is null from khub_bot.gift_mail_reviews where mail_id='206200142';")=='t'
         print('PASS: untracked opened gifts create one review without repeated exceptions/updates or new funds; changed mail reopens review safely')
+        # 143: use disposable financial fixtures only. Original production rows
+        # are never changed by installing the migration itself.
+        sql("update khub_bot.deliveries set state='sent',sent_at=clock_timestamp() where state not in ('sent','cancelled'); update khub_bot.closet_transfers set state='moved' where state<>'moved'; update khub_bot.gift_mail_reviews set resolved_at=clock_timestamp(),resolution='local fixture reset' where resolved_at is null;")
+        big_snapshot={'meat':'9000000000000000','closetMeat':'1000','items':{},'closetItems':{}}
+        counter=0
+        def recovery_claim():
+            global counter
+            counter+=1
+            sql("select khub_bot.queue_closet('recovery-test-"+str(counter)+"','sale_fee',null,null,700,'[]');")
+            return json.loads(sql('set role service_role;select public.bot_claim_closet_transfer_v2('+lit(json.dumps(big_snapshot))+"::jsonb,0,0,'{}');"))
+        def due_for(d):
+            sql("update khub_bot.closet_recovery_attempts set next_check_at=clock_timestamp()-interval '1 second' where attempt='"+d['attempt']+"';")
+            return next(x for x in json.loads(sql('select public.bot_due_closet_recovery();')) if x['closet_reference']==d['closet_reference'])
+        def arm(d):sql("select public.bot_arm_closet_transfer('"+d['id']+"','"+d['attempt']+"');")
+        def uncertain(d):sql("select public.bot_ack_closet_transfer('"+d['id']+"','"+d['attempt']+"',false,'local fixture lost response');")
+        def observe(d,check,closet='1000',inventory='8999999999999300',failed=False,error=None):
+            payload={'read_failed':True} if failed else {'closet':closet,'inventory':inventory}
+            result=sql("select public.bot_record_closet_recovery('"+d['id']+"','"+d['attempt']+"','"+check['check_id']+"',"+lit(json.dumps(payload))+"::jsonb);",error=error)
+            return None if error else json.loads(result)
+        d=recovery_claim();assert d['closet_recovery_version']==1
+        assert due_for(d)['recovery_status']=='not_attempted'
+        assert sql("select state from khub_bot.closet_transfers where id='"+d['id']+"';")=='pending'
+        sql("select public.bot_arm_closet_transfer('"+d['id']+"','"+d['attempt']+"');",error='attempt changed')
+        fresh=json.loads(sql('select public.bot_claim_closet_transfer_v2('+lit(json.dumps(big_snapshot))+"::jsonb,0,0,'{}');"))
+        assert fresh['id']==d['id'] and fresh['attempt']!=d['attempt']
+        arm(fresh)
+        sql("select public.bot_arm_closet_transfer('"+fresh['id']+"','"+fresh['attempt']+"');",error='already armed')
+        uncertain(fresh)
+        sql('select public.bot_isolate_closet_transfers();')
+        assert sql("select count(*) from khub_bot.closet_transfer_reviews where transfer_id='"+fresh['id']+"';")=='0'
+        check=due_for(fresh)
+        assert observe(fresh,check,'1700','5000')['status']=='moved'
+        assert observe(fresh,check,'1700','5000')['status']=='moved' # lost RPC response replay
+        assert sql("select count(*) from khub_bot.closet_recovery_observations where attempt='"+fresh['attempt']+"';")=='1'
+        sql("select public.bot_ack_closet_transfer('"+fresh['id']+"','"+fresh['attempt']+"',true,'late successful acknowledgment');")
+        print('PASS: never-armed attempts requeue with stale-write fencing; exact delayed closet delta resolves despite later inventory changes; acknowledgment/recovery idempotent')
+        d=recovery_claim();arm(d);uncertain(d)
+        for n in range(5):
+            if n==4:sql("update khub_bot.closet_recovery_attempts set deadline=clock_timestamp()-interval '1 second' where attempt='"+d['attempt']+"';")
+            check=due_for(d);result=observe(d,check)
+            assert result['status']==('review' if n==4 else 'watching')
+        assert sql("select state from khub_bot.closet_transfers where id='"+d['id']+"';")=='unknown'
+        assert sql("select count(*) from khub_bot.closet_recovery_observations where attempt='"+d['attempt']+"';")=='5'
+        assert d['closet_reference'] not in [x['closet_reference'] for x in json.loads(sql('select public.bot_due_closet_recovery();'))]
+        sql('select public.bot_isolate_closet_transfers();select public.bot_isolate_closet_transfers();')
+        assert sql("select count(*) from khub_bot.closet_transfer_reviews where transfer_id='"+d['id']+"';")=='1'
+        assert json.loads(sql('select public.bot_worker_status();'))['closetRecoveryReviewKey']
+        sql("select khub_bot.queue_closet('recovery-blocked-meat','sale_fee',null,null,700,'[]');")
+        assert sql('select public.bot_claim_closet_transfer_v2('+lit(json.dumps(big_snapshot))+"::jsonb,0,0,'{}');")==''
+        print('PASS: incomplete/too-short observation history cannot authorize a soft retry; review alerts deduplicate; same-asset holds remain')
+        sql("update khub_bot.closet_transfers set state='moved' where state<>'moved';")
+        d=recovery_claim();arm(d);uncertain(d);check=due_for(d)
+        assert observe(d,check,'1350')['status']=='review'
+        assert sql("select state from khub_bot.closet_transfers where id='"+d['id']+"';")=='unknown'
+        sql("update khub_bot.closet_transfers set state='moved' where id='"+d['id']+"';")
+        d=recovery_claim();arm(d);uncertain(d)
+        stale=due_for(d);current=due_for(d)
+        observe(d,stale,'1700',error='stale observation')
+        assert observe(d,current,failed=True)['status']=='watching'
+        assert sql("select state from khub_bot.closet_transfers where id='"+d['id']+"';")=='unknown'
+        lookup=json.loads(sql('select public.bot_lookup_closet_transfer('+lit(d['closet_reference'])+');'))
+        assert lookup['recovery']['state']=='watching' and lookup['recovery_observations'][0]['snapshot']['read_failed']
+        sql("update khub_bot.closet_transfers set state='moved' where id='"+d['id']+"';")
+        # An older worker's claim has NO native pre-submit marker. Import it as
+        # legacy; even the apparent expected delta cannot be attributed safely.
+        sql("select khub_bot.queue_closet('recovery-legacy','sale_fee',null,null,700,'[]');")
+        legacy=json.loads(sql('select public.bot_claim_closet_transfer('+lit(json.dumps(big_snapshot))+"::jsonb,0,0,'{}');"))
+        uncertain(legacy)
+        check=next(x for x in json.loads(sql('select public.bot_due_closet_recovery();')) if x['closet_reference']==legacy['closet_reference'])
+        assert check['legacy'] and observe(legacy,check,'1700')['status']=='watching'
+        assert sql("select armed_at is null from khub_bot.closet_recovery_attempts where attempt='"+legacy['attempt']+"';")=='t'
+        sql("update khub_bot.closet_recovery_attempts set deadline=clock_timestamp()-interval '1 second' where attempt='"+legacy['attempt']+"';")
+        assert observe(legacy,due_for(legacy),'1700')['status']=='review'
+        sql("set role anon;select public.bot_due_closet_recovery();",error='permission denied')
+        sql("set role authenticated;select public.bot_arm_closet_transfer('"+legacy['id']+"','"+legacy['attempt']+"');",error='permission denied')
+        print('PASS: partial changes, failed reads, stale leases, legacy attempts and unauthorized callers cannot trigger unsafe completion or replay; observations survive separate DB calls')
+        # An unresolved Meat move must not prevent recovery of a different item.
+        sql("select khub_bot.queue_closet('recovery-item','sale_fee',null,null,0,'[{\"id\":2,\"quantity\":3}]');")
+        item_snapshot={**big_snapshot,'items':{'2':'9000000000000000'},'closetItems':{'2':'5'}}
+        item_move=json.loads(sql('select public.bot_claim_closet_transfer_v2('+lit(json.dumps(item_snapshot))+"::jsonb,0,0,'{}');"))
+        assert item_move['item_id']==2;arm(item_move);uncertain(item_move)
+        assert observe(item_move,due_for(item_move),'8','2')['status']=='moved'
+        assert sql("select state from khub_bot.closet_transfers where id='"+legacy['id']+"';")=='unknown'
+        sql("update khub_bot.closet_transfers set state='moved' where state<>'moved';")
+        d=recovery_claim();arm(d)
+        sql("select public.bot_release_unsubmitted_closet('"+d['id']+"','"+d['attempt']+"');")
+        after_release=json.loads(sql('select public.bot_claim_closet_transfer_v2('+lit(json.dumps(big_snapshot))+"::jsonb,0,0,'{}');"))
+        sql("select public.bot_release_unsubmitted_closet('"+d['id']+"','"+d['attempt']+"');") # old response replay cannot cancel new claim
+        assert sql("select attempt::text from khub_bot.closet_transfers where id='"+d['id']+"';")==after_release['attempt']
+        sql("select public.bot_arm_closet_transfer('"+d['id']+"','"+d['attempt']+"');",error='attempt changed')
+        arm(after_release);uncertain(after_release)
+        sql("select khub_bot.queue_closet('recovery-other-writer','sale_fee',null,null,700,'[]');update khub_bot.closet_transfers set state='unknown',attempt=gen_random_uuid(),before_state='{\"inventory\":\"9000\",\"closet\":\"1000\"}' where dedupe_key='recovery-other-writer:meat:0';")
+        assert observe(after_release,due_for(after_release),'1700')['status']=='review'
+        assert sql("select state from khub_bot.closet_transfers where id='"+after_release['id']+"';")=='unknown'
+        print('PASS: unrelated asset recovers while Meat remains held; known pre-request failure safely releases armed marker; replay cannot cancel fresh claim; concurrent writers require review')
+        # A queued row with existing completion proof must be repaired, not paid
+        # twice; an armed-but-unresolved queued row is contradictory and held.
+        sql("update khub_bot.closet_transfers set state='moved' where state<>'moved';")
+        d=recovery_claim();arm(d);uncertain(d)
+        assert observe(d,due_for(d),'1700')['status']=='moved'
+        sql("update khub_bot.closet_transfers set state='pending',attempt=null where id='"+d['id']+"';")
+        assert sql('select public.bot_claim_closet_transfer_v2('+lit(json.dumps(big_snapshot))+"::jsonb,0,0,'{}');")==''
+        assert sql("select state from khub_bot.closet_transfers where id='"+d['id']+"';")=='moved'
+        d=recovery_claim();arm(d);uncertain(d)
+        sql("update khub_bot.closet_transfers set state='pending',attempt=null where id='"+d['id']+"';")
+        assert sql('select public.bot_claim_closet_transfer_v2('+lit(json.dumps(big_snapshot))+"::jsonb,0,0,'{}');")==''
+        assert sql("select state from khub_bot.closet_transfers where id='"+d['id']+"';")=='unknown'
+        assert sql("select state from khub_bot.closet_recovery_attempts where attempt='"+d['attempt']+"';")=='review'
+        sql('select public.bot_isolate_closet_transfers();')
+        first_report=sql("select report_id from khub_bot.closet_transfer_reviews where transfer_id='"+d['id']+"';")
+        sql("select public.bot_reconcile_closet_transfer('"+d['id']+"',false,'local operator verified exact request never moved');")
+        assert sql("select state from khub_bot.closet_recovery_attempts where attempt='"+d['attempt']+"';")=='not_moved'
+        again=json.loads(sql('select public.bot_claim_closet_transfer_v2('+lit(json.dumps(big_snapshot))+"::jsonb,0,0,'{}');"))
+        assert again['id']==d['id'] and again['attempt']!=d['attempt']
+        arm(again);uncertain(again)
+        sql("update khub_bot.closet_recovery_attempts set deadline=clock_timestamp()-interval '1 second' where attempt='"+again['attempt']+"';")
+        assert observe(again,due_for(again))['status']=='review'
+        sql('select public.bot_isolate_closet_transfers();select public.bot_isolate_closet_transfers();')
+        second_report=sql("select report_id from khub_bot.closet_transfer_reviews where transfer_id='"+again['id']+"';")
+        assert second_report!=first_report
+        assert sql("select status from khub_bot.bug_reports where id='"+first_report+"';")=='resolved'
+        assert sql("select status from khub_bot.bug_reports where id='"+second_report+"';")=='open'
+        print('PASS: pending row with completion proof repaired without a write; queued authorized attempt quarantined; manual reconciliation retires old schedule and permits a new fenced claim')
+        # 144: owner-authorized, one-time closet-only soft retry after actual
+        # scheduled observations. Simulate clock history, not a five-minute sleep.
+        def clear_closet_fixture():
+            sql("update khub_bot.closet_transfers set state='moved' where state<>'moved';update khub_bot.closet_soft_retries set status='review' where status in ('approved','ready','claimed');")
+        def stable_soft_window(d,legacy_mode=False,failed_read=False,baseline='1000'):
+            field='created_at' if legacy_mode else 'armed_at'
+            sql("update khub_bot.closet_recovery_attempts set "+field+"=clock_timestamp()-interval '5 minutes 5 seconds',deadline=clock_timestamp()-interval '1 second' where attempt='"+d['attempt']+"';")
+            for minute in range(4,0,-1):
+                snapshot={'closet':baseline,'inventory':'8999999999999300'}
+                if failed_read and minute==1:snapshot={'read_failed':True}
+                sql("insert into khub_bot.closet_recovery_observations(check_id,attempt,observed_at,snapshot,outcome) values('"+str(uuid4())+"','"+d['attempt']+"',clock_timestamp()-interval '"+str(minute)+" minutes',"+lit(json.dumps(snapshot))+"::jsonb,'watching');")
+            return due_for(d)
+        clear_closet_fixture()
+        d=recovery_claim();arm(d);uncertain(d)
+        check=stable_soft_window(d)
+        assert observe(d,check)['status']=='soft_retry'
+        assert observe(d,check)['status']=='soft_retry' # replay is not a second allowance
+        assert sql("select count(*) from khub_bot.closet_soft_retries where transfer_id='"+d['id']+"';")=='1'
+        assert sql("select state from khub_bot.closet_transfers where id='"+d['id']+"';")=='pending'
+        # Old claims cannot bypass the fresh pre-retry check.
+        assert sql('select public.bot_claim_closet_transfer('+lit(json.dumps(big_snapshot))+"::jsonb,0,0,'{}');")==''
+        retry=json.loads(sql('select public.bot_claim_closet_transfer_v2('+lit(json.dumps(big_snapshot))+"::jsonb,0,0,'{}');"))
+        assert retry['id']==d['id'] and retry['attempt']!=d['attempt'] and retry['soft_retry'] is True
+        arm(retry);uncertain(retry)
+        check=stable_soft_window(retry)
+        assert observe(retry,check)['status']=='review'
+        assert 'Soft retry 1/1' in sql("select reason from khub_bot.closet_recovery_attempts where attempt='"+retry['attempt']+"';")
+        assert sql("select state from khub_bot.closet_transfers where id='"+retry['id']+"';")=='unknown'
+        assert sql("select count(*) from khub_bot.closet_soft_retries where transfer_id='"+d['id']+"';")=='1'
+        print('PASS: five stable readable checks approve exactly one soft retry; replay/restart do not replenish allowance; second failure stops for review')
+        clear_closet_fixture()
+        d=recovery_claim();arm(d);uncertain(d);assert observe(d,stable_soft_window(d))['status']=='soft_retry'
+        # Original transfer completes just before a new claim: no retry submitted.
+        late_snapshot={**big_snapshot,'closetMeat':'1700'}
+        assert sql('select public.bot_claim_closet_transfer_v2('+lit(json.dumps(late_snapshot))+"::jsonb,0,0,'{}');")==''
+        assert sql("select state from khub_bot.closet_transfers where id='"+d['id']+"';")=='moved'
+        assert sql("select status from khub_bot.closet_soft_retries where transfer_id='"+d['id']+"';")=='cancelled'
+        assert sql("select retry_attempt is null from khub_bot.closet_soft_retries where transfer_id='"+d['id']+"';")=='t'
+        clear_closet_fixture()
+        d=recovery_claim();arm(d);uncertain(d);assert observe(d,stable_soft_window(d))['status']=='soft_retry'
+        partial_snapshot={**big_snapshot,'closetMeat':'1350'}
+        assert sql('select public.bot_claim_closet_transfer_v2('+lit(json.dumps(partial_snapshot))+"::jsonb,0,0,'{}');")==''
+        assert sql("select status from khub_bot.closet_soft_retries where transfer_id='"+d['id']+"';")=='review'
+        assert sql("select state from khub_bot.closet_transfers where id='"+d['id']+"';")=='unknown'
+        print('PASS: fresh late-completion check cancels retry; partial changes quarantine it without an extra deposit')
+        clear_closet_fixture()
+        d=recovery_claim();arm(d);uncertain(d);check=stable_soft_window(d,failed_read=True)
+        assert observe(d,check)['status']=='watching'
+        assert sql("select count(*) from khub_bot.closet_soft_retries where transfer_id='"+d['id']+"';")=='0'
+        clear_closet_fixture()
+        sql("select khub_bot.queue_closet('soft-legacy','sale_fee',null,null,700,'[]');")
+        legacy_soft=json.loads(sql('select public.bot_claim_closet_transfer('+lit(json.dumps(big_snapshot))+"::jsonb,0,0,'{}');"))
+        uncertain(legacy_soft)
+        sql('select public.bot_due_closet_recovery();')
+        assert observe(legacy_soft,stable_soft_window(legacy_soft,legacy_mode=True))['status']=='soft_retry'
+        print('PASS: failed reads do not authorize a retry; legacy attempts can use the explicitly authorized soft policy after fresh stable observations')
+        clear_closet_fixture()
+        d=recovery_claim();arm(d);uncertain(d);assert observe(d,stable_soft_window(d))['status']=='soft_retry'
+        # Reserve checks remain enforced and approval rolls back on failure.
+        poor={**big_snapshot,'meat':'0'}
+        assert sql('select public.bot_claim_closet_transfer_v2('+lit(json.dumps(poor))+"::jsonb,0,0,'{}');")==''
+        assert sql("select status from khub_bot.closet_soft_retries where transfer_id='"+d['id']+"';")=='approved'
+        protected=int(json.loads(sql('select public.bot_liabilities();'))['meat'])
+        only_one_free={**big_snapshot,'meat':str(protected+700)}
+        assert sql('select public.bot_claim_closet_transfer_v2('+lit(json.dumps(only_one_free))+"::jsonb,0,0,'{}');")==''
+        retry=json.loads(sql('select public.bot_claim_closet_transfer_v2('+lit(json.dumps(big_snapshot))+"::jsonb,0,0,'{}');"))
+        sql("update khub_bot.closet_soft_retries set revalidated_at=clock_timestamp()-interval '11 seconds' where transfer_id='"+d['id']+"';")
+        sql("select public.bot_arm_closet_transfer('"+retry['id']+"','"+retry['attempt']+"');",error='snapshot is stale')
+        sql("select public.bot_release_unsubmitted_closet('"+retry['id']+"','"+retry['attempt']+"');")
+        fresh_retry=json.loads(sql('select public.bot_claim_closet_transfer_v2('+lit(json.dumps(big_snapshot))+"::jsonb,0,0,'{}');"))
+        assert fresh_retry['soft_retry'] is True and fresh_retry['attempt']!=retry['attempt']
+        arm(fresh_retry)
+        sql("select public.bot_ack_closet_transfer('"+fresh_retry['id']+"','"+fresh_retry['attempt']+"',true,'local confirmed soft retry');")
+        assert sql("select status from khub_bot.closet_soft_retries where transfer_id='"+d['id']+"';")=='completed'
+        assert sql("select count(*) from khub_bot.closet_soft_retries where transfer_id='"+d['id']+"';")=='1'
+        print('PASS: soft retry retains escrow/reserve protections; stale snapshot prevents submission; a known non-submission can refresh without spending another physical retry')
+        clear_closet_fixture()
+        sql("select khub_bot.queue_closet('soft-item','sale_fee',null,null,0,'[{\"id\":900003,\"quantity\":3}]');")
+        one_item_stack={**big_snapshot,'items':{'900003':'3'},'closetItems':{'900003':'5'}}
+        item_soft=json.loads(sql('select public.bot_claim_closet_transfer_v2('+lit(json.dumps(one_item_stack))+"::jsonb,0,0,'{}');"))
+        arm(item_soft);uncertain(item_soft)
+        check=stable_soft_window(item_soft,baseline='5')
+        assert observe(item_soft,check,'5','3')['status']=='soft_retry'
+        item_retry=json.loads(sql('select public.bot_claim_closet_transfer_v2('+lit(json.dumps(one_item_stack))+"::jsonb,0,0,'{}');"))
+        assert item_retry['soft_retry'] is True and item_retry['quantity']==3
+        arm(item_retry)
+        sql("select public.bot_ack_closet_transfer('"+item_retry['id']+"','"+item_retry['attempt']+"',true,'confirmed item soft retry');")
+        assert sql("select status from khub_bot.closet_soft_retries where transfer_id='"+item_soft['id']+"';")=='completed'
+        print('PASS: item transfers receive the same one-time soft retry; an unprotected single owned stack does not require unrelated extra items')
     finally:
         if started:pg('-m','immediate','stop')

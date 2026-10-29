@@ -16,10 +16,12 @@ export function normalizeAuctionBrowseParams(input) {
     if (query) next.set('q', query);
     for (const [key, allowed, defaultValue] of [
         ['status', auctionFilters.map(([value]) => value), 'active'],
-        ['sort', auctionSorts.map(([value]) => value), null],
+        ['sort', ['recommended', ...auctionSorts.map(([value]) => value)], null],
         ['trade', ['all', 'escrow', 'direct', 'none'], 'all'],
         ['kind', ['all', 'buy', 'sell'], 'all'],
         ['mine', ['1', 'others'], null],
+        ['buyout', ['any', 'with', 'without'], 'any'],
+        ['bundle', ['any', 'with', 'without'], 'any'],
     ]) {
         const value = source.get(key);
         if (allowed.includes(value) && value !== defaultValue) next.set(key, value);

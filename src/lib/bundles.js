@@ -34,3 +34,21 @@ export function bundleConfirmation(auction) {
         ? `\n\nEntire bundle:\n${auction.bundleItems.map(item => `${Number(item.quantity).toLocaleString('en-US')} × ${item.name}`).join('\n')}`
         : '';
 }
+
+// Display total components without changing the lot quantity used for bidding.
+export function auctionQuantityLabel(auction) {
+    if (auction.bundleItems?.length > 1) {
+        const total = auction.bundleItems.reduce((sum, item) => sum + Number(item.quantity), 0);
+        return `(${total.toLocaleString('en-US')} items)`;
+    }
+    return `×${Number(auction.quantity).toLocaleString('en-US')}`;
+}
+
+export function bundleCover(entries, selectedId, prices = new Map()) {
+    const explicit = entries.find(item => String(item.id) === String(selectedId));
+    if (explicit) return explicit;
+    return [...entries].sort((a, b) => {
+        const price = item => prices.get(Number(item.id))?.available ? Number(prices.get(Number(item.id)).price_meat) || 0 : 0;
+        return price(b) - price(a) || Number(a.id) - Number(b.id);
+    })[0];
+}
