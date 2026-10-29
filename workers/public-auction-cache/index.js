@@ -83,7 +83,9 @@ export class PublicAuctionCache {
         let response, text;
         try {
             response = await fetch(new URL(`/rest/v1/rpc/${rpc}`, base), {
-                method: 'POST', headers, body: JSON.stringify(args), redirect: 'error',
+                // Workers supports manual/follow, not redirect:error. Manual
+                // keeps the public key from being forwarded to another host.
+                method: 'POST', headers, body: JSON.stringify(args), redirect: 'manual',
                 signal: AbortSignal.timeout(8000),
             });
             text = await response.text();
@@ -96,7 +98,9 @@ export class PublicAuctionCache {
             try { databaseCode = JSON.parse(text)?.code; } catch { /* No raw body is exposed. */ }
             throw unavailable(originFailureCode(response.status, databaseCode));
         }
-        if (response.headers.has('set-cookie')) throw unavailable('CACHE_INVALID_RESPONSE');
+        // Supabase's Cloudflare gateway may set __cf_bm even for anonymous
+        // public reads. Ignore origin cookies: only projected JSON is stored,
+        // and no upstream headers or cookies are forwarded to visitors.
         let result;
         try { result = publicProjection(JSON.parse(text), request); }
         catch { throw unavailable('CACHE_INVALID_RESPONSE'); }

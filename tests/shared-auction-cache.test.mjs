@@ -246,11 +246,54 @@ test('origin fetch uses only the anonymous key and fixed read-only RPC arguments
         const data = await real.readOrigin(publicRequest(url));
         assert.equal(requests.length, 1);
         assert.equal(requests[0].url, 'https://project.supabase.co/rest/v1/rpc/read_public_auction_page');
+        assert.equal(requests[0].options.redirect, 'manual', 'use a Workers-supported mode without following redirects');
         assert.deepEqual(requests[0].options.headers, { apikey: 'sb_publishable_fixture', 'Content-Type': 'application/json' });
         assert.equal(JSON.parse(requests[0].options.body).p_view, 'browse');
         assert.equal(JSON.parse(requests[0].options.body).p_id, null);
         assert.doesNotMatch(JSON.stringify(data), /PRIVATE|SECRET/);
     } finally { globalThis.fetch = previous; }
+});
+
+test('anonymous gateway cookies do not break reads and never reach the cache or visitors', async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = async (_url, options) => {
+        // Emulate Workers rejecting the unsupported mode, which Node accepts.
+        if (options.redirect === 'error') throw new TypeError('Unsupported redirect mode');
+        assert.equal(options.redirect, 'manual');
+        assert.equal(options.headers.Cookie, undefined);
+        return Response.json(source(), { headers: { 'Set-Cookie': '__cf_bm=GATEWAY_COOKIE; HttpOnly; Secure', 'X-Upstream-Private': 'PRIVATE_HEADER' } });
+    };
+    try {
+        const f = await fixture();
+        f.cache.env = { SUPABASE_URL: 'https://project.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_fixture' };
+        f.cache.readOrigin = PublicAuctionCache.prototype.readOrigin.bind(f.cache);
+        for (let i = 0; i < 2; i++) {
+            const response = await f.get();
+            assert.equal(response.status, 200);
+            assert.equal(response.headers.has('set-cookie'), false);
+            assert.equal(response.headers.has('X-Upstream-Private'), false);
+            assert.doesNotMatch(JSON.stringify(await response.json()), /GATEWAY_COOKIE|PRIVATE/);
+        }
+        assert.doesNotMatch(JSON.stringify([...f.storage]), /GATEWAY_COOKIE|PRIVATE_HEADER/);
+    } finally { globalThis.fetch = original; }
+});
+
+test('origin redirects are rejected without following or caching their response', async () => {
+    const original = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = async (_url, options) => {
+        calls++;
+        assert.equal(options.redirect, 'manual');
+        return new Response(null, { status: 302, headers: { Location: 'https://another-host.test/' } });
+    };
+    try {
+        const f = await fixture();
+        f.cache.env = { SUPABASE_URL: 'https://project.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_fixture' };
+        f.cache.readOrigin = PublicAuctionCache.prototype.readOrigin.bind(f.cache);
+        assert.equal((await f.get()).status, 503);
+        assert.equal(calls, 1);
+        assert.equal(f.cache.entries.size, 0);
+    } finally { globalThis.fetch = original; }
 });
 
 test('browser cache passes forced reads to the transport after write invalidation', async () => {
