@@ -493,5 +493,49 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         sql("update khub_bot.deliveries set display_message=display_message where id='"+gift_part['id']+"';")
         assert sql("select display_message from khub_bot.deliveries where id='"+gift_part['id']+"';")==frozen_before
         print('PASS: bundle lists under escaped titles in activation/bids/outbid/winnings/Direct reminders; per-gift contents explicit and frozen; Buy rejections grouped')
+        # 142: reference-targeted income lookup distinguishes a new donation from
+        # an older uncertain move, without relying on today's live balances.
+        donation_payload={'sender_id':2949208,'sender_name':'Sheber','meat':4444444,'items':[],
+            'raw':{'type':'normal','fromname':'Sheber'}}
+        old_payload={'sender_id':123,'sender_name':'Earlier donor','meat':700,'items':[],
+            'raw':{'type':'normal','fromname':'Earlier donor'}}
+        for mid,payload in [('206249968',donation_payload),('206248232',old_payload)]:
+            sql("insert into khub_bot.receipts(mail_id,sender_id,received_at,payload,result) values("+lit(mid)+","+str(payload['sender_id'])+",clock_timestamp(),"+lit(json.dumps(payload))+"::jsonb,'donation');")
+        old_c=sql("select id from khub_bot.closet_transfers where receipt_id='206248232';")
+        old_ref=sql("select 'C-'||reference_number from khub_bot.closet_transfers where id='"+old_c+"';")
+        diagnostic={'stage':'balance_mismatch','httpStatus':302,'before':{'inventory':'5000','closet':'1000'},
+            'after':{'inventory':'5000','closet':'1000'}}
+        sql("update khub_bot.closet_transfers set state='unknown',attempt=gen_random_uuid(),before_state='{\"inventory\":\"5000\",\"closet\":\"1000\"}',evidence="+lit('Closet outcome uncertain. '+json.dumps(diagnostic))+" where id='"+old_c+"';")
+        older=json.loads(sql('set role service_role;select public.bot_lookup_closet_transfer('+lit(old_ref)+');'))
+        assert older['source_player_name']=='Earlier donor' and older['source_player_id']==123 and older['receipt_id']=='206248232'
+        income=json.loads(sql("set role service_role;select public.bot_income_status('M-206249968');"))
+        assert income['sender_name']=='Sheber' and income['received_meat']=='4444444'
+        assert len(income['transfers'])==1 and income['transfers'][0]['state']=='pending'
+        assert old_ref in income['blocked_by'] and income['transfers'][0]['receipt_id']=='206249968'
+        assert json.loads(sql("set role service_role;select public.bot_income_status('M-999999999');"))['found'] is False
+        sql("set role anon;select public.bot_income_status('M-206249968');",error='permission denied')
+        # The command is genuinely read-only: neither uncertain nor pending moves
+        # are resolved by checking their references.
+        assert sql("select state from khub_bot.closet_transfers where id='"+old_c+"';")=='unknown'
+        assert sql("select state from khub_bot.closet_transfers where receipt_id='206249968';")=='pending'
+        print('PASS: donor/source context and exact receipt lookup distinguish pending donation from older unknown move; anonymous access denied')
+        # An opened, untracked gift is an expected review outcome, not a failing
+        # transaction. Repeated identical mail makes no new row/update/deposit.
+        raw_gift={'id':'206200142','type':'giftshop','fromid':'123','fromname':'Gift donor','azunixtime':'1793200000','message':'Saved opened gift'}
+        envelope={'id':raw_gift['id'],'wrapper_id':None,'opened':True,'raw':raw_gift}
+        query='set role service_role;select public.bot_register_gift_mail('+lit(json.dumps([envelope]))+'::jsonb);'
+        registered=json.loads(sql(query));assert raw_gift['id'] in registered['reviews']
+        review_xmin=sql("select xmin::text from khub_bot.gift_mail_reviews where mail_id='206200142';")
+        sql(query);sql(query)
+        assert sql("select xmin::text from khub_bot.gift_mail_reviews where mail_id='206200142';")==review_xmin
+        assert sql("select count(*) from khub_bot.receipts where mail_id='206200142';")=='0'
+        assert sql("select count(*) from khub_bot.incoming_gifts where mail_id='206200142';")=='0'
+        sql("update khub_bot.gift_mail_reviews set resolved_at=clock_timestamp(),resolution='local verified review fixture' where mail_id='206200142';")
+        sql(query)
+        assert sql("select resolved_at is not null from khub_bot.gift_mail_reviews where mail_id='206200142';")=='t'
+        envelope['raw']={**raw_gift,'message':'Changed saved mail contents'}
+        sql('set role service_role;select public.bot_register_gift_mail('+lit(json.dumps([envelope]))+'::jsonb);')
+        assert sql("select resolved_at is null from khub_bot.gift_mail_reviews where mail_id='206200142';")=='t'
+        print('PASS: untracked opened gifts create one review without repeated exceptions/updates or new funds; changed mail reopens review safely')
     finally:
         if started:pg('-m','immediate','stop')
