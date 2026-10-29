@@ -28,7 +28,6 @@ export default function Home() {
                     <h1 className="text-4xl font-extrabold text-[#7695FF] sm:text-6xl lg:col-start-2">KoL Auction Hub</h1>
                     <Link to="/update-log" className="justify-self-center whitespace-nowrap text-sm font-normal text-blue-700 hover:underline lg:col-start-3 lg:ml-2 lg:justify-self-start">What’s New <span aria-hidden="true">↗</span></Link>
                 </div>
-                <p className="mt-4 text-lg text-gray-700 sm:text-xl">The best place to find and bid on rare treasures.</p>
                 <SiteTradeTotals totals={siteTotals} />
             </header>
             <main className="mx-auto mt-6 w-full max-w-6xl flex-1 pb-8">

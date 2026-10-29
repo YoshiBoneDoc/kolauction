@@ -909,5 +909,41 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         sql("select khub_bot.site_trade_totals();")
         assert sql("select refreshed_at from khub_bot.site_trade_totals_snapshot;")==before
         print('PASS: global homepage totals count only completed sales and paid fulfillments; bundles, anonymous access and snapshot reuse verified')
+        sql("update khub_bot.site_trade_totals_snapshot set refreshed_at=clock_timestamp()-interval '10 minutes';")
+        before=sql("select refreshed_at from khub_bot.site_trade_totals_snapshot;")
+        assert json.loads(sql("select khub_bot.site_trade_totals();"))==totals
+        assert sql("select refreshed_at from khub_bot.site_trade_totals_snapshot;")==before
+        sql("update khub_bot.site_trade_totals_snapshot set refreshed_at=clock_timestamp()-interval '16 minutes';")
+        before=sql("select refreshed_at from khub_bot.site_trade_totals_snapshot;")
+        # A separate connection holds the display lock as an in-progress refresh.
+        # Readers must serve stale totals promptly rather than queue or recalculate.
+        holder=subprocess.Popen([str(BIN/'psql'),'-h',folder,'-d','postgres','-X','-qAt','-v','ON_ERROR_STOP=1'],
+            stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+        try:
+            holder.stdin.write("begin;select pg_advisory_xact_lock(3888764);select 'LOCKED';\n");holder.stdin.flush()
+            while holder.stdout.readline().strip()!='LOCKED':
+                assert holder.poll() is None,'display lock connection exited'
+            assert json.loads(sql("set statement_timeout='1s';select khub_bot.site_trade_totals();"))==totals
+            assert sql("select refreshed_at from khub_bot.site_trade_totals_snapshot;")==before
+        finally:
+            holder.communicate('rollback;\n\\q\n',timeout=5)
+        # Count snapshot writes during a simultaneous cold-expiry burst.
+        sql("""create table khub_bot.test_totals_refreshes(id integer);
+            create function khub_bot.test_record_totals_refresh() returns trigger language plpgsql as $$
+            begin insert into khub_bot.test_totals_refreshes values(1);return new;end;$$;
+            create trigger test_totals_refresh after update on khub_bot.site_trade_totals_snapshot
+            for each row execute function khub_bot.test_record_totals_refresh();""")
+        from concurrent.futures import ThreadPoolExecutor
+        def read_totals(_):
+            result=subprocess.run([str(BIN/'psql'),'-h',folder,'-d','postgres','-X','-qAt','-v','ON_ERROR_STOP=1',
+                '-c','select khub_bot.site_trade_totals();'],capture_output=True,text=True,timeout=10)
+            assert result.returncode==0,result.stderr
+            return json.loads(result.stdout)
+        with ThreadPoolExecutor(max_workers=12) as pool:
+            assert all(value==totals for value in pool.map(read_totals,range(24)))
+        assert sql('select count(*) from khub_bot.test_totals_refreshes;')=='1'
+        assert sql("select refreshed_at from khub_bot.site_trade_totals_snapshot;")!=before
+        sql((ROOT/'supabase/migrations/queue/202610290151_milestones_cache_interval.sql').read_text())
+        print('PASS: milestones reuse a 10-minute snapshot; expired readers serve stale under contention; 24 concurrent reads recalculate exactly once; migration reruns safely')
     finally:
         if started:pg('-m','immediate','stop')
