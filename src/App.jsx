@@ -32,16 +32,13 @@ import AdminPolls from "./pages/AdminPolls";
 
 const App = () => {
     const { pathname } = useLocation();
-    const { error, refreshAuctions, publicDataDelayed } = useContext(AuctionsContext) || {};
+    const { error, refreshAuctions } = useContext(AuctionsContext) || {};
     if (pathname.replace(/\/+$/, '') === '/official-approval') return <OfficialApproval />;
     const isWallOfShame = pathname.replace(/\/+$/, '') === '/wall-of-shame';
     return (
         <div className={`flex min-h-screen flex-col ${isWallOfShame ? 'shame-background' : 'site-page-background bg-[#F9F9F9]'}`}>
             <div className="px-4 sm:px-6"><AuctionNavigation /></div>
             <SiteBanner />
-            {publicDataDelayed && !error && <p role="status" className="bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">
-                Public listings are temporarily delayed. Open an auction for current details.
-            </p>}
             {error && <div role="alert" className="bg-red-50 p-4 text-red-700">
                 {error}{" "}<button onClick={refreshAuctions} className="underline">Retry</button>
             </div>}

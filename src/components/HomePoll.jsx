@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import PropTypes from 'prop-types';
@@ -17,6 +17,8 @@ export function PollPanel({ service = polls, featuredTarget }) {
     const [error, setError] = useState('');
     const [attempt, setAttempt] = useState(0);
     const [selectedResult, setSelectedResult] = useState(null);
+    const [resultsHidden, setResultsHidden] = useState(false);
+    const resultsContentId = useId();
     const [drafts, setDrafts] = useState({});
     const [repeatId, setRepeatId] = useState(null);
     const [notice, setNotice] = useState('');
@@ -166,10 +168,10 @@ export function PollPanel({ service = polls, featuredTarget }) {
             </form>}
         </div>}
         {notice && <p role="status" className="text-sm text-gray-600">{notice}</p>}
-        {result && <article aria-label={`Results: ${result.question}`} className="max-w-sm rounded-md border border-yellow-200 bg-yellow-50 px-3 py-3 text-slate-800">
-            <div className="mb-1 flex items-center justify-between gap-2">
+        {result && <article aria-label={`Results: ${result.question}`} className={`max-w-sm rounded-md border border-yellow-200 bg-yellow-50 px-3 text-slate-800 ${resultsHidden ? 'flex w-fit items-center gap-4 py-1.5' : 'py-3'}`}>
+            <div className={`flex items-center justify-between gap-2 ${resultsHidden ? '' : 'mb-1'}`}>
                 <p className="text-xs font-semibold uppercase tracking-wide text-yellow-800">{result.active ? 'Live poll results' : 'Previous poll results'}</p>
-                {results.length > 1 && <div role="group" aria-label="Browse poll results" className="flex shrink-0 items-center gap-1">
+                {!resultsHidden && results.length > 1 && <div role="group" aria-label="Browse poll results" className="flex shrink-0 items-center gap-1">
                     <button type="button" aria-label="Previous poll results" onClick={() => navigateResults(-1)} className="poll-result-arrow">
                         <svg aria-hidden="true" width="18" height="18" viewBox="0 0 12 12" fill="currentColor"><path d="M9 1 2 6l7 5Z" /></svg>
                     </button>
@@ -179,6 +181,7 @@ export function PollPanel({ service = polls, featuredTarget }) {
                     </button>
                 </div>}
             </div>
+            <div id={resultsContentId} hidden={resultsHidden}>
             <h2 className="text-sm font-medium leading-5">{result.question}</h2>
             <div className="mt-2 space-y-2">
                 {result.can_manage && <p className="text-xs font-semibold">Admin results</p>}
@@ -189,6 +192,14 @@ export function PollPanel({ service = polls, featuredTarget }) {
                     <button type="button" disabled={pending} onClick={() => setAttempt(value => value + 1)} className="text-blue-800 underline disabled:opacity-60">Refresh results</button>
                     {result.active && <button type="button" disabled={pending} onClick={() => close(result.id)} className="text-slate-700 underline disabled:opacity-60">Conclude poll</button>}
                 </div>}
+            </div>
+            </div>
+            <div className={resultsHidden ? 'shrink-0' : 'mt-3 flex justify-end'}>
+                <button type="button" aria-expanded={!resultsHidden} aria-controls={resultsContentId}
+                    onClick={() => setResultsHidden(value => !value)}
+                    className="rounded border border-yellow-200 px-2 py-1 text-xs font-medium text-yellow-900 hover:bg-yellow-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-700">
+                    {resultsHidden ? 'Unhide' : 'Hide'}
+                </button>
             </div>
         </article>}
         {minimized.map(item => <div key={item.id} className={repeatId === item.id ? 'rounded-md border border-yellow-300 bg-yellow-100 px-5 py-4 text-slate-800' : 'w-fit max-w-full'}>
