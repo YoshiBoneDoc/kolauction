@@ -1,7 +1,13 @@
 # Shared public auction cache
 
+**Current deployment correction:** the supplied Cloudflare screenshot shows
+`kolauction` is a Worker with static assets, not Pages. Use
+[the website Worker deployment guide](CLOUDFLARE_SITE_DEPLOYMENT.md) and root
+`wrangler.jsonc`. Pages-specific instructions below apply only to a Pages deployment.
+The existing `functions/` handlers are reused by `workers/site/index.js`.
+
 The homepage, general public auction browsing, and eligible public seller listings can reuse snapshots across visitors.
-Cloudflare Pages sends public GET requests to one named Durable Object. It serializes
+The website API runtime sends public GET requests to one named Durable Object. It serializes
 database refreshes globally, so simultaneous visitors do not each run the same expensive
 Supabase ranking/filtering query. Public listing GET requests forward no browser JWT
 or cookie. The separate invalidation endpoint accepts only a small signed revision.
@@ -102,7 +108,10 @@ polls, database capacity, abusive direct Supabase requests and unrelated ineffic
 still need their existing limits and monitoring. It does not establish the cause of the
 previous next-day database memory incident or guarantee that all overload is prevented.
 
-## Activate in order
+## Legacy Pages activation sequence
+
+For the current **kolauction Worker**, follow [the Worker setup](CLOUDFLARE_SITE_DEPLOYMENT.md).
+The following steps describe the alternative Pages architecture, not the screenshot.
 
 Nothing is enabled until the build flag below is set. No production deployment or SQL
 application is performed by creating these files.
@@ -279,9 +288,10 @@ Cloudflare. The deployment uses `--keep-vars` to preserve dashboard-managed vari
 Worker secrets are preserved as well. No Supabase service-role key or bot credentials
 are needed in GitHub. Missing deployment secrets produce an explicit failed workflow.
 
-Push this workflow to GitHub after the secrets are configured. The website's existing
-Cloudflare Pages Git deployment continues independently; the workflow deploys only the
-cache Worker. Apply required SQL migrations before pushing code that depends on them.
+Push this workflow to GitHub after the secrets are configured. The website's existing Cloudflare Git deployment continues independently; the
+workflow deploys only the cache Worker. Its added website validation job checks API
+routing and performs a compile-only dry run using the root Wrangler configuration.
+See [current website deployment settings](CLOUDFLARE_SITE_DEPLOYMENT.md). Apply required SQL migrations before pushing code that depends on them.
 The workflow does not apply database migrations, modify Pages bindings, deploy the bot,
 or create the initial Supabase/cache settings. Avoid enabling a second automatic Worker
 deployment through Workers Builds for this same branch while this workflow is active.

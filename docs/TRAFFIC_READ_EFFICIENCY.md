@@ -60,6 +60,10 @@ The personal bot quickstart guide is unchanged.
 
 ## Deployment
 
+**Website hosting correction:** `kolauction` is a Worker with static assets, rather
+than Pages. See [the current runtime/binding setup](CLOUDFLARE_SITE_DEPLOYMENT.md).
+The cache Worker remains separate; the website runtime reuses the API handlers.
+
 - Apply queued migration **148**, then **149**, after 147. The index builds in 148
   are ordinary transactional index builds; schedule this migration outside a
   giveaway, since building them can briefly block writes. No financial rows are

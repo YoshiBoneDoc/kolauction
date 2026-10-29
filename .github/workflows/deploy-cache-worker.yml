@@ -14,7 +14,31 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate-site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Test website API routing and cache privacy
+        run: node --test tests/site-worker.test.mjs tests/shared-auction-cache.test.mjs
+      # Validation only. The existing Cloudflare Git integration deploys the
+      # website with its own public Supabase build variables.
+      - name: Compile website Worker without deploying
+        run: npx --yes wrangler@4 deploy --dry-run --config wrangler.jsonc --outdir "$RUNNER_TEMP/khub-site-dry-run"
+        env:
+          VITE_SHARED_AUCTION_CACHE: 'true'
+          WRANGLER_SEND_METRICS: 'false'
+          CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV: 'false'
+
   deploy:
+    needs: validate-site
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15

@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kolauction",
+  "main": "workers/site/index.js",
+  "compatibility_date": "2026-10-28",
+  "keep_vars": true,
+  "build": {
+    "command": "npm run build:cloudflare"
+  },
+  "assets": {
+    "directory": "./build",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api", "/api/*"]
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "PUBLIC_AUCTION_CACHE",
+        "class_name": "PublicAuctionCache",
+        "script_name": "khub-public-auction-cache"
+      }
+    ]
+  }
+}
