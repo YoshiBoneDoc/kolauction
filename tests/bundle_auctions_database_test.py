@@ -323,5 +323,175 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         completed_flags=[by_id[aid]['status']=='completed' for aid in high_ids]
         assert completed_flags==sorted(completed_flags)
         print('PASS: homepage High Rollers selects all active lots before completed trades, even when completed values are higher')
+        # Multi-item envelopes preserve all original ledger rows and reservations.
+        sql("update khub_bot.deliveries set state='sent',sent_at=clock_timestamp() where state not in ('sent','cancelled'); update khub_bot.closet_transfers set state='moved' where state<>'moved';")
+        def queued_batch(key, count=10, meat=19):
+            attachments=[{'id':900000+i,'quantity':i+1} for i in range(count)]
+            sql("select khub_bot.queue("+lit(key)+",null,null,48889602,'refund',"+str(meat)+","+lit(json.dumps(attachments))+"::jsonb,'same return');")
+            sql("update khub_bot.deliveries set display_message='Your items and Meat are returned.',display_footer='' where dedupe_key like "+lit(key+':%')+";")
+        def batch_claim(key):
+            for _ in range(30):
+                d=json.loads(sql('set role service_role;select public.bot_claim_delivery_batch(5);') or 'null')
+                assert d is not None
+                if d['dedupe_key'].startswith(key+':'):return d
+                sql("select public.bot_ack_delivery('"+d['id']+"','"+d['attempt']+"',true,'local test confirmed send');")
+            raise AssertionError('test queue never reached')
+        # Exercise real templates, not just synthetic matching messages.
+        real_reject=create()
+        rejected_mid,rejected_result,_=ingest(real_reject,'list',19,parts)
+        assert rejected_result not in ('accepted','activated')
+        real_key='rejected:'+rejected_mid
+        d=batch_claim(real_key)
+        assert len(d['items'])==2 and d['meat']=='19',d
+        assert 'Request not accepted' in d['display_message']
+        sql("select public.bot_ack_delivery('"+d['id']+"','"+d['attempt']+"',true,'verified real rejected bundle return');")
+        real_return=create();assert ingest(real_return,'list',items=parts)[1]=='accepted'
+        call(f"select public.cancel_auction('{real_return}');")
+        return_key=sql(f"select regexp_replace(dedupe_key,':(item:[0-9]+|meat):[0-9]+$','') from khub_bot.deliveries where auction_id='{real_return}' and kind='return_item' limit 1;")
+        d=batch_claim(return_key)
+        assert len(d['items'])==2 and 'bundle items are being returned' in d['display_message'],d
+        checks=json.loads(sql('select public.bot_mailbox_check_deliveries();'))
+        saved=next(x for x in checks if x['id']==d['id'])
+        assert saved['expected_message']==d['display_message']+'\n\n'+d['reference_marker']+(('\n'+d['display_footer']) if d.get('display_footer') else '')
+        assert 'Attached in this message:' not in d['display_message']
+        original=sql("select display_message from khub_bot.deliveries where id='"+d['id']+"';")
+        assert 'Attached in this message:' in original
+        sql("select public.bot_split_delivery_batch('"+d['id']+"','"+d['attempt']+"');")
+        assert sql("select display_message from khub_bot.deliveries where id='"+d['id']+"';")==original
+        sql(f"update khub_bot.deliveries set state='sent',sent_at=clock_timestamp() where auction_id='{real_return}';")
+        # Operator gift-return templates also differ per item; the envelope
+        # normalizes them without altering their original frozen ledger messages.
+        sql("select khub_bot.queue('gift-return:fixture',null,null,48889602,'refund',19,'[{\"id\":2,\"quantity\":3},{\"id\":364,\"quantity\":5}]'::jsonb,'Operator-requested return of verified gift contents.');")
+        # A real receipt is required in the template; reuse the rejected receipt.
+        sql("update khub_bot.deliveries set receipt_id="+lit(rejected_mid)+" where dedupe_key like 'gift-return:fixture:%';")
+        d=batch_claim('gift-return:fixture')
+        assert len(d['items'])==2 and d['meat']=='19' and 'Your gift contents are being returned' in d['display_message'],d
+        sql("select public.bot_ack_delivery('"+d['id']+"','"+d['attempt']+"',true,'verified operator gift contents return');")
+        print('PASS: actual rejected bundle, canceled bundle and operator gift-return templates group correctly; frozen originals survive gift fallback')
+        queued_batch('multi-test')
+        before=json.loads(sql('select public.bot_liabilities();'))
+        d=batch_claim('multi-test')
+        assert len(d['items'])==10 and d['meat']=='19' and d['mail_batch']==d['id'],d
+        assert sql("select count(*) from khub_bot.deliveries where mail_batch='"+d['id']+"' and state='sending';")=='11'
+        assert json.loads(sql('select public.bot_liabilities();'))==before
+        checks=json.loads(sql('select public.bot_mailbox_check_deliveries();'))
+        assert len(checks)==1 and len(checks[0]['items'])==10 and checks[0]['meat']=='19'
+        sql("select public.bot_ack_delivery('"+d['id']+"','"+d['attempt']+"',true,'verified local envelope send');")
+        assert sql("select count(*) from khub_bot.deliveries where mail_batch='"+d['id']+"' and state='sent';")=='11'
+        print('PASS: 10 item types plus Meat share one envelope; all 11 ledger rows reserved then acknowledged together')
+        queued_batch('multi-limit',13,0)
+        d=batch_claim('multi-limit');assert len(d['items'])==11
+        sql("select public.bot_ack_delivery('"+d['id']+"','"+d['attempt']+"',true,'verified first limited envelope');")
+        d=batch_claim('multi-limit');assert len(d['items'])==2
+        sql("select public.bot_ack_delivery('"+d['id']+"','"+d['attempt']+"',true,'verified final limited envelope');")
+        queued_batch('multi-uncertain',3,0)
+        d=batch_claim('multi-uncertain')
+        sql("select public.bot_ack_delivery('"+d['id']+"','"+d['attempt']+"',false,'send response timed out');")
+        result={'status':'not_found','candidate_ids':[]}
+        sql("select public.bot_record_mailbox_check('"+d['id']+"','"+d['attempt']+"',"+lit(json.dumps(result))+"::jsonb);")
+        assert sql("select count(*) from khub_bot.delivery_mailbox_reviews where resolved_at is null and delivery_id in (select id from khub_bot.deliveries where mail_batch='"+d['id']+"');")=='3'
+        assert len(json.loads(sql('select public.bot_mailbox_check_deliveries();')))==1
+        # A member cannot be resent or individually marked sent. Reconciliation
+        # through any member applies to the original full envelope atomically.
+        child=sql("select id from khub_bot.deliveries where mail_batch='"+d['id']+"' and id<>'"+d['id']+"' limit 1;")
+        sql("select public.bot_ack_delivery('"+child+"','"+d['attempt']+"',true,'invalid partial acknowledgment');",error='batch reference')
+        assert sql("select count(*) from khub_bot.deliveries where mail_batch='"+d['id']+"' and state='unknown';")=='3'
+        verified={'status':'verified','candidate_ids':['123456789'],'message_id':'123456789','message_hash':'a'*64}
+        sql("select public.bot_record_mailbox_check('"+d['id']+"','"+d['attempt']+"',"+lit(json.dumps(verified))+"::jsonb);")
+        assert sql("select count(*) from khub_bot.deliveries where mail_batch='"+d['id']+"' and state='sent';")=='3'
+        assert sql("select count(*) from khub_bot.delivery_mailbox_reviews where resolved_at is null and delivery_id in (select id from khub_bot.deliveries where mail_batch='"+d['id']+"');")=='0'
+        print('PASS: >11 types split safely; uncertain envelope isolates all members; one exact Sent Mail recovery resolves all')
+        queued_batch('multi-manual',3,0)
+        d=batch_claim('multi-manual')
+        child=sql("select id from khub_bot.deliveries where mail_batch='"+d['id']+"' and id<>'"+d['id']+"' limit 1;")
+        full=json.loads(sql("set role service_role;select public.bot_lookup_delivery('"+child+"');"))
+        assert full['id']==d['id'] and len(full['items'])==3
+        sql("update khub_bot.deliveries set attempt=gen_random_uuid() where id='"+child+"';")
+        sql("select public.bot_ack_delivery('"+d['id']+"','"+d['attempt']+"',true,'stale child claim must roll back');",error='claim does not match')
+        assert sql("select count(*) from khub_bot.deliveries where mail_batch='"+d['id']+"' and state='sending';")=='3'
+        sql("update khub_bot.deliveries set attempt='"+d['attempt']+"' where id='"+child+"';")
+        sql("select public.bot_ack_delivery('"+d['id']+"','"+d['attempt']+"',false,'uncertain local test envelope');")
+        sql("select public.bot_reconcile_delivery('"+child+"',false,'manually verified no envelope sent');")
+        assert sql("select count(*) from khub_bot.deliveries where dedupe_key like 'multi-manual:%' and state='pending' and mail_batch is null and not mail_batch_disabled;")=='3'
+        regrouped=batch_claim('multi-manual');assert len(regrouped['items'])==3
+        sql("select public.bot_ack_delivery('"+regrouped['id']+"','"+regrouped['attempt']+"',true,'verified regrouped regular envelope');")
+        queued_batch('multi-held',4,0)
+        held=sql("select id from khub_bot.deliveries where dedupe_key like 'multi-held:%' order by id limit 1;")
+        sql("insert into khub_bot.gift_delivery_waits(delivery_id,retry_after,failures,stage) values('"+held+"',clock_timestamp()+interval '1 day',1,'wrapping_solvency');")
+        queued_batch('multi-other-plan',2,0)
+        d=batch_claim('multi-held');assert len(d['items'])==3
+        assert sql("select state from khub_bot.deliveries where id='"+held+"';")=='pending'
+        assert sql("select count(*) from khub_bot.deliveries where dedupe_key like 'multi-other-plan:%' and state='pending';")=='2'
+        sql("select public.bot_ack_delivery('"+d['id']+"','"+d['attempt']+"',true,'verified eligible siblings only');")
+        sql("select public.bot_split_delivery_batch('"+d['id']+"','"+d['attempt']+"');",error='Batch claim changed')
+        sql('set role anon;select public.bot_claim_delivery_batch(5);',error='permission denied')
+        print('PASS: member lookup shows full envelope; stale claims roll back atomically; manual not-sent preserves all debts; held/unrelated rows excluded')
+        queued_batch('multi-gift',3,0)
+        d=batch_claim('multi-gift')
+        sql("select public.bot_split_delivery_batch('"+d['id']+"','"+d['attempt']+"');")
+        sql("select public.bot_split_delivery_batch('"+d['id']+"','"+d['attempt']+"');")
+        assert sql("select count(*) from khub_bot.deliveries where dedupe_key like 'multi-gift:%' and state='pending' and mail_batch is null and mail_batch_disabled;")=='3'
+        single=batch_claim('multi-gift');assert single['mail_batch'] is None and 'items' not in single
+        sql("select public.bot_ack_delivery('"+single['id']+"','"+single['attempt']+"',true,'verified individual gift send');")
+        print('PASS: known non-attempt gift fallback splits idempotently; subsequent claims remain individual')
+        # 141: full bundle context appears in notices, settlements, rejections,
+        # and explicit Direct Trade reminders, while gift fallback identifies the
+        # individual attachment without confusing it with the entire bundle.
+        sql("update khub_bot.deliveries set state='sent',sent_at=clock_timestamp() where state='pending';")
+        rich_title='Adventures & friends'
+        rich=call('select public.create_bundle_auction('+lit(json.dumps(parts))+',100,24,p_title=>'+lit(rich_title)+');')
+        rich_mid,rich_result,_=ingest(rich,'list',items=parts);assert rich_result=='accepted'
+        # Use the canonical stored title, including the existing Bundle: prefix.
+        escaped=sql(f"select khub_bot.escape_report_kmail(item) from public.auctions where id='{rich}';")
+        name2=sql("select khub_bot.escape_report_kmail(name) from khub_bot.catalog where id=2;")
+        name364=sql("select khub_bot.escape_report_kmail(name) from khub_bot.catalog where id=364;")
+        context=escaped+'\nBundle contents:\n- 3 × '+name2+'\n- 5 × '+name364
+        activation=batch_claim('activated:'+rich_mid)
+        assert context in activation['display_message'],activation
+        assert ' × 1\nBundle contents:' not in activation['display_message']
+        sql("select public.bot_ack_delivery('"+activation['id']+"','"+activation['attempt']+"',true,'verified bundle activation notice');")
+        first_bid,_,_=ingest(rich,'bid',100,actor=48889602)
+        bid=batch_claim('bid-accepted:'+first_bid);assert context in bid['display_message']
+        sql("select public.bot_ack_delivery('"+bid['id']+"','"+bid['attempt']+"',true,'verified bundle bid confirmation');")
+        second_bid,_,_=ingest(rich,'bid',200,actor=48889603)
+        outbid=batch_claim('outbid:'+second_bid);assert context in outbid['display_message']
+        sql("select public.bot_ack_delivery('"+outbid['id']+"','"+outbid['attempt']+"',true,'verified bundle outbid refund');")
+        expire(rich)
+        sale_key=sql(f"select regexp_replace(dedupe_key,':(item:[0-9]+|meat):[0-9]+$','') from khub_bot.deliveries where auction_id='{rich}' and kind='sale_item' limit 1;")
+        winnings=batch_claim(sale_key)
+        assert len(winnings['items'])==2 and context in winnings['display_message']
+        assert winnings['display_message'].count('This message contains:')==1
+        assert '- 3 × '+name2 in winnings['display_message'].split('This message contains:')[1]
+        assert '- 5 × '+name364 in winnings['display_message'].split('This message contains:')[1]
+        sql("select public.bot_split_delivery_batch('"+winnings['id']+"','"+winnings['attempt']+"');")
+        gift_part=batch_claim(sale_key)
+        assert context in gift_part['display_message'] and 'Attached in this message: ' in gift_part['display_message']
+        assert 'This message contains:' not in gift_part['display_message']
+        attachment_name=name2 if gift_part['item_id']==2 else name364
+        assert str(gift_part['quantity'])+' x '+attachment_name in gift_part['display_message']
+        # The individual gift body is exactly what recovery will look for.
+        check=next(x for x in json.loads(sql('select public.bot_mailbox_check_deliveries();')) if x['id']==gift_part['id'])
+        assert check['expected_message']==gift_part['display_message']+'\n\n'+gift_part['reference_marker']
+        sql("select public.bot_ack_delivery('"+gift_part['id']+"','"+gift_part['attempt']+"',true,'verified individual winning bundle gift');")
+        sql(f"update khub_bot.deliveries set state='sent',sent_at=clock_timestamp() where auction_id='{rich}' and state='pending';")
+        # Actual Buy-auction rejection containing multiple item types plus Meat.
+        buy_bad_mid,_,_=ingest(order,'fill',meat=7,items=parts,actor=48889602)
+        buy_return=batch_claim('buy-rejected:'+buy_bad_mid)
+        assert len(buy_return['items'])==2 and buy_return['meat']=='7',buy_return
+        assert 'This message contains:' in buy_return['display_message']
+        sql("select public.bot_ack_delivery('"+buy_return['id']+"','"+buy_return['attempt']+"',true,'verified grouped Buy rejection refund');")
+        # Preformatted reminders do not call friendly_message: insertion trigger
+        # must add the same context without changing the trade instructions.
+        direct_context_lot=create(False);call(f"select public.place_bid('{direct_context_lot}',200);",buyer);expire(direct_context_lot)
+        direct_body=sql(f"select display_message from khub_bot.deliveries where auction_id='{direct_context_lot}' and dedupe_key like 'direct-trade-reminder:%' limit 1;")
+        assert 'Bundle contents:\n- 3 × '+name2+'\n- 5 × '+name364 in direct_body
+        assert 'Do not send these items or Meat to kHub; this is a Direct Trade.' in direct_body
+        # Preparing a message twice must not duplicate either list. Already
+        # sending/unknown/sent bodies must not be changed by later state updates.
+        assert sql("select khub_bot.prepare_bundle_mail(d,d.display_message)=d.display_message from khub_bot.deliveries d where id='"+gift_part['id']+"';")=='t'
+        frozen_before=sql("select display_message from khub_bot.deliveries where id='"+gift_part['id']+"';")
+        sql("update khub_bot.deliveries set display_message=display_message where id='"+gift_part['id']+"';")
+        assert sql("select display_message from khub_bot.deliveries where id='"+gift_part['id']+"';")==frozen_before
+        print('PASS: bundle lists under escaped titles in activation/bids/outbid/winnings/Direct reminders; per-gift contents explicit and frozen; Buy rejections grouped')
     finally:
         if started:pg('-m','immediate','stop')

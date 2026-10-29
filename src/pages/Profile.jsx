@@ -110,8 +110,9 @@ const Profile = () => {
                             const isBuy = auction.auctionKind === 'buy';
                             const personalBid = latestProfileBid(auction, currentUser.id);
                             const historyRow = title === 'Listing history';
+                            const shadedRow = historyRow || title === 'Active listings';
                             const cancelled = ['cancelled', 'voided'].includes(result.status);
-                            const historyClass = historyRow ? ` profile-history-entry ${cancelled ? 'is-cancelled' : isBuy ? 'is-buy' : 'is-sell'}` : '';
+                            const historyClass = shadedRow ? ` profile-history-entry ${cancelled ? 'is-cancelled' : result.status === 'ended_no_bids' ? 'is-unsold' : isBuy ? 'is-buy' : 'is-sell'}` : '';
                             const historyStatus = historyRow ? result.status === 'completed' ? ' is-completed'
                                 : cancelled ? ' is-cancelled' : ['expired', 'ended_no_bids'].includes(result.status) ? ' is-expired' : '' : '';
                             const personallyFulfilled = auction.mySaleQuantity;
