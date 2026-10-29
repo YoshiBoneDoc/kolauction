@@ -10,9 +10,10 @@ import { useNow } from '../hooks/useNow';
 import PendingTrades from '../components/PendingTrades';
 import SiteFooter from '../components/SiteFooter';
 import HomePoll from '../components/HomePoll';
+import SiteTradeTotals from '../components/SiteTradeTotals';
 
 export default function Home() {
-    const { auctions, homeSections, isLoading, error, hasLoaded = !isLoading && !error, refreshAuctions } = useContext(AuctionsContext);
+    const { auctions, homeSections, siteTotals, isLoading, error, hasLoaded = !isLoading && !error, refreshAuctions } = useContext(AuctionsContext);
     const now = useNow();
     const featuredPollTarget = useRef(null);
     const hasActiveAuctions = auctions.some(auction => ['active', 'finalizing'].includes(getAuctionStatus(auction, now)));
@@ -22,9 +23,13 @@ export default function Home() {
 
     return (
         <div className="site-page-background flex flex-1 w-full flex-col bg-[#F9F9F9] px-4 sm:px-6">
-            <header className="mx-auto w-full max-w-6xl border-b border-gray-300 pb-6 text-center">
-                <h1 className="mt-4 text-4xl font-extrabold text-[#7695FF] sm:text-6xl">KoL Auction Hub <span className="inline-flex items-center gap-1.5 whitespace-nowrap align-middle text-sm font-normal"><span>Beta</span><span aria-hidden="true">·</span><Link to="/update-log" className="text-blue-700 hover:underline">What’s New <span aria-hidden="true">↗</span></Link></span></h1>
+            <header className="mx-auto w-full max-w-6xl text-center">
+                <div className="mt-4 grid grid-cols-1 items-baseline gap-y-1 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+                    <h1 className="text-4xl font-extrabold text-[#7695FF] sm:text-6xl lg:col-start-2">KoL Auction Hub</h1>
+                    <Link to="/update-log" className="justify-self-center whitespace-nowrap text-sm font-normal text-blue-700 hover:underline lg:col-start-3 lg:ml-2 lg:justify-self-start">What’s New <span aria-hidden="true">↗</span></Link>
+                </div>
                 <p className="mt-4 text-lg text-gray-700 sm:text-xl">The best place to find and bid on rare treasures.</p>
+                <SiteTradeTotals totals={siteTotals} />
             </header>
             <main className="mx-auto mt-6 w-full max-w-6xl flex-1 pb-8">
                 <div ref={featuredPollTarget} />

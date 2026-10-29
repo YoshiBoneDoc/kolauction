@@ -885,5 +885,29 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         sql("select public.bot_ack_closet_transfer('"+item_retry['id']+"','"+item_retry['attempt']+"',true,'confirmed item soft retry');")
         assert sql("select status from khub_bot.closet_soft_retries where transfer_id='"+item_soft['id']+"';")=='completed'
         print('PASS: item transfers receive the same one-time soft retry; an unprotected single owned stack does not require unrelated extra items')
+        # Global display totals count completed sales and confirmed Buy payments
+        # once, including bundle units; pending obligations are never volume.
+        sql("delete from khub_bot.site_trade_totals_snapshot;")
+        totals=json.loads(sql("select khub_bot.site_trade_totals();"))
+        sales=json.loads(sql("""select jsonb_build_object('meat',coalesce(sum(final_price),0)::text,
+            'items',coalesce(sum(case when bundle_items<>'[]'::jsonb then
+                (select sum((i->>'quantity')::numeric) from jsonb_array_elements(bundle_items) i)
+                else quantity end),0)::text,'trades',count(*)::text)
+            from public.auctions where auction_kind='sell' and status='completed'
+                and winner_id is not null and final_price is not null;"""))
+        fills=json.loads(sql("""select jsonb_build_object('meat',coalesce(sum(payment_meat),0)::text,
+            'items',coalesce(sum(quantity),0)::text,'trades',count(*)::text)
+            from khub_bot.buy_fulfillments f where exists(select 1 from khub_bot.deliveries d
+                where d.receipt_id=f.receipt_id and d.dedupe_key like 'buy-fill-payment:%' and d.state='sent')
+            and not exists(select 1 from khub_bot.deliveries d where d.receipt_id=f.receipt_id
+                and d.dedupe_key like 'buy-fill-payment:%' and d.state<>'sent');"""))
+        assert totals=={key:str(int(sales[key])+int(fills[key])) for key in ['meat','items','trades']}
+        assert json.loads(sql("set role anon;select public.read_public_home_auctions()->'site_totals';"))==totals
+        assert json.loads(sql("set role anon;select public.read_home_auctions()->'site_totals';"))==totals
+        sql("set role anon;select * from khub_bot.site_trade_totals_snapshot;",error='permission denied')
+        before=sql("select refreshed_at from khub_bot.site_trade_totals_snapshot;")
+        sql("select khub_bot.site_trade_totals();")
+        assert sql("select refreshed_at from khub_bot.site_trade_totals_snapshot;")==before
+        print('PASS: global homepage totals count only completed sales and paid fulfillments; bundles, anonymous access and snapshot reuse verified')
     finally:
         if started:pg('-m','immediate','stop')

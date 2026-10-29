@@ -92,6 +92,15 @@ test('strict public projection drops identities, financial records, nested secre
     assert.throws(() => publicProjection(bids, publicRequest(url)), /Invalid/);
 });
 
+test('only homepage aggregate totals cross the shared public projection', () => {
+    const input = { ...source(), site_totals: { meat: '1420000000', items: '24582', trades: '328', balance: 'PRIVATE' } };
+    assert.deepEqual(publicProjection(input, { view: 'home' }).site_totals,
+        { meat: '1420000000', items: '24582', trades: '328' });
+    assert.equal(publicProjection(input, publicRequest(url)).site_totals, undefined);
+    input.site_totals.meat = 'PRIVATE';
+    assert.equal(publicProjection(input, { view: 'home' }).site_totals, undefined);
+});
+
 test('public cache keys reject private views/parameters, random cache busters and duplicate filters', () => {
     for (const query of ['view=profile', 'view=detail', 'view=browse&id=secret', 'view=browse&sellerId=secret',
         'view=browse&mine=1', 'view=browse&fresh=1', 'view=browse&status=active&status=all',

@@ -16,13 +16,13 @@ const { outputFiles } = buildSync({ stdin: { contents: `
 let active, user;
 function state(initial) {
  const h=active,index=h.cursor++;
- if (!(index in h.slots)) h.slots[index]=initial;
+ if (!(index in h.slots)) h.slots[index]=typeof initial==='function'?initial():initial;
  return [h.slots[index],next=>{h.slots[index]=typeof next==='function'?next(h.slots[index]):next;}];
 }
 const compiled={exports:{}};
 const require=createRequire(import.meta.url);
 new Function('require','module','exports',outputFiles[0].text)(name=>name==='react'?{
- ...React,useState:state,useRef:initial=>state({current:initial})[0],useEffect:fn=>active.effects.push(fn),useContext:()=>({currentUser:user}),
+ ...React,useState:state,useId:()=>state('test-poll-results')[0],useRef:initial=>state({current:initial})[0],useEffect:fn=>active.effects.push(fn),useContext:()=>({currentUser:user}),
 }:name==='react-dom'?{...require(name),createPortal:(panel,target)=>React.cloneElement(panel,{'data-placement':target.name})}:require(name),compiled,compiled.exports);
 const {HomePoll,PollPanel,PollManager}=compiled.exports;
 function nodes(tree) {
@@ -148,7 +148,7 @@ test('published past results share a results panel with answered live polls',asy
 test('an old background response cannot restore voting after a successful submission',async()=>{
  let reads=0,release;
  const h=harness({read:async()=>{reads++;if(reads===2)return new Promise(resolve=>{release=resolve;});return feed(reads>2?{...poll,has_voted:true,results:{yes:1,no:0,total:1}}:poll);},vote:async()=>{}});
- await h.load();h.effects[0]();
+ await h.load();h.effects.at(-1)();
  await h.button('Yes').props.onClick();h.render();
  release(feed(poll));await new Promise(resolve=>setImmediate(resolve));h.render();
  assert.equal(h.button('Yes'),undefined);assert.match(h.html(),/Live poll results/);

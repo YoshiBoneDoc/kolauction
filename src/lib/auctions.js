@@ -165,6 +165,7 @@ export function createAuctionService(client, { publicReader = null } = {}) {
                 })]));
             }
             return { auctions, total: Number(data.total), seller: data.seller || null,
+                ...(view === 'home' ? { siteTotals: data.site_totals || null } : {}),
                 ...(data.public_snapshot ? { publicSnapshot: data.public_snapshot } : {}),
                 ...(homeSections ? { homeSections } : {}),
                 ...(view === 'browse' ? { priceBounds: data.price_bounds && parsePrice(data.price_bounds.min) != null && parsePrice(data.price_bounds.max) != null

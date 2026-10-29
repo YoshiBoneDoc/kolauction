@@ -1,4 +1,5 @@
 // Shared cache schema: public catalogue/listing facts only. Never cache a raw RPC response.
+import { parseSiteTradeTotals } from '../../src/lib/siteTradeTotals.js';
 export const CACHE_VERSION = 1;
 export const PUBLIC_FIELDS = [
     'id', 'auction_number', 'auction_kind', 'item', 'item_id', 'quantity', 'image',
@@ -83,6 +84,8 @@ export function publicProjection(data, request) {
     const result = { privacy_version: 1, shared_cache_version: CACHE_VERSION,
         rows, total: Number(data.total), bids: [], seller: null, server_time: data.server_time };
     if (request.view === 'home') {
+        const totals = parseSiteTradeTotals(data.site_totals);
+        if (totals) result.site_totals = totals;
         const ids = new Set(rows.map(row => row.id));
         result.sections = Object.fromEntries(['popular', 'new', 'ending', 'highRollers', 'recent'].map(key => {
             const values = data.sections?.[key];
