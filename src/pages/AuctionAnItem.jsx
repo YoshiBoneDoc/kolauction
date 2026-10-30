@@ -1,3 +1,5 @@
+import ListingPriceInputs from '../components/ListingPriceInputs';
+import useListingPrice from '../hooks/useListingPrice';
 import { canRelist, relistDraft } from '../lib/relistAuction';
 import { createMarketPriceService } from '../lib/marketPrices';
 import BundleContents from '../components/BundleContents';
@@ -44,8 +46,6 @@ export default function AuctionAnItem() {
     const [itemSearch, setItemSearch] = useState('');
     const [selectedItem, setSelectedItem] = useState('');
     const [quantity, setQuantity] = useState('1');
-    const [minBidMeat, setMinBidMeat] = useState('');
-    const [instantPrice, setInstantPrice] = useState('');
     const [showBuyout, setShowBuyout] = useState(false);
     const buyoutInput = useRef(null);
     const [auctionTime, setAuctionTime] = useState('24');
@@ -58,6 +58,10 @@ export default function AuctionAnItem() {
     const [deliveryMode, setDeliveryMode] = useState('immediate');
     const isBuy = auctionKind === 'buy';
     const isBundle = auctionKind === 'bundle';
+    const minimumPricing = useListingPrice(isBundle ? '1' : quantity, isBuy ? 'item' : 'whole');
+    const buyoutPricing = useListingPrice(isBundle ? '1' : quantity, 'whole');
+    const { canonical: minBidMeat, setCanonical: setMinBidMeat } = minimumPricing;
+    const { canonical: instantPrice, setCanonical: setInstantPrice } = buyoutPricing;
     const [bundleEntries, setBundleEntries] = useState([]);
     const [bundleImageItemId, setBundleImageItemId] = useState(null);
     const [bundleTitleText, setBundleTitleText] = useState('');
@@ -128,7 +132,7 @@ export default function AuctionAnItem() {
         setCustomEndTime(preset ? '' : localDateTimeInput(auctionNow() + draft.hours * 3600000));
         setBundleEntries(draft.entries); setBundleTitleText(draft.title); setBundleImageItemId(draft.cover);
         setPreview(null); setError(''); setBundleTitleConflict(false);
-    }, [locationKey, state, currentUser]);
+    }, [locationKey, state, currentUser, setMinBidMeat, setInstantPrice]);
     const deferredSearch = useDeferredValue(itemSearch);
     const hasItemSearch = Boolean(itemSearch.trim());
     const matchingItems = useMemo(() => {
@@ -150,10 +154,12 @@ export default function AuctionAnItem() {
 
     function showPreview(event) {
         event.preventDefault();
+        if (!isBundle && ((minimumPricing.message && !minBidMeat) || (buyoutPricing.message && !instantPrice && !isBuy))) { setError(minimumPricing.message || buyoutPricing.message); return; }
         const item = catalogItems.find(entry => String(entry.id) === selectedItem && isAuctionableItem(entry));
         const count = parseAuctionAmount(quantity, 5000000000);
         const minimum = parseMeatAmount(minBidMeat);
         const purchasePrice = !isBuy && instantPrice.trim() ? parseMeatAmount(instantPrice) : null;
+        if (!isBundle && !isBuy && (buyoutPricing.whole.trim() || buyoutPricing.item.trim()) && !instantPrice.trim()) { setError(buyoutPricing.message || 'Enter a valid positive buyout price in Meat.'); return; }
         let contents = null;
         let customTitle = '';
         if (isBundle) {
@@ -423,14 +429,18 @@ export default function AuctionAnItem() {
                             })}
                         </ul> : <p className="bundle-empty-state mt-3 rounded-lg border border-dashed border-[#EADBD3] px-3 py-3 text-center text-xs text-gray-700">Your bundle is empty. Search for an item above and add it here.</p>}
                     </section>}
+                    {isBundle ? <>
                     <label htmlFor="minBidMeat" className="mb-2 block text-sm font-bold">{isBuy ? 'Maximum purchase price per item (Meat):' : 'Minimum Bid (Meat, whole listing):'}</label>
                     <input id="minBidMeat" type="text" inputMode="decimal" required autoComplete="off" value={minBidMeat} onChange={(event) => setMinBidMeat(event.target.value)} onBlur={() => setMinBidMeat(value => normalizeAuctionAmount(value, { meat: true }))} placeholder="e.g. 1000, 10b, 4.53m, 50k" className={fieldClass} />
+                    </> : <ListingPriceInputs id="minimum-price" label={isBuy ? 'Maximum purchase price (Meat):' : 'Minimum Bid (Meat):'} pricing={minimumPricing} required />}
                     {!isBuy && (showBuyout ? <section id="buyout-price-fields" className="mb-4">
+                        {isBundle ? <>
                         <label htmlFor="instantPurchasePrice" className="mb-2 block text-sm font-bold">Buyout Price (Meat, whole listing, optional):</label>
                         <input ref={buyoutInput} id="instantPurchasePrice" type="text" inputMode="decimal" autoComplete="off" value={instantPrice}
                             onChange={(event) => setInstantPrice(event.target.value)}
                             onBlur={() => setInstantPrice(value => normalizeAuctionAmount(value, { meat: true }))}
                             placeholder="e.g. 1000, 10b, 4.53m, 50k" aria-describedby="instant-price-help" className={fieldClass} />
+                        </> : <ListingPriceInputs id="buyout-price" label="Buyout Price (Meat, optional):" pricing={buyoutPricing} inputRef={buyoutInput} />}
                         <p id="instant-price-help" className="mb-2 text-sm text-gray-600">The total price you will accept to end bidding early for this entire listing. A bid reaching this price also ends bidding at this amount.</p>
                         <button type="button" onClick={() => { setInstantPrice(''); setShowBuyout(false); }} className="min-h-11 bg-transparent px-0 text-sm text-blue-700 underline">Remove buyout price</button>
                     </section> : <button type="button" aria-expanded={false} onClick={() => {
