@@ -30,7 +30,7 @@ export default function SiteTradeTotals({ totals }) {
                     <span className="inline-flex items-center gap-1 whitespace-nowrap" title="Most bids ever placed on a single auction">
                         <span aria-hidden="true" className="relative inline-block h-[22px] w-[13px] shrink-0 overflow-hidden mix-blend-multiply dark:mix-blend-screen">
                             <img src="/images/site-stats/record-bids.gif" alt="" className="absolute -left-[5px] -top-px h-6 w-6 max-w-none dark:invert" />
-                        </span>{BigInt(values.record_bids).toLocaleString('en-US')} Record Bids
+                        </span>{BigInt(values.record_bids).toLocaleString('en-US')} Bids (Record)
                     </span>
                 </>}
             </div>
