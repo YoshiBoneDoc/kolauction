@@ -1,11 +1,13 @@
 // Shared public snapshots and private viewer context use separate transports.
 // Never send the browser's JWT/cookies or private query parameters to Cloudflare.
 export function createPublicAuctionReader(client, { enabled = false, fetch: fetcher = globalThis.fetch } = {}) {
+    const details = new Map();
     return {
         async accepts(request) {
-            if (!enabled || !client || !['home', 'browse', 'seller'].includes(request.view)
+            if (request.fresh && request.view === 'detail') details.clear();
+            if (!enabled || !client || !['home', 'browse', 'seller', 'detail'].includes(request.view)
                 || request.sellerId || request.excludeOwn || request.fresh || request.summaryOnly
-                || request.view === 'seller' && !request.id) return false;
+                || ['seller', 'detail'].includes(request.view) && !request.id) return false;
             // Signed-in All can contain the viewer's unpublished drafts (or an
             // administrator's drafts). Keep that mixed public/private pool direct.
             if (['browse', 'seller'].includes(request.view) && request.status === 'all') {
@@ -16,8 +18,45 @@ export function createPublicAuctionReader(client, { enabled = false, fetch: fetc
             return true;
         },
         async load(request) {
+            if (request.view === 'detail') {
+                const { data: auth, error: authError } = await client.auth.getSession();
+                if (authError) throw authError;
+                // Token scopes prevent reuse across sign-in, sign-out or authorization changes.
+                const key = `${request.id}:${auth.session?.access_token || 'anon'}`;
+                let context = details.get(key);
+                if (!context || Date.now() - context.at >= 5000) {
+                    const full = !context || Date.now() - context.staticAt >= 300000 || context.data.rows[0]?.status !== 'active' || context.data.rows[0]?.auction_kind === 'buy';
+                    let query = client.rpc(full ? 'read_auction_page' : 'read_auction_detail_context', { p_view: 'detail', p_id: request.id,
+                        p_search: '', p_status: 'active', p_sort: 'ending', p_page: 1 });
+                    if (request.signal && query.abortSignal) query = query.abortSignal(request.signal);
+                    let { data, error } = await query;
+                    if (error) throw error;
+                    request.signal?.throwIfAborted();
+                    if (data?.privacy_version !== 1 || !Array.isArray(data.rows) || !Array.isArray(data.bids)) throw new Error('Invalid private auction detail.');
+                    const transitioned = !full && data.rows.some(row => row._detail_full_required);
+                    if (transitioned) {
+                        let authoritative = client.rpc('read_auction_page', { p_view: 'detail', p_id: request.id, p_search: '', p_status: 'active', p_sort: 'ending', p_page: 1 });
+                        if (request.signal && authoritative.abortSignal) authoritative = authoritative.abortSignal(request.signal);
+                        ({ data, error } = await authoritative);
+                        if (error) throw error;
+                        request.signal?.throwIfAborted();
+                        if (data?.privacy_version !== 1 || !Array.isArray(data.rows) || !Array.isArray(data.bids)) throw new Error('Invalid private auction detail.');
+                    }
+                    context = { data: full || transitioned ? data : { ...data, rows: data.rows.map(row => ({ ...context.data.rows.find(value => value.id === row.id), ...row })) },
+                        at: Date.now(), staticAt: full || transitioned ? Date.now() : context.staticAt };
+                    details.clear();
+                    details.set(key, context);
+                }
+                // Unpublished drafts stay exclusively on the private transport.
+                if (!context.data.rows.length || context.data.rows[0].status === 'pending_escrow') return context.data;
+                const [staticData, live] = await Promise.all(['detail-static', 'detail-live'].map(view => this.load({ ...request, view })));
+                return { ...context.data, server_time: live.server_time,
+                    rows: context.data.rows.map(row => ({ ...row, ...staticData.rows.find(value => value.id === row.id),
+                        ...(Date.parse(live.public_snapshot?.captured_at) >= context.staticAt ? live.rows.find(value => value.id === row.id) : row) })) };
+            }
+
             const params = new URLSearchParams({ view: request.view });
-            if (request.view === 'seller') params.set('id', request.id);
+            if (request.view === 'seller' || request.view.startsWith('detail-')) params.set('id', request.id);
             if (['browse', 'seller'].includes(request.view)) {
                 for (const key of ['search', 'status', 'sort', 'trade', 'kind', 'buyout', 'bundle', 'page', 'minPrice', 'maxPrice']) {
                     if (request[key] != null) params.set(key, String(request[key]));
@@ -36,7 +75,7 @@ export function createPublicAuctionReader(client, { enabled = false, fetch: fetc
             request.signal?.throwIfAborted();
             // Homepage cards show no names or personal actions. Pending trades
             // already have their own private read, so no extra database call is needed.
-            if (request.view === 'home') return data;
+            if (request.view === 'home' || request.view.startsWith('detail-')) return data;
             const { data: auth, error: authError } = await client.auth.getSession();
             if (authError) throw authError;
             if (!auth.session && request.view !== 'seller') return data;

@@ -90,7 +90,7 @@ export const AuctionsProvider = ({ children }) => {
 
     useEffect(() => {
         if (!key || networkRequest.view === 'profile' && !currentUser?.id) return;
-        const delay = () => Math.max(auctionRefreshDelay(networkRequest, cache.snapshot(key).data?.auctions || [], auctionNow()), cache.retryAfter(key));
+        const delay = () => Math.max(auctionRefreshDelay(networkRequest, cache.snapshot(key).data?.auctions || [], auctionNow(), import.meta.env.VITE_SHARED_AUCTION_CACHE === 'true'), cache.retryAfter(key));
         const previous = cache.snapshot(key);
         const initialDelay = previous.error ? cache.retryAfter(key)
             : previous.updatedAt == null ? (networkRequest.view === 'browse' && (networkRequest.minPrice != null || networkRequest.maxPrice != null) ? 250 : 0)

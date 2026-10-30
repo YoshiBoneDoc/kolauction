@@ -161,18 +161,21 @@ export class PublicAuctionCache {
         const key = JSON.stringify(query);
         let entry = this.entries.get(key);
         const age = entry ? Date.now() - entry.storedAt : Infinity;
+        const detail = query.view.startsWith('detail-') || query.view === 'featured';
+        const ttl = query.view === 'detail-live' ? 2000 : query.view === 'featured' ? 30000 : 300000;
         const dirty = entry && (entry.revision || '0') !== this.revision;
         let state = 'HIT';
-        if (dirty || age > (query.view === 'banner' ? FRESH_MS : MAX_AGE_MS)) {
+        const expiredFeature = query.view === 'featured' && entry?.data.rows.some(row => Date.parse(row.bid_deadline || row.end_time) <= Date.parse(entry.data.server_time) + age);
+        if (expiredFeature || (!detail && dirty) || age > (detail ? ttl : query.view === 'banner' ? FRESH_MS : MAX_AGE_MS)) {
             try { entry = await this.refresh(key, query); state = dirty ? 'REVALIDATED' : 'MISS'; }
             catch (error) { return Response.json(cacheErrorBody(error.code), { status: 503,
                 headers: { 'Cache-Control': 'no-store', 'Retry-After': '30' } }); }
             // An invalidation can arrive while the refreshed snapshot is persisted.
             // Never return that older generation as a successful fresh response.
-            if ((entry.revision || '0') !== this.revision) return Response.json({ error: unavailable().message }, {
+            if (!detail && (entry.revision || '0') !== this.revision) return Response.json({ error: unavailable().message }, {
                 status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '1' },
             });
-        } else if (age > FRESH_MS && age <= MAX_AGE_MS) {
+        } else if (!detail && age > FRESH_MS && age <= MAX_AGE_MS) {
             state = 'STALE';
             this.ctx.waitUntil(this.refresh(key, query).catch(() => {}));
         }

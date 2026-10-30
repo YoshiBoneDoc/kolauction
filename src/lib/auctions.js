@@ -128,7 +128,7 @@ export function createAuctionService(client, { publicReader = null } = {}) {
             // Browsing is read-only. The existing bot tick expires all auction
             // types; write RPCs independently validate deadlines under their locks.
             const requestStartedAt = auctionClockRequestStarted();
-            const sharedRequest = { view, sellerId, excludeOwn, kind, buyout, bundle, summaryOnly, search, status, sort, trade, page, minPrice, maxPrice, signal, fresh };
+            const sharedRequest = { view, id, sellerId, excludeOwn, kind, buyout, bundle, summaryOnly, search, status, sort, trade, page, minPrice, maxPrice, signal, fresh };
             let request;
             if (await publicReader?.accepts(sharedRequest)) request = publicReader.load(sharedRequest).then(data => ({ data }));
             else if (view === 'seller' && summaryOnly) request = requireClient().rpc('read_seller_auction_context', { p_seller_id: id, p_ids: [] });

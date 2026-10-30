@@ -28,10 +28,10 @@ export function auctionReadRequest(pathname, search = '', viewerId = null) {
     };
 }
 
-export function auctionRefreshDelay(request, auctions = [], now = Date.now()) {
+export function auctionRefreshDelay(request, auctions = [], now = Date.now(), sharedDetail = false) {
     // Public summary/page reads keep a stable cadence during simultaneous endings.
     if (['home', 'browse'].includes(request?.view)) return 60000;
-    let delay = request?.view === 'detail' ? 10000 : 30000;
+    let delay = request?.view === 'detail' ? (sharedDetail ? 2000 : 10000) : 30000;
     for (const auction of auctions) {
         if (auction.status !== 'active') continue;
         const remaining = auction.endTime - now;

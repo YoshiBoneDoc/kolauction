@@ -31,12 +31,17 @@ export function publicRequest(url) {
     for (const key of query.keys()) {
         if (!params.has(key) || query.getAll(key).length !== 1) throw new Error('Unsupported public parameter.');
     }
-    const view = choose(query.get('view'), ['home', 'browse', 'seller'], 'browse');
-    if (view === 'home') {
+    const view = choose(query.get('view'), ['home', 'browse', 'seller', 'detail-live', 'detail-static', 'featured'], 'browse');
+    if (view === 'home' || view === 'featured') {
         if (query.size !== 1) throw new Error('Homepage does not accept filters.');
         return { view };
     }
     let id;
+    if (view.startsWith('detail-')) {
+        const id = query.get('id');
+        if (query.size !== 2 || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(id || '')) throw new Error('Invalid auction.');
+        return { view, id: id.toLowerCase() };
+    }
     if (view === 'seller') {
         id = query.get('id');
         if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(id || '')) throw new Error('Invalid public profile.');
@@ -62,6 +67,9 @@ export function publicRequest(url) {
 }
 
 export function publicProjection(data, request) {
+    if (request.view === 'featured') {
+        data = { privacy_version: 1, server_time: new Date().toISOString(), rows: data ? [data] : [], bids: [], total: data ? 1 : 0 };
+    }
     if (request.view === 'banner') {
         if (data !== null && (!data || typeof data.revision !== 'string' || data.revision.length > 100
             || typeof data.message !== 'string' || data.message.length > 2000)) throw new Error('Invalid public banner.');
@@ -77,8 +85,9 @@ export function publicProjection(data, request) {
     const pick = (value, keys) => Object.fromEntries(keys.filter(key => Object.hasOwn(value, key)).map(key => [key, value[key]]));
     const rows = data.rows.map(row => {
         if (!row || typeof row.id !== 'string' || row.status === 'pending_escrow') throw new Error('Nonpublic auction in snapshot.');
-        return { ...pick(row, PUBLIC_FIELDS), usernames_visible: false,
-            bundle_items: Array.isArray(row.bundle_items) ? row.bundle_items.map(item => pick(item, ['id', 'quantity', 'name', 'image'])) : [],
+        const fields = request.view === 'detail-live' ? PUBLIC_FIELDS.filter(key => !['item', 'item_id', 'quantity', 'image', 'duration_hours', 'created_at'].includes(key)) : PUBLIC_FIELDS;
+        return { ...pick(row, fields), ...(request.view === 'featured' ? { giveaway_title: row.giveaway_title } : {}), ...(request.view.startsWith('detail-') ? {} : { usernames_visible: false }),
+            ...(request.view === 'detail-live' ? {} : { bundle_items: Array.isArray(row.bundle_items) ? row.bundle_items.map(item => pick(item, ['id', 'quantity', 'name', 'image'])) : [] }),
         };
     });
     const result = { privacy_version: 1, shared_cache_version: CACHE_VERSION,
@@ -97,6 +106,8 @@ export function publicProjection(data, request) {
 }
 
 export function originRequest(request) {
+    if (request.view === 'featured') return { rpc: 'read_featured_giveaway', args: {} };
+    if (request.view.startsWith('detail-')) return { rpc: 'read_public_auction_detail_state', args: { p_id: request.id } };
     if (request.view === 'banner') return { rpc: 'read_site_banner', args: {} };
     return request.view === 'home' ? { rpc: 'read_public_home_auctions', args: {} } : {
         rpc: 'read_public_auction_page', args: { p_view: request.view, p_id: request.id || null,
