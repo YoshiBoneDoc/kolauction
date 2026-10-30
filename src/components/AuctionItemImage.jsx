@@ -31,7 +31,7 @@ export default function AuctionItemImage({ src, item, compact = false, size = 'd
     const imageSize = size === 'tiny' ? 'h-6 w-6' : compact ? 'h-12 w-12 sm:h-16 sm:w-16' : 'h-28 w-28 sm:h-40 sm:w-40';
     return <figure className={`min-w-0 text-center ${compact || size === 'tiny' ? 'shrink-0' : ''} ${className}`}>
         {!(fallbackText && imageFailed) && <img src={src} alt={item} onLoad={() => setLoading(false)} onError={() => { setLoading(false); if (fallbackText) setImageFailed(true); }}
-            style={enhanceEnabled && enhancements ? { filter: `blur(${14 + damage * 4}px)`, imageRendering: 'pixelated' } : undefined}
+            style={enhanceEnabled && enhancements ? { filter: `blur(${0.4 + damage * 2}px)`, imageRendering: 'pixelated' } : undefined}
             className={`mx-auto object-contain [image-rendering:pixelated] ${imageSize}`} />}
         {fallbackText && imageFailed && <span role="img" aria-label={`${item} image unavailable`} className="text-center text-[8px] leading-[9px] text-gray-500">{fallbackText}</span>}
         {((!compact && size !== 'tiny') || enhanceEnabled) && <figcaption className="mt-2">

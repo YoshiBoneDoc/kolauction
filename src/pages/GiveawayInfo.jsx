@@ -1,6 +1,11 @@
+import { useLayoutEffect } from 'react';
 import SiteFooter from '../components/SiteFooter';
 
 export default function GiveawayInfo() {
+    useLayoutEffect(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    }, []);
+
     return (
         <div className="site-page-background flex flex-1 flex-col bg-gray-50">
             <main className="mx-auto w-full max-w-3xl flex-1 px-6 pt-12 pb-16">

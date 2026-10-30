@@ -19,7 +19,7 @@ const { outputFiles } = buildSync({ stdin: { contents: `
         </UserContext.Provider></StaticRouter>);
     }`,resolveDir:fileURLToPath(new URL('../',import.meta.url)),loader:'jsx'},
     bundle:true,write:false,platform:'node',format:'cjs',packages:'external',jsx:'automatic',
-    define:{'import.meta.env':'{}'},loader:{'.gif':'dataurl'},
+    define:{'import.meta.env':'{}'},loader:{'.gif':'dataurl','.css':'empty'},
 });
 const compiled={exports:{}};
 const requireModule=createRequire(import.meta.url);
@@ -201,4 +201,19 @@ test('author withdrawal and separate trade queries never accept caller-supplied 
     await service.withdrawTradeRating('auction');
     await service.submitTradeQuery('request','auction','Please review this trade concern.');
     assert.deepEqual(calls,[['withdraw_trade_rating',{p_auction_id:'auction'}],['submit_trade_query',{p_request_id:'request',p_auction_id:'auction',p_body:'Please review this trade concern.'}]]);
+});
+
+test('administrator sections isolate bans and analytics from message categories', () => {
+    const user = {id:'normal'};
+    const inbox = render('/admin/inbox', user);
+    assert.match(inbox, /Administrator sections/);
+    assert.doesNotMatch(inbox, /Account bans|Auctions affected by bans|Loading analytics/);
+    const bans = render('/admin/inbox?tab=bans', user);
+    assert.match(bans, /Account bans/);
+    assert.match(bans, /Auctions affected by bans/);
+    assert.doesNotMatch(bans, /Inbox categories|Loading analytics/);
+    const analytics = render('/admin/inbox?tab=analytics', user);
+    assert.match(analytics, /Loading analytics/);
+    assert.doesNotMatch(analytics, /Account bans|Inbox categories/);
+    assert.doesNotMatch(render('/admin/inbox?tab=analytics'), /Loading analytics/);
 });

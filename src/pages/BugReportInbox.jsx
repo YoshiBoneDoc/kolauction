@@ -5,6 +5,7 @@ import SiteFooter from '../components/SiteFooter';
 import { supabase } from '../lib/supabase';
 import { createBugReportService } from '../lib/bugReports';
 import SupportThread from '../components/SupportThread';
+import AdminAnalytics from '../components/AdminAnalytics';
 import AdminAccountControls from '../components/AdminAccountControls';
 import AdminAuctionBanReviews from '../components/AdminAuctionBanReviews';
 import { supportCategories as categories, threadKey } from '../lib/supportThreads';
@@ -84,8 +85,6 @@ function Inbox() {
     }
 
     return <>
-        {result && !result.error && <AdminAccountControls />}
-        {result && !result.error && <AdminAuctionBanReviews />}
         <nav aria-label="Inbox categories" className="flex flex-wrap gap-x-5 gap-y-1 border-b border-gray-200">
             {[['all', 'All'], ...categories].map(([value, label]) => <button key={value} aria-current={category === value ? 'page' : undefined}
                 onClick={() => { setParams(value === 'all' ? {} : { category: value }); setPage(1); setActionError(''); }}
@@ -125,16 +124,28 @@ function Inbox() {
 
 export default function BugReportInbox() {
     const { currentUser } = useContext(UserContext);
+    const [params, setParams] = useSearchParams();
+    const tab = ['bans', 'analytics'].includes(params.get('tab')) ? params.get('tab') : 'inbox';
     return <div className="site-page-background flex flex-1 flex-col bg-gray-50">
         <main className="mx-auto w-full max-w-6xl flex-1 space-y-5 px-4 py-6 sm:px-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
-                <h1 className="text-3xl font-bold text-blue-700">Administrator inbox</h1>
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                    <h1 className="text-3xl font-bold text-blue-700">Administrator inbox</h1>
+                    {currentUser && <nav aria-label="Administrator sections" className="inline-flex rounded-lg border border-gray-200 bg-white p-1">
+                        {['inbox', 'bans', 'analytics'].map(value => <button key={value}
+                            aria-current={tab === value ? 'page' : undefined}
+                            onClick={() => setParams(previous => { const next = new URLSearchParams(previous); if (value === 'inbox') next.delete('tab'); else next.set('tab', value); return next; })}
+                            className={`min-h-10 rounded-md px-3 text-sm font-medium transition-colors ${tab === value ? 'bg-blue-50 text-blue-800' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}>
+                            {value === 'inbox' ? 'Inbox' : value === 'bans' ? 'Bans' : 'Analytics'}
+                        </button>)}
+                    </nav>}
+                </div>
                 <div className="flex flex-wrap gap-4">
                     <Link to="/admin/polls" className="text-sm text-blue-700 underline">Manage polls</Link>
                     <Link to="/admin/banner" className="text-sm text-blue-700 underline">Manage site banner</Link>
                 </div>
             </div>
-            {currentUser ? <Inbox key={currentUser.id} /> : <p><Link to="/login" className="text-blue-700 underline">Log in</Link> with an administrator account to open this inbox.</p>}
+            {currentUser ? <div key={currentUser.id} className="space-y-5">{tab === 'analytics' ? <AdminAnalytics /> : tab === 'bans' ? <><AdminAccountControls /><AdminAuctionBanReviews /></> : <Inbox />}</div> : <p><Link to="/login" className="text-blue-700 underline">Log in</Link> with an administrator account to open this inbox.</p>}
         </main>
         <SiteFooter />
     </div>;
