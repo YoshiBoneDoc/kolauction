@@ -234,3 +234,16 @@ html[data-theme="dark"] .giveaway-detail .copy-message-field button:hover {
 html[data-theme="dark"] .giveaway-detail .copy-message-field button svg {
  background:transparent; color:#000!important; stroke:#000!important;
 }
+
+/* Outcome panels inherit the giveaway page's dark ink unless themed explicitly. */
+html[data-theme="dark"] .giveaway-detail :is([aria-label="Auction escrow"], [aria-label="Auction outcome"], [aria-label="Auction review"]) {
+ background:#25354a;
+ border-color:#526780;
+ color:#f8fafc;
+}
+html[data-theme="dark"] .giveaway-detail :is([aria-label="Auction escrow"], [aria-label="Auction outcome"], [aria-label="Auction review"]) a {
+ color:#bfdbfe;
+}
+html[data-theme="dark"] .giveaway-detail :is([aria-label="Auction escrow"], [aria-label="Auction outcome"], [aria-label="Auction review"]) a:hover {
+ color:#fff;
+}
