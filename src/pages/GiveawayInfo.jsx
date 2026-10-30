@@ -1,4 +1,5 @@
 import { useLayoutEffect } from 'react';
+import GiveawayTotal from '../components/GiveawayTotal';
 import SiteFooter from '../components/SiteFooter';
 
 export default function GiveawayInfo() {
@@ -8,7 +9,8 @@ export default function GiveawayInfo() {
 
     return (
         <div className="site-page-background flex flex-1 flex-col bg-gray-50">
-            <main className="mx-auto w-full max-w-3xl flex-1 px-6 pt-12 pb-16">
+            <main className="relative mx-auto w-full max-w-3xl flex-1 px-6 pt-12 pb-16">
+                <GiveawayTotal />
 
                 <div className="space-y-12 text-sm leading-7 text-gray-700 dark:text-gray-200">
 
@@ -54,7 +56,7 @@ export default function GiveawayInfo() {
                         </div>
 
                         <p className="mb-6">
-                            These aren't your ordinary kHub auctions. A few
+                            These aren’t your ordinary kHub auctions. A few
                             things work differently:
                         </p>
 
@@ -70,7 +72,7 @@ export default function GiveawayInfo() {
                                 </h3>
 
                                 <p>
-                                    When the hour is up, it's up. The auction
+                                    When the hour is up, it’s up. The auction
                                     ends at its scheduled time, regardless of
                                     any last-second bids.
                                 </p>
@@ -124,7 +126,7 @@ export default function GiveawayInfo() {
                             </p>
 
                             <p className="max-w-md">
-                                Or maybe I'll wake up tomorrow and wonder why I ever
+                                Or maybe I’ll wake up tomorrow and wonder why I ever
                                 thought this was a good idea.
                             </p>
 

@@ -181,6 +181,8 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         stack_sale(owner,bundle=True)
         analytics=json.loads(call('select public.read_admin_analytics();',owner))
         assert analytics['giveaways']['meat_stack_mania']=='10000',analytics
+        assert sql('set role anon;select public.read_giveaway_total();')=='10000'
+        assert call('select public.read_giveaway_total();',buyer)=='10000'
         call('select public.read_admin_analytics();',buyer,error='Administrator access required')
         assert json.loads(call('select public.read_admin_analytics();',seller))['giveaways']['meat_stack_mania']=='10000'
         print('PASS: giveaway analytics sums only owner completed stack-only auctions and enforces administrator access')
