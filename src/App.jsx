@@ -10,6 +10,7 @@ import Login from "./pages/Login"; // Import Login page
 import Profile from "./pages/Profile"; // Import Profile
 import AuctionDetails from "./pages/AuctionDetails";
 import InfoPage from "./pages/InfoPage.jsx";
+import GiveawayInfo from "./pages/GiveawayInfo";
 import OfficialApproval from './pages/OfficialApproval';
 import DonatePage from "./pages/DonatePage.jsx";
 import AuthEmailPage from "./pages/AuthEmailPage";
@@ -56,6 +57,7 @@ const App = () => {
                 <Route path="/donate" element={<DonatePage />} /> {/* Add route */}
                 <Route path="/wall-of-shame" element={<WallOfShame />} />
                 <Route path="/info" element={<InfoPage />} /> {/* Add this route */}
+                <Route path="/giveaways" element={<GiveawayInfo />} />
                 <Route path="/auctions" element={<AllAuctions />} />
                 <Route path="/auction-item" element={<AuctionAnItem />} />
                 <Route path="/register" element={<Register />} />

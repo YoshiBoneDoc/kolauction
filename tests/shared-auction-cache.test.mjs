@@ -93,9 +93,9 @@ test('strict public projection drops identities, financial records, nested secre
 });
 
 test('only homepage aggregate totals cross the shared public projection', () => {
-    const input = { ...source(), site_totals: { meat: '1420000000', items: '24582', trades: '328', balance: 'PRIVATE' } };
+    const input = { ...source(), site_totals: { meat: '1420000000', items: '24582', trades: '328', record_bids: '78', balance: 'PRIVATE' } };
     assert.deepEqual(publicProjection(input, { view: 'home' }).site_totals,
-        { meat: '1420000000', items: '24582', trades: '328' });
+        { meat: '1420000000', items: '24582', trades: '328', record_bids: '78' });
     assert.equal(publicProjection(input, publicRequest(url)).site_totals, undefined);
     input.site_totals.meat = 'PRIVATE';
     assert.equal(publicProjection(input, { view: 'home' }).site_totals, undefined);

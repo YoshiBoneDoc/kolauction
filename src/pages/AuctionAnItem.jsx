@@ -71,6 +71,8 @@ export default function AuctionAnItem() {
     const [bundleTitleConflict, setBundleTitleConflict] = useState(false);
     const bundleTitleInput = useRef(null);
     const [preview, setPreview] = useState(null);
+    const [giveaway, setGiveaway] = useState(false);
+    const [giveawayTitle, setGiveawayTitle] = useState('Meat Stack Mania');
     useEffect(() => {
         const select = durationInput.current;
         if (!select) return;
@@ -170,7 +172,9 @@ export default function AuctionAnItem() {
             try { customEndAt = customAuctionEnd(customEndTime); }
             catch (failure) { setError(failure.message); return; }
         }
-        setPreview({ item: contents ? bundleTitle(contents, customTitle) : item.name, itemId: contents ? contents[0].id : item.id, quantity: contents ? 1 : count, ...(contents ? { bundleItems: contents, bundleTitle: customTitle || null, bundleImageItemId: contents.some(entry => entry.id === bundleImageItemId) ? bundleImageItemId : null } : {}), minBidMeat: minimum, instantPurchasePrice: purchasePrice, auctionTime, escrowMode, ...(customEndAt ? { customEndAt } : {}),
+        if (giveaway && (isBuy || isBundle)) { setError('Giveaways use a single sell item.'); return; }
+        if (giveaway && !giveawayTitle.trim()) { setError('Enter a giveaway title.'); return; }
+        setPreview({ ...(giveaway ? { giveawayTitle: giveawayTitle.trim() } : {}), item: contents ? bundleTitle(contents, customTitle) : item.name, itemId: contents ? contents[0].id : item.id, quantity: contents ? 1 : count, ...(contents ? { bundleItems: contents, bundleTitle: customTitle || null, bundleImageItemId: contents.some(entry => entry.id === bundleImageItemId) ? bundleImageItemId : null } : {}), minBidMeat: minimum, instantPurchasePrice: purchasePrice, auctionTime, escrowMode, ...(customEndAt ? { customEndAt } : {}),
             image: contents ? bundleCover(contents, bundleImageItemId, bundlePrices).image : itemImageUrl(item.image), ...(isBuy ? { auctionKind, deliveryMode } : {}) });
         setError('');
         setBundleTitleConflict(false);
@@ -223,7 +227,7 @@ export default function AuctionAnItem() {
                         {[['buy','Buy Items'],['sell','Sell Items']].map(([value,label]) => {
                             const selected = value === 'buy' ? isBuy : !isBuy;
                             return <button key={value} type="button" aria-pressed={selected}
-                                onClick={() => { if (value === 'buy') { setAuctionKind('buy'); setEscrowMode(true); setCustomDuration(false); } else if (isBuy) setAuctionKind('sell'); setError(''); }}
+                                onClick={() => { if (value === 'buy') { setAuctionKind('buy'); setGiveaway(false); setEscrowMode(true); setCustomDuration(false); } else if (isBuy) setAuctionKind('sell'); setError(''); }}
                                 className={`min-h-11 rounded-lg border px-4 py-2 text-sm font-semibold ${selected ? 'border-blue-200 bg-white text-blue-800 shadow-sm' : 'border-transparent bg-transparent text-slate-500'}`}>{label}</button>;
                         })}
                     </div>
@@ -233,7 +237,7 @@ export default function AuctionAnItem() {
                         <div className="listing-shape-control inline-flex w-44 max-w-full shrink-0 rounded-lg border border-[#EADBD3] bg-[#FFFAF7] p-0.5">
                             {[['sell', 'Single item'], ['bundle', 'Bundle']].map(([value, label]) => <label key={value} className="inline-flex min-w-0 flex-1 cursor-pointer">
                                 <input type="radio" name="sell-auction-type" value={value} checked={auctionKind === value}
-                                    onChange={() => { setAuctionKind(value); setError(''); }} className="peer sr-only" />
+                                    onChange={() => { setAuctionKind(value); if (value === 'bundle') setGiveaway(false); setError(''); }} className="peer sr-only" />
                                 <span data-selected={auctionKind === value} className={`listing-shape-option w-full rounded-md px-2 py-1 text-center text-xs font-semibold transition-colors peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-blue-600 ${auctionKind === value ? 'bg-[#E8EEFF] text-[#2454D8]' : 'text-[#647084] hover:bg-[#FFF0E8]'}`}>{label}</span>
                             </label>)}
                         </div>
@@ -263,6 +267,7 @@ export default function AuctionAnItem() {
                             <h3 className="break-words text-lg font-semibold leading-snug text-gray-900 dark:text-gray-100">{preview.item}</h3>
                         </div>
                     </div>}
+                    {preview.giveawayTitle && <p className="mb-3 font-bold text-red-700">Giveaway: {preview.giveawayTitle}</p>}
                     <dl className="divide-y divide-gray-100 text-sm">
                         {!preview.bundleItems && <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] items-baseline gap-3 py-2.5">
                             <dt className="text-gray-500">Quantity</dt>
@@ -467,7 +472,8 @@ export default function AuctionAnItem() {
                             className="block min-h-11 w-full min-w-0 max-w-full rounded border border-gray-400 bg-white p-3 text-base text-gray-900" />
                         <p id="custom-ending-help" className="mt-2 text-xs text-gray-500">Your timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}. Choose a time within 30 days.{escrowMode && ' Deposit your items before the chosen ending time.'}</p>
                     </section>}
-                    {!isBuy && <p className="-mt-2 mb-4 text-xs text-gray-500">Last-minute bids reset the countdown to 1 minute.</p>}
+                    {!isBuy && !giveaway && <p className="-mt-2 mb-4 text-xs text-gray-500">Last-minute bids reset the countdown to 1 minute.</p>}
+                    {currentUser?.isAdmin && <div className="mb-4"><button type="button" aria-pressed={giveaway} onClick={() => { const next = !giveaway; setGiveaway(next); if (next) { const meat = catalogItems.find(item => item.name === 'dense meat stack'); setAuctionKind('sell'); setEscrowMode(true); setSelectedItem(String(meat?.id || '')); setItemSearch('dense meat stack'); setQuantity('1000'); setMinBidMeat('1'); setShowBuyout(false); setInstantPrice(''); } }} className="min-h-11 w-full rounded border border-red-700 bg-red-700 px-4 font-bold text-white">Giveaway</button>{giveaway && <label className="mt-3 block text-sm font-bold">Title<input value={giveawayTitle} maxLength={80} onChange={event => setGiveawayTitle(event.target.value)} className={fieldClass} /></label>}</div>}
                     <button type="submit" className="min-h-11 w-full rounded bg-blue-600 px-4 py-3 font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">Preview Auction</button>
                 </form>}
             </div>

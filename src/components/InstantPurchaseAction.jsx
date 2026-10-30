@@ -1,4 +1,5 @@
 import { bundleConfirmation } from '../lib/bundles';
+import { minimumAuctionBid } from '../lib/bidIncrements';
 import SellPrice from './SellPrice';
 import { useContext, useState } from 'react';
 import PropTypes from 'prop-types';
@@ -14,7 +15,7 @@ export default function InstantPurchaseAction({ auction, compact = false, showTe
     const [pending, setPending] = useState(false);
     const [error, setError] = useState('');
     const [message, setMessage] = useState('');
-    if (!auction.instantPurchasePrice) return null;
+    if (!auction.instantPurchasePrice || (auction.giveawayTitle && auction.instantPurchasePrice !== minimumAuctionBid(auction))) return null;
     const price = auction.instantPurchasePrice.toLocaleString('en-US');
     const displayedPrice = compact ? formatCompactMeat(auction.instantPurchasePrice) : price;
     const isSeller = currentUser?.id === auction.sellerId;

@@ -1,5 +1,10 @@
 {
   "version": 1,
-  "include": ["/api/public-auctions", "/api/public-auctions/invalidate", "/api/public-banner"],
+  "include": [
+    "/api/public-auctions",
+    "/api/public-auctions/invalidate",
+    "/api/public-banner",
+    "/api/giveaway-image"
+  ],
   "exclude": []
 }

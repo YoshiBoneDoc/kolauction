@@ -19,6 +19,7 @@ export function mapAuction(row, bidRows) {
     return {
         id: row.id,
         auctionKind: row.auction_kind || 'sell',
+        giveawayTitle: row.giveaway_title || null,
         isBundle: Array.isArray(row.bundle_items) && row.bundle_items.length > 1,
         bundleItems: Array.isArray(row.bundle_items) ? row.bundle_items.map(item => ({ ...item, id: Number(item.id), quantity: Number(item.quantity) })) : [],
         pricePerItem: Number(row.price_per_item || row.min_bid_meat),
@@ -200,7 +201,8 @@ export function createAuctionService(client, { publicReader = null } = {}) {
                 if (error) throw databaseError(error);
                 return data;
             }
-            const { data, error } = await requireClient().rpc('create_auction', {
+            const { data, error } = await requireClient().rpc(auction.giveawayTitle ? 'create_giveaway_auction' : 'create_auction', {
+                ...(auction.giveawayTitle ? { p_title: auction.giveawayTitle } : {}),
                 p_item: auction.item,
                 p_quantity: auction.quantity,
                 p_min_bid_meat: auction.minBidMeat,

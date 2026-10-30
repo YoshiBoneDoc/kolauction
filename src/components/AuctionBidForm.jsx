@@ -25,10 +25,10 @@ export default function AuctionBidForm({ auction, showTerms = true, showHeading 
         event.preventDefault();
         if (pending) return;
         setMessage('');
-        const bid = buyout ? auction.instantPurchasePrice : parseMeatAmount(amount);
+        const bid = buyout ? auction.instantPurchasePrice : auction.giveawayTitle ? minimum : parseMeatAmount(amount);
         const instant = auction.instantPurchasePrice && bid !== null && bid >= auction.instantPurchasePrice;
-        if (bid === null || (!instant && (minimum === null || bid < minimum))) {
-            setError(minimum === null ? 'The maximum supported bid has been reached.' : `Enter a bid of at least ${minimumText} Meat.`);
+        if (bid === null || (!instant && (minimum === null || (auction.giveawayTitle ? bid !== minimum : bid < minimum)))) {
+            setError(auction.giveawayTitle && minimum !== null ? `Giveaway bids must be exactly ${minimumText} Meat.` : minimum === null ? 'The maximum supported bid has been reached.' : `Enter a bid of at least ${minimumText} Meat.`);
             return;
         }
         const prompt = instant
@@ -59,7 +59,7 @@ export default function AuctionBidForm({ auction, showTerms = true, showHeading 
             className="col-start-2 row-start-2 inline-flex h-6 w-20 items-center justify-center rounded-none rounded-r-[2px] border border-gray-300 bg-white p-0 text-xs font-semibold text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-500">Close</button>
     </div>;
     if (inline && auction.escrowMode) return <div className="grid h-full min-w-0 grid-cols-[minmax(0,1fr)_80px] grid-rows-[20px_24px] items-end">
-        <label htmlFor={inputId} title={`${minimum === null ? 'The maximum supported bid has been reached.' : `Attach at least ${minimumText} Meat, with no items.`}${auction.instantPurchasePrice ? ` Attach ${auction.instantPurchasePrice.toLocaleString('en-US')} Meat to accept the buyout.` : ''} Bids must be processed before the auction deadline.`}
+        <label htmlFor={inputId} title={`${minimum === null ? 'The maximum supported bid has been reached.' : `Attach ${auction.giveawayTitle ? 'exactly' : 'at least'} ${minimumText} Meat, with no items.`}${auction.instantPurchasePrice ? ` Attach ${auction.instantPurchasePrice.toLocaleString('en-US')} Meat to accept the buyout.` : ''} Bids must be processed before the auction deadline.`}
             className="col-span-2 row-start-1 self-end text-xs font-medium leading-4 text-gray-600">KMail with attached bid meat.</label>
         <CopyMessage text={`BID ${auction.auctionNumber || auction.id}`} label="BID command" recipient="kHub (#3888760)" inputId={inputId} inline className="col-start-1 row-start-2 min-w-0" />
         <button type="button" onClick={onClose} aria-label="Close Bid Form"
@@ -70,10 +70,10 @@ export default function AuctionBidForm({ auction, showTerms = true, showHeading 
 
     if (inline) return <form onSubmit={submit} aria-label={`Bid on ${auction.item}`} className="grid h-full min-h-0 w-full min-w-0 grid-cols-[minmax(0,1fr)_clamp(104px,50%,160px)] grid-rows-[18px_24px] gap-y-0.5 text-left">
         <label htmlFor={inputId} className={error || message ? 'sr-only' : 'col-start-1 row-start-1 self-end text-[10px] font-medium leading-3 text-gray-600'}>Your Bid (Meat)</label>
-        {auction.instantPurchasePrice > 0 && <button type="button" disabled={pending} onClick={event => submit(event, true)} title={`Buyout: ${auction.instantPurchasePrice.toLocaleString('en-US')} Meat`}
+        {auction.instantPurchasePrice > 0 && (!auction.giveawayTitle || auction.instantPurchasePrice === minimum) && <button type="button" disabled={pending} onClick={event => submit(event, true)} title={`Buyout: ${auction.instantPurchasePrice.toLocaleString('en-US')} Meat`}
             className="button-green col-start-2 row-start-1 inline-flex h-[18px] items-center justify-center rounded-[2px] border border-green-800 bg-green-800 p-0 text-[11px] font-semibold text-green-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-green-700 disabled:cursor-not-allowed disabled:border-gray-300 disabled:bg-gray-100 disabled:text-gray-500">Buy Now</button>}
         <input id={inputId} type="text" inputMode="decimal" autoComplete="off" autoFocus
-            value={amount} onChange={(event) => { setAmount(event.target.value); setError(''); setMessage(''); }}
+            readOnly={Boolean(auction.giveawayTitle)} value={auction.giveawayTitle ? minimum ?? '' : amount} onChange={(event) => { setAmount(event.target.value); setError(''); setMessage(''); }}
             onBlur={() => setAmount(value => normalizeAuctionAmount(value, { meat: true }))}
             placeholder={minimum === null ? minimumText : `Min: ${minimumText} · k/m/b`} disabled={pending || minimum === null}
             title={minimum === null ? minimumText : `Next minimum bid: ${minimumText} Meat. Full amounts or k/m/b shorthand.`}
@@ -96,7 +96,7 @@ export default function AuctionBidForm({ auction, showTerms = true, showHeading 
             {showTerms && <div className={`text-xs ${compact ? 'leading-4 text-gray-500' : 'text-gray-700'}`}><SettlementTerms escrowMode={false} /></div>}
             <label htmlFor={inputId} className="block text-sm font-semibold">Your bid (Meat)</label>
             <input id={inputId} type="text" inputMode="decimal" autoComplete="off"
-                value={amount} onChange={(event) => { setAmount(event.target.value); setError(''); setMessage(''); }}
+                readOnly={Boolean(auction.giveawayTitle)} value={auction.giveawayTitle ? minimum ?? '' : amount} onChange={(event) => { setAmount(event.target.value); setError(''); setMessage(''); }}
                 onBlur={() => setAmount(value => normalizeAuctionAmount(value, { meat: true }))}
                 placeholder={minimum === null ? minimumText : `${minimumText} · Full amounts or k/m/b shorthand.`} disabled={pending || minimum === null}
                 aria-invalid={Boolean(error)} aria-describedby={`${inputId}-help${error ? ` ${inputId}-error` : ''}`}

@@ -1,5 +1,7 @@
 import PopularAuctions from '../components/PopularAuctions';
 import HighRollers from '../components/HighRollers';
+import GiveawayCard from '../components/GiveawayCard';
+import useFeaturedGiveaway from '../hooks/useFeaturedGiveaway';
 import ExploreAuctions from '../components/ExploreAuctions';
 import { useContext, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
@@ -15,6 +17,7 @@ import SiteTradeTotals from '../components/SiteTradeTotals';
 export default function Home() {
     const { auctions, homeSections, siteTotals, isLoading, error, hasLoaded = !isLoading && !error, refreshAuctions } = useContext(AuctionsContext);
     const now = useNow();
+    const featuredGiveaway = useFeaturedGiveaway();
     const featuredPollTarget = useRef(null);
     const hasActiveAuctions = auctions.some(auction => ['active', 'finalizing'].includes(getAuctionStatus(auction, now)));
 
@@ -37,6 +40,10 @@ export default function Home() {
                     <button onClick={refreshAuctions} className="underline">Retry</button>
                 </p>}
                 <PendingTrades />
+                {featuredGiveaway && getAuctionStatus(featuredGiveaway, now) === 'active' && <div className="mb-8">
+                    <GiveawayCard auction={featuredGiveaway} now={now} />
+                    <p className="mt-1.5 text-center text-xs"><Link to="/giveaways" className="text-blue-700 underline hover:text-blue-800 dark:text-blue-300 dark:hover:text-blue-200">Seriously, wtf is this?</Link></p>
+                </div>}
                 <HighRollers auctions={highRollers} now={now}>
                     {isLoading && <p role="status">Loading High Rollers…</p>}
                     {!isLoading && !error && highRollers.length === 0 && <p>No active or completed auctions valued at 50M Meat or more yet.</p>}

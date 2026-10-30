@@ -3,6 +3,10 @@ export function parseSiteTradeTotals(value) {
     if (!value || typeof value !== 'object') return null;
     const entries = ['meat', 'items', 'trades'].map(key => [key, value[key]]);
     if (entries.some(([, amount]) => typeof amount !== 'string' || !/^\d{1,40}$/.test(amount))) return null;
+    // Older deployed snapshots remain valid while migration/cache rollout runs.
+    if (typeof value.record_bids === 'string' && /^\d{1,40}$/.test(value.record_bids)) {
+        entries.push(['record_bids', value.record_bids]);
+    }
     return Object.fromEntries(entries);
 }
 

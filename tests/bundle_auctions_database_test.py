@@ -901,7 +901,9 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
                 where d.receipt_id=f.receipt_id and d.dedupe_key like 'buy-fill-payment:%' and d.state='sent')
             and not exists(select 1 from khub_bot.deliveries d where d.receipt_id=f.receipt_id
                 and d.dedupe_key like 'buy-fill-payment:%' and d.state<>'sent');"""))
-        assert totals=={key:str(int(sales[key])+int(fills[key])) for key in ['meat','items','trades']}
+        expected_totals={key:str(int(sales[key])+int(fills[key])) for key in ['meat','items','trades']}
+        expected_totals['record_bids']=sql('select coalesce(max(n),0) from (select count(*) n from public.bids group by auction_id) counts;')
+        assert totals==expected_totals
         assert json.loads(sql("set role anon;select public.read_public_home_auctions()->'site_totals';"))==totals
         assert json.loads(sql("set role anon;select public.read_home_auctions()->'site_totals';"))==totals
         sql("set role anon;select * from khub_bot.site_trade_totals_snapshot;",error='permission denied')
@@ -943,7 +945,9 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
             assert all(value==totals for value in pool.map(read_totals,range(24)))
         assert sql('select count(*) from khub_bot.test_totals_refreshes;')=='1'
         assert sql("select refreshed_at from khub_bot.site_trade_totals_snapshot;")!=before
-        sql((ROOT/'supabase/migrations/queue/202610290151_milestones_cache_interval.sql').read_text())
+        sql(next(ROOT.glob('supabase/migrations/**/202610290151_milestones_cache_interval.sql')).read_text())
+        sql(next(ROOT.glob('supabase/migrations/**/202610290152_milestones_record_bids.sql')).read_text())
+        assert json.loads(sql("select khub_bot.site_trade_totals();"))==totals
         print('PASS: milestones reuse a 10-minute snapshot; expired readers serve stale under contention; 24 concurrent reads recalculate exactly once; migration reruns safely')
     finally:
         if started:pg('-m','immediate','stop')

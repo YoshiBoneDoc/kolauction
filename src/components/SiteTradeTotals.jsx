@@ -4,10 +4,10 @@ import { formatSiteMeat, parseSiteTradeTotals } from '../lib/siteTradeTotals';
 export default function SiteTradeTotals({ totals }) {
     const values = parseSiteTradeTotals(totals);
     if (!values) return null;
-    return <div className="mx-auto mt-4 w-full max-w-6xl text-center" aria-label="kHub Milestones">
+    return <div className="mx-auto mt-[22px] mb-[1.5px] w-full max-w-6xl text-center" aria-label="kHub Milestones">
         <div className="flex items-center gap-3 sm:gap-4">
             <span aria-hidden="true" className="h-px flex-1 bg-gray-300 dark:bg-slate-600" />
-            <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm font-medium text-slate-700 dark:text-slate-200 sm:gap-x-4">
                 <span className="inline-flex items-center gap-1 whitespace-nowrap" title={`${BigInt(values.meat).toLocaleString('en-US')} Meat`}>
                     <span aria-hidden="true" className="relative inline-block h-[22px] w-[18px] shrink-0 overflow-hidden mix-blend-multiply dark:mix-blend-screen">
                         <img src="/images/site-stats/meat.gif" alt="" className="absolute -left-[3px] -top-px h-6 w-6 max-w-none dark:invert" />
@@ -25,6 +25,14 @@ export default function SiteTradeTotals({ totals }) {
                         <img src="/images/site-stats/trades.gif" alt="" className="absolute -left-[4px] -top-[10px] h-8 w-8 max-w-none dark:invert" />
                     </span>{BigInt(values.trades).toLocaleString('en-US')} trades
                 </span>
+                {values.record_bids != null && <>
+                    <span aria-hidden="true" className="text-slate-400">·</span>
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap" title="Most bids ever placed on a single auction">
+                        <span aria-hidden="true" className="relative inline-block h-[22px] w-[13px] shrink-0 overflow-hidden mix-blend-multiply dark:mix-blend-screen">
+                            <img src="/images/site-stats/record-bids.gif" alt="" className="absolute -left-[5px] -top-px h-6 w-6 max-w-none dark:invert" />
+                        </span>{BigInt(values.record_bids).toLocaleString('en-US')} Record Bids
+                    </span>
+                </>}
             </div>
             <span aria-hidden="true" className="h-px flex-1 bg-gray-300 dark:bg-slate-600" />
         </div>

@@ -110,9 +110,10 @@ test('update log explains completed bidder visibility and escrow-only Buy Auctio
 });
 
 
-test('What’s New links to the update log beside Beta on Home only', () => {
+test('What’s New links to the update log beside the centered title on Home only', () => {
     const html = render('/');
-    assert.match(html, /Beta<\/span>[\s\S]*?href="\/update-log"[^>]*>What’s New/);
+    assert.match(html, /<h1[^>]*>KoL Auction Hub<\/h1>[\s\S]*?href="\/update-log"[^>]*>What’s New/);
+    assert.doesNotMatch(html, />Beta</);
     assert.doesNotMatch(navigation(html), /update-log/);
     assert.doesNotMatch(render('/auctions'), /href="\/update-log"/);
 });

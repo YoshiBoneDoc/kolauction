@@ -7,6 +7,8 @@ import { UserContext } from '../context/UserContext';
 import { auctionFilters, resolveBrowseSort } from '../lib/auctionBrowsing';
 import { useNow } from '../hooks/useNow';
 import CompactAuctionCard from '../components/CompactAuctionCard';
+import GiveawayCard from '../components/GiveawayCard';
+import useFeaturedGiveaway from '../hooks/useFeaturedGiveaway';
 import PendingTrades from '../components/PendingTrades';
 import useAuctionSearch from '../hooks/useAuctionSearch';
 
@@ -16,6 +18,7 @@ export default function AllAuctions() {
     const { params, setParams, rememberSearch, resetSession, navigationType, locationKey } = useAuctionBrowseSession({ priceBounds: AUCTION_PRICE_RANGE_ENABLED ? priceBounds : null, isLoading, error });
     const [searchInput, setSearchInput] = useAuctionSearch(setParams);
     const now = useNow();
+    const featuredGiveaway = useFeaturedGiveaway();
     const [openBid, setOpenBid] = useState(null);
     const [filtersOpen, setFiltersOpen] = useState(false);
     const filtersId = useId();
@@ -153,7 +156,8 @@ export default function AllAuctions() {
                     </div>
                     {!error && pageRows.length === 0 && <p className="rounded-lg border bg-white p-6">{trade === 'none' ? 'Select Escrow or Direct to show auctions.' : mineOnly ? 'No auctions of yours match these filters.' : 'No auctions match your search and filters. Try another item name or status.'}</p>}
                     <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        {pageRows.map((auction) => <CompactAuctionCard key={auction.id} auction={auction} now={now}
+                        {featuredGiveaway && featuredGiveaway.endTime > now && <GiveawayCard compact auction={featuredGiveaway} now={now} />}
+                        {pageRows.filter(auction => !(featuredGiveaway?.endTime > now && auction.id === featuredGiveaway.id)).map((auction) => <CompactAuctionCard key={auction.id} auction={auction} now={now}
                             expanded={openBid?.id === auction.id && openBid?.browseKey === browseKey}
                             onToggleBid={() => setOpenBid(previous => previous?.id === auction.id && previous?.browseKey === browseKey ? null : { id: auction.id, browseKey })} />)}
                     </div>

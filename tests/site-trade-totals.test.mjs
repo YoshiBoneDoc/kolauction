@@ -10,6 +10,14 @@ test('public trade totals accept only exact nonnegative decimal fields', () => {
         assert.equal(parseSiteTradeTotals(value), null);
     }
 });
+test('record bids remains exact, optional and independently validated', () => {
+    const totals = { meat: '0', items: '0', trades: '0' };
+    assert.deepEqual(parseSiteTradeTotals({ ...totals, record_bids: '1234', private: 'DROP' }), { ...totals, record_bids: '1234' });
+    assert.deepEqual(parseSiteTradeTotals({ ...totals, record_bids: '0' }), { ...totals, record_bids: '0' });
+    for (const record_bids of ['-1', '1e3', 1234, null]) {
+        assert.deepEqual(parseSiteTradeTotals({ ...totals, record_bids }), totals);
+    }
+});
 test('homepage Meat shorthand preserves big integers and two decimal places', () => {
     assert.equal(formatSiteMeat('1420000000'), '1.42b');
     assert.equal(formatSiteMeat('0'), '0');

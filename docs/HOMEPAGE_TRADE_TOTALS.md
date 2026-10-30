@@ -1,22 +1,26 @@
 # Homepage totals
 
 Apply [migration 150](../supabase/migrations/202610290150_homepage_trade_totals.sql)
-and [migration 151](../supabase/migrations/queue/202610290151_milestones_cache_interval.sql),
+and [migration 151](../supabase/migrations/202610290151_milestones_cache_interval.sql),
+then [migration 152](../supabase/migrations/queue/202610290152_milestones_record_bids.sql),
 then deploy the website and public cache Worker through the existing Git workflows.
 No bot update is required. Until the migration is applied and the homepage snapshot
 refreshes, the totals row is omitted rather than displaying invented zero values.
 
-The three figures are public lifetime aggregates:
+The figures are public lifetime aggregates:
 
 - Meat: completed Sell final prices plus confirmed Buy fulfillment payments,
   excluding commissions, funding deposits, refunds and donations.
 - Items: quantities from those trades; bundle components are summed individually.
 - Trades: one per completed Sell auction and one per paid Buy fulfillment.
   Partial Buy-order purchases remain included if the order later expires or cancels.
+- Record Bids: the largest number of recorded bids on any single auction, active
+  or historical. Buy fulfillments are purchases, not bids, and are not included.
+  Apply migration 152 and deploy both website and cache Worker to show this field.
 
 An independent, nonblocking fifteen-minute database snapshot is reused by both the
 direct and shared-cache homepage reads. The browser makes no extra request for
-these figures. The public cache allows only three nonnegative decimal strings;
+these figures. The public cache allows only the four nonnegative decimal strings;
 no account balances, participant details or transaction records are shared.
 The display may lag by the snapshot interval plus normal public-cache refresh.
 These numbers never authorize any financial operation.
