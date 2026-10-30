@@ -7,7 +7,7 @@ export async function onRequestGet({ request }) {
     if (!penguin && !/^(?:itemimages|otherimages)(?:\/[A-Za-z0-9_-]+)+\.gif$/.test(path)) return new Response('Invalid image', { status: 400 });
     const filename = path.split('/').at(-1);
     const candidates = penguin
-        ? ['https://wiki.kingdomofloathing.com/Special:Redirect/file/Shoppeng.gif', 'https://images.kingdomofloathing.com/otherimages/shoppeng.gif']
+        ? ['https://wiki.kingdomofloathing.com/images/4/4b/Shoppeng.gif', 'https://wiki.kingdomofloathing.com/Special:Redirect/file/Shoppeng.gif', 'https://images.kingdomofloathing.com/otherimages/shoppeng.gif']
         : [`https://images.kingdomofloathing.com/${path}`, `https://wiki.kingdomofloathing.com/Special:Redirect/file/${encodeURIComponent(filename)}`];
     for (const url of candidates) {
         try {

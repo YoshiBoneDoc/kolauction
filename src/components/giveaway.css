@@ -213,7 +213,7 @@ body:has(.giveaway-detail) div:has(> .site-navigation) { background:linear-gradi
 }
 
 /* Readability changes apply exclusively to giveaway auction detail pages. */
-.giveaway-detail .giveaway-bid-warning { font-size:clamp(15px,1.6vw,18px); line-height:1.5; text-decoration:underline; }
+.giveaway-detail .giveaway-bid-warning { font-size:clamp(13px,1.3vw,15px); line-height:1.45; text-decoration:underline; }
 .giveaway-detail .giveaway-bid-warning strong { font-weight:800; }
 .giveaway-detail .giveaway-detail-info .giveaway-countdown { font-size:clamp(18px,2vw,23px); font-weight:700; }
 
@@ -222,3 +222,15 @@ body:has(.giveaway-detail) div:has(> .site-navigation) { background:linear-gradi
 /* Keep giveaway deposit instructions legible in their pale box. */
 .giveaway-detail [aria-label="list KMail instructions"],
 .giveaway-detail [aria-label="list KMail instructions"] :is(p,strong,span,a,code) { color:#bb0000; }
+
+/* Processed giveaway art already has transparency; do not restore a white mat. */
+html[data-theme="dark"] :is(.giveaway-detail,.giveaway-card) img[class*="object-contain"] {
+ background:transparent; padding:0; border-radius:0;
+}
+html[data-theme="dark"] .giveaway-detail .copy-message-field button,
+html[data-theme="dark"] .giveaway-detail .copy-message-field button:hover {
+ background:#fff!important; color:#000!important;
+}
+html[data-theme="dark"] .giveaway-detail .copy-message-field button svg {
+ background:transparent; color:#000!important; stroke:#000!important;
+}

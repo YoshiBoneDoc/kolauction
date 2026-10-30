@@ -237,7 +237,7 @@ export default function AuctionAnItem() {
                         <div className="listing-shape-control inline-flex w-44 max-w-full shrink-0 rounded-lg border border-[#EADBD3] bg-[#FFFAF7] p-0.5">
                             {[['sell', 'Single item'], ['bundle', 'Bundle']].map(([value, label]) => <label key={value} className="inline-flex min-w-0 flex-1 cursor-pointer">
                                 <input type="radio" name="sell-auction-type" value={value} checked={auctionKind === value}
-                                    onChange={() => { setAuctionKind(value); if (value === 'bundle') setGiveaway(false); setError(''); }} className="peer sr-only" />
+                                    onChange={() => { setAuctionKind(value); if (value === 'bundle') { setGiveaway(false); } setError(''); }} className="peer sr-only" />
                                 <span data-selected={auctionKind === value} className={`listing-shape-option w-full rounded-md px-2 py-1 text-center text-xs font-semibold transition-colors peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-blue-600 ${auctionKind === value ? 'bg-[#E8EEFF] text-[#2454D8]' : 'text-[#647084] hover:bg-[#FFF0E8]'}`}>{label}</span>
                             </label>)}
                         </div>

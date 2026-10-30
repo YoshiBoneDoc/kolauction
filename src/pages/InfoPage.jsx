@@ -316,6 +316,15 @@ const InfoPage = () => {
                 </div>
 
                 <hr className="info-contact-divider mx-auto mb-5 w-2/3 max-w-lg" />
+                <section aria-labelledby="brief-history-title" className="mb-6">
+                    <h2 id="brief-history-title" className={`${sectionHeadingClass} mb-2 text-center`}>A Brief History</h2>
+                    <ul className="list-disc space-y-2 pl-5">
+                        <li>October 19, 2026 - Official launch of kHub.</li>
+                        <li>Friday, October 30, 2026, 01:02AM - The first 'Meat Stack Mania' was held.</li>
+                    </ul>
+                </section>
+
+                <hr className="info-contact-divider mx-auto mb-5 w-2/3 max-w-lg" />
 
                 <h2 className={`${sectionHeadingClass} mb-1 text-center`}>
                     Contact Us

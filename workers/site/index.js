@@ -1,5 +1,6 @@
 import { onRequest as publicAuctions } from '../../functions/api/public-auctions.js';
 import { onRequest as publicBanner } from '../../functions/api/public-banner.js';
+import { onRequestGet as giveawayImage } from '../../functions/api/giveaway-image.js';
 import { onRequest as invalidateAuctions } from '../../functions/api/public-auctions/invalidate.js';
 
 // Reuse the existing handlers: the same privacy, signing and method checks apply
@@ -7,6 +8,7 @@ import { onRequest as invalidateAuctions } from '../../functions/api/public-auct
 const routes = new Map([
     ['/api/public-auctions', publicAuctions],
     ['/api/public-banner', publicBanner],
+    ['/api/giveaway-image', giveawayImage],
     ['/api/public-auctions/invalidate', invalidateAuctions],
 ]);
 
