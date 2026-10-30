@@ -93,7 +93,7 @@ body:has(.giveaway-detail) .site-navigation :is(a,button):hover { text-shadow:0 
 .giveaway-detail .bid-kmail-instructions p.text-xs { font-size:12px; color:#fff0ee; font-style:italic; }
 .giveaway-detail .copy-message-field { height:48px; border:1px solid #e1d2ff; background:#fff!important; color:#111827; }
 .giveaway-detail .copy-message-field code { font-size:16px; font-weight:700; }
-.giveaway-detail .copy-message-field button { color:#1245ff; background:#fff; border:1px solid #e1d2ff; height:32px; width:32px; }
+.giveaway-detail .copy-message-field button { color:#000; background:#fff; border:1px solid #e1d2ff; height:32px; width:32px; }
 .giveaway-detail .giveaway-detail-info :is(p,span.text-gray-600,span.text-gray-700) { color:#210c10; }
 .giveaway-detail .giveaway-detail-info a { color:#073aff; text-decoration:underline; }
 .giveaway-detail .giveaway-detail-info .giveaway-detail-price { color:#fff; }
@@ -216,3 +216,9 @@ body:has(.giveaway-detail) div:has(> .site-navigation) { background:linear-gradi
 .giveaway-detail .giveaway-bid-warning { font-size:clamp(15px,1.6vw,18px); line-height:1.5; text-decoration:underline; }
 .giveaway-detail .giveaway-bid-warning strong { font-weight:800; }
 .giveaway-detail .giveaway-detail-info .giveaway-countdown { font-size:clamp(18px,2vw,23px); font-weight:700; }
+
+.giveaway-detail .copy-message-field button svg { color:#000; stroke:#000; }
+
+/* Keep giveaway deposit instructions legible in their pale box. */
+.giveaway-detail [aria-label="list KMail instructions"],
+.giveaway-detail [aria-label="list KMail instructions"] :is(p,strong,span,a,code) { color:#bb0000; }
