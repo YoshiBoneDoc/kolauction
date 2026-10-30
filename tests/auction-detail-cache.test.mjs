@@ -64,7 +64,7 @@ test('recurring detail reads use narrow context, preserve static data and refres
     Date.now = () => now;
     try {
         const calls = [];
-        let ended = false;
+        let ended = false, blocked = false;
         const client = {
             auth: { getSession: async () => ({ data: { session: null } }) },
             rpc: async name => {
@@ -72,7 +72,7 @@ test('recurring detail reads use narrow context, preserve static data and refres
                 const row = name === 'read_auction_page'
                     ? { id, status: ended ? 'completed' : 'active', auction_kind: 'sell', item: 'Static item', giveaway_title: 'Title' }
                     : { id, _detail_full_required: ended, viewer_is_highest_bidder: true };
-                return { data: { privacy_version: 1, rows: [row], bids: [{ id: 'bid' }], total: 1, server_time: new Date(now).toISOString() } };
+                return { data: { privacy_version: 1, rows: blocked ? [] : [row], bids: [{ id: 'bid' }], total: 1, server_time: new Date(now).toISOString() } };
             },
         };
         const reader = createPublicAuctionReader(client, { enabled: true, fetch: async () => Response.json({
@@ -90,6 +90,8 @@ test('recurring detail reads use narrow context, preserve static data and refres
         now += 6000; ended = true;
         await reader.load(request);
         assert.deepEqual(calls.slice(-2), ['read_auction_detail_context', 'read_auction_page']);
+        now += 6000; blocked = true;
+        assert.deepEqual((await reader.load(request)).rows, [], 'private denial cannot resurrect cached public details');
         assert.equal(await reader.accepts({ ...request, fresh: true }), false);
     } finally { Date.now = realNow; }
 });

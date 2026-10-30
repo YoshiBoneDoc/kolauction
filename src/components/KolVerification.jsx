@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import useKolIdentity from '../hooks/useKolIdentity';
 import { startPrivateRefresh } from '../lib/privateRefresh';
 import CopyMessage from './CopyMessage';
+import IgnoreList from './IgnoreList';
 
 export default function KolVerification() {
     const { currentUser } = useContext(UserContext);
@@ -32,7 +33,7 @@ export default function KolVerification() {
                 <h2 className="text-[15px] font-semibold profile-text">Your KoL account</h2>
                 {identity?.kol_player_id && <span className="profile-verified-badge">Verified</span>}
             </div>
-            {identity?.kol_player_id ? <p className="mt-1.5 text-[13px] profile-muted">{identity.kol_player_name} (#{identity.kol_player_id}) · Auction escrow uses this player ID.</p> : <>
+            {identity?.kol_player_id ? <div className="mt-1.5 flex flex-wrap items-center gap-3"><p className="text-[13px] profile-muted">{identity.kol_player_name} (#{identity.kol_player_id}) · Auction escrow uses this player ID.</p><IgnoreList /></div> : <>
                 <p className="mt-1.5 text-[13px] profile-muted">Link your account before listing or bidding. Send the code from this page by KMail from the KoL account you own.</p>
                 <button onClick={request} disabled={pending || !supabase} className="profile-verification-button">{pending ? 'Creating code…' : challenge ? 'Get a new verification code' : 'Get verification code'}</button>
                 {challenge && <div className="space-y-2"><p>KMail <strong>kHub (#3888760)</strong> with this exact message, attaching no Meat or items:</p><CopyMessage text={challenge.command} label="verification message" /><p>Valid for 20 minutes. This page checks for verification every 10 seconds while this tab is visible.</p></div>}

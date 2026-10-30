@@ -186,7 +186,7 @@ test('Pages forwards no cookie/JWT/body/custom headers and all responses disallo
 function readerFixture(user = null) {
     const requests = [], rpcCalls = [];
     const client = { auth: { async getSession() { return { data: { session: user && { access_token: `SECRET-${user}` } } }; } },
-        rpc(name, args) { rpcCalls.push({ name, args }); return Promise.resolve({ data: { privacy_version: 1,
+        rpc(name, args) { if (name === 'read_ignore_relationships') return Promise.resolve({ data: false }); rpcCalls.push({ name, args }); return Promise.resolve({ data: { privacy_version: 1,
             server_time: new Date().toISOString(), rows: [{ id, seller_id: user, my_reservation: { id: `PRIVATE-${user}` } }] } }); } };
     const reader = createPublicAuctionReader(client, { enabled: true, fetch: async (url, options) => {
         requests.push({ url, options }); return Response.json(publicProjection(source(), publicRequest(`https://site.test${url}`)));
@@ -529,4 +529,45 @@ test('cache Worker accepts either public-key variable name and rejects privilege
         await cache.readOrigin(publicRequest(url));
         assert.equal(requests.at(-1).headers.apikey, 'sb_publishable_canonical');
     } finally { globalThis.fetch = previous; }
+});
+
+ test('ignore eligibility is private, cached and selects personalized pagination only for affected Direct pools', async () => {
+    const f = readerFixture('alice');
+    let checks = 0;
+    const original = f.client.rpc;
+    f.client.rpc = (name, args) => name === 'read_ignore_relationships'
+        ? (checks++, Promise.resolve({ data: true })) : original(name, args);
+    for (const view of ['home', 'browse', 'seller']) {
+        assert.equal(await f.reader.accepts({ view, id, status: 'active' }), false);
+        assert.equal(await f.reader.accepts({ view, id, status: 'active', trade: 'escrow' }), true);
+    }
+    assert.equal(await f.reader.accepts({ view: 'detail', id }), true);
+    assert.equal(checks, 1);
+    assert.equal(f.requests.length, 0);
+ });
+
+test('eligibility refreshes after its bounded TTL and session changes; detail/escrow skip eligibility', async () => {
+    const realNow = Date.now;
+    let now = realNow();
+    Date.now = () => now;
+    try {
+        const f = readerFixture('alice');
+        let checks = 0, blocked = false;
+        f.client.rpc = async () => { checks++; return { data: blocked }; };
+        const request = { view: 'browse', status: 'active' };
+        assert.equal(await f.reader.accepts(request), true);
+        blocked = true;
+        assert.equal(await f.reader.accepts(request), true);
+        assert.equal(checks, 1);
+        now += 60001;
+        assert.equal(await f.reader.accepts(request), false);
+        assert.equal(checks, 2);
+        assert.equal(await f.reader.accepts({ view: 'detail', id }), true);
+        assert.equal(await f.reader.accepts({ ...request, trade: 'escrow' }), true);
+        assert.equal(checks, 2);
+        f.client.auth.getSession = async () => ({ data: { session: { access_token: 'NEW-SCOPE' } } });
+        blocked = false;
+        assert.equal(await f.reader.accepts(request), true);
+        assert.equal(checks, 3);
+    } finally { Date.now = realNow; }
 });

@@ -2,19 +2,43 @@
 // Never send the browser's JWT/cookies or private query parameters to Cloudflare.
 export function createPublicAuctionReader(client, { enabled = false, fetch: fetcher = globalThis.fetch } = {}) {
     const details = new Map();
+    let eligibility;
+    let scope;
+    let generation = 0;
+    const invalidate = () => { generation++; eligibility = null; details.clear(); };
+    globalThis.window?.addEventListener('khub:ignore-list-changed', invalidate);
+    async function affected(session) {
+        const token = session?.access_token || session?.user?.id || (session ? 'signed-in' : 'anon');
+        if (scope !== token) { scope = token; invalidate(); }
+        if (!session) return false;
+        if (!eligibility || Date.now() - eligibility.at >= 60000) {
+            const revision = generation;
+            const promise = client.rpc('read_ignore_relationships').then(({ data, error }) => {
+                if (error) throw error;
+                if (typeof data !== 'boolean') throw new Error('Invalid private visibility context.');
+                return data;
+            });
+            eligibility = { at: Date.now(), promise };
+            try { const result = await promise; if (revision !== generation) return affected(session); return result; }
+            catch (error) { eligibility = null; throw error; }
+        }
+        return eligibility.promise;
+    }
     return {
         async accepts(request) {
             if (request.fresh && request.view === 'detail') details.clear();
             if (!enabled || !client || !['home', 'browse', 'seller', 'detail'].includes(request.view)
                 || request.sellerId || request.excludeOwn || request.fresh || request.summaryOnly
                 || ['seller', 'detail'].includes(request.view) && !request.id) return false;
-            // Signed-in All can contain the viewer's unpublished drafts (or an
-            // administrator's drafts). Keep that mixed public/private pool direct.
-            if (['browse', 'seller'].includes(request.view) && request.status === 'all') {
-                const { data, error } = await client.auth.getSession();
-                if (error) throw error;
-                if (data.session) return false;
-            }
+            // Personalized visibility must be applied before pagination and totals.
+            const { data, error } = await client.auth.getSession();
+            if (error) throw error;
+            const needsEligibility = ['home', 'browse', 'seller'].includes(request.view)
+                && request.trade !== 'escrow' && request.kind !== 'buy';
+            const restricted = needsEligibility && await affected(data.session);
+            if (data.session && ['browse', 'seller'].includes(request.view) && request.status === 'all') return false;
+            if (restricted && ['home', 'browse', 'seller'].includes(request.view)
+                && request.trade !== 'escrow' && request.kind !== 'buy') return false;
             return true;
         },
         async load(request) {

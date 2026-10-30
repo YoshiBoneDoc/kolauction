@@ -123,6 +123,13 @@ export const AuctionsProvider = ({ children }) => {
         await cache.load(key, { force: true, fresh });
         if (pendingKey) await cache.load(pendingKey, { force: true });
     }, []);
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const refresh = () => { void refreshReads(true); };
+        window.addEventListener('khub:ignore-list-changed', refresh);
+        return () => window.removeEventListener('khub:ignore-list-changed', refresh);
+    }, [refreshReads]);
+
     // Retry buttons still use the shared cache. Only action refreshes bypass it.
     const refreshAuctions = useCallback(() => refreshReads(), [refreshReads]);
     const refreshAfterAction = () => refreshReads(true);
