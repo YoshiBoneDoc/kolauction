@@ -115,6 +115,7 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         aid=giveaway()
         call(f"select public.place_bid('{aid}',11);",buyer,error='next minimum')
         call(f"select public.place_bid('{aid}',1);",buyer)
+        call(f"select public.place_bid('{aid}',11);",buyer,error='already the highest')
         sql(f"update public.auctions set end_time=clock_timestamp()+interval '30 seconds' where id='{aid}';")
         deadline=row(aid)['end_time']
         call(f"select public.place_bid('{aid}',11);",other)
@@ -134,6 +135,25 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         deadline=row(escrow)['end_time']
         assert ingest(escrow,'bid',meat=11,actor=48889603)[1]=='accepted'
         assert row(escrow)['end_time']==deadline
+        # A leading bidder cannot raise their own giveaway bid; only the new
+        # deposit is refunded, once, and the held bid/deadline remain intact.
+        before=row(escrow)
+        bid_count=sql(f"select count(*) from public.bids where auction_id='{escrow}';")
+        mid,reason,replay=ingest(escrow,'bid',meat=21,actor=48889603)
+        assert 'already the highest bidder' in reason
+        assert row(escrow)==before
+        assert sql(f"select count(*) from public.bids where auction_id='{escrow}';")==bid_count
+        def rejected_refunds():
+            return json.loads(sql(f"select jsonb_agg(jsonb_build_object('recipient',recipient_id,'meat',meat)) from khub_bot.deliveries where receipt_id='{mid}' and kind='refund';"))
+        assert rejected_refunds()==[{'recipient':48889603,'meat':21}]
+        assert sql(replay)=='duplicate'
+        assert rejected_refunds()==[{'recipient':48889603,'meat':21}]
+        assert ingest(escrow,'bid',meat=21,actor=48889602)[1]=='accepted'
+        # Ordinary escrow auctions still allow a fully funded replacement bid.
+        regular=create()
+        assert ingest(regular,'list',items=parts)[1]=='accepted'
+        assert ingest(regular,'bid',meat=100,actor=48889602)[1]=='accepted'
+        assert ingest(regular,'bid',meat=110,actor=48889602)[1]=='accepted'
         buyout=call("select public.create_giveaway_auction('seal tooth',1000,1,24,null,100,2,false,'Buyout test');")
         call(f"select public.purchase_auction('{buyout}');",buyer,error='next minimum')
         call(f"select public.place_bid('{buyout}',100);",buyer,error='next minimum')
@@ -142,6 +162,28 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         deadline=row(normal)['end_time']
         call(f"select public.place_bid('{normal}',100);",buyer)
         assert row(normal)['end_time']>deadline
+        # Giveaway analytics counts awarded stacks, not bid revenue or titles.
+        owner,_=account(98004,3552305,'teres minor')
+        def stack_sale(uid,quantity=3,item_id=258,complete=True,bundle=False):
+            if bundle:
+                sale=call("select public.create_bundle_auction('[{\"id\":258,\"quantity\":9},{\"id\":2,\"quantity\":1}]',1,24,null,false);",uid)
+            else:
+                name='dense meat stack' if item_id==258 else 'seal tooth'
+                sale=call(f"select public.create_auction('{name}',{quantity},1,24,null,null,{item_id},false);",uid)
+            if complete:
+                sql(f"update public.auctions set status='completed',winner_id='{buyer}',winner_username='fixture',final_price=1,seller_confirmed_at=now(),buyer_confirmed_at=now(),completed_at=now() where id='{sale}';")
+            return sale
+        stack_sale(owner,3)
+        stack_sale(owner,7)
+        stack_sale(owner,100,complete=False)
+        stack_sale(seller,100)
+        stack_sale(owner,100,item_id=2)
+        stack_sale(owner,bundle=True)
+        analytics=json.loads(call('select public.read_admin_analytics();',owner))
+        assert analytics['giveaways']['meat_stack_mania']=='10000',analytics
+        call('select public.read_admin_analytics();',buyer,error='Administrator access required')
+        assert json.loads(call('select public.read_admin_analytics();',seller))['giveaways']['meat_stack_mania']=='10000'
+        print('PASS: giveaway analytics sums only owner completed stack-only auctions and enforces administrator access')
         print('PASS: admin creation, exact Direct and funded Escrow bids, fixed deadline, public feature, one claim after escrow activation')
     finally:
         if started:pg('-m','immediate','stop')
