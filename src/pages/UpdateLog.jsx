@@ -9,7 +9,7 @@ export default function UpdateLog() {
         <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-4 py-8 sm:px-6">
             <h1 className="text-3xl font-bold text-blue-700">Update Log</h1>
             <ul className="list-disc space-y-4 pl-5 text-gray-700">
-                <li>Hosted the first 'Meat Stack Mania' on Friday, October 30, 2026, 01:02AM</li>
+                <li>Hosted the first '<Link to="/giveaways" className="text-blue-700 underline dark:text-blue-300">Meat Stack Mania</Link>' on Friday, October 30, 2026, 01:02AM</li>
                 <li>Further performance improvements to keep kHub running smoothly during periods of high traffic.</li>
                 <li>Added a Relist option for expired, ended, or cancelled auctions, available on the All Auctions page, your account profile, and seller profile pages.</li>
                 <li>Added new filters for bundled auctions and buyout availability.</li>
