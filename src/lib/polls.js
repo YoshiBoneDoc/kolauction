@@ -15,6 +15,7 @@ export function createPollService(client) {
         publish: (id, concludeCurrent = false) => call('publish_poll', { p_poll_id: id, p_conclude_current: concludeCurrent }),
         publishResults: (id, publish) => call('publish_poll_results', { p_poll_id: id, p_publish: publish }),
         vote: (id, answer) => call('vote_home_poll', { p_poll_id: id, p_answer: answer }),
+        voteChoices: (id, choices) => call('vote_home_poll_choices', { p_poll_id: id, p_choices: choices }),
         voteChoice: (id, choice) => call('vote_home_poll_choice', { p_poll_id: id, p_choice: choice }),
         close: id => call('close_home_poll', { p_poll_id: id }),
         remove: id => call('delete_home_poll', { p_poll_id: id }),

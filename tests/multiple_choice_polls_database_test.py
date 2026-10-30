@@ -200,6 +200,34 @@ with tempfile.TemporaryDirectory(prefix='khub-choice-polls-',dir='/tmp') as fold
         assert feed(first)['published_results'][0]['results']==final
         assert feed(first)['poll']['id']==blocker
         assert feed(first)['skipped_polls']==[]
+        sql(next(p for p in migrations if p.name=='202610300157_multi_select_polls.sql').read_text())
+        assert json.loads(sql(f"select final_results from khub_bot.site_polls where id='{first_poll}';"))==final
+        for remaining in sql('select id from khub_bot.site_polls where active;').splitlines():close(remaining)
+        multi=call("select public.save_poll_draft('Which features would you like?',null,'multiple_choice',true,array['Search','Filters','Alerts']);")
+        publish(multi)
+        assert feed(first)['poll']['allow_multiple_responses'] is True
+        assert 'results' not in feed(first)['poll']
+        def votes(choices,uid=first,error=None):
+            return call(f"select public.vote_home_poll_choices('{multi}',{choices});",uid,error)
+        for invalid in ['null','array[]::integer[]','array[0]','array[4]','array[1,null]','array[1,1]']:
+            votes(invalid,error='valid listed options')
+        votes('array[1,3]');votes('array[2]')
+        assert sql(f"select selected_choices from khub_bot.site_poll_votes where poll_id='{multi}' and voter_id='{first}';")=='{1,3}'
+        with ThreadPoolExecutor(max_workers=2) as pool:list(pool.map(lambda _:votes('array[1,2]',second),range(2)))
+        results=json.loads(sql(f"select khub_bot.poll_results('{multi}');"))
+        assert results['total']==2 and results['multiple'] is True
+        assert [c['count'] for c in results['choices']]==[2,1,1]
+        names=json.loads(call(f"select public.read_poll_voters('{multi}');"))
+        assert len(names['choices'][0]['voters'])==2
+        assert 'Choice First' not in json.dumps(feed(first))
+        assert feed(third)['answered_polls']==[]
+        close(multi)
+        assert json.loads(sql(f"select final_results from khub_bot.site_polls where id='{multi}';"))==results
+        single=draft(['One','Two']);publish(single)
+        call(f"select public.vote_home_poll_choices('{single}',array[1,2]);",first,error='valid listed options')
+        vote(single,1)
+        assert json.loads(sql(f"select khub_bot.poll_results('{single}');"))['total']==1
+        print('PASS: multi-select validation, atomic ballots, immutable retries, concurrent duplicate submissions, per-voter totals, private results and frozen archives')
         print('PASS: multiple-choice drafts/validation, immutable single votes with concurrent retries, ordered mixed poll queue, private pre-vote counts and voter names, frozen archives, unchanged Yes/No and repeated text responses, zero delivery effects, restart persistence')
     finally:
         if started:pg('-m','fast','-w','stop')

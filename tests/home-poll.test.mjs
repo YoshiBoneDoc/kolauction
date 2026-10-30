@@ -285,3 +285,25 @@ test('skipped text questions stay minimized below results and can be answered wi
  await nodes(h.tree).find(n=>n.type==='form'&&nodes(n).some(child=>child.type==='textarea')).props.onSubmit({preventDefault(){}});h.render();
  assert.equal(calls[0][0],'skipped');assert.equal(calls[0][1],'Changed my mind');assert.ok(h.button('Submit vote'));assert.equal(h.button('Answer this poll: '+skipped.question),undefined);
 });
+
+test('multi-select checkboxes submit one ballot and disable empty selections',async()=>{
+ const item={...poll,poll_type:'multiple_choice',allow_multiple_responses:true,choices:['Search','Filters','Alerts']};const calls=[];
+ const h=harness({read:async()=>feed(item),voteChoices:async(...args)=>calls.push(args)});await h.load();
+ const boxes=()=>nodes(h.tree).filter(n=>n.type==='input'&&n.props.type==='checkbox');
+ assert.equal(boxes().length,3);assert.ok(h.button('Submit vote').props.disabled);
+ boxes()[0].props.onChange();h.render();boxes()[2].props.onChange();h.render();
+ await nodes(h.tree).find(n=>n.type==='form').props.onSubmit({preventDefault(){}});
+ assert.deepEqual(calls,[['poll',[1,3]]]);h.render();
+ boxes()[0].props.onChange();h.render();boxes()[2].props.onChange();h.render();assert.ok(h.button('Submit vote').props.disabled);
+});
+
+test('admin can enable several answers on a multiple-choice draft',async()=>{
+ const calls=[];const h=harness({list:async()=>[],saveDraft:async(...args)=>calls.push(args)},PollManager);await h.load();
+ const byId=id=>nodes(h.tree).find(n=>n.props.id===id);
+ byId('poll-type').props.onChange({target:{value:'multiple_choice'}});h.render();
+ byId('poll-question').props.onChange({target:{value:'Which features should we add?'}});
+ byId('poll-choices').props.onChange({target:{value:'Search\nFilters'}});
+ nodes(h.tree).find(n=>n.type==='input'&&n.props.type==='checkbox').props.onChange({target:{checked:true}});h.render();
+ await nodes(h.tree).find(n=>n.type==='form').props.onSubmit({preventDefault(){}});
+ assert.deepEqual(calls,[['Which features should we add?',null,'multiple_choice',true,['Search','Filters']]]);
+});

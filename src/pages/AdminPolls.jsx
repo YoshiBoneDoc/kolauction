@@ -41,7 +41,7 @@ export function PollManager({ service = polls }) {
     async function save(event) {
         event.preventDefault();
         if (pollType === 'multiple_choice' && !validChoices) { setError('Enter 2–8 different choices, up to 120 characters each.');return; }
-        await action(async () => { await service.saveDraft(question, editing, pollType, pollType === 'free_text' && multiple, pollType === 'multiple_choice' ? choices : []); setQuestion(''); setEditing(null); setPollType('yes_no'); setMultiple(false);setChoiceText(''); });
+        await action(async () => { await service.saveDraft(question, editing, pollType, pollType !== 'yes_no' && multiple, pollType === 'multiple_choice' ? choices : []); setQuestion(''); setEditing(null); setPollType('yes_no'); setMultiple(false);setChoiceText(''); });
     }
     async function deletePoll(poll) {
         if (writing.current) return;
@@ -64,7 +64,7 @@ export function PollManager({ service = polls }) {
                     <select id="poll-type" value={pollType} disabled={pending} onChange={event => { setPollType(event.target.value);setMultiple(false); }} className="rounded border border-gray-300 bg-white p-2 text-sm text-slate-800">
                         <option value="yes_no">Yes / No</option><option value="multiple_choice">Multiple choice</option><option value="free_text">Free text</option>
                     </select>
-                    {pollType === 'free_text' && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={multiple} disabled={pending} onChange={event => setMultiple(event.target.checked)} />Allow multiple responses</label>}
+                    {pollType !== 'yes_no' && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={multiple} disabled={pending} onChange={event => setMultiple(event.target.checked)} /> {pollType === 'multiple_choice' ? 'Allow more than one answer' : 'Allow multiple responses'}</label>}
                 </div>
                 <textarea id="poll-question" value={question} onChange={event => setQuestion(event.target.value)} minLength={10} maxLength={300} required rows={2}
                     placeholder={pollType === 'yes_no' ? 'Your Yes / No question…' : 'What would you like to ask players?'} className="w-full rounded border border-gray-300 bg-white p-3 text-sm text-slate-800" />
@@ -72,7 +72,7 @@ export function PollManager({ service = polls }) {
                     <label htmlFor="poll-choices" className="block text-sm font-semibold">Choices (one per line)</label>
                     <textarea id="poll-choices" value={choiceText} disabled={pending} onChange={event => setChoiceText(event.target.value)} rows={4} maxLength={2000}
                         placeholder={'First choice\nSecond choice'} className="w-full rounded border border-gray-300 bg-white p-3 text-sm text-slate-800" />
-                    <p className="text-xs text-gray-500">2–8 different choices, up to 120 characters each. Players choose one answer and then see the results.</p>
+                    <p className="text-xs text-gray-500">2–8 different choices, up to 120 characters each. Players {multiple ? 'can select several answers' : 'choose one answer'} and then see the results.</p>
                 </div>}
                 {pollType === 'free_text' && <p className="text-xs text-gray-500">Responses are private and grouped by poll under Other in your inbox.{multiple && ' After answering, players can use “Send another response” to reopen the form.'}</p>}
                 <div className="flex flex-wrap items-center gap-3">
@@ -87,7 +87,7 @@ export function PollManager({ service = polls }) {
                     <span>{poll.closed_at ? 'Concluded' : poll.published_at ? 'Published' : 'Created'} {new Date(poll.closed_at || poll.published_at || poll.created_at).toLocaleString()}</span>
                 </div>
                 <h2 className="text-base font-semibold text-slate-800">{poll.question}</h2>
-                {!poll.published_at && <p className="text-xs text-gray-500">{poll.poll_type === 'free_text' ? `Free text · ${poll.allow_multiple_responses ? 'Multiple responses allowed' : 'One response per player'}` : poll.poll_type === 'multiple_choice' ? 'Multiple choice' : 'Yes / No'}</p>}
+                {!poll.published_at && <p className="text-xs text-gray-500">{poll.poll_type === 'free_text' ? `Free text · ${poll.allow_multiple_responses ? 'Multiple responses allowed' : 'One response per player'}` : poll.poll_type === 'multiple_choice' ? `Multiple choice · ${poll.allow_multiple_responses ? 'Several answers per player' : 'One answer per player'}` : 'Yes / No'}</p>}
                 {!poll.published_at && poll.poll_type === 'multiple_choice' && <ul className="list-disc pl-5 text-sm text-gray-600">{poll.choices.map((label,index) => <li key={index}>{label}</li>)}</ul>}
                 {poll.published_at && <>
                     {poll.poll_type === 'free_text' ? <p className="text-sm text-gray-600">{poll.results?.total || 0} responses · {poll.allow_multiple_responses ? 'Multiple responses allowed' : 'One response per player'} · <Link to="/admin/inbox?category=other" className="text-blue-700 underline">View in inbox</Link></p> : <><PollResults results={poll.results} /><PollVoters pollId={poll.id} service={service} /></>}

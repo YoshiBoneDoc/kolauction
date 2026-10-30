@@ -68,7 +68,8 @@ export function PollPanel({ service = polls, featuredTarget }) {
         generation.current += 1;
         setPending(true); setError('');
         try {
-            if (poll.poll_type === 'multiple_choice') await service.voteChoice(poll.id, answer);
+            if (poll.poll_type === 'multiple_choice' && poll.allow_multiple_responses) await service.voteChoices(poll.id, answer);
+            else if (poll.poll_type === 'multiple_choice') await service.voteChoice(poll.id, answer);
             else await service.vote(poll.id, answer);
             setFeed(previous => {
                 const voted = { ...previous.poll, has_voted: true };
@@ -163,16 +164,20 @@ export function PollPanel({ service = polls, featuredTarget }) {
                 </div>}
             </div>
             {question.poll_type === 'free_text' && responseForm(question)}
-            {question.poll_type === 'multiple_choice' && <form className="mt-2 space-y-2" onSubmit={event => { event.preventDefault();if (choice?.pollId === question.id) return vote(choice.index); }}>
+            {question.poll_type === 'multiple_choice' && <form className="mt-2 space-y-2" onSubmit={event => { event.preventDefault();if (choice?.pollId === question.id && (!question.allow_multiple_responses || choice.indices?.length)) return vote(question.allow_multiple_responses ? choice.indices : choice.index); }}>
                 <fieldset disabled={pending} className="space-y-1">
-                    <legend className="sr-only">Choose one answer to {question.question}</legend>
+                    <legend className="mb-1 text-xs text-yellow-800">{question.allow_multiple_responses ? 'Select one or more answers.' : 'Choose one answer.'}</legend>
                     {(question.choices || []).map((label,index) => <label key={index} className="flex cursor-pointer items-start gap-2 text-sm leading-5">
-                        <input type="radio" name={`poll-choice-${question.id}`} value={index+1} required checked={choice?.pollId === question.id && choice.index === index+1}
-                            onChange={() => setChoice({pollId:question.id,index:index+1})} className="mt-0.5 h-4 w-4 shrink-0 accent-yellow-700" />
+                        <input type={question.allow_multiple_responses ? 'checkbox' : 'radio'} name={`poll-choice-${question.id}`} value={index+1} required={!question.allow_multiple_responses} checked={choice?.pollId === question.id && (question.allow_multiple_responses ? (choice.indices || []).includes(index+1) : choice.index === index+1)}
+                            onChange={() => setChoice(previous => {
+                                if (!question.allow_multiple_responses) return {pollId:question.id,index:index+1};
+                                const selected = previous?.pollId === question.id ? previous.indices || [] : [];
+                                return {pollId:question.id,indices:selected.includes(index+1) ? selected.filter(value => value !== index+1) : [...selected,index+1]};
+                            })} className="mt-0.5 h-4 w-4 shrink-0 accent-yellow-700" />
                         <span className="min-w-0 break-words">{label}</span>
                     </label>)}
                 </fieldset>
-                <button type="submit" disabled={pending || choice?.pollId !== question.id} className="min-h-10 rounded border border-yellow-700 bg-yellow-800 px-4 py-2 text-sm font-semibold text-white hover:bg-yellow-900 disabled:opacity-60">{pending ? 'Submitting…' : 'Submit vote'}</button>
+                <button type="submit" disabled={pending || choice?.pollId !== question.id || Boolean(question.allow_multiple_responses && !choice?.indices?.length)} className="min-h-10 rounded border border-yellow-700 bg-yellow-800 px-4 py-2 text-sm font-semibold text-white hover:bg-yellow-900 disabled:opacity-60">{pending ? 'Submitting…' : 'Submit vote'}</button>
             </form>}
         </div>}
         {notice && <p role="status" className="text-sm text-gray-600">{notice}</p>}
