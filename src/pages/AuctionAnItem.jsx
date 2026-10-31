@@ -76,6 +76,7 @@ export default function AuctionAnItem() {
     const bundleTitleInput = useRef(null);
     const [preview, setPreview] = useState(null);
     const [giveaway, setGiveaway] = useState(false);
+    const [giveawayCondition, setGiveawayCondition] = useState('last_bid');
     const [giveawayTitle, setGiveawayTitle] = useState('Meat Stack Mania');
     useEffect(() => {
         const select = durationInput.current;
@@ -179,8 +180,9 @@ export default function AuctionAnItem() {
             catch (failure) { setError(failure.message); return; }
         }
         if (giveaway && (isBuy || isBundle)) { setError('Giveaways use a single sell item.'); return; }
+        if (giveaway && giveawayCondition !== 'last_bid' && !escrowMode) { setError('This win condition requires Escrow delivery.'); return; }
         if (giveaway && !giveawayTitle.trim()) { setError('Enter a giveaway title.'); return; }
-        setPreview({ ...(giveaway ? { giveawayTitle: giveawayTitle.trim() } : {}), item: contents ? bundleTitle(contents, customTitle) : item.name, itemId: contents ? contents[0].id : item.id, quantity: contents ? 1 : count, ...(contents ? { bundleItems: contents, bundleTitle: customTitle || null, bundleImageItemId: contents.some(entry => entry.id === bundleImageItemId) ? bundleImageItemId : null } : {}), minBidMeat: minimum, instantPurchasePrice: purchasePrice, auctionTime, escrowMode, ...(customEndAt ? { customEndAt } : {}),
+        setPreview({ ...(giveaway ? { giveawayTitle: giveawayTitle.trim(), giveawayWinCondition: giveawayCondition } : {}), item: contents ? bundleTitle(contents, customTitle) : item.name, itemId: contents ? contents[0].id : item.id, quantity: contents ? 1 : count, ...(contents ? { bundleItems: contents, bundleTitle: customTitle || null, bundleImageItemId: contents.some(entry => entry.id === bundleImageItemId) ? bundleImageItemId : null } : {}), minBidMeat: minimum, instantPurchasePrice: purchasePrice, auctionTime, escrowMode, ...(customEndAt ? { customEndAt } : {}),
             image: contents ? bundleCover(contents, bundleImageItemId, bundlePrices).image : itemImageUrl(item.image), ...(isBuy ? { auctionKind, deliveryMode } : {}) });
         setError('');
         setBundleTitleConflict(false);
@@ -483,7 +485,7 @@ export default function AuctionAnItem() {
                         <p id="custom-ending-help" className="mt-2 text-xs text-gray-500">Your timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}. Choose a time within 30 days.{escrowMode && ' Deposit your items before the chosen ending time.'}</p>
                     </section>}
                     {!isBuy && !giveaway && <p className="-mt-2 mb-4 text-xs text-gray-500">Last-minute bids reset the countdown to 1 minute.</p>}
-                    {currentUser?.isAdmin && <div className="mb-4"><button type="button" aria-pressed={giveaway} onClick={() => { const next = !giveaway; setGiveaway(next); if (next) { const meat = catalogItems.find(item => item.name === 'dense meat stack'); setAuctionKind('sell'); setEscrowMode(true); setSelectedItem(String(meat?.id || '')); setItemSearch('dense meat stack'); setQuantity('1000'); setMinBidMeat('1'); setShowBuyout(false); setInstantPrice(''); } }} className="min-h-11 w-full rounded border border-red-700 bg-red-700 px-4 font-bold text-white">Giveaway</button>{giveaway && <label className="mt-3 block text-sm font-bold">Title<input value={giveawayTitle} maxLength={80} onChange={event => setGiveawayTitle(event.target.value)} className={fieldClass} /></label>}</div>}
+                    {currentUser?.isAdmin && <div className="mb-4"><button type="button" aria-pressed={giveaway} onClick={() => { const next = !giveaway; setGiveaway(next); if (next) { const meat = catalogItems.find(item => item.name === 'dense meat stack'); setAuctionKind('sell'); setEscrowMode(true); setSelectedItem(String(meat?.id || '')); setItemSearch('dense meat stack'); setQuantity('1000'); setMinBidMeat('1'); setShowBuyout(false); setInstantPrice(''); } }} className="min-h-11 w-full rounded border border-red-700 bg-red-700 px-4 font-bold text-white">Giveaway</button>{giveaway && <fieldset className="mt-2 flex flex-wrap gap-3 text-xs"><legend className="sr-only">Win Condition</legend>{[['last_bid', 'Last Bid'], ['random_draw', 'Random Draw'], ['split', 'Split'], ['surprise', 'Surprise Me']].map(([value, label]) => <label key={value} className="flex items-center gap-1"><input type="radio" name="giveaway-condition" checked={giveawayCondition === value} onChange={() => { setGiveawayCondition(value); if (value !== 'last_bid') setEscrowMode(true); }} />{label}</label>)}</fieldset>}{giveaway && <label className="mt-3 block text-sm font-bold">Title<input value={giveawayTitle} maxLength={80} onChange={event => setGiveawayTitle(event.target.value)} className={fieldClass} /></label>}</div>}
                     <button type="submit" className="min-h-11 w-full rounded bg-blue-600 px-4 py-3 font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">Preview Auction</button>
                 </form>}
             </div>

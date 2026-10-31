@@ -2,7 +2,7 @@
 import { parseSiteTradeTotals } from '../../src/lib/siteTradeTotals.js';
 export const CACHE_VERSION = 1;
 export const PUBLIC_FIELDS = [
-    'id', 'auction_number', 'auction_kind', 'item', 'item_id', 'quantity', 'image',
+    'giveaway_title', 'giveaway_win_condition', 'id', 'auction_number', 'auction_kind', 'item', 'item_id', 'quantity', 'image',
     'min_bid_meat', 'current_bid', 'bid_count', 'duration_hours', 'created_at', 'end_time',
     'bid_deadline', 'status', 'escrow_mode', 'start_on_deposit', 'custom_end_at',
     'instant_purchase_price', 'instant_purchased_at', 'has_winner', 'final_price',

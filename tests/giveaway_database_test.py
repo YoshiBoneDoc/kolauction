@@ -162,6 +162,31 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         deadline=row(normal)['end_time']
         call(f"select public.place_bid('{normal}',100);",buyer)
         assert row(normal)['end_time']>deadline
+        # Durable draws and splits use unique player identities, including repeat bidders.
+        for condition in ('random_draw','split','surprise'):
+            game=call("select public.create_giveaway_auction('seal tooth',3,1,24,null,null,2,true,'Draw fixture',null,'"+condition+"');")
+            assert ingest(game,'list',items=[{'id':2,'quantity':3}])[1]=='accepted'
+            resolved=row(game)['giveaway_win_condition']
+            assert resolved in ('last_bid','random_draw','split')
+            assert ingest(game,'bid',meat=1,actor=48889602)[1]=='accepted'
+            assert ingest(game,'bid',meat=11,actor=48889603)[1]=='accepted'
+            assert ingest(game,'bid',meat=21,actor=48889602)[1]=='accepted'
+            sql(f"update public.auctions set created_at=clock_timestamp()-interval '1 day',end_time=clock_timestamp()-interval '2 minutes' where id='{game}';")
+            # Invoke the inner settlement boundary directly only in the isolated test database.
+            sql(f"select khub_bot.finish_listing_before_receipt_time('{game}','deadline');")
+            awards=sql(f"select jsonb_agg(to_jsonb(w) order by player_id) from khub_bot.giveaway_awards w where auction_id='{game}';")
+            deliveries=sql(f"select jsonb_agg(to_jsonb(d) order by dedupe_key) from khub_bot.deliveries d where auction_id='{game}';")
+            if resolved!='last_bid':
+                allocated=json.loads(awards)
+                assert sum(w['quantity'] for w in allocated)==3
+                assert len(allocated)==(1 if resolved=='random_draw' else 2)
+                if resolved=='split':assert sorted(w['quantity'] for w in allocated)==[1,2]
+                else:assert row(game)['winner_id']==allocated[0]['user_id']
+            sql(f"select khub_bot.finish_listing_before_receipt_time('{game}','deadline');")
+            assert sql(f"select jsonb_agg(to_jsonb(w) order by player_id) from khub_bot.giveaway_awards w where auction_id='{game}';")==awards
+            assert sql(f"select jsonb_agg(to_jsonb(d) order by dedupe_key) from khub_bot.deliveries d where auction_id='{game}';")==deliveries
+            assert row(game)['giveaway_win_condition']==resolved
+        print('PASS: persisted unique-player draw, whole-item split, surprise activation and repeat settlement')
         # Giveaway analytics counts awarded stacks, not bid revenue or titles.
         owner,_=account(98004,3552305,'teres minor')
         def stack_sale(uid,quantity=3,item_id=258,complete=True,bundle=False):

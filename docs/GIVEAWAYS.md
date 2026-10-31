@@ -15,3 +15,12 @@ Checks:
 - `python3 tests/giveaway_database_test.py` — isolated PostgreSQL; no live credentials.
 - `node --experimental-sqlite --test bot/tests/chat-announcements.test.mjs bot/tests/giveaway-announcements.test.mjs`
 - `npm run build`
+
+Win conditions require queued migration `202610300160_giveaway_win_conditions.sql`
+(and its matching standalone bot copy). Apply it before deploying the website.
+Last Bid preserves existing settlement. Random Draw, Split and Surprise Me require
+Escrow delivery. Surprise Me resolves once on activation. Draws and whole-item
+split allocations are stored server-side with settlement, before the existing
+idempotent bot delivery queue is processed. Each distinct linked KoL player ID
+participates once; remainder items go to a randomly ordered subset. Bid refunds
+and seller payments retain the existing funding rules.

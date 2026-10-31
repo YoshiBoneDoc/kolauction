@@ -1,3 +1,4 @@
+import { giveawayConditionLabel } from '../lib/giveaway';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import TradeTypeBadge from './TradeTypeBadge';
@@ -30,6 +31,7 @@ export default function GiveawayCard({ auction, now, compact = false }) {
                 ? <h2 className="giveaway-comic-title" data-title={title} style={{ '--title-scale': Math.max(.32, Math.min(1, 19 / title.length)) }}>{title}</h2>
                 : <FittedPrice as="h2" fitKey={title} className="giveaway-comic-title">{title}</FittedPrice>}</div>
             <div className="giveaway-price-splash"><FittedPrice as="p" fitKey={bid} className="giveaway-price">{bid}</FittedPrice></div>
+            <p className="text-xs">Win Condition: {giveawayConditionLabel(auction.giveawayWinCondition)}</p>
             <GiveawayCountdown endTime={auction.endTime} now={now} />
         </div>
         <span className="giveaway-badge"><TradeTypeBadge escrow={auction.escrowMode} compact short /></span>

@@ -1,0 +1,1 @@
+export const giveawayConditionLabel = condition => ({ last_bid: 'Last Bid', random_draw: 'Random Draw', split: 'Split - prize is split between all participants who placed a bid', surprise: 'Selected when the auction becomes active' })[condition] || 'Last Bid';

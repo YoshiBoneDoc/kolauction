@@ -95,3 +95,11 @@ test('recurring detail reads use narrow context, preserve static data and refres
         assert.equal(await reader.accepts({ ...request, fresh: true }), false);
     } finally { Date.now = realNow; }
 });
+
+ test('giveaway condition is public static cache information', () => {
+    const data = publicProjection({ privacy_version: 1, rows: [{ id, status: 'completed', giveaway_title: 'Fixture',
+        giveaway_win_condition: 'split', seller_id: 'private' }], bids: [], total: 1, server_time: new Date().toISOString() }, { view: 'detail-static' });
+    assert.equal(data.rows[0].giveaway_win_condition, 'split');
+    assert.equal(data.rows[0].giveaway_title, 'Fixture');
+    assert.equal(data.rows[0].seller_id, undefined);
+});
