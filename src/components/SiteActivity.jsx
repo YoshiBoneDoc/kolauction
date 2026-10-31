@@ -59,10 +59,18 @@ export default function SiteActivity({ children }) {
     return <div className={administrator ? 'grid flex-1 items-start lg:grid-cols-[10rem_minmax(0,1fr)]' : 'flex flex-1 flex-col'}>
         {administrator && <aside aria-label="Site activity" className="m-4 rounded border border-gray-300 p-3 text-sm lg:sticky lg:top-4 lg:mr-0">
             <h2 className="mb-2 font-bold">Site activity</h2>
-            {activity ? <dl className="space-y-2">
-                <div><dt>Viewing now</dt><dd className="text-lg font-bold">{activity.viewers}</dd></div>
-                <div><dt>Logged in</dt><dd className="text-lg font-bold">{activity.logged_in}</dd></div>
-            </dl> : <p role="status">Activity unavailable</p>}
+            {activity ? <div className="space-y-2">
+                {[['viewers', 'Viewing now'], ['logged_in', 'Logged in']].map(([key, label]) => <details key={key}>
+                    <summary className="cursor-pointer rounded focus-visible:outline focus-visible:outline-2">
+                        {label}<span className="block text-lg font-bold">{activity[key]}</span>
+                    </summary>
+                    {Array.isArray(activity.users) ? <ul aria-label={`${label} users`} className="mt-1 max-h-60 space-y-1 overflow-y-auto break-words text-xs">
+                        {activity.users.map(user => <li key={user.id}>{user.username}</li>)}
+                        {key === 'viewers' && activity.guests > 0 && <li>Anonymous guests: {activity.guests}</li>}
+                        {activity[key] === 0 && <li>No active users</li>}
+                    </ul> : <p className="mt-1 text-xs">User list unavailable until the database update is applied.</p>}
+                </details>)}
+            </div> : <p role="status">Activity unavailable</p>}
             <p className="mt-2 text-xs opacity-70">Active in the last 2 minutes. Includes you. Updates every 30 seconds.</p>
         </aside>}
         <div className="min-w-0 flex-1">{children}</div>
