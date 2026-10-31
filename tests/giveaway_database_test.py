@@ -122,6 +122,8 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         assert row(aid)['end_time']==deadline
         featured=json.loads(sql('set role anon;select public.read_featured_giveaway();'))
         assert featured['giveaway_title']=='Meat Stack Mania'
+        reminder=json.loads(sql('set role service_role;select public.bot_claim_giveaway_announcement();'))
+        assert reminder['id']==aid and reminder['kind']=='final_reminder'
         assert json.loads(sql('set role service_role;select public.bot_claim_giveaway_announcement();'))['id']==aid
         assert sql('set role service_role;select public.bot_claim_giveaway_announcement();')==''
         escrow=giveaway(True)

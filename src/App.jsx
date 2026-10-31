@@ -30,6 +30,7 @@ import UpdateLog from "./pages/UpdateLog";
 import MeetTheCreator from "./pages/MeetTheCreator";
 import AdminBanner from "./pages/AdminBanner";
 import AdminPolls from "./pages/AdminPolls";
+import SiteActivity from "./components/SiteActivity";
 
 const App = () => {
     const { pathname } = useLocation();
@@ -43,7 +44,7 @@ const App = () => {
             {error && <div role="alert" className="bg-red-50 p-4 text-red-700">
                 {error}{" "}<button onClick={refreshAuctions} className="underline">Retry</button>
             </div>}
-            <Routes>
+            <SiteActivity><Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/submit-appeal" element={<SubmitAppeal />} />
                 <Route path="/report-a-bug" element={<ReportBug />} />
@@ -74,7 +75,7 @@ const App = () => {
                 <Route path="/auction/:id" element={<AuctionDetails />} />
                 <Route path="*" element={<NotFound />} />
 
-            </Routes>
+            </Routes></SiteActivity>
         </div>
     );
 };
