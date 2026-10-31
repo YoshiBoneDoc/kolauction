@@ -94,6 +94,12 @@ with tempfile.TemporaryDirectory(prefix='khub-player-ignores-',dir='/tmp') as fo
         def visible(uid):
             data=json.loads(call("select public.read_auction_page(p_view=>'browse',p_status=>'active');",uid))
             return {r['id'] for r in data['rows']}
+        def home(uid):
+            data=json.loads(call('select public.read_home_auctions();',uid))
+            ids={r['id'] for r in data['rows']}
+            assert all(set(section)<=ids for section in data['sections'].values())
+            assert 'site_totals' in data
+            return data,ids
         assert call('select public.read_ignore_relationships();',buyer)=='f'
         assert direct in visible(buyer)
         buyers_direct=call("select public.create_auction('seal tooth',1,100,24,null,5000,2,false);",buyer)
@@ -101,6 +107,15 @@ with tempfile.TemporaryDirectory(prefix='khub-player-ignores-',dir='/tmp') as fo
         assert call('select public.read_ignore_relationships();',buyer)=='t'
         assert call('select public.read_ignore_relationships();',seller)=='t'
         assert buyers_direct not in visible(seller)
+        seller_home,seller_ids=home(seller)
+        buyer_home,buyer_ids=home(buyer)
+        assert buyers_direct not in seller_ids, 'Homepage exposes a Direct auction from a player who is ignored'
+        assert direct not in buyer_ids, 'Homepage exposes a Direct auction from a player who ignored the viewer'
+        assert direct in seller_ids and escrow in buyer_ids
+        assert seller_home['total']==2 and buyer_home['total']==2
+        assert direct in home(other)[1]
+        anonymous=json.loads(sql('set role anon;select public.read_home_auctions();'))
+        assert direct in {r['id'] for r in anonymous['rows']}
 
         assert direct not in visible(buyer)
         assert json.loads(call(f"select public.read_auction_page(p_view=>'detail',p_id=>'{direct}');",buyer))['rows']==[]
@@ -113,8 +128,11 @@ with tempfile.TemporaryDirectory(prefix='khub-player-ignores-',dir='/tmp') as fo
         call(f"select public.purchase_auction('{direct}');",buyer,error='Direct trading')
         call('select public.set_player_ignored(48889602,false);')
         assert direct in visible(buyer)
+        assert direct in home(buyer)[1]
         call('select public.set_player_ignored(48889601,true);',buyer)
         assert direct not in visible(buyer)
+        assert direct not in home(buyer)[1]
+        assert buyers_direct not in home(seller)[1]
         call('select public.set_player_ignored(48889601,false);',buyer)
         call('select public.set_player_ignored(99999999,true);',buyer)
         assert json.loads(call('select public.read_player_ignores();',buyer))==[{'id':'99999999','name':None}]
@@ -131,7 +149,26 @@ with tempfile.TemporaryDirectory(prefix='khub-player-ignores-',dir='/tmp') as fo
         plan=sql(f"explain (analyze,buffers) select * from khub_bot.visible_auctions() where id='{direct}';",buyer)
         assert 'Function Scan on visible_auctions' not in plan,plan
         assert 'InitPlan' in plan,plan
+        # Completed Direct trades must also disappear from Recent and High Rollers.
+        sql(f"""update public.auctions set status='completed',winner_id='{other}',
+            winner_username='Bundle Other',final_price=60000000,completed_at=now(),
+            finalized_at=now(),seller_confirmed_at=now(),buyer_confirmed_at=now()
+            where id='{direct}';""")
+        assert direct not in home(buyer)[1]
+        for uid in [seller,other]:
+            homepage,ids=home(uid)
+            assert direct in ids
+            assert direct in homepage['sections']['recent']
+            assert direct in homepage['sections']['highRollers']
+        call('select public.set_player_ignored(48889601,false);',buyer)
+        homepage,ids=home(buyer)
+        assert direct in ids and direct in homepage['sections']['recent']
+        assert direct in homepage['sections']['highRollers']
+        sql('set role authenticated;select public.read_home_auctions_before_site_totals();',buyer,error='permission denied')
+        # Safe to reapply after an interrupted manual migration workflow.
+        sql(next(ROOT.glob('supabase/migrations/**/202610310165_homepage_ignore_visibility.sql')).read_text())
+        assert direct in home(buyer)[1]
         print(plan)
-        print('PASS: private lists, unknown IDs, self/invalid IDs, symmetric Direct hiding, Escrow visibility, bid/buyout guards and removal')
+        print('PASS: private lists, unknown IDs, self/invalid IDs, symmetric Direct hiding on browse/home, homepage totals/sections, Escrow visibility, bid/buyout guards and removal')
     finally:
         if started:pg('-m','immediate','-w','stop')
