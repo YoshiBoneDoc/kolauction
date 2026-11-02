@@ -908,3 +908,21 @@ html[data-theme="dark"] .profile-dashboard .profile-history-entry.is-unsold:hove
 html[data-theme="dark"] .profile-dashboard .profile-history-entry .profile-entry-status.is-completed { color: #7BD5A0; }
 html[data-theme="dark"] .profile-dashboard .profile-history-entry .profile-entry-status.is-cancelled { color: #EDA09A; }
 html[data-theme="dark"] .profile-dashboard .profile-history-entry .profile-entry-status.is-expired { color: #E4BA76; }
+
+/* Administration navigation overrides shared button chrome in both themes. */
+html .admin-underline-tab,
+html .admin-underline-tab:hover {
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
+  border-radius: 0;
+  background: transparent;
+  border-bottom-color: transparent;
+}
+html .admin-underline-tab[aria-current="page"] { border-bottom-color: #1d4ed8; color: #1d4ed8; }
+html[data-theme="dark"] .admin-underline-tab[aria-current="page"] { border-bottom-color: #93c5fd; color: #93c5fd; }
+html .admin-underline-tab:focus-visible,
+html .admin-analytics-tabs button:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }
+html .admin-analytics-tabs button:hover { border-color: transparent; }
+html .admin-analytics-tabs button[aria-current="page"] { border-color: var(--light-border, #d1d5db); }
+html[data-theme="dark"] .admin-analytics-tabs button[aria-current="page"] { border-color: var(--theme-border); background: var(--theme-raised); }

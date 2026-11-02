@@ -116,7 +116,7 @@ export default function AdminPolls() {
         <main className="mx-auto w-full max-w-4xl flex-1 space-y-5 px-4 py-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <h1 className="text-3xl font-bold text-blue-700">Manage polls</h1>
-                <Link to="/admin/inbox" className="text-sm text-blue-700 underline">Administrator inbox</Link>
+                <Link to="/admin/inbox" className="text-sm text-blue-700 underline">Administration</Link>
             </div>
             <p className="text-sm text-gray-600">Multiple polls can be live. Players answer them in publication order. Yes/No and multiple-choice results appear after voting; written responses stay private in your inbox.</p>
             {currentUser ? <PollManager key={currentUser.id} /> : <p><Link to="/login" className="text-blue-700 underline">Log in</Link> with your administrator account to manage polls.</p>}

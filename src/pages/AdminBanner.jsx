@@ -54,7 +54,7 @@ export default function AdminBanner() {
         <main className="mx-auto w-full max-w-3xl flex-1 space-y-5 px-4 py-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <h1 className="text-3xl font-bold text-blue-700">Site announcement</h1>
-                <Link to="/admin/inbox" className="text-sm text-blue-700 underline">Administrator inbox</Link>
+                <Link to="/admin/inbox" className="text-sm text-blue-700 underline">Administration</Link>
             </div>
             <p className="text-sm text-gray-600">Everyone can see the banner and dismiss it with ×. Changing a published message or publishing it again shows it to everyone again.</p>
             {currentUser ? <BannerManager key={currentUser.id} /> : <p><Link to="/login" className="text-blue-700 underline">Log in</Link> with your administrator account to manage announcements.</p>}
