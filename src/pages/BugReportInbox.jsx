@@ -129,20 +129,22 @@ export default function BugReportInbox() {
     return <div className="site-page-background flex flex-1 flex-col bg-gray-50">
         <main className="mx-auto w-full max-w-6xl flex-1 space-y-5 px-4 py-6 sm:px-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
-                <h1 className="text-3xl font-bold text-blue-700">Administration</h1>
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                    <h1 className="text-3xl font-bold text-blue-700">Administration</h1>
+                    {currentUser && <nav aria-label="Administrator sections" className="flex gap-6 border-b border-gray-200">
+                        {['inbox', 'bans', 'analytics'].map(value => <button key={value}
+                            aria-current={tab === value ? 'page' : undefined}
+                            onClick={() => setParams(previous => { const next = new URLSearchParams(previous); if (value === 'inbox') next.delete('tab'); else next.set('tab', value); return next; })}
+                            className={`admin-underline-tab min-h-11 border-b-2 bg-transparent px-0 text-sm font-medium transition-colors ${tab === value ? 'border-blue-700 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-900'}`}>
+                            {value === 'inbox' ? 'Inbox' : value === 'bans' ? 'Bans' : 'Analytics'}
+                        </button>)}
+                    </nav>}
+                </div>
                 <div className="flex flex-wrap gap-4">
                     <Link to="/admin/polls" className="text-sm text-blue-700 underline">Manage polls</Link>
                     <Link to="/admin/banner" className="text-sm text-blue-700 underline">Manage site banner</Link>
                 </div>
             </div>
-            {currentUser && <nav aria-label="Administrator sections" className="flex gap-6 border-b border-gray-200">
-                {['inbox', 'bans', 'analytics'].map(value => <button key={value}
-                    aria-current={tab === value ? 'page' : undefined}
-                    onClick={() => setParams(previous => { const next = new URLSearchParams(previous); if (value === 'inbox') next.delete('tab'); else next.set('tab', value); return next; })}
-                    className={`admin-underline-tab min-h-11 border-b-2 bg-transparent px-0 text-sm font-medium transition-colors ${tab === value ? 'border-blue-700 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-900'}`}>
-                    {value === 'inbox' ? 'Inbox' : value === 'bans' ? 'Bans' : 'Analytics'}
-                </button>)}
-            </nav>}
             {currentUser ? <div key={currentUser.id} className="space-y-5">{tab === 'analytics' ? <AdminAnalytics /> : tab === 'bans' ? <><AdminAccountControls /><AdminAuctionBanReviews /></> : <Inbox />}</div> : <p><Link to="/login" className="text-blue-700 underline">Log in</Link> with an administrator account to open this inbox.</p>}
         </main>
         <SiteFooter />

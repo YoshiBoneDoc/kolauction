@@ -134,8 +134,8 @@ body:has(.giveaway-detail) div:has(> .site-navigation) { background:linear-gradi
 .giveaway-detail [class*="text-gray-"],
 .giveaway-detail .giveaway-detail-info .giveaway-countdown { color:#fff; }
 .giveaway-detail .giveaway-detail-info .text-\[11px\] { font-size:11px; color:#fff; }
-/* Preserve the winner's green label over the giveaway's white text styling in both themes. */
-.giveaway-detail [aria-label="Bid history"] p.giveaway-winner-label { color:#15803d!important; }
+/* Keep the bright winner green on the coral giveaway panel in both themes. */
+.giveaway-detail [aria-label="Bid history"] p.giveaway-winner-label { color:#86efac!important; }
 .giveaway-detail [aria-label="Auction bidding"] { margin-top:16px; padding-top:16px; }
 .giveaway-detail .giveaway-detail-card { padding:24px; }
 .giveaway-page-art .giveaway-flame { font-size:clamp(24px,calc(var(--size)*.75),100px); }
