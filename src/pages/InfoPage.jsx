@@ -271,7 +271,7 @@ const InfoPage = () => {
                         <div className="mb-3 space-y-1.5 leading-5">
                             <p><strong>Selling:</strong> A tiered commission is deducted from your final sale proceeds. Each rate applies only to the portion of the sale within that tier.</p>
                             <p><strong>Buying:</strong> Fees are calculated per item and paid by the buyer. Sellers receive the full listed price.</p>
-                            <p><strong>Where do the fees go?</strong> Commissions help support the time and effort that goes into developing, improving, and maintaining kHub. A portion also goes back into the community through giveaways.</p>
+                            <p><strong>Where do the fees go?</strong> Commissions help support the time and effort that goes into developing, improving, and maintaining kHub. A portion also goes back into the community through <Link to="/giveaways" className="text-blue-700 underline">giveaways</Link>.</p>
                         </div>
                         <details>
                             <summary className="cursor-pointer text-sm font-semibold text-gray-700">Detailed Breakdown</summary>
