@@ -140,7 +140,7 @@ export default function AuctionDetails() {
                             <div className="sm:text-right">
                                 <p className="font-bold text-gray-900">{bid.amount.toLocaleString('en-US')} Meat</p>
                                 {auction.instantPurchasedAt && bid.amount === auction.instantPurchasePrice && <p className="text-xs font-semibold text-green-700">Buyout</p>}
-                                {auction.giveawayTitle ? bid.giveawayWinner && result.hasWinner && <p className="text-xs font-semibold text-green-700">Giveaway Winner</p>
+                                {auction.giveawayTitle ? bid.giveawayWinner && result.hasWinner && <p className="giveaway-winner-label text-xs font-semibold text-green-700">Giveaway Winner</p>
                                     : !auction.instantPurchasedAt && result.hasWinner && bid.amount === result.finalPrice && <p className="text-xs font-semibold text-green-700">Winning bid</p>}
                                 <p className="text-xs text-gray-600">{new Date(bid.timestamp).toLocaleString()}</p>
                             </div>
