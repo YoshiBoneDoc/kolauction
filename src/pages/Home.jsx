@@ -42,7 +42,7 @@ export default function Home() {
                 <PendingTrades />
                 {featuredGiveaway && getAuctionStatus(featuredGiveaway, now) === 'active' && <div className="mb-8">
                     <GiveawayCard auction={featuredGiveaway} now={now} />
-                    <p className="mt-1.5 text-center text-xs"><Link to="/giveaways" className="text-blue-700 underline hover:text-blue-800 dark:text-blue-300 dark:hover:text-blue-200">Seriously, wtf is this?</Link></p>
+                    <p className="mt-1.5 text-center text-xs"><Link to="/giveaways" className="text-blue-700 underline hover:text-blue-800 dark:text-blue-300 dark:hover:text-blue-200">How Does This Giveaway Work?</Link></p>
                 </div>}
                 <HighRollers auctions={highRollers} now={now}>
                     {isLoading && <p role="status">Loading High Rollers…</p>}

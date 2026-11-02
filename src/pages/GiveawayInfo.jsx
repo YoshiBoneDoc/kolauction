@@ -18,7 +18,7 @@ export default function GiveawayInfo() {
                     <section className="space-y-6">
                         <div className="inline-block">
                             <h1 className="text-xl font-bold text-blue-600/60 dark:text-blue-300">
-                                Seriously, wtf is this?
+                                How Does This Giveaway Work?
                             </h1>
                             <div className="mt-2 h-[2px] w-[110%] rounded-full bg-blue-300/60" />
                         </div>
