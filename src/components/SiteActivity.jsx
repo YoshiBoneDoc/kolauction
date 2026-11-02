@@ -23,6 +23,8 @@ export default function SiteActivity({ children }) {
     const { signedInUserId } = useContext(UserContext);
     const administrator = useAdministrator();
     const [activity, setActivity] = useState(null);
+    const ownPresence = activity?.users?.some(user => user.id === signedInUserId) ? 1 : 0;
+    const otherUsers = activity?.users?.filter(user => user.id !== signedInUserId);
 
     useEffect(() => {
         if (!supabase) return;
@@ -62,16 +64,16 @@ export default function SiteActivity({ children }) {
             {activity ? <div className="space-y-2">
                 {[['viewers', 'Viewing now'], ['logged_in', 'Logged in']].map(([key, label]) => <details key={key}>
                     <summary className="cursor-pointer rounded focus-visible:outline focus-visible:outline-2">
-                        {label}<span className="block text-lg font-bold">{activity[key]}</span>
+                        {label}<span className="block text-lg font-bold">{Math.max(0, activity[key] - ownPresence)}</span>
                     </summary>
                     {Array.isArray(activity.users) ? <ul aria-label={`${label} users`} className="mt-1 max-h-60 space-y-1 overflow-y-auto break-words text-xs">
-                        {activity.users.map(user => <li key={user.id}>{user.username}</li>)}
+                        {otherUsers.map(user => <li key={user.id}>{user.username}</li>)}
                         {key === 'viewers' && activity.guests > 0 && <li>Anonymous guests: {activity.guests}</li>}
-                        {activity[key] === 0 && <li>No active users</li>}
+                        {activity[key] - ownPresence === 0 && <li>No active users</li>}
                     </ul> : <p className="mt-1 text-xs">User list unavailable until the database update is applied.</p>}
                 </details>)}
             </div> : <p role="status">Activity unavailable</p>}
-            <p className="mt-2 text-xs opacity-70">Active in the last 2 minutes. Includes you. Updates every 30 seconds.</p>
+            <p className="mt-2 text-xs opacity-70">Active in the last 2 minutes. Excludes you. Updates every 30 seconds.</p>
         </aside>}
         <div className="min-w-0 flex-1">{children}</div>
     </div>;

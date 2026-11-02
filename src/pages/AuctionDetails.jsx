@@ -100,7 +100,7 @@ export default function AuctionDetails() {
                                 <span className="inline-flex rounded border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Live</span>
                                 <span aria-hidden="true" className="text-gray-400">·</span>
                                 {auction.giveawayTitle ? <GiveawayCountdown endTime={auction.endTime} now={now} /> : <p className={auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-600'}>Ends in <time dateTime={new Date(auction.endTime).toISOString()}>{timeRemaining(auction.endTime, now)}</time></p>}
-                                <p className="w-full text-[11px] text-gray-500">{auction.giveawayTitle ? <>Giveaway ends at the scheduled time. No jumping ahead! <span className="giveaway-bid-warning">Minimum increases only. <strong>Overbids won't count!</strong></span></> : 'Late bids extend the auction by 1 minute.'}</p>
+                                <p className="w-full text-[11px] text-gray-500">{auction.giveawayTitle ? <>Giveaway ends at the scheduled time. <span className="giveaway-bid-warning">Minimum increases only. <strong>Overbids won't count!</strong></span></> : 'Late bids extend the auction by 1 minute.'}</p>
                             </div>}
                         </div>
                         {closedSale ? <>
@@ -140,7 +140,8 @@ export default function AuctionDetails() {
                             <div className="sm:text-right">
                                 <p className="font-bold text-gray-900">{bid.amount.toLocaleString('en-US')} Meat</p>
                                 {auction.instantPurchasedAt && bid.amount === auction.instantPurchasePrice && <p className="text-xs font-semibold text-green-700">Buyout</p>}
-                                {!auction.instantPurchasedAt && result.hasWinner && bid.amount === result.finalPrice && <p className="text-xs font-semibold text-green-700">Winning bid</p>}
+                                {auction.giveawayTitle ? bid.giveawayWinner && result.hasWinner && <p className="text-xs font-semibold text-green-700">Giveaway Winner</p>
+                                    : !auction.instantPurchasedAt && result.hasWinner && bid.amount === result.finalPrice && <p className="text-xs font-semibold text-green-700">Winning bid</p>}
                                 <p className="text-xs text-gray-600">{new Date(bid.timestamp).toLocaleString()}</p>
                             </div>
                         </li>

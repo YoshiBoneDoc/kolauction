@@ -11,6 +11,7 @@ export function mapAuction(row, bidRows) {
             bidder: bid.bidder_username,
             amount: Number(bid.amount),
             timestamp: new Date(bid.created_at).getTime(),
+            giveawayWinner: bid.giveaway_winner === true,
             // The database omits this field unless the viewer is an administrator.
             adminDeliveryReferences: Array.isArray(bid.admin_delivery_references) ? bid.admin_delivery_references : [],
         }));

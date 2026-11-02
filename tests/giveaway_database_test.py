@@ -173,6 +173,7 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
             assert ingest(game,'bid',meat=1,actor=48889602)[1]=='accepted'
             assert ingest(game,'bid',meat=11,actor=48889603)[1]=='accepted'
             assert ingest(game,'bid',meat=21,actor=48889602)[1]=='accepted'
+            assert sql(f"select count(*) from public.bids where auction_id='{game}' and khub_bot.giveaway_winning_bid(id);")=='0'
             sql(f"update public.auctions set created_at=clock_timestamp()-interval '1 day',end_time=clock_timestamp()-interval '2 minutes' where id='{game}';")
             # Invoke the inner settlement boundary directly only in the isolated test database.
             sql(f"select khub_bot.finish_listing_before_receipt_time('{game}','deadline');")
@@ -184,6 +185,14 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
                 assert len(allocated)==(1 if resolved=='random_draw' else 2)
                 if resolved=='split':assert sorted(w['quantity'] for w in allocated)==[1,2]
                 else:assert row(game)['winner_id']==allocated[0]['user_id']
+            marked=json.loads(sql(f"select coalesce(jsonb_agg(to_jsonb(b)),'[]') from public.bids b where auction_id='{game}' and khub_bot.giveaway_winning_bid(id);"))
+            expected={w['user_id'] for w in allocated if w['quantity']>0} if resolved=='split' else {row(game)['winner_id']}
+            assert {b['bidder_id'] for b in marked}==expected
+            assert len(marked)==len(expected)
+            page=json.loads(sql(f"select public.read_auction_page('detail','{game}',null,'all','ending',1);"))
+            assert {b['id'] for b in page['bids'] if b['giveaway_winner']}=={b['id'] for b in marked}
+            for bid in marked:
+                assert sql(f"select id from public.bids where auction_id='{game}' and bidder_id='{bid['bidder_id']}' order by created_at desc,amount desc,id desc limit 1;")==bid['id']
             sql(f"select khub_bot.finish_listing_before_receipt_time('{game}','deadline');")
             assert sql(f"select jsonb_agg(to_jsonb(w) order by player_id) from khub_bot.giveaway_awards w where auction_id='{game}';")==awards
             assert sql(f"select jsonb_agg(to_jsonb(d) order by dedupe_key) from khub_bot.deliveries d where auction_id='{game}';")==deliveries
