@@ -59,8 +59,10 @@ export default function Home() {
                         {!isLoading && !error && completed.length === 0 && <p>No completed trades yet.</p>}
                     </PopularAuctions>
                 </div>
+                <div className="mt-4">
+                    <HomePoll featuredTarget={featuredPollTarget} />
+                </div>
             </main>
-            <HomePoll featuredTarget={featuredPollTarget} />
             <SiteFooter className="home-footer -mx-4 sm:-mx-6" />
         </div>
     );
