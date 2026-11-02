@@ -31,9 +31,6 @@ export function PollPanel({ service = polls, featuredTarget }) {
     const [repeatId, setRepeatId] = useState(null);
     const [notice, setNotice] = useState('');
     const [choice, setChoice] = useState(null);
-    // Once an unanswered poll is shown at the top, keep it there for this visit,
-    // including its results. A new mount uses the saved answers/skips from the feed.
-    const [featured, setFeatured] = useState(false);
     const responseRequest = useRef(null);
     const writing = useRef(false);
     const generation = useRef(0);
@@ -52,7 +49,6 @@ export function PollPanel({ service = polls, featuredTarget }) {
                 const data = await service.read();
                 if (!cancelled && request === generation.current) {
                     setFeed(data); setError('');
-                    if (!data?.can_manage && !data?.poll?.can_manage && data?.poll?.active && !data.poll.has_voted) setFeatured(true);
                 }
             } catch (failure) { if (!cancelled && request === generation.current) setError(failure.message); return false; }
         }
@@ -151,8 +147,8 @@ export function PollPanel({ service = polls, featuredTarget }) {
     }
     const question = !isAdmin && poll?.active && !poll.has_voted ? poll : null;
     if (!question && !answered.length && !published.length && !minimized.length && !feed?.can_manage && !error && !notice) return null;
-    const panel = <section aria-label="Community poll" className="mx-auto mb-4 w-full max-w-6xl space-y-2">
-        {question && <div className="rounded-md border border-yellow-300 bg-yellow-100 px-3 py-3 text-slate-800">
+    const questionPanel = question && <section aria-label="Community poll" className="mx-auto mb-4 w-full max-w-6xl">
+        <div className="rounded-md border border-yellow-300 bg-yellow-100 px-3 py-3 text-slate-800">
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                 <div className="min-w-0 flex-1 basis-48">
                     <p className="text-xs font-semibold uppercase tracking-wide text-yellow-800">Community poll</p>
@@ -179,7 +175,9 @@ export function PollPanel({ service = polls, featuredTarget }) {
                 </fieldset>
                 <button type="submit" disabled={pending || choice?.pollId !== question.id || Boolean(question.allow_multiple_responses && !choice?.indices?.length)} className="min-h-10 rounded border border-yellow-700 bg-yellow-800 px-4 py-2 text-sm font-semibold text-white hover:bg-yellow-900 disabled:opacity-60">{pending ? 'Submitting…' : 'Submit vote'}</button>
             </form>}
-        </div>}
+        </div>
+    </section>;
+    const panel = <section aria-label="Community poll results" className="mx-auto mb-4 w-full max-w-6xl space-y-2">
         {notice && <p role="status" className="text-sm text-gray-600">{notice}</p>}
         {result && <article aria-label={`Results: ${result.question}`} className={`max-w-sm rounded-md border border-yellow-200 bg-yellow-50 px-3 text-slate-800 ${resultsHidden ? 'flex w-fit items-center gap-4 py-1.5' : 'py-3'}`}>
             <div className={`flex items-center justify-between gap-2 ${resultsHidden ? '' : 'mb-1'}`}>
@@ -227,7 +225,10 @@ export function PollPanel({ service = polls, featuredTarget }) {
         {feed?.can_manage && <p className="text-sm"><Link to="/admin/polls" className="text-blue-800 underline">Manage polls &amp; view past results</Link></p>}
         {error && <p role="alert" className="text-sm text-red-800">{error}{' '}<button type="button" disabled={pending} onClick={() => setAttempt(value => value + 1)} className="underline">Retry</button></p>}
     </section>;
-    return featured && featuredTarget?.current ? createPortal(panel, featuredTarget.current) : panel;
+    return <>
+        {questionPanel && (featuredTarget?.current ? createPortal(questionPanel, featuredTarget.current) : questionPanel)}
+        {panel}
+    </>;
 }
 PollPanel.propTypes = { service: PropTypes.object, featuredTarget: PropTypes.shape({ current: PropTypes.object }) };
 

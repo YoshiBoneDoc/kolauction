@@ -56,31 +56,41 @@ test('deleting a poll requires explicit confirmation and removes it only after t
  } finally {if(previousWindow===undefined)delete globalThis.window;else globalThis.window=previousWindow;}
 });
 
-test('unanswered polls feature above auctions and keep results there until leaving the homepage',async()=>{
+test('only unanswered questions feature at the top; answering moves results below trades immediately',async()=>{
  let saved=false;
  const service={read:async()=>feed(saved?{...poll,has_voted:true,results:{yes:1,no:0,total:1}}:poll),vote:async()=>{saved=true;}};
  const props={featuredTarget:{current:{name:'top'}}};
- const visit=harness(service,PollPanel,props);await visit.load();assert.equal(visit.tree.props['data-placement'],'top');
- await visit.button('Yes').props.onClick();visit.render();assert.equal(visit.tree.props['data-placement'],'top');assert.match(visit.html(),/Live poll results/);
- await visit.load();assert.equal(visit.tree.props['data-placement'],'top');
- const returned=harness(service,PollPanel,props);await returned.load();assert.equal(returned.tree.props['data-placement'],undefined);assert.match(returned.html(),/Live poll results/);
+ const visit=harness(service,PollPanel,props);await visit.load();
+ const featured=()=>nodes(visit.tree).find(n=>n.props?.['data-placement']==='top');
+ assert.ok(featured());assert.doesNotMatch(renderToStaticMarkup(featured()),/poll results/);
+ await visit.button('Yes').props.onClick();visit.render();assert.equal(featured(),undefined);assert.match(visit.html(),/Live poll results/);
+ await visit.load();assert.equal(featured(),undefined);
+ const returned=harness(service,PollPanel,props);await returned.load();assert.equal(nodes(returned.tree).some(n=>n.props?.['data-placement']==='top'),false);assert.match(returned.html(),/Live poll results/);
 });
 
-test('skipped text polls stay featured this visit but return minimized at the bottom on a later visit',async()=>{
+test('skipped text polls move to the bottom immediately and remain there on a later visit',async()=>{
  let skipped=false;const textPoll={...poll,poll_type:'free_text'};
  const service={read:async()=>({...feed(skipped?null:textPoll),skipped_polls:skipped?[textPoll]:[]}),skip:async()=>{skipped=true;}};
  const props={featuredTarget:{current:{name:'top'}}};
  const visit=harness(service,PollPanel,props);await visit.load();await visit.button('Skip').props.onClick();visit.render();
- assert.equal(visit.tree.props['data-placement'],'top');assert.match(visit.html(),/Answer this poll/);
- const returned=harness(service,PollPanel,props);await returned.load();assert.equal(returned.tree.props['data-placement'],undefined);assert.match(returned.html(),/Answer this poll/);
+ assert.equal(nodes(visit.tree).some(n=>n.props?.['data-placement']==='top'),false);assert.match(visit.html(),/Answer this poll/);
+ const returned=harness(service,PollPanel,props);await returned.load();assert.equal(nodes(returned.tree).some(n=>n.props?.['data-placement']==='top'),false);assert.match(returned.html(),/Answer this poll/);
 });
 
-test('remaining unanswered questions feature on return; admin results stay at the bottom',async()=>{
+test('previous and answered results stay below trades while an unanswered question is featured',async()=>{
  const props={featuredTarget:{current:{name:'top'}}};
- const visit=harness({read:async()=>({...feed(poll),answered_polls:[{...poll,id:'older',has_voted:true,results:{yes:1,no:0,total:1}}]})},PollPanel,props);
- await visit.load();assert.equal(visit.tree.props['data-placement'],'top');assert.ok(visit.button('Yes'));
+ const answered={...poll,id:'older',question:'An answered poll?',has_voted:true,results:{yes:1,no:0,total:1}};
+ const previous={...answered,id:'previous',question:'A previous poll?',active:false};
+ const visit=harness({read:async()=>({...feed(poll),answered_polls:[answered],published_results:[previous]})},PollPanel,props);
+ await visit.load();assert.ok(visit.button('Yes'));
+ const top=nodes(visit.tree).find(n=>n.props?.['data-placement']==='top');
+ const bottom=nodes(visit.tree).find(n=>n.props?.['aria-label']==='Community poll results');
+ assert.ok(top);assert.ok(bottom);assert.doesNotMatch(renderToStaticMarkup(top),/An answered poll|A previous poll|Live poll results/);
+ assert.match(renderToStaticMarkup(bottom),/An answered poll/);
+ visit.button('Next poll results').props.onClick();visit.render();
+ assert.match(renderToStaticMarkup(nodes(visit.tree).find(n=>n.props?.['aria-label']==='Community poll results')),/A previous poll/);
  const admin=harness({read:async()=>feed({...poll,can_manage:true,results:{yes:1,no:0,total:1}})},PollPanel,props);
- await admin.load();assert.equal(admin.tree.props['data-placement'],undefined);assert.equal(admin.button('Yes'),undefined);
+ await admin.load();assert.equal(nodes(admin.tree).some(n=>n.props?.['data-placement']==='top'),false);assert.equal(admin.button('Yes'),undefined);
 });
 
 test('poll service passes only the authenticated RPC arguments and surfaces failures',async()=>{

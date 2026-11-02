@@ -24,7 +24,7 @@ const auctionTypeComparison = [
     },
     {
         heading: 'FEES',
-        escrow: 'Fees start at 5% and decrease for higher-value sales. See chart below for full details. No sale, no fee.',
+        escrow: 'Fees range from 1-5%, decreasing for higher-value sales. See chart below for full details. No sale, no fee.',
         direct: 'No commission. Optional tips are appreciated.',
     },
     {
@@ -236,8 +236,8 @@ const InfoPage = () => {
                     </ul>
                 </section>
 
-                <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-x-8 md:gap-y-0">
-                    <section aria-labelledby="bid-increases-title" className="min-w-0 md:row-span-3 md:grid md:grid-rows-subgrid">
+                <div className="mb-6 grid grid-cols-1 items-start gap-6 md:grid-cols-2 md:gap-x-8">
+                    <section aria-labelledby="bid-increases-title" className="min-w-0">
                         <h2 id="bid-increases-title" className={`${sectionHeadingClass} mb-2 scroll-mt-4`}>Minimum Bid Increases</h2>
                         <div className="mb-3 space-y-1.5 leading-5">
                             <p>The first bid must meet the seller’s minimum price. Later bids must exceed the current highest bid by at least the increase below. Applies to both Escrow and Direct Trade auctions.</p>
@@ -266,52 +266,56 @@ const InfoPage = () => {
                         </div>
                     </section>
 
-                    <section aria-labelledby="escrow-fees-title" className="min-w-0 md:row-span-3 md:grid md:grid-rows-subgrid">
+                    <section aria-labelledby="escrow-fees-title" className="min-w-0">
                         <h2 id="escrow-fees-title" className={`${sectionHeadingClass} mb-2 scroll-mt-4`}>Escrow Fees</h2>
                         <div className="mb-3 space-y-1.5 leading-5">
-                            <p><strong>When Selling:</strong> Commission is deducted from your proceeds based on the final sale price. Each rate applies only to the portion within that tier.</p>
-                            <p><strong>When Buying:</strong> Commission is calculated per item, not on the total order value. Buyers pay the fee; sellers receive the full listed price.</p>
+                            <p><strong>Selling:</strong> A tiered commission is deducted from your final sale proceeds. Each rate applies only to the portion of the sale within that tier.</p>
+                            <p><strong>Buying:</strong> Fees are calculated per item and paid by the buyer. Sellers receive the full listed price.</p>
+                            <p><strong>Where do the fees go?</strong> Commissions help support the time and effort that goes into developing, improving, and maintaining kHub. A portion also goes back into the community through giveaways.</p>
                         </div>
-                        <div>
-                            <div className="overflow-hidden rounded-md border border-gray-200">
-                                <table className="w-full text-xs leading-5">
-                                    <caption className="sr-only">Tiered escrow seller commission on portions of the final sale price, in Meat</caption>
-                                    <thead className="bg-gray-100 text-gray-700"><tr>
-                                        <th scope="col" className={`${subheadingClass} px-3 py-1.5 text-left`}>Sale Price Portion</th>
-                                        <th scope="col" className={`${subheadingClass} px-3 py-1.5 text-right`}>Fee Rate</th>
-                                        <th scope="col" className={`${subheadingClass} px-3 py-1.5 text-right`}>Effective Rate<sup>1</sup></th>
-                                    </tr></thead>
-                                    <tbody className="divide-y divide-gray-200">
-                                        {ESCROW_FEE_TIERS.map(tier => <tr key={tier.portion} className="bg-white odd:bg-gray-50">
-                                            <td className="px-3 py-1">{tier.portion.replace(/(\d)([mb])/g, (_, amount, unit) => amount + unit.toUpperCase())}</td>
-                                            <td className="px-3 py-1 text-right font-medium text-gray-800">{tier.rate}</td>
-                                            <td className="px-3 py-1 text-right text-gray-800">{tier.upTo === null ? 'Approaches 1%' : `${(escrowFee(tier.upTo) / tier.upTo * 100).toFixed(2)}%`}</td>
-                                        </tr>)}
-                                    </tbody>
-                                </table>
-                            </div>
-                            <p className="mt-2 text-xs italic leading-5"><sup>1</sup> At the upper end of each price range.</p>
-                            <p className="text-xs italic leading-5">Commissions are rounded down to whole Meat. <strong>No sale, no fee.</strong></p>
-                            <div className="mt-2 divide-y divide-gray-200 rounded-md bg-blue-50/70 text-xs leading-4">
-                                <div className="px-3 py-2">
-                                    <h3 className="font-semibold text-gray-800">Example: Selling an Item</h3>
-                                    <p>A 10M Meat sale incurs:</p>
-                                    <ul className="list-disc pl-4">
-                                        <li>First 1M at 5% → 50,000 Meat</li>
-                                        <li>Remaining 9M at 4% → 360,000 Meat</li>
-                                    </ul>
-                                    <p>Total commission: 410,000 Meat (4.1%)</p>
+                        <details>
+                            <summary className="cursor-pointer text-sm font-semibold text-gray-700">Detailed Breakdown</summary>
+                            <div className="mt-3">
+                                <div className="overflow-hidden rounded-md border border-gray-200">
+                                    <table className="w-full text-xs leading-5">
+                                        <caption className="sr-only">Tiered escrow seller commission on portions of the final sale price, in Meat</caption>
+                                        <thead className="bg-gray-100 text-gray-700"><tr>
+                                            <th scope="col" className={`${subheadingClass} px-3 py-1.5 text-left`}>Sale Price Portion</th>
+                                            <th scope="col" className={`${subheadingClass} px-3 py-1.5 text-right`}>Fee Rate</th>
+                                            <th scope="col" className={`${subheadingClass} px-3 py-1.5 text-right`}>Effective Rate<sup>1</sup></th>
+                                        </tr></thead>
+                                        <tbody className="divide-y divide-gray-200">
+                                            {ESCROW_FEE_TIERS.map(tier => <tr key={tier.portion} className="bg-white odd:bg-gray-50">
+                                                <td className="px-3 py-1">{tier.portion.replace(/(\d)([mb])/g, (_, amount, unit) => amount + unit.toUpperCase())}</td>
+                                                <td className="px-3 py-1 text-right font-medium text-gray-800">{tier.rate}</td>
+                                                <td className="px-3 py-1 text-right text-gray-800">{tier.upTo === null ? 'Approaches 1%' : `${(escrowFee(tier.upTo) / tier.upTo * 100).toFixed(2)}%`}</td>
+                                            </tr>)}
+                                        </tbody>
+                                    </table>
                                 </div>
-                                <div className="px-3 py-2">
-                                    <h3 className="font-semibold text-gray-800">Example: Buying Items</h3>
-                                    <p>Two orders totaling 10M Meat:</p>
-                                    <ul className="list-disc pl-4">
-                                        <li>1,000 items × 10,000 Meat → 500,000 Meat fee (5%)</li>
-                                        <li>1 item × 10M Meat → 410,000 Meat fee (4.1%)</li>
-                                    </ul>
+                                <p className="mt-2 text-xs italic leading-5"><sup>1</sup> At the upper end of each price range.</p>
+                                <p className="text-xs italic leading-5">Commissions are rounded down to whole Meat. <strong>No sale, no fee.</strong></p>
+                                <div className="mt-2 divide-y divide-gray-200 rounded-md bg-blue-50/70 text-xs leading-4">
+                                    <div className="px-3 py-2">
+                                        <h3 className="font-semibold text-gray-800">Example: Selling an Item</h3>
+                                        <p>A 10M Meat sale incurs:</p>
+                                        <ul className="list-disc pl-4">
+                                            <li>First 1M at 5% → 50,000 Meat</li>
+                                            <li>Remaining 9M at 4% → 360,000 Meat</li>
+                                        </ul>
+                                        <p>Total commission: 410,000 Meat (4.1%)</p>
+                                    </div>
+                                    <div className="px-3 py-2">
+                                        <h3 className="font-semibold text-gray-800">Example: Buying Items</h3>
+                                        <p>Two orders totaling 10M Meat:</p>
+                                        <ul className="list-disc pl-4">
+                                            <li>1,000 items × 10,000 Meat → 500,000 Meat fee (5%)</li>
+                                            <li>1 item × 10M Meat → 410,000 Meat fee (4.1%)</li>
+                                        </ul>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        </details>
                     </section>
                 </div>
 
