@@ -5,10 +5,10 @@ import ProfileTimeLeft from '../components/ProfileTimeLeft';
 import RelistButton from '../components/RelistButton';
 import { auctionQuantityLabel } from '../lib/bundles';
 import WinnerLink from '../components/WinnerLink';
-import { useContext, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { UserContext } from "../context/UserContext";
 import { AuctionsContext } from "../context/AuctionsContext";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { getAuctionResult, getAuctionStatus } from "../lib/auctionLifecycle";
 import KolVerification from "../components/KolVerification";
 import AuctionItemImage from '../components/AuctionItemImage';
@@ -30,12 +30,20 @@ const Profile = () => {
     const { currentUser } = useContext(UserContext);
     const { auctions, isLoading, error, refreshAuctions } = useContext(AuctionsContext);
     const now = useNow(auctions);
+    const { hash } = useLocation();
+    const profileUserId = currentUser?.id;
     const activityRef = useRef(null);
-    const [selectedTab, setSelectedTab] = useState('auctions');
+    const [selectedTab, setSelectedTab] = useState(hash === '#profile-tab-saved' ? 'saved' : 'auctions');
     const [historyTab, setHistoryTab] = useState('listing');
     const [retrying, setRetrying] = useState(false);
     const [expandedSections, setExpandedSections] = useState({});
     const [collapsedSections, setCollapsedSections] = useState({});
+
+    useEffect(() => {
+        if (hash !== '#profile-tab-saved' || !profileUserId) return;
+        setSelectedTab('saved');
+        document.getElementById('profile-tab-saved')?.scrollIntoView({ block: 'start' });
+    }, [hash, profileUserId, error]);
 
     function selectTab(id, inner = false) {
         if (id === (inner ? historyTab : selectedTab)) return;
@@ -207,7 +215,6 @@ const Profile = () => {
                     <section aria-label="Trade totals">
                         <div className="mb-3">
                             <h2 className="text-lg font-semibold profile-text">Trade totals</h2>
-                            <p className="text-xs profile-label">Totals include completed bot deliveries (seller fees deducted) and direct trades confirmed by both parties.</p>
                         </div>
                         <dl className="grid grid-cols-1 gap-4 md:grid-cols-3">
                             <div className="profile-stat-card">

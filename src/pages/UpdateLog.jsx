@@ -9,7 +9,13 @@ export default function UpdateLog() {
         <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-4 py-8 sm:px-6">
             <h1 className="text-3xl font-bold text-blue-700">Update Log</h1>
             <ul className="list-disc space-y-4 pl-5 text-gray-700">
-                <li>Hosted the first '<Link to="/giveaways" className="text-blue-700 underline dark:text-blue-300">Meat Stack Mania</Link>' on Friday, October 30, 2026, 01:02AM</li>
+                <li>Free escrow trades and <Link to="/info#escrow-fees-title" className="text-blue-700 underline">reduced commissions</Link> for November.</li>
+                <li>Added the ability to <Link to="/profile#profile-tab-saved" className="text-blue-700 underline">bookmark auctions</Link> and optionally receive KMail reminders before they end (can be done on your account profile page).</li>
+                <li>Refreshed the <Link to="/profile" className="text-blue-700 underline">Account Profile</Link> page with a cleaner layout and easier navigation.</li>
+                <li>Made further performance improvements.</li>
+                <li>Replaced &quot;Popular&quot; items on the homepage with &quot;Hidden Gems&quot;, highlighting auctions offering the best value. May revisit/refine this sorting in the future.</li>
+                <li>Based on feedback from the previous poll, updated Discover sorting to show auctions ending within 3 hours first, followed by listings offering the best value.</li>
+                <li>Hosted the first &apos;<Link to="/giveaways" className="text-blue-700 underline dark:text-blue-300">Meat Stack Mania</Link>&apos; on Friday, October 30, 2026, 01:02AM</li>
                 <li>When creating an auction, you can now enter either the total listing price or the price per item. The other automatically updates.</li>
                 <li>Further performance improvements to keep kHub running smoothly during periods of high traffic.</li>
                 <li>Added a Relist option for expired, ended, or cancelled auctions, available on the All Auctions page, your account profile, and seller profile pages.</li>

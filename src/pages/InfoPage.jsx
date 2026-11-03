@@ -269,7 +269,7 @@ const InfoPage = () => {
                     <section aria-labelledby="escrow-fees-title" className="min-w-0">
                         <h2 id="escrow-fees-title" className={`${sectionHeadingClass} mb-2 scroll-mt-4`}>Escrow Fees</h2>
                         <div className="mb-3 space-y-1.5 leading-5">
-                            <p className="text-green-800"><strong>Thanksgiving Promo:</strong></p>
+                            <p className="text-green-800"><strong>Giving Thanks:</strong></p>
                             <p className="text-green-800">For the month of November, escrow trades are commission-free as long as you&apos;ve completed less than 20m Meat in escrow trades. If you&apos;re still below 20m, your next trade is entirely free, regardless of its value.</p>
                             <p className="text-green-800">After that, fees are 2% on the first 1b Meat and 1% on anything above 1b.</p>
                             <p className="pt-6"><em>The text below applies to the normal fee structure and isn&apos;t applicable during this promo</em></p>
