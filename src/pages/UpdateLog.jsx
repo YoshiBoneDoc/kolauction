@@ -9,7 +9,7 @@ export default function UpdateLog() {
         <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-4 py-8 sm:px-6">
             <h1 className="text-3xl font-bold text-blue-700">Update Log</h1>
             <ul className="list-disc space-y-4 pl-5 text-gray-700">
-                <li>Free escrow trades and <Link to="/info#escrow-fees-title" className="text-blue-700 underline">reduced commissions</Link> for November.</li>
+                <li>Free escrow trades and <Link to="/info#escrow-fees-title" aria-label="Read about reduced escrow commissions for November" className="text-blue-700 underline">reduced commissions</Link> for November.</li>
                 <li>Added the ability to <Link to="/profile#profile-tab-saved" className="text-blue-700 underline">bookmark auctions</Link> and optionally receive KMail reminders before they end (can be done on your account profile page).</li>
                 <li>Refreshed the <Link to="/profile" className="text-blue-700 underline">Account Profile</Link> page with a cleaner layout and easier navigation.</li>
                 <li>Made further performance improvements.</li>
