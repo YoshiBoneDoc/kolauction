@@ -58,6 +58,8 @@ export function mapAuction(row, bidRows) {
         minBidMeat: Number(row.min_bid_meat),
         itemId: row.item_id,
         marketValueMeat: Number(row.market_value_meat || 0),
+        dealMarketValueMeat: Number(row.deal_market_value_meat || 0),
+        dealCheckedAt: row.deal_checked_at || null,
         escrowMode: row.escrow_mode === true,
         startOnDeposit: row.start_on_deposit !== false,
         customEndAt: row.custom_end_at || null,

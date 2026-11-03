@@ -11,10 +11,10 @@ export const PUBLIC_FIELDS = [
     'price_per_item', 'purchased_quantity', 'remaining_quantity', 'available_quantity',
     'reserved_quantity', 'reduced_quantity', 'delivery_mode', 'buy_closing_reason',
     'receipt_time_bidding', 'escrow_timing_review', 'finalization_not_before',
-    'ban_review_required', 'bidding_restricted', 'market_value_meat', 'latest_bid_at', 'is_hot',
+    'ban_review_required', 'bidding_restricted', 'deal_market_value_meat', 'deal_checked_at', 'market_value_meat', 'latest_bid_at', 'is_hot',
 ];
 const statuses = ['active', 'completed', 'cancelled', 'expired', 'ended', 'all'];
-const sorts = ['recommended', 'ending', 'ended-desc', 'newest', 'price-asc', 'price-desc', 'bids-desc', 'bids-asc', 'activity', 'high-rollers'];
+const sorts = ['best-value', 'recommended', 'ending', 'ended-desc', 'newest', 'price-asc', 'price-desc', 'bids-desc', 'bids-asc', 'activity', 'high-rollers'];
 const params = new Set(['view', 'id', 'search', 'status', 'sort', 'trade', 'kind', 'buyout', 'bundle', 'page', 'minPrice', 'maxPrice']);
 const choose = (value, choices, fallback) => {
     if (value == null) return fallback;

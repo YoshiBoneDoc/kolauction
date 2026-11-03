@@ -5,6 +5,8 @@ import { createRequire } from 'node:module';
 import * as router from 'react-router-dom';
 import { fileURLToPath } from 'node:url';
 
+// These server-render tests supply authorized history at the hook boundary.
+// Real async history fetching/pagination/auth clearing is covered by bid-history-refresh.test.mjs.
 const { outputFiles } = buildSync({
     stdin: {
         contents: `
@@ -36,12 +38,12 @@ const { outputFiles } = buildSync({
         `,
         resolveDir: fileURLToPath(new URL('../', import.meta.url)), loader: 'jsx',
     },
-    bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external',
+    bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external', external: ['../hooks/useBidHistory'],
     define: { 'import.meta.env': '{}' }, jsx: 'automatic', loader: { '.gif': 'dataurl', '.css': 'empty' },
 });
 const compiled = { exports: {} };
 const requireModule = createRequire(import.meta.url);
-new Function('require', 'module', 'exports', outputFiles[0].text)((name) => name === 'react-router-dom' ? router : requireModule(name), compiled, compiled.exports);
+new Function('require', 'module', 'exports', outputFiles[0].text)((name) => name === '../hooks/useBidHistory' ? (auction => ({ bids: auction.bids || [], loading: false, hasMore: false })) : name === 'react-router-dom' ? router : requireModule(name), compiled, compiled.exports);
 const { render } = compiled.exports;
 
 test('Info explains first bids, both trade modes and exact buyouts alongside all eight hybrid threshold rows', async () => {
@@ -60,7 +62,7 @@ test('Info explains first bids, both trade modes and exact buyouts alongside all
     assert.match(html, /rounded up to the nearest multiple/);
     assert.match(html, /1\.81M Meat/);
 });
-const base = { sellerId: 'seller', owner: 'Seller', quantity: 1, minBidMeat: 100, currentBid: 0, bids: [], createdAt: Date.now(), endTime: Date.now() + 3600000, status: 'active' };
+const base = { dealMarketValueMeat: 1000000000, dealCheckedAt: new Date().toISOString(), sellerId: 'seller', owner: 'Seller', quantity: 1, minBidMeat: 100, currentBid: 0, bids: [], createdAt: Date.now(), endTime: Date.now() + 3600000, status: 'active' };
 const auctions = [
     { ...base, id: 'active', item: 'Active accessory' },
     { ...base, id: 'complete', item: 'Completed accessory', status: 'completed', finalPrice: 200, winnerId: 'buyer', winner: 'Buyer' },
@@ -326,14 +328,14 @@ test('individual auction pages display the exact hybrid minimum in Direct inputs
 });
 
 test('homepage has one See all auctions link beside Explore Auctions and caps the Explore strip with navigation to the full list', async () => {
-    const listings = Array.from({ length: 31 }, (_, i) => ({ ...auctions[0], id: `carousel-${i}`, item: `Carousel item ${i}`, bidCount: 31-i }));
+    const listings = Array.from({ length: 31 }, (_, i) => ({ ...auctions[0], id: `carousel-${i}`, item: `Carousel item ${i}`, minBidMeat: 10000+i, bidCount: 31-i }));
     const html = (await render('/', listings));
     assert.equal((html.match(/>See all auctions<\/a>/g) || []).length, 1);
     assert.doesNotMatch(html, /Browse active auctions|See more active auctions/);
     assert.match(html, /Explore Auctions<\/h2>/);
     assert.match(html, /role="tablist" aria-label="Explore auction sorting"/);
-    assert.match(html, /aria-selected="true"[^>]*>Popular<\/button>/);
-    assert.match(html, /href="\/auctions\?status=active&amp;sort=bids-desc"/);
+    assert.match(html, /aria-selected="true"[^>]*>Hidden Gems<\/button>/);
+    assert.match(html, /href="\/auctions\?status=active&amp;sort=best-value"/);
     assert.equal((html.match(/<li class="w-64 shrink-0"/g) || []).length, 24);
     assert.doesNotMatch(html, /Pause auction scrolling/);
     for (const listing of listings.slice(0,24)) assert.equal((html.match(new RegExp(`>${listing.item} <span`, 'g')) || []).length, 1);
@@ -479,7 +481,7 @@ test('all home strips use compact cards, only recently completed trades auto-scr
 
 test('every home strip distinguishes Buy cards and keeps per-item Sell price breakdowns',async () =>{
     const rows=['active','completed'].flatMap(status=>[
-        {...auctions[0],id:`buy-${status}`,item:`Buy item ${status}`,auctionKind:'buy',pricePerItem:60000000,quantity:20,status,completedAt:'2026-10-24T12:00:00Z',escrowMode:true},
+        {...auctions[0],id:`buy-${status}`,item:`Buy item ${status}`,auctionKind:'buy',dealMarketValueMeat:30000000,pricePerItem:60000000,quantity:20,status,completedAt:'2026-10-24T12:00:00Z',escrowMode:true},
         {...auctions[0],id:`sell-${status}`,item:`Sell item ${status}`,quantity:20,currentBid:80000000,finalPrice:80000000,status,completedAt:'2026-10-24T12:00:00Z',escrowMode:false},
     ]);
     const html=(await render('/',rows));
@@ -618,4 +620,16 @@ test('pending-trade timeouts do not claim that the signed-in viewer has zero pen
     const html = (await render('/', [], {id:'viewer'}, {pendingError:'timeout',pendingHasLoaded:false}));
     assert.match(html, /Pending trades could not be loaded/);
     assert.doesNotMatch(html, /0 pending trades/);
+});
+test('profile groups auction and bid sections into tabs with a separate attention summary', async () => {
+    const html = await render('/profile', auctions, {id:'seller',khubUsername:'Seller'});
+    assert.match(html, /role="tablist" aria-label="Account auctions"/);
+    assert.match(html, /id="profile-tab-auctions"[^>]*aria-selected="true"/);
+    assert.match(html, /id="profile-panel-bids"[^>]*hidden=""/);
+    assert.match(html, /id="profile-panel-saved"[^>]*hidden=""/);
+    assert.match(html, /id="profile-history-tab-listing"[^>]*aria-selected="true"/);
+    assert.match(html, /id="profile-history-panel-fulfillments"[^>]*hidden=""/);
+    assert.ok(html.indexOf('aria-label="Auctions needing attention"') < html.indexOf('aria-label="Your auctions and bids"'));
+    assert.equal((html.match(/>Active listings<\/h2>/g) || []).length,1);
+    assert.equal((html.match(/>Bid history<\/h2>/g) || []).length,1);
 });

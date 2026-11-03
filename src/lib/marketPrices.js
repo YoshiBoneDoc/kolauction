@@ -66,3 +66,17 @@ export function marketPriceDisplay(record, now = Date.now()) {
     return { text: `Market Value: ${record.price_meat.toLocaleString('en-US')} Meat per item`,
         stale: Boolean(record.readFailed) || !Number.isFinite(Date.parse(record.checked_at)) || (Number.isFinite(Date.parse(record.captured_at)) ? Date.parse(record.captured_at) : now) - Date.parse(record.checked_at) >= DAY };
 }
+
+export function bundleMarketPriceDisplay(items, records, now = Date.now()) {
+    let total = 0, stale = false;
+    for (const item of items) {
+        const record = records.get(item.id);
+        if (!record?.available || !Number.isSafeInteger(record.price_meat) || record.price_meat <= 0) {
+            return { text: 'Market value unavailable for the entire bundle', available: false, stale: false };
+        }
+        total += record.price_meat * item.quantity;
+        stale ||= marketPriceDisplay(record, now).stale;
+    }
+    if (!items.length || !Number.isSafeInteger(total)) return { text: 'Market value unavailable for the entire bundle', available: false, stale: false };
+    return { text: `Market Value: ${total.toLocaleString('en-US')} Meat for the entire bundle`, available: true, stale };
+}

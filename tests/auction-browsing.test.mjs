@@ -54,10 +54,10 @@ test('closed unfunded escrow drafts do not become cancelled, expired or ended au
 
 test('Explore selects a unique item after ranking the full pool for each tab, without affecting All Auctions', () => {
     const pool = [
-        { ...base, id: 'popular', itemId: 1, bidCount: 9, createdAt: 100, endTime: 19000 },
+        { ...base, id: 'popular', dealMarketValueMeat: 100000, dealCheckedAt: new Date(now).toISOString(), itemId: 1, bidCount: 9, createdAt: 100, endTime: 19000 },
         { ...base, id: 'new', itemId: '1', bidCount: 1, createdAt: 300, endTime: 18000, auctionKind: 'buy' },
         { ...base, id: 'ending', itemId: 1, bidCount: 2, createdAt: 200, endTime: 11000 },
-        { ...base, id: 'other', itemId: 2, item: 'Other item', bidCount: 4, createdAt: 250, endTime: 15000 },
+        { ...base, id: 'other', dealMarketValueMeat: 50000, dealCheckedAt: new Date(now).toISOString(), itemId: 2, item: 'Other item', bidCount: 4, createdAt: 250, endTime: 15000 },
         { ...base, id: 'closed', itemId: 3, status: 'completed', bidCount: 99, createdAt: 500, endTime: 10500 },
         { ...base, id: 'pending', itemId: 4, status: 'pending_escrow' },
     ];
@@ -76,9 +76,9 @@ test('Explore selects a unique item after ranking the full pool for each tab, wi
 
 test('Explore does not truncate before deduplication and falls back to normalized item names', () => {
     const pool = [
-        ...Array.from({ length: 60 }, (_, i) => ({ ...base, id: `duplicate-${i}`, bidCount: 100 - i })),
+        ...Array.from({ length: 60 }, (_, i) => ({ ...base, id: `duplicate-${i}`, dealMarketValueMeat: 100000, dealCheckedAt: new Date(now).toISOString(), bidCount: 100 - i })),
         { ...base, id: 'name-variant', item: '  MR. ACCESSORY ', bidCount: 2 },
-        ...Array.from({ length: 30 }, (_, i) => ({ ...base, id: `unique-${i}`, item: `Item ${i}`, bidCount: 1 })),
+        ...Array.from({ length: 30 }, (_, i) => ({ ...base, id: `unique-${i}`, dealMarketValueMeat: 100000, dealCheckedAt: new Date(now).toISOString(), item: `Item ${i}`, bidCount: 1 })),
     ];
     assert.equal(exploreAuctions(pool, 'popular', now).length, 31);
     assert.equal(exploreAuctions(pool, 'popular', now)[0].id, 'duplicate-0');

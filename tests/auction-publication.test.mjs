@@ -4,15 +4,20 @@ import { buildSync } from 'esbuild';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import * as React from 'react';
+import { readFileSync } from 'node:fs';
+import * as itemCatalog from '../src/lib/itemCatalog.js';
+const catalogFixture = JSON.parse(readFileSync(new URL('../src/data/items.json', import.meta.url), 'utf8'));
 import * as router from 'react-router-dom';
 
+// Supply the catalog through its service boundary and execute its mount effect.
+// The controlled thenable makes the fixture ready before driving page handlers.
 // Drive the real page's handlers with a small hook harness; no live API or DOM.
 const { outputFiles } = buildSync({ stdin: { contents: `
     export { default as AuctionAnItem } from './src/pages/AuctionAnItem.jsx';
     export { UserContext } from './src/context/UserContext.jsx';
     export { AuctionsContext } from './src/context/AuctionsContext.jsx';
 `, resolveDir: fileURLToPath(new URL('../', import.meta.url)), loader: 'jsx' },
-    bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external', jsx: 'automatic',
+    bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external', external: ['../lib/itemCatalog'], jsx: 'automatic',
     define: { 'import.meta.env': '{}' }, loader: { '.gif': 'dataurl' },
 });
 let active;
@@ -23,10 +28,14 @@ function slot(initial) {
     return [harness.slots[index], value => { harness.slots[index] = typeof value === 'function' ? value(harness.slots[index]) : value; }];
 }
 const hooks = { ...React, useState: slot, useRef: value => slot({ current: value })[0],
-    useContext: context => active.contexts.get(context), useEffect() {}, useMemo: fn => fn(), useCallback: fn => fn, useDeferredValue: value => value };
+    useContext: context => active.contexts.get(context), useEffect(fn, deps) {
+        const [ran, setRan] = slot(false);
+        if (deps?.length === 0 && !ran) { setRan(true); fn(); }
+    }, useMemo: fn => fn(), useCallback: fn => fn, useDeferredValue: value => value };
 const compiled = { exports: {} };
 const requireModule = createRequire(import.meta.url);
 new Function('require', 'module', 'exports', outputFiles[0].text)(name => name === 'react' ? hooks
+    : name === '../lib/itemCatalog' ? { ...itemCatalog, createItemCatalogService: () => ({ load: () => ({ then: callback => callback(catalogFixture) }) }) }
     : name === 'react-router-dom' ? { ...router, useNavigate: () => active.navigate, useLocation: () => ({ hash: '' }) } : requireModule(name), compiled, compiled.exports);
 const { AuctionAnItem, UserContext, AuctionsContext } = compiled.exports;
 function nodes(element) {

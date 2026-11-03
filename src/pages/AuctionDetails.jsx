@@ -1,3 +1,4 @@
+import SavedAuctions from '../components/SavedAuctions';
 import RemainingTime from '../components/RemainingTime';
 import BidHistory from '../components/BidHistory';
 import AuctionLiveUnavailable from '../components/AuctionLiveUnavailable';
@@ -9,6 +10,7 @@ import { auctionQuantityLabel } from '../lib/bundles';
 import BundleContents from '../components/BundleContents';
 import AuctionEndedTime from '../components/AuctionEndedTime';
 import MarketPrice from '../components/MarketPrice';
+import BundleMarketPrice from '../components/BundleMarketPrice';
 import SellPrice from '../components/SellPrice';
 import BuyAuctionDetails from '../components/BuyAuctionDetails';
 import TradeTypeBadge from '../components/TradeTypeBadge';
@@ -70,8 +72,9 @@ export default function AuctionDetails() {
         <main className={`site-page-background flex-1 bg-[#F1F3F5] px-4 py-6 sm:px-6 ${auction.giveawayTitle ? 'giveaway-detail' : ''}`}>
             {auction.giveawayTitle && <div className="giveaway-page-art" aria-hidden="true"><GiveawayDecorations source={auction.image} /></div>}
             {backLink}
-            <div className={`mx-auto max-w-4xl rounded-lg border border-gray-200 bg-white p-4 shadow-lg sm:p-6 ${auction.giveawayTitle ? 'giveaway-detail-card' : ''}`}>
-                <section aria-label="Auction overview" className="grid min-w-0 grid-cols-1 items-start gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:gap-6">
+            <div className={`relative mx-auto max-w-4xl rounded-lg border border-gray-200 bg-white p-4 shadow-lg sm:p-6 ${auction.giveawayTitle ? 'giveaway-detail-card' : ''}`}>
+                <SavedAuctions auctionId={auction.id} />
+                <section aria-label="Auction overview" className="grid min-w-0 pr-8 grid-cols-1 items-start gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:gap-6">
                     <div className="flex min-w-0 items-center justify-center sm:pt-2">
                         {auction.image ? <AuctionItemImage key={auction.id} src={auction.giveawayTitle ? giveawayImage : auction.image} item={auction.item} enhanceEnabled /> : <p className="text-gray-500">No Image Available</p>}
                     </div>
@@ -95,7 +98,9 @@ export default function AuctionDetails() {
                                 </div>
                                 {closedSale && auction.instantPurchasedAt && <p className="text-sm leading-6 text-green-700">Buyout accepted for {result.finalPrice.toLocaleString('en-US')} Meat on <span className="inline-block whitespace-nowrap">{new Date(auction.instantPurchasedAt).toLocaleString()}.</span></p>}
                             </div>
-                            {!auction.isBundle && (active || result.status === 'completed') && <MarketPrice itemId={auction.itemId} auctionId={auction.id} completed={result.status === 'completed'} />}
+                            {(active || result.status === 'completed') && (auction.isBundle
+                                ? <BundleMarketPrice items={auction.bundleItems} completed={result.status === 'completed'} />
+                                : <MarketPrice itemId={auction.itemId} auctionId={auction.id} completed={result.status === 'completed'} />)}
                         </div>
                         {active && <InstantPurchaseAction key={`purchase-${auction.id}`} auction={auction} showTerms={false} />}
                         <div className="space-y-2 text-sm text-gray-700">

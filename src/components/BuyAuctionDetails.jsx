@@ -1,3 +1,4 @@
+import SavedAuctions from './SavedAuctions';
 import { useAuctionBoundaryNow } from '../hooks/useAuctionBoundaryNow';
 import RemainingTime from './RemainingTime';
 import AuctionEndedTime from './AuctionEndedTime';
@@ -98,14 +99,15 @@ export default function BuyAuctionDetails({ auction, backLink }) {
         try { await cancelAuction(auction.id); } catch (failure) { setError(failure.message); } finally { setPending(false); }
     }
     return <main className="site-page-background flex-1 bg-[#F1F3F5] px-4 py-6 sm:px-6">{backLink}
-        <div className="buy-auction-detail mx-auto max-w-4xl space-y-5 rounded-xl border border-[#E8DDD7] bg-[#FFFAF7] p-4 shadow-sm sm:p-6">
-            <header className="flex items-start gap-3 border-b border-[#E8DDD7] pb-4">
+        <div className="buy-auction-detail relative mx-auto max-w-4xl space-y-5 rounded-xl border border-[#E8DDD7] bg-[#FFFAF7] p-4 shadow-sm sm:p-6">
+            <header className="flex items-start gap-3 border-b border-[#E8DDD7] pb-4 pr-8">
                 {auction.image && <AuctionItemImage key={auction.id} src={auction.image} item={auction.item} compact />}
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                         <p className="text-xs text-[#64748B]">Buy Auction · #{auction.auctionNumber}</p>
                         <span aria-label="Auction status" className={`ml-auto max-w-full rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass}`}>{outcomeLabel}</span>
                     </div>
+                    <SavedAuctions auctionId={auction.id} />
                     <h1 className="buy-detail-title break-words text-2xl font-bold leading-tight text-[#172554]">{auction.item}</h1>
                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#64748B]">
                         <p>Requested by <SellerLink auction={auction} /></p>

@@ -137,8 +137,12 @@ export default function AllAuctions() {
                             onToggle={() => setFiltersOpen(previous => !previous)} />
                         <button type="button" aria-label="View all auctions" onClick={clearAdvancedFilters}
                             title="Reset search, sorting, and all filters"
-                            className="inline-flex h-9 w-36 shrink-0 items-center gap-2 whitespace-nowrap rounded border border-blue-700 bg-white px-3 text-sm font-semibold text-blue-700 hover:bg-blue-50">
-                            <span className="flex-1 text-center">View All</span>{cycleIcon}
+                            className="inline-flex h-9 w-36 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded border border-blue-700 bg-white px-3 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+                            <span>View All</span>
+                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0">
+                                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8m0-5v5h-5" />
+                                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16m5 0H3v5" />
+                            </svg>
                         </button>
                     </div>
                     {filtersOpen && <AuctionFilters id={filtersId} status={status} trade={trade} buyout={buyout} bundle={bundle} bounds={priceBounds} minPrice={minPrice} maxPrice={maxPrice}

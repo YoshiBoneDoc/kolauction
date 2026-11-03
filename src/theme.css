@@ -444,6 +444,8 @@ html[data-theme="dark"] .bundle-preview-back:hover { background-color: var(--the
   --profile-card: #FFFAF7;
   --profile-nested: #FFF7F2;
   --profile-hover: #FFF0E8;
+  --profile-tab-highlight: #FFE5CF;
+  --profile-tab-accent: #D97727;
   --profile-border: #EADBD3;
   --profile-divider: #EEE1DA;
   --profile-text: #202632;
@@ -460,6 +462,8 @@ html[data-theme="dark"] .profile-dashboard {
   --profile-card: #131e2f;
   --profile-nested: #1e2c40;
   --profile-hover: #293b52;
+  --profile-tab-highlight: #453023;
+  --profile-tab-accent: #F0A05A;
   --profile-border: #41516a;
   --profile-divider: #34455F;
   --profile-text: #e2e8f0;
@@ -928,3 +932,140 @@ html .admin-analytics-tabs button:focus-visible { outline: 2px solid #60a5fa; ou
 html .admin-analytics-tabs button:hover { border-color: transparent; }
 html .admin-analytics-tabs button[aria-current="page"] { border-color: var(--light-border, #d1d5db); }
 html[data-theme="dark"] .admin-analytics-tabs button[aria-current="page"] { border-color: var(--theme-border); background: var(--theme-raised); }
+
+/* Ribbon tabs stay transparent even under the dark theme's button defaults. */
+.auction-bookmark-tab,
+html[data-theme="dark"] .auction-bookmark-tab {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.profile-dashboard .profile-header-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--profile-muted);
+  font-size: 13px;
+  font-weight: 400;
+  text-decoration: none;
+}
+.profile-dashboard .profile-header-link:hover { color: var(--profile-blue); text-decoration: underline; }
+html[data-theme="dark"] .profile-dashboard button.profile-header-link { background: transparent; }
+
+.profile-dashboard .profile-seller-link {
+  min-height: 24px;
+  color: var(--profile-blue);
+}
+
+.profile-dashboard .profile-auction-tabs { border-bottom: 1px solid var(--profile-divider); }
+.profile-dashboard .profile-auction-tab {
+  min-height: 40px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 8px 6px;
+  color: var(--profile-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+.profile-dashboard .profile-auction-tab:hover { background: var(--profile-tab-highlight); color: var(--profile-text); }
+.profile-dashboard .profile-auction-tab[aria-selected="true"] {
+  background: var(--profile-tab-highlight);
+  color: var(--profile-text);
+  font-weight: 600;
+}
+.profile-dashboard .profile-history-tab {
+  min-height: 32px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 3px 0;
+  color: var(--profile-muted);
+  font-size: 12px;
+  font-weight: 400;
+  text-align: left;
+}
+.profile-dashboard .profile-history-tab:hover { background: var(--profile-tab-highlight); color: var(--profile-text); }
+.profile-dashboard .profile-history-tab[aria-selected="true"] { background: var(--profile-tab-highlight); color: var(--profile-text); font-weight: 600; }
+html[data-theme="dark"] .profile-dashboard :is(.profile-auction-tab, .profile-history-tab) { background: transparent; }
+.profile-dashboard :is(.profile-auction-tab, .profile-history-tab):focus {
+  outline: none;
+  box-shadow: none;
+}
+html[data-theme="dark"] .profile-dashboard :is(.profile-auction-tab, .profile-history-tab):is(:hover, [aria-selected="true"]),
+.profile-dashboard :is(.profile-auction-tab, .profile-history-tab):focus-visible {
+  background: var(--profile-tab-highlight);
+}
+.profile-dashboard :is(.profile-auction-tab, .profile-history-tab):focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-color: var(--profile-tab-accent);
+}
+.profile-dashboard .profile-saved-entry {
+  border: 1px solid var(--profile-divider);
+  border-radius: 9px;
+  background: var(--profile-nested);
+  padding: 10px 12px;
+}
+.profile-dashboard .profile-saved-entry select { max-width: 100%; }
+
+.profile-dashboard .profile-transaction-section.profile-transaction-embedded {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+
+.profile-dashboard .profile-relist-action {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #607a9e;
+  transition: color 150ms;
+}
+.profile-dashboard .profile-relist-action:hover { color: var(--profile-blue); }
+html[data-theme="dark"] .profile-dashboard .profile-relist-action { color: #9fb4d3; }
+html[data-theme="dark"] .profile-dashboard .profile-relist-action:hover { color: var(--profile-blue); }
+
+.profile-dashboard .profile-saved-entry { border-radius: 12px; padding: 12px; }
+.profile-dashboard .profile-saved-reminder { color: var(--profile-muted); }
+.profile-dashboard .profile-saved-reminder-select {
+  width: 210px;
+  max-width: 100%;
+  min-height: 36px;
+  appearance: none;
+  border: 0;
+  border-radius: 8px;
+  background: var(--profile-hover);
+  padding: 6px 25px 6px 34px;
+  color: var(--profile-text);
+  font-size: 12px;
+  cursor: pointer;
+}
+.profile-dashboard .profile-saved-remove,
+html[data-theme="dark"] .profile-dashboard .profile-saved-remove {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--profile-muted);
+}
+.profile-dashboard .profile-saved-remove:hover { color: var(--profile-blue); }
+
+/* Inner tabs stay unfilled; their active state is a thin underline. */
+.profile-dashboard .profile-history-tab,
+.profile-dashboard .profile-history-tab:is(:hover, :focus-visible, [aria-selected="true"]),
+html[data-theme="dark"] .profile-dashboard .profile-history-tab:is(:hover, :focus-visible, [aria-selected="true"]) {
+  background: transparent;
+}
+.profile-dashboard .profile-history-tab {
+  border-bottom: 2px solid transparent;
+}
+.profile-dashboard .profile-history-tab[aria-selected="true"] { border-bottom-color: var(--profile-tab-accent); }
+.profile-dashboard .profile-history-tab:focus-visible { text-decoration: underline; }
+/* Keep the browser from choosing a disappearing row as its scroll anchor. */
+.profile-dashboard section[aria-label="Your auctions and bids"] { overflow-anchor: none; }

@@ -8,7 +8,7 @@ function savedTab() {
     try {
         const saved = window.sessionStorage.getItem(storageKey);
         if (exploreAuctionTabs.some(tab => tab.id === saved)) return saved;
-    } catch { /* Storage may be unavailable; Popular remains the default. */ }
+    } catch { /* Storage may be unavailable; Hidden Gems remains the default. */ }
     return 'popular';
 }
 
@@ -44,6 +44,7 @@ export default function ExploreAuctions({ auctions, sections, now, children }) {
                 className="explore-auction-tab bg-transparent">{option.label}</button>)}
         </div>}>
         {children}
+        {selected === 'popular' && displayed.length === 0 && <p className="text-sm text-gray-500">No qualifying Hidden Gems right now. Try New or Ending Soon.</p>}
     </StaticAuctionStrip>;
 }
 ExploreAuctions.propTypes = { auctions: PropTypes.arrayOf(PropTypes.object).isRequired,

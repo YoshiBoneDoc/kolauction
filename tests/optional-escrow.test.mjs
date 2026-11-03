@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 import * as router from 'react-router-dom';
 import { createAuctionService } from '../src/lib/auctions.js';
 
+// These server-render tests supply authorized history at the hook boundary.
+// Real async history fetching/pagination/auth clearing is covered by bid-history-refresh.test.mjs.
 const { outputFiles } = buildSync({ stdin: { contents: `
     import React from 'react';
     import { renderRouteMarkup as renderToStaticMarkup } from './tests/helpers/renderRouteMarkup.mjs';
@@ -18,12 +20,12 @@ const { outputFiles } = buildSync({ stdin: { contents: `
             <AuctionsContext.Provider value={{auctions:[],...context}}><App /></AuctionsContext.Provider>
         </UserContext.Provider></StaticRouter>);
     }`, resolveDir: fileURLToPath(new URL('../', import.meta.url)), loader: 'jsx' },
-    bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external', jsx: 'automatic',
+    bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external', external: ['../hooks/useBidHistory'], jsx: 'automatic',
     define: { 'import.meta.env': '{}' }, loader: { '.gif': 'dataurl', '.css': 'empty' },
 });
 const compiled = { exports: {} };
 const requireModule = createRequire(import.meta.url);
-new Function('require', 'module', 'exports', outputFiles[0].text)(name => name === 'react-router-dom' ? router : requireModule(name), compiled, compiled.exports);
+new Function('require', 'module', 'exports', outputFiles[0].text)(name => name === '../hooks/useBidHistory' ? (auction => ({ bids: auction.bids || [], loading: false, hasMore: false })) : name === 'react-router-dom' ? router : requireModule(name), compiled, compiled.exports);
 const { render } = compiled.exports;
 const auction = { id:'direct', auctionNumber:'1234', sellerId:'seller', owner:'Seller', item:'Test item', quantity:2,
     minBidMeat:100, currentBid:500, endTime:1, bids:[], escrowMode:false, status:'awaiting_trade',

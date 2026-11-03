@@ -34,7 +34,7 @@ export default function IgnoreList() {
         finally { setPending(false); }
     }
     return <>
-        <button type="button" onClick={open} disabled={!supabase} className="ml-auto text-[13px] underline whitespace-nowrap">Ignore list</button>
+        <button type="button" onClick={open} disabled={!supabase} className="profile-header-link whitespace-nowrap">Ignore list</button>
         <dialog ref={dialog} aria-labelledby="ignore-list-title" className="profile-panel profile-text w-[min(440px,90vw)] max-h-[80vh] overflow-auto backdrop:bg-black/60">
             <div className="flex items-center justify-between gap-4">
                 <h2 id="ignore-list-title" className="font-semibold">Your ignore list</h2>

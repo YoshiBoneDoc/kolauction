@@ -161,10 +161,7 @@ test('profile transaction cards use two compact rows without progress bars', () 
         bids: [],
     };
     const html = render({ page: 'profile', userId: 'seller', auctions: [buyOrder] });
-    const mobileStart = html.indexOf('<div class="lg:hidden space-y-[18px]">');
-    const buySectionStart = html.indexOf('<section class="profile-transaction-section">', mobileStart);
-    const buySectionEnd = html.indexOf('</section>', buySectionStart);
-    const buySection = html.slice(buySectionStart, buySectionEnd);
+    const buySection = profileSection(html, 'Buy order fulfillments');
     assert.match(buySection, /Test item[\s\S]*?× 500/);
     assert.match(buySection.replace(/<[^>]+>/g, ''), /Buy order · Escrow/);
     assert.match(buySection, /200 Meat\/item · Earned: <strong>100k Meat<\/strong>/);
@@ -191,15 +188,7 @@ test('profile limits active and historical lists while keeping pending entries v
     const html = render({ page: 'profile', userId: 'seller', auctions: [...activeListings, ...activeBids, ...listingHistory, ...bidHistory] });
     assert.match(html, /Show 3 more ↓/); // 13 active listings: initial 10.
     assert.match(html, /Show 2 more ↓/); // 12 active bids and 7 listing-history entries.
-    const mobileStart = html.indexOf('<div class="lg:hidden space-y-[18px]">');
-    const desktopStart = html.indexOf('<div class="hidden grid-cols-2 items-start gap-[18px] lg:grid">');
-    const mobileSections = html.slice(mobileStart, desktopStart);
-    const visibleCount = title => {
-        const titlePosition = mobileSections.indexOf(`>${title}</h2>`);
-        const sectionStart = mobileSections.lastIndexOf('<section class="profile-transaction-section">', titlePosition);
-        const sectionEnd = mobileSections.indexOf('</section>', titlePosition);
-        return (mobileSections.slice(sectionStart, sectionEnd).match(/<article\b/g) || []).length;
-    };
+    const visibleCount = title => (profileSection(html, title).match(/<article\b/g) || []).length;
     assert.equal(visibleCount('Active listings'), 10);
     assert.equal(visibleCount('Active bids'), 10);
     assert.equal(visibleCount('Listing history'), 5);
@@ -209,21 +198,19 @@ test('profile limits active and historical lists while keeping pending entries v
         ...auction, id: `pending-${index}`, sellerId: 'seller', status: 'pending_escrow', bids: [],
     }));
     const pendingHtml = render({ page: 'profile', userId: 'seller', auctions: pending });
-    assert.match(pendingHtml, /Awaiting escrow deposit/);
+    assert.match(pendingHtml, /Awaiting item deposit/);
     assert.doesNotMatch(pendingHtml, /Show \d+ more/);
-    const pendingMobileStart = pendingHtml.indexOf('<div class="lg:hidden space-y-[18px]">');
-    const pendingDesktopStart = pendingHtml.indexOf('<div class="hidden grid-cols-2 items-start gap-[18px] lg:grid">');
-    assert.equal((pendingHtml.slice(pendingMobileStart, pendingDesktopStart).match(/<article\b/g) || []).length, 12);
+    assert.equal((profileSection(pendingHtml, 'Awaiting escrow deposit').match(/<article\b/g) || []).length, 12);
 });
 
 test('profile sections use independent accessible collapse controls and omit escrow delivery queue', () => {
     const html = render({ page: 'profile', userId: 'seller', auctions: [] });
     assert.doesNotMatch(html, /Sending escrow deliveries/);
-    assert.match(html, /aria-label="Collapse Buy order fulfillments" aria-expanded="true"/);
+    assert.match(html, /aria-label="Collapse Listing history" aria-expanded="true"/);
     assert.match(html, /aria-label="Collapse Active bids" aria-expanded="true"/);
     assert.match(html, /profile-count-chevron/);
-    assert.equal((html.match(/aria-label="Collapse [^"]+" aria-expanded="true"/g) || []).length, 14);
-    assert.equal((html.match(/Nothing here yet\./g) || []).length, 14);
+    assert.equal((html.match(/aria-label="Collapse [^"]+" aria-expanded="true"/g) || []).length, 4);
+    assert.equal((html.match(/Nothing here yet\./g) || []).length, 5);
 });
 
 test('active bids and bid history outcomes use persisted bidder and winner IDs', () => {
@@ -254,23 +241,19 @@ test('active bids and bid history outcomes use persisted bidder and winner IDs',
     assert.doesNotMatch(html, /Winner: <a[^>]*>seller<\/a>/);
 });
 
-test('profile keeps all transaction sections in reading order on mobile and independent columns on desktop', () => {
+test('profile renders each section once in responsive tab columns with attention above the table', () => {
     const html = render({ page: 'profile', userId: 'seller', auctions: [] });
-    const mobileStart = html.indexOf('<div class="lg:hidden space-y-[18px]">');
-    const desktopStart = html.indexOf('<div class="hidden grid-cols-2 items-start gap-[18px] lg:grid">');
-    assert.ok(mobileStart >= 0 && desktopStart > mobileStart);
-    assert.match(html, /flex min-w-0 flex-col gap-\[18px\]/);
-    const mobileSections = html.slice(mobileStart, desktopStart);
-    const sectionTitles = [
-        'Buy order fulfillments', 'Awaiting escrow deposit',
-        'Awaiting settlement', 'Active listings', 'Active bids', 'Listing history', 'Bid history',
-    ];
-    let previous = -1;
-    for (const title of sectionTitles) {
-        const position = mobileSections.indexOf(`>${title}</h2>`);
-        assert.ok(position > previous, `${title} should remain in original mobile reading order`);
-        previous = position;
+    assert.match(html, /role="tablist" aria-label="Account auctions"/);
+    assert.match(html, /grid items-start gap-3 lg:grid-cols-2/);
+    const tableStart = html.indexOf('aria-label="Your auctions and bids"');
+    assert.ok(tableStart >= 0);
+    assert.doesNotMatch(html, /aria-label="Auctions needing attention"/);
+    for (const title of ['Buy order fulfillments', 'Active listings', 'Active bids', 'Listing history', 'Bid history']) {
+        assert.equal(html.split(`>${title}</h2>`).length - 1, 1, `${title} should have a single responsive section`);
     }
+    const auctionsPanel = html.slice(html.indexOf('id="profile-panel-auctions"'), html.indexOf('id="profile-panel-bids"'));
+    assert.ok(auctionsPanel.indexOf('Active listings') < auctionsPanel.indexOf('Listing history'));
+    assert.match(auctionsPanel, /Buy order fulfillments/);
 });
 
 
@@ -360,9 +343,10 @@ test('escrow outcomes explain automatic deposit expiry without claiming a seller
 });
 
 function profileSection(html, title) {
-    const mobile = html.slice(html.indexOf('<div class="lg:hidden'), html.indexOf('<div class="hidden grid-cols-2'));
-    const heading = mobile.indexOf(`>${title}</h2>`);
-    return mobile.slice(mobile.lastIndexOf('<section', heading), mobile.indexOf('</section>', heading));
+    const label = title === 'Awaiting escrow deposit' ? 'Awaiting item deposit' : title;
+    const heading = html.indexOf(`>${label}</h2>`);
+    assert.ok(heading >= 0, `Missing section ${title}`);
+    return html.slice(html.lastIndexOf('<section', heading), html.indexOf('</section>', heading));
 }
 
 test('account bids consolidate by auction identity and show only the latest personal bid per row', () => {
@@ -396,4 +380,21 @@ test('listing history sorts by most recent conclusion and applies direction/outc
     assert.match(section, /profile-entry-status is-expired">Expired/);
     assert.match(profileSection(html, 'Bid history'), />Ended Auctions<\/span>/);
     assert.doesNotMatch(profileSection(html, 'Active listings'), /profile-history-entry/);
+});
+
+test('attention rows are full-width, grouped once per nonempty category, and absent when empty', () => {
+    const deposits = Array.from({length:3}, (_,i) => ({...auction,id:`deposit-${i}`,sellerId:'seller',status:'pending_escrow',bids:[]}));
+    const settlement = {...auction,id:'settlement',sellerId:'seller',status:'awaiting_trade',hasWinner:true,winnerId:'buyer'};
+    const html = render({page:'profile',userId:'seller',auctions:[...deposits,settlement]});
+    const start = html.indexOf('aria-label="Auctions needing attention"');
+    const end = html.indexOf('aria-label="Your auctions and bids"');
+    assert.ok(start >= 0 && end > start);
+    const attention = html.slice(start,end);
+    assert.equal((attention.match(/>Awaiting item deposit<\/h2>/g)||[]).length,1);
+    assert.equal((attention.match(/>Awaiting settlement<\/h2>/g)||[]).length,1);
+    assert.equal((attention.match(/<article\b/g)||[]).length,4);
+    assert.doesNotMatch(attention,/lg:grid-cols-2|<summary|View details/);
+    const depositsOnly = render({page:'profile',userId:'seller',auctions:deposits});
+    assert.doesNotMatch(depositsOnly,/>Awaiting settlement<\/h2>/);
+    assert.doesNotMatch(render({page:'profile',userId:'seller',auctions:[]}),/aria-label="Auctions needing attention"/);
 });

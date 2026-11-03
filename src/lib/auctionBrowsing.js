@@ -1,3 +1,4 @@
+import { minimumAuctionBid } from './bidIncrements.js';
 export { auctionPrice } from './auctionPriceRange.js';
 import { auctionPrice, auctionFilterPrice } from './auctionPriceRange.js';
 import { getAuctionStatus, isAbandonedEscrowDraft } from './auctionLifecycle.js';
@@ -15,6 +16,7 @@ export const auctionSorts = [
     ['ending', 'Ending soon'],
     ['ended-desc', 'Recently ended'],
     ['newest', 'Newest'],
+    ['best-value', 'Best value'],
     ['price-asc', 'Price: low to high'],
     ['price-desc', 'Price: high to low'],
     ['bids-desc', 'Most bids'],
@@ -65,8 +67,10 @@ export function browseAuctions(auctions, { search = '', status = 'active', sort 
         }
         if (sort === 'recommended') {
             const urgent = auction => getAuctionStatus(auction, now) === 'active' && auction.endTime > now && auction.endTime - now <= 10800000;
-            comparison = Number(urgent(b)) - Number(urgent(a)) || (urgent(a) && urgent(b) ? a.endTime - b.endTime : b.createdAt - a.createdAt);
+            comparison = Number(activeGiveaway(b, now)) - Number(activeGiveaway(a, now))
+                || Number(urgent(b)) - Number(urgent(a)) || (urgent(a) && urgent(b) ? a.endTime - b.endTime : 0) || compareDeals(a, b, now);
         }
+        if (sort === 'best-value') comparison = Number(activeGiveaway(b, now)) - Number(activeGiveaway(a, now)) || compareDeals(a, b, now);
         if (sort === 'newest') comparison = b.createdAt - a.createdAt;
         if (sort === 'ending') comparison = a.endTime - b.endTime;
         if (sort === 'ended-desc') {
@@ -87,7 +91,7 @@ export function popularActiveAuctions(auctions, now = Date.now()) {
 }
 
 export const exploreAuctionTabs = [
-    { id: 'popular', label: 'Popular', sort: 'bids-desc' },
+    { id: 'popular', label: 'Hidden Gems', sort: 'best-value' },
     { id: 'new', label: 'New', sort: 'newest' },
     { id: 'ending', label: 'Ending Soon', sort: 'ending' },
 ];
@@ -97,6 +101,7 @@ export function exploreAuctions(auctions, tab = 'popular', now = Date.now()) {
     const { sort } = exploreAuctionTabs.find(option => option.id === tab) || exploreAuctionTabs[0];
     const seen = new Set();
     return browseAuctions(auctions, { sort, now }).filter(auction => {
+        if (sort === 'best-value' && !auction.giveawayTitle && dealScore(auction, now) <= 0) return false;
         const key = auction.itemId != null ? `id:${auction.itemId}` : `name:${auction.item.trim().toLocaleLowerCase()}`;
         if (seen.has(key)) return false;
         seen.add(key);
@@ -137,4 +142,25 @@ export function highRollerAuctions(auctions, now = Date.now()) {
                 || Number(bSoon) - Number(aSoon) || (aSoon && bSoon ? a.endTime - b.endTime : 0)
                 || highRollerValue(b) - highRollerValue(a) || String(a.id).localeCompare(String(b.id));
         });
+}
+
+// Public reference data only; never used to authorize a bid or fulfillment.
+export function dealScore(auction, now = Date.now()) {
+    const market = auction.dealMarketValueMeat;
+    const checked = Date.parse(auction.dealCheckedAt);
+    if (auction.giveawayTitle || auction.status !== 'active' || auction.endTime <= now
+        || !(market > 0) || !Number.isFinite(checked) || checked > now || now - checked >= 86400000) return 0;
+    const buy = auction.auctionKind === 'buy';
+    const price = buy ? auction.pricePerItem : minimumAuctionBid(auction);
+    if (price == null) return 0;
+    const saving = buy ? price - market : market - price;
+    return saving >= 10000 && saving / market >= 0.05 ? saving / market : 0;
+}
+function compareDeals(a, b, now) {
+    const left = dealScore(a, now), right = dealScore(b, now);
+    return right - left || (left > 0 && right > 0 ? a.endTime - b.endTime : 0) || b.createdAt - a.createdAt;
+}
+
+function activeGiveaway(auction, now) {
+    return Boolean(auction.giveawayTitle) && auction.status === 'active' && auction.endTime > now;
 }

@@ -8,11 +8,13 @@ import { StaticRouter } from 'react-router-dom';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createAuctionService } from '../src/lib/auctions.js';
 
-const {outputFiles}=buildSync({stdin:{contents:`export {default as BuyAuctionDetails} from './src/components/BuyAuctionDetails.jsx';export {UserContext} from './src/context/UserContext.jsx';export {AuctionsContext} from './src/context/AuctionsContext.jsx';`,resolveDir:fileURLToPath(new URL('../',import.meta.url)),loader:'jsx'},bundle:true,write:false,platform:'node',format:'cjs',packages:'external',jsx:'automatic',define:{'import.meta.env':'{}'}});
+// Drive the component clock explicitly; the page no longer accepts a now prop.
+// Keep hook state faithful to React by evaluating lazy initializers.
+const {outputFiles}=buildSync({stdin:{contents:`export {default as BuyAuctionDetails} from './src/components/BuyAuctionDetails.jsx';export {UserContext} from './src/context/UserContext.jsx';export {AuctionsContext} from './src/context/AuctionsContext.jsx';`,resolveDir:fileURLToPath(new URL('../',import.meta.url)),loader:'jsx'},bundle:true,write:false,platform:'node',format:'cjs',packages:'external',external:['../hooks/useAuctionBoundaryNow','./SavedAuctions'],jsx:'automatic',define:{'import.meta.env':'{}'}});
 let active;
-function state(initial){const h=active,i=h.cursor++;if(!(i in h.slots))h.slots[i]=initial;return [h.slots[i],next=>{h.slots[i]=typeof next==='function'?next(h.slots[i]):next;}];}
+function state(initial){const h=active,i=h.cursor++;if(!(i in h.slots))h.slots[i]=typeof initial==='function'?initial():initial;return [h.slots[i],next=>{h.slots[i]=typeof next==='function'?next(h.slots[i]):next;}];}
 const compiled={exports:{}};const require=createRequire(import.meta.url);
-new Function('require','module','exports',outputFiles[0].text)(name=>name==='react'?{...React,useState:state,useRef:initial=>state({current:initial})[0],useEffect(){},useContext:context=>active.contexts.get(context)}:require(name),compiled,compiled.exports);
+new Function('require','module','exports',outputFiles[0].text)(name=>name==='react'?{...React,useState:state,useRef:initial=>state({current:initial})[0],useEffect(){},useContext:context=>active.contexts.get(context)}:name==='./SavedAuctions'?()=>null:name==='../hooks/useAuctionBoundaryNow'?{useAuctionBoundaryNow:()=>active.now}:require(name),compiled,compiled.exports);
 const {BuyAuctionDetails,UserContext,AuctionsContext}=compiled.exports;
 function nodes(tree){return !tree||typeof tree!=='object'?[]:[tree,...React.Children.toArray(tree.props?.children).flatMap(nodes)];}
 const readable = html => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
