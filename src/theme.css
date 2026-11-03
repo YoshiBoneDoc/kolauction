@@ -444,7 +444,7 @@ html[data-theme="dark"] .bundle-preview-back:hover { background-color: var(--the
   --profile-card: #FFFAF7;
   --profile-nested: #FFF7F2;
   --profile-hover: #FFF0E8;
-  --profile-tab-highlight: #FFE5CF;
+  --profile-tab-highlight: #FFEEDF;
   --profile-tab-accent: #D97727;
   --profile-border: #EADBD3;
   --profile-divider: #EEE1DA;
@@ -462,7 +462,7 @@ html[data-theme="dark"] .profile-dashboard {
   --profile-card: #131e2f;
   --profile-nested: #1e2c40;
   --profile-hover: #293b52;
-  --profile-tab-highlight: #453023;
+  --profile-tab-highlight: #352A24;
   --profile-tab-accent: #F0A05A;
   --profile-border: #41516a;
   --profile-divider: #34455F;
@@ -1032,14 +1032,33 @@ html[data-theme="dark"] .profile-dashboard :is(.profile-auction-tab, .profile-hi
 html[data-theme="dark"] .profile-dashboard .profile-relist-action { color: #9fb4d3; }
 html[data-theme="dark"] .profile-dashboard .profile-relist-action:hover { color: var(--profile-blue); }
 
-.profile-dashboard .profile-saved-entry { border-radius: 12px; padding: 12px; }
+.profile-dashboard .profile-saved-entry {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 12px;
+  border-radius: 8px;
+  padding: 5px 12px;
+}
+.profile-dashboard .profile-saved-entry .profile-entry-image {
+  position: static;
+  grid-column: 1;
+  grid-row: 1;
+  transform: none;
+}
+.profile-dashboard .profile-saved-row-details { grid-column: 2; }
+.profile-dashboard .profile-saved-row-controls { grid-column: 3; }
+@media (max-width: 767px) {
+  .profile-dashboard .profile-saved-entry { grid-template-columns: 32px minmax(0, 1fr); }
+  .profile-dashboard .profile-saved-row-controls { grid-column: 1 / -1; justify-self: end; }
+}
 .profile-dashboard .profile-saved-reminder { color: var(--profile-muted); }
 .profile-dashboard .profile-saved-reminder-select {
   width: 210px;
   max-width: 100%;
   min-height: 36px;
   appearance: none;
-  border: 0;
+  border: 1px solid var(--profile-tab-accent);
   border-radius: 8px;
   background: var(--profile-hover);
   padding: 6px 25px 6px 34px;
@@ -1052,9 +1071,9 @@ html[data-theme="dark"] .profile-dashboard .profile-saved-remove {
   border: 0;
   background: transparent;
   padding: 0;
-  color: var(--profile-muted);
+  color: #EF4444;
 }
-.profile-dashboard .profile-saved-remove:hover { color: var(--profile-blue); }
+.profile-dashboard .profile-saved-remove:hover { color: #EF4444; }
 
 /* Inner tabs stay unfilled; their active state is a thin underline. */
 .profile-dashboard .profile-history-tab,
@@ -1069,3 +1088,42 @@ html[data-theme="dark"] .profile-dashboard .profile-history-tab:is(:hover, :focu
 .profile-dashboard .profile-history-tab:focus-visible { text-decoration: underline; }
 /* Keep the browser from choosing a disappearing row as its scroll anchor. */
 .profile-dashboard section[aria-label="Your auctions and bids"] { overflow-anchor: none; }
+
+.profile-dashboard .profile-attention-group .profile-entry-status {
+  font-size: 13px;
+  line-height: 18px;
+}
+
+/* Deep red ribbon with a pale interior on hover or when bookmarked. */
+.auction-bookmark-tab { --auction-bookmark-fill: #B51D3B; }
+.auction-bookmark-tab:is(:hover, :focus-visible, [aria-pressed="true"]) {
+  --auction-bookmark-fill: #F7CBD3;
+}
+.auction-bookmark-tab svg { transition: fill 150ms ease; }
+
+.profile-dashboard .profile-saved-default { background: transparent; }
+.profile-dashboard .profile-saved-default-select { width: clamp(100px, 24vw, 210px); min-height: 30px; padding: 4px 24px 4px 10px; }
+.profile-dashboard .profile-saved-apply,
+html[data-theme="dark"] .profile-dashboard .profile-saved-apply {
+  width: auto;
+  white-space: nowrap;
+  min-height: 16px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--profile-blue);
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+}
+.profile-dashboard .profile-saved-apply:hover:not(:disabled) { color: var(--profile-blue); text-decoration: underline; }
+.profile-dashboard .profile-saved-apply:disabled { opacity: .5; cursor: default; }
+
+.profile-dashboard :is(.profile-saved-reminder-select, .profile-saved-apply):focus-visible {
+  outline: 2px solid var(--profile-tab-accent);
+  outline-offset: 2px;
+}
+
+html[data-theme="dark"] .profile-dashboard .profile-saved-apply { color: var(--profile-blue); }
+html[data-theme="dark"] .profile-dashboard .profile-saved-apply:hover:not(:disabled) { color: var(--profile-blue); }

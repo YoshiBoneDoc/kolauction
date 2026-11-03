@@ -11,7 +11,7 @@ test('saved auctions read and write only through owner-scoped RPCs and all reque
     assert.equal((await service.read('auction'))[0].id, 'auction');
     await service.set('auction', true, 15);await service.set('auction', false);
     assert.deepEqual(calls[1], ['set_saved_auction', { p_id: 'auction', p_saved: true, p_minutes: 15, p_time_zone: 'America/New_York' }]);
-    assert.deepEqual(calls[2][1], { p_id: 'auction', p_saved: false, p_minutes: 0, p_time_zone: 'America/New_York' });
+    assert.deepEqual(calls[2][1], { p_id: 'auction', p_saved: false, p_minutes: null, p_time_zone: 'America/New_York' });
     await assert.rejects(service.set('auction', true, 7));assert.equal(calls.length, 3);
 });
 test('unavailable reads are not displayed as empty successful saved lists; errors do not expose database details', async () => {

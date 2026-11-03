@@ -61,9 +61,12 @@ export function createCompletedMarketPriceService(client, now = Date.now) {
         valid: id => typeof id === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(id) });
 }
 
-export function marketPriceDisplay(record, now = Date.now()) {
+export function marketPriceDisplay(record, now = Date.now(), quantity = 1) {
     if (!record?.available || !Number.isSafeInteger(record.price_meat) || record.price_meat <= 0) return { text: 'Market price unavailable', stale: false };
-    return { text: `Market Value: ${record.price_meat.toLocaleString('en-US')} Meat per item`,
+    const unit = `${record.price_meat.toLocaleString('en-US')} Meat per item`;
+    const value = Number.isSafeInteger(quantity) && quantity > 1
+        ? `${(BigInt(record.price_meat) * BigInt(quantity)).toLocaleString('en-US')} Meat total · ${unit}` : unit;
+    return { text: `Market Value: ${value}`,
         stale: Boolean(record.readFailed) || !Number.isFinite(Date.parse(record.checked_at)) || (Number.isFinite(Date.parse(record.captured_at)) ? Date.parse(record.captured_at) : now) - Date.parse(record.checked_at) >= DAY };
 }
 

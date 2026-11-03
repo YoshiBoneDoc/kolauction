@@ -100,7 +100,7 @@ export default function AuctionDetails() {
                             </div>
                             {(active || result.status === 'completed') && (auction.isBundle
                                 ? <BundleMarketPrice items={auction.bundleItems} completed={result.status === 'completed'} />
-                                : <MarketPrice itemId={auction.itemId} auctionId={auction.id} completed={result.status === 'completed'} />)}
+                                : <MarketPrice itemId={auction.itemId} auctionId={auction.id} quantity={auction.quantity} completed={result.status === 'completed'} />)}
                         </div>
                         {active && <InstantPurchaseAction key={`purchase-${auction.id}`} auction={auction} showTerms={false} />}
                         <div className="space-y-2 text-sm text-gray-700">

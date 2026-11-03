@@ -24,7 +24,7 @@ const auctionTypeComparison = [
     },
     {
         heading: 'FEES',
-        escrow: 'Fees range from 1-5%, decreasing for higher-value sales. See chart below for full details. No sale, no fee.',
+        escrow: 'The original fee schedule ranges from 1–5%. A temporary promotion may waive or reduce fees; see current terms below. No sale, no fee.',
         direct: 'No commission. Optional tips are appreciated.',
     },
     {
@@ -269,6 +269,10 @@ const InfoPage = () => {
                     <section aria-labelledby="escrow-fees-title" className="min-w-0">
                         <h2 id="escrow-fees-title" className={`${sectionHeadingClass} mb-2 scroll-mt-4`}>Escrow Fees</h2>
                         <div className="mb-3 space-y-1.5 leading-5">
+                            <p className="text-green-800"><strong>Thanksgiving Promo:</strong></p>
+                            <p className="text-green-800">For the month of November, escrow trades are commission-free as long as you&apos;ve completed less than 20m Meat in escrow trades. If you&apos;re still below 20m, your next trade is entirely free, regardless of its value.</p>
+                            <p className="text-green-800">After that, fees are 2% on the first 1b Meat and 1% on anything above 1b.</p>
+                            <p className="pt-6"><em>The text below applies to the normal fee structure and isn&apos;t applicable during this promo</em></p>
                             <p><strong>Selling:</strong> A tiered commission is deducted from your final sale proceeds. Each rate applies only to the portion of the sale within that tier.</p>
                             <p><strong>Buying:</strong> Fees are calculated per item and paid by the buyer. Sellers receive the full listed price.</p>
                             <p><strong>Where do the fees go?</strong> Commissions help support the time and effort that goes into developing, improving, and maintaining kHub. A portion also goes back into the community through <Link to="/giveaways" className="text-blue-700 underline">giveaways</Link>.</p>
@@ -324,7 +328,7 @@ const InfoPage = () => {
                     <h2 id="brief-history-title" className={`${sectionHeadingClass} mb-2 text-center`}>A Brief History</h2>
                     <ul className="list-disc space-y-2 pl-5">
                         <li>October 19, 2026 - Official launch of kHub.</li>
-                        <li>Friday, October 30, 2026, 01:02AM - The first '<Link to="/giveaways" className="text-blue-700 underline dark:text-blue-300">Meat Stack Mania</Link>' was held.</li>
+                        <li>Friday, October 30, 2026, 01:02AM - The first &apos;<Link to="/giveaways" className="text-blue-700 underline dark:text-blue-300">Meat Stack Mania</Link>&apos; was held.</li>
                     </ul>
                 </section>
 

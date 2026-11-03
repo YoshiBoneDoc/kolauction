@@ -110,7 +110,7 @@ const Profile = () => {
         const isCollapsed = collapsedSections[title] === true;
 
         return (
-            <section key={title} className={`profile-transaction-section${embedded ? ' profile-transaction-embedded' : ''}`}>
+            <section key={title} className={`profile-transaction-section${embedded ? ' profile-transaction-embedded' : ''}${compact ? ' profile-attention-group' : ''}`}>
                 {embedded && !compact ? <h2 className="sr-only">{title}</h2> : <div className={`flex items-center justify-between gap-3 border-b profile-divider ${compact ? 'pb-1.5' : 'pb-3'}`}>
                     <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
                         <h2 className="text-[17px] font-semibold profile-text">{compact && title === 'Awaiting escrow deposit' ? 'Awaiting item deposit' : title}</h2>

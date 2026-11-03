@@ -1,3 +1,4 @@
+import useEscrowFeePreview from '../hooks/useEscrowFeePreview';
 import ListingPriceInputs from '../components/ListingPriceInputs';
 import useListingPrice from '../hooks/useListingPrice';
 import { canRelist, relistDraft } from '../lib/relistAuction';
@@ -5,7 +6,6 @@ import { createMarketPriceService } from '../lib/marketPrices';
 import BundleContents from '../components/BundleContents';
 import { prepareBundle, bundleCover, bundleTitle, normalizeBundleTitle, MAX_BUNDLE_ITEMS, MAX_BUNDLE_TITLE_LENGTH } from '../lib/bundles';
 import { effectiveFeePercent, feeLabel } from '../lib/feeDisplay';
-import { escrowFee } from '../lib/escrowFees';
 import { buyFunding } from '../lib/buyOrders';
 import TradeTypeBadge from '../components/TradeTypeBadge';
 import { useState, useContext, useDeferredValue, useEffect, useMemo, useRef } from 'react';
@@ -74,6 +74,7 @@ export default function AuctionAnItem() {
     const [bundleTitleConflict, setBundleTitleConflict] = useState(false);
     const bundleTitleInput = useRef(null);
     const [preview, setPreview] = useState(null);
+    const { fee: previewFee } = useEscrowFeePreview(preview?.minBidMeat, Boolean(preview?.escrowMode && preview?.auctionKind !== 'buy'));
     const [giveaway, setGiveaway] = useState(false);
     const [giveawayCondition, setGiveawayCondition] = useState('last_bid');
     const [giveawayTitle, setGiveawayTitle] = useState('Meat Stack Mania');
@@ -297,9 +298,9 @@ export default function AuctionAnItem() {
                             <dd className="min-w-0 break-words text-right font-medium tabular-nums text-gray-900">{preview.customEndAt ? formatAuctionEnd(preview.customEndAt) : `${preview.auctionTime} hours`}</dd>
                         </div>
                         {preview.auctionKind === 'buy' && <>{[['Purchase funds',buyFunding(preview.minBidMeat, preview.quantity).purchase],[`Commission reserve (${effectiveFeePercent(buyFunding(preview.minBidMeat, preview.quantity).feeReserve, BigInt(preview.minBidMeat) * BigInt(preview.quantity))})`,buyFunding(preview.minBidMeat, preview.quantity).feeReserve],['Required deposit, including fee reserve',buyFunding(preview.minBidMeat, preview.quantity).total]].map(([label,value]) => <div key={label} className="flex justify-between gap-3 py-3"><dt>{label}</dt><dd className="text-right font-semibold">{value.toLocaleString('en-US')} Meat</dd></div>)}</>}
-                    {preview.auctionKind !== 'buy' && preview.escrowMode && <div className={`${preview.bundleItems ? 'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3' : 'flex justify-between gap-3'} py-3`}><dt>{preview.bundleItems ? <>Estimated fee <span className="block text-xs font-normal text-gray-500">At minimum bid · {effectiveFeePercent(escrowFee(preview.minBidMeat), preview.minBidMeat)}</span></> : `Estimated ${feeLabel(escrowFee(preview.minBidMeat), preview.minBidMeat)} at minimum bid`}</dt><dd className="shrink-0 text-right font-semibold tabular-nums">{escrowFee(preview.minBidMeat).toLocaleString('en-US')} Meat</dd></div>}
+                    {preview.auctionKind !== 'buy' && preview.escrowMode && previewFee !== null && <div className={`${preview.bundleItems ? 'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3' : 'flex justify-between gap-3'} py-3`}><dt>{preview.bundleItems ? <>Estimated fee <span className="block text-xs font-normal text-gray-500">At minimum bid · {effectiveFeePercent(previewFee, preview.minBidMeat)}</span></> : `Estimated ${feeLabel(previewFee, preview.minBidMeat)} at minimum bid`}</dt><dd className="shrink-0 text-right font-semibold tabular-nums">{previewFee.toLocaleString('en-US')} Meat</dd></div>}
                     </dl>
-                    {preview.auctionKind === 'buy' && <p className="text-xs text-gray-500">The reserve rounds up to whole Meat. Actual fees are rounded down per fulfillment; unused reserve is refunded.</p>}
+                    {preview.auctionKind === 'buy' && <p className="text-xs text-gray-500">The original-rate reserve is retained as a rollback buffer and rounds up to whole Meat. Actual fees are rounded down per fulfillment; unused reserve is refunded.</p>}
                     <div className={preview.bundleItems
                         ? 'bundle-preview-footer -mx-4 -mb-4 mt-5 grid grid-cols-1 gap-2 rounded-b-lg border-t border-[#EADBD3] bg-[#FFF7F2] p-4 dark:border-gray-700 dark:bg-gray-800/60 sm:-mx-8 sm:-mb-8 sm:grid-cols-[0.85fr_1.15fr] sm:gap-3 sm:p-5'
                         : 'mt-4 grid grid-cols-2 gap-3 border-t border-gray-100 pt-4'}>

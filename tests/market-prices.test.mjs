@@ -62,3 +62,12 @@ test('completed auction snapshots use the shared batch cache and their completio
     const old=createCompletedMarketPriceService({async rpc(){return {data:[{auction_id:id,has_snapshot:false,available:false,checked_at:null,observed_at:null,captured_at:null}]};}});
     assert.equal((await old.load([id])).get(id).has_snapshot,false);
 });
+
+test('multi-item listings display exact whole-lot market value followed by the per-item estimate', () => {
+    const quote = {...row(),price_meat:205000000};
+    assert.equal(marketPriceDisplay(quote,Date.parse(row().checked_at),2).text,
+        'Market Value: 410,000,000 Meat total · 205,000,000 Meat per item');
+    assert.equal(marketPriceDisplay({...quote,price_meat:Number.MAX_SAFE_INTEGER},Date.now(),2).text,
+        'Market Value: 18,014,398,509,481,982 Meat total · 9,007,199,254,740,991 Meat per item');
+    assert.equal(marketPriceDisplay({...quote,available:false},Date.now(),2).text,'Market price unavailable');
+});

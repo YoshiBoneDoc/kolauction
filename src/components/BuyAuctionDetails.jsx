@@ -120,7 +120,7 @@ export default function BuyAuctionDetails({ auction, backLink }) {
                     <div className="min-w-0 space-y-1">
                         <h2 className="text-xs font-medium text-[#64748B]">Offer Price</h2>
                         <p className="buy-detail-price break-words text-2xl font-bold leading-tight tracking-tight text-[#183153]">{auction.pricePerItem.toLocaleString('en-US')} <span className="whitespace-nowrap text-sm font-normal tracking-normal">Meat / item</span></p>
-                        {((active && !closed) || result.status === 'completed') && <MarketPrice itemId={auction.itemId} auctionId={auction.id} completed={result.status === 'completed'} />}
+                        {((active && !closed) || result.status === 'completed') && <MarketPrice itemId={auction.itemId} auctionId={auction.id} quantity={auction.quantity} completed={result.status === 'completed'} />}
                     </div>
                     <div className="min-w-0 space-y-1">
                         <h2 className="text-xs font-medium text-[#64748B]">Order Progress</h2>

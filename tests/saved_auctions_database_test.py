@@ -100,6 +100,7 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
         claim=json.loads(sql('set role service_role;select public.bot_claim_saved_reminder();reset role;'))
         assert claim['auction_id']==aid and claim['recipient_id']==48889802
         assert claim['time_zone']=='Asia/Kolkata'
+        assert claim['quantity']=='1' and claim['is_bundle'] is False
         assert sql('select public.bot_claim_saved_reminder();')==''
         assert sql(f"select public.bot_start_saved_reminder('{claim['id']}');")
         assert sql(f"select public.bot_start_saved_reminder('{claim['id']}');")==''
@@ -128,7 +129,59 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
         assert sql('select public.bot_claim_saved_reminder();')=='', 'An abandoned claim is consumed conservatively'
         assert sql("set role service_role;select public.bot_worker_status()->>'savedRemindersVersion';reset role;")=='1'
 
+        # Profile hides final outcomes at 72 hours without deleting bookmarks or
+        # their permanent send-attempt records. Active/held/unsettled rows remain.
+        for status in ['completed','cancelled','voided','expired','ended_no_bids']:
+            for hours, expected in [(71,True),(73,False)]:
+                case_id=sql(f"insert into public.auctions(seller_id,seller_username,item,quantity,min_bid_meat,duration_hours,end_time,status,completed_at,seller_confirmed_at,buyer_confirmed_at,cancelled_at,expired_at,finalized_at) values('{owner}','Traffic Seller','History fixture',1,100,24,now()+interval '1 day','{status}',now()-interval '{hours} hours',now(),now(),now()-interval '{hours} hours',now()-interval '{hours} hours',now()-interval '{hours} hours') returning id;")
+                sql(f"select public.set_saved_auction('{case_id}',true,0);",other)
+                assert any(row['id']==case_id for row in read(other))==expected,(status,hours)
+                detail=json.loads(sql(f"select public.read_saved_auctions('{case_id}');",other))['rows']
+                assert len(detail)==1
+        for status in ['active','on_hold','awaiting_trade','settling']:
+            sql(f"update public.auctions set status='{status}',created_at=now()-interval '20 days',end_time=now()-interval '10 days' where id='{aid}';")
+            assert any(row['id']==aid for row in read(other)),status
+        sql(f"update public.auctions set status='completed',completed_at=now()-interval '73 hours' where id='{aid}';")
+        assert not any(row['id']==aid for row in read(other))
+        archived=json.loads(sql(f"select public.read_saved_auctions('{aid}');",other))['rows'][0]
+        assert archived['reminder_attempted'] and archived['reminder_outcome']=='sent'
+        # Hundreds of hidden records must not prevent a new current bookmark.
+        sql(f"with history as (insert into public.auctions(seller_id,seller_username,item,quantity,min_bid_meat,duration_hours,end_time,status,cancelled_at) select '{owner}','Traffic Seller','Old archive '||n,1,100,24,now()+interval '1 day','cancelled',now()-interval '5 days' from generate_series(1,200) n returning id) insert into khub_bot.saved_auctions(user_id,auction_id) select '{owner}',id from history;")
+        new_id=sql(f"insert into public.auctions(seller_id,seller_username,item,quantity,min_bid_meat,duration_hours,end_time,status) values('{owner}','Traffic Seller','Current bookmark',1,100,24,now()+interval '1 day','active') returning id;")
+        sql(f"set role authenticated;select public.set_saved_auction('{new_id}',true,0);reset role;",owner)
+        assert any(row['id']==new_id for row in read(owner))
+
+        # Defaults are user-scoped; existing choices change only on Apply to all.
+        sql("set role anon;select public.set_saved_reminder_default(15);reset role;",error='permission denied')
+        sql("select public.set_saved_reminder_default(7);",other,error='Invalid reminder preference')
+        sql("select public.set_saved_reminder_default(60,false,'America/New_York');",other)
+        assert json.loads(sql('select public.read_saved_auctions();',other))['default_reminder_minutes']==60
+        assert json.loads(sql('select public.read_saved_auctions();',owner))['default_reminder_minutes']==0
+        sql(f"select public.set_saved_auction('{new_id}',true,null,'America/New_York');",other)
+        saved_row=next(row for row in read(other) if row['id']==new_id)
+        assert saved_row['reminder_minutes']==60
+        assert saved_row['quantity']=='1' and saved_row['auction_kind']=='sell' and saved_row['escrow_mode'] is False
+        assert saved_row['bundle_items']==[] and saved_row['current_bid']=='0'
+        assert not set(saved_row) & {'seller_id','seller_username','highest_bidder_id','winner_id','balance_meat','funding_required','my_reservation'}
+
+        sql(f"select public.set_saved_auction('{new_id}',true,15,'America/New_York');",other)
+        sql("select public.set_saved_reminder_default(30,false,'America/New_York');",other)
+        assert next(row for row in read(other) if row['id']==new_id)['reminder_minutes']==15
+        sql("select public.set_saved_reminder_default(30,true,'America/New_York');",other)
+        assert next(row for row in read(other) if row['id']==new_id)['reminder_minutes']==30
+        assert next(row for row in read(owner) if row['id']==new_id)['reminder_minutes']==0
+        assert sql(f"select outcome from khub_bot.saved_auctions where user_id='{other}' and auction_id='{aid}';")=='sent'
+        sql("set role authenticated;select * from khub_bot.saved_auction_preferences;reset role;",other,error='permission denied')
+        sql(f"update public.auctions set end_time=now()+interval '29 minutes' where id='{new_id}';")
+        sql(f"update khub_bot.saved_auctions set preference_set_at=now()-interval '1 hour' where user_id='{other}' and auction_id='{new_id}';")
+        bulk_claim=json.loads(sql('select public.bot_claim_saved_reminder();'))
+        assert bulk_claim['auction_id']==new_id
+        assert sql(f"select public.bot_start_saved_reminder('{bulk_claim['id']}');")
+        sql("select public.set_saved_reminder_default(15,true,'America/New_York');",other)
+        retained=json.loads(sql(f"select jsonb_build_object('attempt',attempt,'started',send_started,'outcome',outcome) from khub_bot.saved_auctions where user_id='{other}' and auction_id='{new_id}';"))
+        assert retained=={'attempt':bulk_claim['id'],'started':True,'outcome':'unknown'}
+        assert sql('select public.bot_claim_saved_reminder();')==''
         assert sql(financial_probe)==before_projection
-        print('PASS: ownership/ACL, due times, five-minute grace, late preferences, extensions, cancellation/completion, tombstones and unchanged financial functions.')
+        print('PASS: saved-auction ownership, reminders, 72-hour final-outcome expiry, ongoing exclusions, detail bookmarks, archive-independent limit and unchanged financial functions.')
     finally:
         if started:pg('-m','immediate','-w','stop')
