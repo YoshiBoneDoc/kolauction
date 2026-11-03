@@ -1,6 +1,6 @@
 # kHub handoff for the next chat
 
-Updated October 27, 2026. Read this before proposing work, then inspect the relevant
+Repository audit: November 2, 2026. Read this before proposing work, then inspect the relevant
 code. The website is live; the Oracle bot holds real players’ Meat and items.
 
 ## Working standards
@@ -28,6 +28,64 @@ code. The website is live; the Oracle bot holds real players’ Meat and items.
   [delivery processing](bot/src/worker.mjs:1). IntelliJ absolute-path navigation
   has been unreliable; do not claim links were verified.
 
+## Current implementation and orientation
+
+- Start at [routing](src/App.jsx:1), [authentication](src/context/UserContext.jsx:1),
+  [auction provider](src/context/AuctionsContext.jsx:1) and [RPC service](src/lib/auctions.js:1).
+  Browse filters, sorting, totals and pagination are database-backed, not a full
+  client-side auction dataset. The memory cache retains separate resources per
+  authorization scope; browsing preferences are separate from private data.
+- Cloudflare has two Workers: [website runtime](workers/site/index.js:1) serves
+  Vite assets and four API routes; [cache runtime](workers/public-auction-cache/index.js:1)
+  uses named Durable Objects for shared public snapshots. Browser JWTs/cookies
+  never enter the shared listing transport. Private context and writes go to Supabase.
+- Shared paths include Home, eligible browse/seller lists, featured giveaway,
+  banner and public detail static/live state. Detail pages also read private
+  context/bid history; they are not wholly cached. Ignore relationships and private
+  filters can select direct reads. Writes refresh authoritative data.
+- Implemented: Sell/Buy/Bundle listings, Direct and Escrow settlement, KMail
+  registration/recovery, feedback withdrawal and moderation inboxes, bans/appeals,
+  seller profiles, trade totals, multi-select polls, player ignores, admin analytics,
+  site activity, and giveaways with Last Bid/Random Draw/Split/Surprise Me conditions.
+  Use [giveaway notes](README.md) for condition and funding constraints.
+- Current SQL files extend through 169. Prefixes 150, 151, 160 and 167 have multiple
+  filenames: use full filenames and prerequisites, not the number alone. The queue
+  currently has no SQL. Neither this layout nor local tests proves applied state.
+
+## Deployment and verification
+
+- Website production settings: `npm run build:cloudflare`, then
+  `npx wrangler@4 deploy --config wrangler.jsonc --keep-vars` in the existing
+  Cloudflare Git integration. This build defaults shared caching to true; plain
+  `npm run build` does not. `/khub-build.json` exposes the compiled flag.
+- GitHub's [workflow](.github/workflows/deploy-cache-worker.yml:1) validates website
+  routing/privacy and dry-runs the website, then deploys **only the cache Worker**.
+  Supabase SQL and Oracle bot deployment remain manual and separate.
+- Apply required SQL before dependent runtimes. Match Worker bindings and Supabase
+  public credentials using [deployment setup](docs/CLOUDFLARE_SITE_DEPLOYMENT.md:1).
+  No deployment or production SQL was performed in this documentation audit.
+- Relevant local checks: `npm run build`, `npm run lint`,
+  `node --test tests/*.test.mjs`; database suites under `tests/*database_test.py`
+  use isolated PostgreSQL. Bot tests use its own package scripts and Node 24+.
+  Run checks appropriate to code changes; historical passes are not a current run.
+
+## Current priority: traffic reliability
+
+The owner reports giveaway traffic still causes slow/erroring loads after caching
+improvements. Supplied cumulative query exports identify expensive private reads:
+card context ~406 ms average, detail context ~238 ms, authenticated auction-page
+variants ~250–332 ms; public Home ~684 ms and browse ~376 ms. Public live detail
+state averages ~9 ms. These are collection-period figures, not a giveaway timeline
+or proof of CPU saturation. Account and bot polling add substantial call volume.
+
+Next: inspect private projections and bid-history work, obtain targeted plans,
+correlate historical resource charts/cache error logs, then optimize and measure.
+Preserve financial authorization and privacy. The cache has bounded queues,
+origin deadlines and cooldowns; do not increase limits blindly. Browser route
+splitting is also outstanding: the listing editor imports the large item catalog
+into the initial bundle. Use the [performance diagnostics](README.md#performance-investigation).
+A quiet database-pressure snapshot cannot reconstruct an earlier traffic spike.
+
 ## Runtime and deployment boundaries
 
 - Website: React/Vite on Cloudflare. Database/Auth: Supabase PostgreSQL/Auth.
@@ -51,46 +109,6 @@ code. The website is live; the Oracle bot holds real players’ Meat and items.
   messages. Preserve ignored bot/backups; their existence is not proof of a
   complete, tested off-device backup strategy.
 
-## Immediate unresolved incident: seller payout D-1523
-
-Auction **#1075**, **The Nuge’s favorite crossbow ×1** (item 7201), sale price
-**200,000,000 Meat**. Standard tiered fee: **5,110,000**. Seller payout:
-**194,890,000 Meat**, recipient **player #705792**, reference **D-1523**.
-Recipient/amount come from the owner’s logs; no live lookup was performed here.
-
-The bot reported an unconfirmed send at 10:28AM and again after an owner-directed
-retry at 10:34AM on October 27. It isolated the payout rather than automatically
-resending, allowing other deliveries to continue. The generic REVIEW line does
-not establish the cause. No detailed transport evidence has been supplied yet.
-
-The owner then sent the payout manually in a gift package. They initially could
-not find the Sent entry, but subsequently **found the package and confirmed it
-is still there; the recipient simply has not opened it**. Do not suggest sending
-another payout. Opening is not required for a successfully sent package to count
-as sent. The bot’s deletion path inspected here targets Inbox, not Sent.
-
-Previously supplied reconciliation instructions were to stop the worker, save
-`lookup D-1523` to `D-1523-before-resolution.json`, then use `resolve D-1523 sent`
-only after confirming the manual payment. **It is unknown whether the owner ran
-those commands.** Do not assume the ledger is reconciled or that the whole
-auction is complete; the item delivery is a separate obligation.
-
-Next diagnostic evidence, if the file was saved, from **Oracle, `~/khub-bot`**:
-
-```bash
-cat D-1523-before-resolution.json
-```
-
-Otherwise inspect current read-only evidence before proposing further steps:
-
-```bash
-sudo docker compose run --rm --no-deps bot node src/cli.mjs lookup D-1523
-```
-
-A later `resolve` may replace evidence, so missing original evidence must be
-acknowledged. No diagnosis yet proves that the performance changes caused this
-send failure. Investigate the actual saved evidence before changing transport.
-
 ## Financial safety and failure isolation
 
 - Numeric player IDs are authoritative recipients. Preserve exact integer
@@ -110,70 +128,13 @@ send failure. Investigate the actual saved evidence before changing transport.
 - Settlement, winner items and seller payouts are separate tracked obligations.
   Preserve frozen fees, anti-sniping, receipt-time deadlines and refund accounting.
 
-## Recent completed local work to preserve
+## Verification boundaries
 
-These are implementation notes, **not proof of current production deployment**.
+Use existing focused Node/browser and isolated PostgreSQL tests for relevant changes.
+Never start a live worker or send real assets as a test. Historical suite counts
+are not a current verification result or production capacity measurement. Missing
+original incident payloads mean some fixtures are constructed, not captured mail.
 
-- Phase 1: shared, authorization-scoped in-memory auction dataset/cache;
-  client-side filtering/sorting and pagination; deduplicated/serialized loading;
-  previously loaded data retained on temporary failures, explicit initial errors.
-  Session storage holds browsing preferences, not private auction datasets.
-- Phase 2: browsing no longer triggers financial maintenance. Bot expiration and
-  server-side deadline validation cover Sell, Buy and Direct auctions. Do not
-  weaken financial locks or validation to reduce read latency.
-- Phase 3: retention indexes/fixed cutoffs, justified delivery indexes and durable
-  handled-receipt replay checks. Skipped ingestion must still allow delivery
-  recovery and safe cleanup; unresolved financial mail must remain recoverable.
-- Gift-only collectibles are eligible for Buy/Sell listings; package wrappers are
-  excluded. Ordinary attached gift items are **not** gift packages. Classification
-  follows KoL mail type, not item name or giftability.
-- A valid outside package command takes precedence over inside text. Inside-only
-  auction-command intent returns the contents with corrective instructions;
-  it never executes the inside command. Explicit outside DONATE is preserved.
-- Parser corrections distinguish acquisition tables from Valentines. Legitimate
-  or ambiguous Valentines remain protected/reviewable. Further hardening covers
-  note separators, explicit item quantities, mailbox structure and exact visible
-  send acknowledgments. Meat extraction was intentionally left unchanged in the
-  later hardening pass. Missing quantities/unknown wrappers were defensive checks,
-  not demonstrated production incidents.
-- Normal transaction logging consolidates intake/outcome/confirmed references.
-  **REFUNDED only after confirmation**, never merely queued. Errors, retries,
-  reviews and debugging remain visible; do not remove diagnostic failures.
-- Escrow Protection Guarantee is permanent and uncapped for verified automated
-  escrow errors, with exclusions. The full policy is on auction creation;
-  Info’s comparison table and Update Log link there. Do not restore old 1M caps.
-- Buy detail funding UI, compact history, owner-only financial summary and
-  admin-only readable reservation audit are implemented. Enhance-image controls
-  are hidden; their code remains. Avoid undoing these small design decisions.
-
-Relevant references:
-[transaction audit](bot/REGRESSION_AUDIT.md:1),
-[parser hardening](bot/PARSING_HARDENING.md:1),
-[inside-package commands](bot/INSIDE_GIFT_COMMANDS.md:1),
-[Buy detail UI](src/components/BuyAuctionDetails.jsx:1),
-[auction read cache](src/lib/auctionReadCache.js:1).
-Migrations 117–122 document recent changes; inspect the actual files and applied
-state before suggesting SQL. Matching bot copies are alternatives, not a second
-set to execute.
-
-## Verification evidence and limits
-
-The previous local parser-hardening run reported **282 Node tests and nine
-isolated PostgreSQL suite runs passing**. Later targeted SQL coverage includes a
-200M crossbow settlement: exact seller payout/fee, numeric recipients, once-only
-asset deliveries, repeated ticks/receipts, uncertain payout isolation, unrelated
-queue progress, restart persistence and verified-Sent recovery. Admin audit
-privacy tests and frontend checks also passed during their implementation.
-These historical results are not a fresh run and do not prove live KoL transport,
-Oracle balances, deployed versions, current queues, or production lock health.
-
-Original raw Jimmyking incident HTML and the original reported gift envelope were
-not recovered. Tests combine public upstream fixtures/archived response fragments
-with explicitly constructed variants. Do not call reconstructed fixtures captured
-production mail or infer regression introduction dates from missing bot history.
-
-For new relevant changes, inspect package scripts and run focused existing tests.
-Bot runtime targets Node 24+; local Node 22 tests required
-`NODE_OPTIONS=--experimental-sqlite`. SQL tests create disposable local PostgreSQL
-clusters. Do not start a real worker or use production credentials for tests.
-Do not spend time rerunning unrelated suites for documentation-only changes.
+Primary references: [website](README.md), [bot](bot/README.md),
+[database](supabase/README.md), [deployment](docs/CLOUDFLARE_SITE_DEPLOYMENT.md),
+[remaining work](ROADMAP.md). Do not regenerate the personal quickstart guide.

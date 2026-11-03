@@ -72,3 +72,7 @@ amplifytools.xcconfig
 
 # Personal photos
 about_me_pics/
+
+# Generated Python test caches
+__pycache__/
+*.py[cod]

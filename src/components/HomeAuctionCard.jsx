@@ -1,3 +1,4 @@
+import AuctionLiveUnavailable from './AuctionLiveUnavailable';
 import { auctionQuantityLabel } from '../lib/bundles';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
@@ -9,6 +10,7 @@ import TradeTypeBadge from './TradeTypeBadge';
 import { getAuctionStatus } from '../lib/auctionLifecycle';
 
 export default function HomeAuctionCard({ auction, now }) {
+    if (auction.liveUnavailable) return <AuctionLiveUnavailable auction={auction} />;
     const completed = auction.status === 'completed';
     const hot = getAuctionStatus(auction, now) === 'active' && auction.isHot;
     const buy = auction.auctionKind === 'buy';

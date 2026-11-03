@@ -1,41 +1,45 @@
-import { useContext } from "react";
+import { lazy, Suspense, useContext } from "react";
 import { AuctionsContext } from "./context/AuctionsContext";
 import { Routes, Route, useLocation } from "react-router-dom";
 import AuctionNavigation from "./components/AuctionNavigation";
-import Home from "./pages/Home";
-import AllAuctions from "./pages/AllAuctions";
-import AuctionAnItem from "./pages/AuctionAnItem";
-import Register from "./pages/Register"; // New page
-import Login from "./pages/Login"; // Import Login page
-import Profile from "./pages/Profile"; // Import Profile
-import AuctionDetails from "./pages/AuctionDetails";
-import InfoPage from "./pages/InfoPage.jsx";
-import GiveawayInfo from "./pages/GiveawayInfo";
-import OfficialApproval from './pages/OfficialApproval';
-import DonatePage from "./pages/DonatePage.jsx";
-import AuthEmailPage from "./pages/AuthEmailPage";
-import ResetPassword from "./pages/ResetPassword";
-import ConfirmEmail from "./pages/ConfirmEmail";
-import WallOfShame from "./pages/WallOfShame";
-import SellerProfile from './pages/SellerProfile';
-import ReportBug from './pages/ReportBug';
-import TradeQuery from './pages/TradeQuery';
-import ReportTrade from './pages/ReportTrade';
-import SubmitAppeal from './pages/SubmitAppeal';
-import NotFound from './pages/NotFound';
-import BugReportInbox from './pages/BugReportInbox';
+const Home = lazy(() => import("./pages/Home"));
+const AllAuctions = lazy(() => import("./pages/AllAuctions"));
+const AuctionAnItem = lazy(() => import("./pages/AuctionAnItem"));
+const Register = lazy(() => import("./pages/Register"));
+const Login = lazy(() => import("./pages/Login"));
+const Profile = lazy(() => import("./pages/Profile"));
+const AuctionDetails = lazy(() => import("./pages/AuctionDetails"));
+const InfoPage = lazy(() => import("./pages/InfoPage.jsx"));
+const GiveawayInfo = lazy(() => import("./pages/GiveawayInfo"));
+const OfficialApproval = lazy(() => import('./pages/OfficialApproval'));
+const DonatePage = lazy(() => import("./pages/DonatePage.jsx"));
+const AuthEmailPage = lazy(() => import("./pages/AuthEmailPage"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const ConfirmEmail = lazy(() => import("./pages/ConfirmEmail"));
+const WallOfShame = lazy(() => import("./pages/WallOfShame"));
+const SellerProfile = lazy(() => import('./pages/SellerProfile'));
+const ReportBug = lazy(() => import('./pages/ReportBug'));
+const TradeQuery = lazy(() => import('./pages/TradeQuery'));
+const ReportTrade = lazy(() => import('./pages/ReportTrade'));
+const SubmitAppeal = lazy(() => import('./pages/SubmitAppeal'));
+const NotFound = lazy(() => import('./pages/NotFound'));
+const BugReportInbox = lazy(() => import('./pages/BugReportInbox'));
 
 import SiteBanner from "./components/SiteBanner";
-import UpdateLog from "./pages/UpdateLog";
-import MeetTheCreator from "./pages/MeetTheCreator";
-import AdminBanner from "./pages/AdminBanner";
-import AdminPolls from "./pages/AdminPolls";
+const UpdateLog = lazy(() => import("./pages/UpdateLog"));
+const MeetTheCreator = lazy(() => import("./pages/MeetTheCreator"));
+const AdminBanner = lazy(() => import("./pages/AdminBanner"));
+const AdminPolls = lazy(() => import("./pages/AdminPolls"));
 import SiteActivity from "./components/SiteActivity";
+
+function RouteLoading() {
+    return <div role="status" className="p-6 text-center">Loading page…</div>;
+}
 
 const App = () => {
     const { pathname } = useLocation();
     const { error, refreshAuctions } = useContext(AuctionsContext) || {};
-    if (pathname.replace(/\/+$/, '') === '/official-approval') return <OfficialApproval />;
+    if (pathname.replace(/\/+$/, '') === '/official-approval') return <Suspense fallback={<RouteLoading />}><OfficialApproval /></Suspense>;
     const isWallOfShame = pathname.replace(/\/+$/, '') === '/wall-of-shame';
     return (
         <div className={`flex min-h-screen flex-col ${isWallOfShame ? 'shame-background' : 'site-page-background bg-[#F9F9F9]'}`}>
@@ -44,7 +48,7 @@ const App = () => {
             {error && <div role="alert" className="bg-red-50 p-4 text-red-700">
                 {error}{" "}<button onClick={refreshAuctions} className="underline">Retry</button>
             </div>}
-            <SiteActivity><Routes>
+            <SiteActivity><Suspense fallback={<RouteLoading />}><Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/submit-appeal" element={<SubmitAppeal />} />
                 <Route path="/report-a-bug" element={<ReportBug />} />
@@ -75,7 +79,7 @@ const App = () => {
                 <Route path="/auction/:id" element={<AuctionDetails />} />
                 <Route path="*" element={<NotFound />} />
 
-            </Routes></SiteActivity>
+            </Routes></Suspense></SiteActivity>
         </div>
     );
 };

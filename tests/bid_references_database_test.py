@@ -135,7 +135,7 @@ with tempfile.TemporaryDirectory(prefix='khub-bid-refs-',dir='/tmp') as folder:
         assert read(expired,admin)['bids']==[]
         assert sql("select sum(meat) from khub_bot.deliveries where receipt_id='89541' and kind='refund';")=='100'
         reference=sql("select reference_number from khub_bot.deliveries where receipt_id='89541' and kind='refund' order by reference_number limit 1;")
-        diagnostic=(ROOT/'scripts/diagnostics/d1170_bid_timing.sql').read_text().replace('where d.reference_number=1170','where d.reference_number='+reference)
+        diagnostic=(ROOT/'tests/fixtures/bid_reference_diagnostic.sql').read_text().replace('where d.reference_number=1170','where d.reference_number='+reference)
         report=json.loads(sql(diagnostic))
         assert report['kmail_id']=='89541' and report['rejection_reason']=='Bidding is closed.'
         assert report['rejection_seconds_after_deadline']>0 and report['accepted_bids']==[]

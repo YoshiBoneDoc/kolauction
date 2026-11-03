@@ -1,3 +1,4 @@
+import AuctionLiveUnavailable from '../components/AuctionLiveUnavailable';
 import { giveawayConditionLabel } from '../lib/giveaway';
 import { GiveawayDecorations, GiveawayCountdown } from '../components/GiveawayCard';
 import GiveawayItemImage, { useGiveawayCutout } from '../components/GiveawayItemImage';
@@ -49,6 +50,8 @@ export default function AuctionDetails() {
             <p className="mx-auto max-w-4xl text-xl font-bold text-red-700">{error ? 'Auction could not be loaded.' : 'Auction not found.'}</p>
         </main>
     );
+
+    if (auction.liveUnavailable) return <main className="flex-1 p-6">{backLink}<AuctionLiveUnavailable auction={auction} /></main>;
 
     if (auction.auctionKind === 'buy') return <BuyAuctionDetails auction={auction} now={now} backLink={backLink} />;
 

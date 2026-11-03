@@ -1,83 +1,131 @@
-# KoL Auction Hub
+# kHub — KoL Auction Hub
 
-> **Returning to this project? The auction bot lives in `bot/` inside this project.**
-> It runs separately on **Oracle Cloud**, not on Cloudflare. Start with
-> [the bot README](bot/README.md) and [deployment instructions](bot/DEPLOYMENT.md).
+React/Vite auction website with Supabase Auth/PostgreSQL and a separate Oracle
+KMail worker for **kHub (#3888760)**. Start new sessions with [the handoff](HANDOFF.md).
+See [unfinished work](ROADMAP.md), [database reference](supabase/README.md) and
+[bot operations](bot/README.md). Repository state does not prove production rollout.
 
-Starting a new chat? Read [the project handoff](HANDOFF.md) first.
+## Architecture
 
-## Where everything lives
+| Component | Entry point | Runtime |
+| --- | --- | --- |
+| Website | [React routes](src/App.jsx:1) | Cloudflare Worker + Vite static assets |
+| Website API | [site adapter](workers/site/index.js:1) | Root `wrangler.jsonc` |
+| Shared snapshots | [cache Worker](workers/public-auction-cache/index.js:1) | Separate Worker / SQLite Durable Objects |
+| Auth and authoritative state | [RPC client](src/lib/auctions.js:1), `supabase/migrations/` | Supabase |
+| Asset handling | [bot worker](bot/src/worker.mjs:1) | Oracle Ubuntu / Docker |
 
-| Part | Local files | Hosting |
-|---|---|---|
-| Website | `src/` | Cloudflare |
-| Accounts and auction database | `supabase/` setup files | Supabase |
-| Auction middleman bot: kHub (#3888760) | **`bot/`** | **Oracle Cloud**, Docker container `khub-bot` |
+The website Worker serves `/api/public-auctions`, `/api/public-banner`,
+`/api/public-auctions/invalidate` and `/api/giveaway-image`; unknown API routes return
+JSON 404 instead of SPA HTML. The repository's Amplify files are legacy scaffolding.
 
-The bot was moved to Oracle and reported working on October 19, 2026.
-Its server folder is `~/khub-bot`. Confirm the current server/IP in the Oracle
-console when returning; these details can change.
+## Implemented functionality
 
-## Important: the bot is excluded from this Git repository
+- Sell, Buy and Bundle auctions; Direct settlement and automated Escrow deposits,
+  funded bids, refunds, winner deliveries and seller payouts.
+- Server-authoritative minimum increments, buyouts, late-bid extension for ordinary
+  Sell auctions, custom deadlines and receipt-time safeguards.
+- KMail registration/recovery, verified KoL identities, profile histories, seller
+  profiles, private balances/reservations and public trade totals.
+- Feedback/withdrawal, trade queries, account bans/appeals, reviewed public ban
+  gallery, admin inbox, analytics, announcements and multi-select polls.
+- Player ignores with server-side visibility filtering; site activity tracking.
+- Admin giveaway preset; Last Bid, Random Draw, Split and Surprise Me conditions.
+  Non-Last-Bid conditions require Escrow. Giveaways require the exact next minimum,
+  reject self-outbids and do not extend their deadline. Draws/allocations are persisted
+  before delivery. Actual prize recipients are marked in bid history.
 
-**`/bot/` is deliberately gitignored. A fresh clone of this website repository
-will not contain the bot, its credentials, or its SSH keys.**
+### Read and cache boundaries
 
-Keep a separate private backup or private repository for the bot code. Its own
-ignore rules exclude `.env` and `keys/`; back up those credentials separately and
-privately. The local SSH keys currently live in `bot/keys/`.
+[The provider](src/context/AuctionsContext.jsx:1) loads bounded database pages, not
+an entire market dataset. Its memory cache is scoped to viewer authorization;
+private auction datasets are not persisted in browser storage. Preferences are separate.
 
-Editing the local bot does not update Oracle automatically. From `bot/`, run
-`npm run bundle` to create `exports/khub-bot.tar.gz`, then follow the deployment
-guide to upload it and rebuild the hosted container. The archive excludes secrets.
+[The public transport](src/lib/publicAuctionReader.js:1) shares allowlisted public
+rows without browser cookies/JWTs. Home needs no card-context read; signed-in viewers
+may need a cached ignore-eligibility check. Eligible browse/seller pages add private
+context separately. Own/others, affected ignore pools and signed-in All-status views
+can use direct reads. Actions use live authorization and authoritative post-write refreshes.
 
-**Stop the Oracle bot before starting a Mac copy, even in read-only mode.** Both
-modes log into the same KoL account and can repeatedly replace each other's sessions.
+Public detail static/live snapshots are combined with private context and bid history;
+details are not wholly cached. Public live TTL is two seconds; static TTL five minutes.
+Private context is reused for five seconds, with full reads on transitions and periodically.
+Featured giveaway shares the listing object, with a 30-second TTL; banner has a separate object.
 
-## Useful starting points
+Listing snapshots are fresh for 30 seconds and normally usable up to five minutes
+while refreshing; known bid-invalidated snapshots must revalidate. Each object
+serializes origin reads, spaces starts by one second, allows four distinct pending
+keys, uses an eight-second fetch deadline and a 30-second origin-failure cooldown.
+These overload protections can produce temporary 503s. Never bypass privacy or flood
+Supabase with per-visitor fallback reads. HTTP responses are `no-store`; Durable
+Objects, not a blanket CDN rule, own shared storage. See [deployment](docs/CLOUDFLARE_SITE_DEPLOYMENT.md).
 
-### Preventing credential leaks
+### Totals and reference data
 
-Website builds reject private-key material, privileged Supabase keys, secret
-`VITE_` variables, and private files/backups in public assets or generated output.
-The browser's Supabase **publishable** key is public by design; the bot's secret
-key and KoL password belong only in its private server environment.
+Public lifetime trade value includes completed Sell prices and paid Buy fulfillments;
+items sum actual component quantities; trades count completed Sells and paid Buy
+fulfillments. Deposits, refunds, donations and commission are not added as trade value.
+Record bids and giveaway totals are separate measures. Aggregate snapshots are
+advisory display data, never financial authorization.
 
-The bot packager also scans its allowlisted files before creating an upload
-archive. Keep credentials and SSH keys out of source, `public/`, build output,
-and deployment archives. `.gitignore` does not protect files already tracked by
-Git, and removing a tracked file does not remove its earlier history.
+The bot refreshes KoLmafia item data weekly. Tradeable or giftable items are eligible,
+excluding package wrappers. The website has a five-minute catalog cache and bundled
+fallback; database validation remains authoritative. `npm run update:items` refreshes
+checked-in reference data, not the live deployment.
 
-`npm run security:check` scans nonignored website source without displaying
-credentials. `npm run security:install` installs the local pre-commit check
-(preserving an existing custom hook). It checks staged file contents and rejects
-forced additions of private files. Install it again on a fresh clone; Git hooks
-are local and can be bypassed. Guard tests: `node --test tests/asset-security.test.mjs`.
+## Development and verification
 
-New registration uses KMail to **kHub (#3888760)**: `REGISTER`. The bot creates and links the account, then sends a generated
-password. `CREDENTIALS` from the linked KoL player issues a new password. This needs
-the matching bot/website update and queued migration `019`; see the database setup.
-Existing email accounts retain their login/history and can use KMail recovery once linked.
-New accounts do not require SMTP.
+Use Node 24 (also used by CI and required by the bot). From the website root:
 
-- [Outstanding work](ROADMAP.md)
-- [Database setup](supabase/README.md)
-- [Shared public auction cache setup](docs/SHARED_AUCTION_CACHE.md)
-- [Traffic resilience Batch 1](docs/TRAFFIC_BATCH1.md)
-- [Item catalog and automatic weekly updates](supabase/ITEM_CATALOG.md)
-- [Bot operation and troubleshooting](bot/README.md)
-- [Bot packaging and deployment](bot/DEPLOYMENT.md)
-
-Bot links work when the local `bot/` folder is present; it is intentionally absent
-from the website's GitHub repository.
-
-## For pushing changes to git from kolauction folder:
-
-From your project's terminal, run these one at a time:
-
-```bash
-git status
-git add .
-git commit -m "Brief description of your changes"
-git push origin main
+```sh
+npm ci
+npm run dev
 ```
+
+Use `.env.example` for public Supabase settings. Plain Vite does not emulate the
+Durable Object API; use direct reads locally or a configured Worker preview.
+
+```sh
+npm run build
+npm run lint
+node --test tests/*.test.mjs
+npm run security:check
+```
+
+Python database suites under `tests/` use disposable PostgreSQL clusters; inspect
+individual prerequisites. Do not run a live bot or financial writes as tests.
+
+## Deployment
+
+[Deployment reference](docs/CLOUDFLARE_SITE_DEPLOYMENT.md) contains exact settings,
+bindings and verification. Website: Cloudflare Git integration uses
+`npm run build:cloudflare` and root Wrangler configuration. This build defaults shared
+caching to true and emits `/khub-build.json`; plain `npm run build` does not enable it.
+GitHub Actions validates/dry-runs the website and deploys **only the cache Worker**.
+SQL application and Oracle bot rebuild/restart are manual, separate steps.
+
+`bot/` is deliberately gitignored and absent from fresh website clones. Never force-add
+it. Keep private bot releases and credentials backed up separately. A website commit
+cannot identify the live Oracle image. Run only one KoL-connected worker across hosts.
+
+## Performance investigation
+
+Giveaway traffic reliability remains unfinished. Cumulative exports identify private
+card/detail reads and public Home/browse as targets, but cannot isolate an incident hour.
+Capture current sessions/locks and query statistics; compare two snapshots
+without resetting statistics. Collect safe RPC identities, historical
+CPU/memory/I/O/connections and `[PUBLIC_CACHE]` failure codes for the same time window.
+Database-wide and query-statistics resets are independent. Do not run financial-write
+`EXPLAIN ANALYZE` on production. See [priorities](ROADMAP.md).
+
+## Secrets and documentation boundaries
+
+Publishable Supabase keys belong in public build settings; service-role keys, KoL
+passwords, SSH keys and invalidation signing secrets do not. Build/package scans
+reject private material. `npm run security:install` installs the local staged-file
+check; ignored paths do not remove already-committed secrets from Git history.
+
+Primary documentation is this README, the bot/database READMEs, handoff and roadmap.
+Keep the personal QUICKSTART_README unchanged unless explicitly authorized; the
+current consolidation leaves it untouched. Obsolete phase documents have been
+removed from the bot packaging list after consolidation.

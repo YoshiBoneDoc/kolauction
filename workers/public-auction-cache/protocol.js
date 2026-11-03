@@ -1,3 +1,4 @@
+import { LIVE_FIELDS } from './liveState.js';
 // Shared cache schema: public catalogue/listing facts only. Never cache a raw RPC response.
 import { parseSiteTradeTotals } from '../../src/lib/siteTradeTotals.js';
 export const CACHE_VERSION = 1;
@@ -79,15 +80,15 @@ export function publicProjection(data, request) {
     }
     if (data?.privacy_version !== 1 || !Array.isArray(data.rows) || !Array.isArray(data.bids)
         || data.bids.length || !Number.isSafeInteger(Number(data.total)) || Number(data.total) < 0
-        || !Number.isFinite(Date.parse(data.server_time)) || data.rows.length > (request.view === 'home' ? 120 : 24)) {
+        || !Number.isFinite(Date.parse(data.server_time)) || data.rows.length > (['home', 'batch-live'].includes(request.view) ? 120 : 24)) {
         throw new Error('Invalid public snapshot.');
     }
     const pick = (value, keys) => Object.fromEntries(keys.filter(key => Object.hasOwn(value, key)).map(key => [key, value[key]]));
     const rows = data.rows.map(row => {
         if (!row || typeof row.id !== 'string' || row.status === 'pending_escrow') throw new Error('Nonpublic auction in snapshot.');
-        const fields = request.view === 'detail-live' ? PUBLIC_FIELDS.filter(key => !['item', 'item_id', 'quantity', 'image', 'duration_hours', 'created_at'].includes(key)) : PUBLIC_FIELDS;
-        return { ...pick(row, fields), ...(request.view === 'featured' ? { giveaway_title: row.giveaway_title } : {}), ...(request.view.startsWith('detail-') ? {} : { usernames_visible: false }),
-            ...(request.view === 'detail-live' ? {} : { bundle_items: Array.isArray(row.bundle_items) ? row.bundle_items.map(item => pick(item, ['id', 'quantity', 'name', 'image'])) : [] }),
+        const fields = request.view === 'batch-live' ? LIVE_FIELDS : request.view === 'detail-live' ? PUBLIC_FIELDS.filter(key => !['item', 'item_id', 'quantity', 'image', 'duration_hours', 'created_at'].includes(key)) : PUBLIC_FIELDS;
+        return { ...pick(row, fields), ...(request.view === 'featured' ? { giveaway_title: row.giveaway_title } : {}), ...(request.view.startsWith('detail-') || request.view === 'batch-live' ? {} : { usernames_visible: false }),
+            ...(['detail-live', 'batch-live'].includes(request.view) ? {} : { bundle_items: Array.isArray(row.bundle_items) ? row.bundle_items.map(item => pick(item, ['id', 'quantity', 'name', 'image'])) : [] }),
         };
     });
     const result = { privacy_version: 1, shared_cache_version: CACHE_VERSION,
@@ -106,6 +107,7 @@ export function publicProjection(data, request) {
 }
 
 export function originRequest(request) {
+    if (request.view === 'batch-live') return { rpc: 'read_public_auction_live_batch', args: { p_ids: request.ids } };
     if (request.view === 'featured') return { rpc: 'read_featured_giveaway', args: {} };
     if (request.view.startsWith('detail-')) return { rpc: 'read_public_auction_detail_state', args: { p_id: request.id } };
     if (request.view === 'banner') return { rpc: 'read_site_banner', args: {} };

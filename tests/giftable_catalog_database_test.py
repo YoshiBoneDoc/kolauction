@@ -4,6 +4,7 @@ credentials, network, real bot, KoL account or live database is used.
 Run: python3 tests/giftable_catalog_database_test.py
 """
 import json
+from helpers.local_supabase import add_storage_fixture
 from pathlib import Path
 import subprocess
 import tempfile
@@ -13,7 +14,7 @@ ROOT=Path(__file__).resolve().parents[1]
 BIN=Path(subprocess.check_output(['pg_config','--bindir'],text=True).strip())
 with tempfile.TemporaryDirectory(prefix='khub-giftable-catalog-',dir='/tmp') as folder:
     data=Path(folder)/'data'
-    subprocess.run([str(BIN/'initdb'),'-D',str(data),'-A','trust','--no-locale'],check=True,capture_output=True)
+    subprocess.run([str(BIN/'initdb'),'-D',str(data),'-A','trust','--no-locale','--encoding=UTF8'],check=True,capture_output=True)
     def pg(*args):
         return subprocess.run([str(BIN/'pg_ctl'),'-D',str(data),*args],check=True,capture_output=True)
     started=False
@@ -45,6 +46,7 @@ with tempfile.TemporaryDirectory(prefix='khub-giftable-catalog-',dir='/tmp') as 
             grant usage on schema public,auth to anon,authenticated,service_role;
             grant execute on function auth.uid() to anon,authenticated;
         ''')
+        add_storage_fixture(sql)
         migrations=sorted([*ROOT.glob('supabase/migrations/*.sql'),*ROOT.glob('supabase/migrations/queue/*.sql')],key=lambda p:p.name)
         assert len({p.name for p in migrations})==len(migrations)
         for migration in migrations:

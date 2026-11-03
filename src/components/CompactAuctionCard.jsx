@@ -1,3 +1,4 @@
+import AuctionLiveUnavailable from './AuctionLiveUnavailable';
 import RelistButton from './RelistButton';
 import { auctionQuantityLabel } from '../lib/bundles';
 import AuctionEndedTime from './AuctionEndedTime';
@@ -19,6 +20,7 @@ export default function CompactAuctionCard({ auction, now, expanded = false, onT
     const location = useLocation();
     const formId = useId();
     const linkState = { browseFrom: `${location.pathname}${location.search}` };
+    if (auction.liveUnavailable) return <AuctionLiveUnavailable auction={auction} />;
     const result = getAuctionResult(auction, now);
     const active = result.status === 'active';
     const ownsAuction = currentUser?.id === auction.sellerId;

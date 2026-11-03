@@ -52,7 +52,7 @@ test('diagnostic reason survives cooldown and restart without another origin req
     const restarted = await fixture(f.storage);
     assert.equal((await (await restarted.get()).json()).code, 'CACHE_RPC_MISSING');
     assert.equal(restarted.reads(), 0);
-    restarted.cache.cooldownUntil = 0;
+    restarted.cache.cooldownUntil = 0; restarted.cache.failures.clear();
     assert.equal((await restarted.get()).status, 200);
     assert.equal(restarted.cache.lastFailureCode, 'CACHE_UNAVAILABLE');
 });
@@ -123,7 +123,7 @@ test('a simultaneous 200-visitor cold burst runs one origin query and the snapsh
     assert.equal((await response.json()).rows[0].item, 'Test item');
 });
 
-test('stale reads share refresh, database failure backs off globally, age never slides, clock remains current', async () => {
+test('stale reads share refresh, database failure backs off its family, age never slides, clock remains current', async () => {
     const realNow = Date.now; let now = realNow(); Date.now = () => now;
     try {
         const f = await fixture();
@@ -570,4 +570,250 @@ test('eligibility refreshes after its bounded TTL and session changes; detail/es
         assert.equal(await f.reader.accepts(request), true);
         assert.equal(checks, 3);
     } finally { Date.now = realNow; }
+});
+
+test('independent live reads get a probe after one Home timeout; two failing families open global circuit', async () => {
+    const f = await fixture();
+    await f.get(); // Warm browse at the current revision.
+    f.cache.lastOriginAt = 0;
+    let origins = 0;
+    f.cache.readOrigin = async () => { origins++; throw cacheFailure('CACHE_ORIGIN_TIMEOUT'); };
+    assert.equal((await f.get('https://site.test/api/public-auctions?view=home')).status, 503);
+    assert.equal((await f.get(`https://site.test/api/public-auctions?view=detail-live&id=${id}`)).status, 503);
+    assert.equal(origins, 2); // Independent family got one bounded probe.
+    assert.ok(f.cache.cooldownUntil > Date.now());
+    const browse = await f.get();
+    assert.equal(browse.status, 200);
+    assert.equal(browse.headers.get('X-Khub-Cache'), 'HIT');
+});
+
+test('a legacy dirty listing still cannot return pre-bid prices after isolated family failures', async () => {
+    const f = await fixture();
+    f.cache.env.PUBLIC_CACHE_INVALIDATION_SECRET = signingSecret;
+    await f.get();
+    f.cache.lastOriginAt = 0;
+    let origins = 0;
+    f.cache.readOrigin = async () => { origins++; throw cacheFailure('CACHE_ORIGIN_TIMEOUT'); };
+    await f.get('https://site.test/api/public-auctions?view=home');
+    await f.cache.fetch(notification('1'));
+    const browse = await f.get();
+    assert.equal(browse.status, 503);
+    assert.doesNotMatch(await browse.text(), /current_bid/);
+    assert.equal(origins, 2);
+});
+
+const signedAuction = (revision, auction_id = id) => ({ revision, auction_id,
+    signature: createHmac('sha256', signingSecret).update(`khub-public-auctions:v2:${revision}:${auction_id}`).digest('hex') });
+const scopedNotification = (revision, auction = id) => new Request('https://cache.internal/invalidate', {
+    method: 'POST', body: JSON.stringify(signedAuction(revision, auction)),
+});
+const secondId = '22345678-1234-4123-8123-123456789abc';
+async function liveFixture() {
+    const f = await fixture();
+    f.cache.env.LIVE_AUCTION_STATE = 'true';
+    f.cache.env.PUBLIC_CACHE_INVALIDATION_SECRET = signingSecret;
+    const calls = [];
+    f.cache.readOrigin = async request => {
+        calls.push(request);
+        f.cache.lastOriginAt = 0;
+        const input = source();
+        if (request.view === 'batch-live') input.rows = request.ids.map(auction => ({ ...input.rows[0], id: auction, current_bid: 200 }));
+        return publicProjection(input, request);
+    };
+    return { ...f, calls, get: (target = url) => f.cache.fetch(new Request(target, { headers: { 'X-Khub-Live-State': '1' } })) };
+}
+
+test('live mode coalesces a visitor burst and reuses auction state across different browse keys', async () => {
+    const f = await liveFixture();
+    const responses = await Promise.all(Array.from({ length: 100 }, () => f.get()));
+    assert.equal(f.calls.filter(q => q.view === 'browse').length, 1);
+    assert.equal(f.calls.filter(q => q.view === 'batch-live').length, 1);
+    assert.equal((await responses[0].json()).rows[0].current_bid, 200);
+    await f.get(`${url}&sort=ending`);
+    assert.equal(f.calls.filter(q => q.view === 'batch-live').length, 1);
+});
+
+test('scoped invalidation refreshes live bid state without rebuilding listing selection', async () => {
+    const f = await liveFixture();
+    await f.get();
+    await f.cache.fetch(scopedNotification('1'));
+    const response = await f.get();
+    const body = await response.json();
+    assert.equal(body.rows[0].current_bid, 200);
+    assert.equal(body.public_snapshot.ordering_delayed, true);
+    assert.equal(f.calls.filter(q => q.view === 'browse').length, 1);
+    assert.equal(f.calls.filter(q => q.view === 'batch-live').length, 2);
+});
+
+test('unrelated scoped bids preserve live state and out-of-order notifications remain effective', async () => {
+    const f = await liveFixture();
+    await f.get();
+    await f.cache.fetch(scopedNotification('4', secondId));
+    await f.get();
+    assert.equal(f.calls.filter(q => q.view === 'batch-live').length, 1);
+    await f.cache.fetch(scopedNotification('3', id));
+    await f.get();
+    assert.equal(f.calls.filter(q => q.view === 'batch-live').length, 2);
+    assert.equal(f.cache.revision, '4');
+    const forged = signedAuction('5'); forged.auction_id = secondId;
+    assert.equal((await f.cache.fetch(new Request('https://cache.internal/invalidate', { method: 'POST', body: JSON.stringify(forged) }))).status, 403);
+});
+
+test('failed live verification returns catalogue facts without any old bidding information', async () => {
+    const f = await liveFixture();
+    await f.get();
+    await f.cache.fetch(scopedNotification('1'));
+    f.cache.readOrigin = async () => { f.cache.lastOriginAt = 0; throw cacheFailure('CACHE_ORIGIN_TIMEOUT'); };
+    const response = await f.get();
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.rows[0].item, 'Test item');
+    assert.equal(body.rows[0]._live_unavailable, true);
+    for (const field of ['current_bid','min_bid_meat','bid_count','end_time','status','final_price','available_quantity','has_winner']) {
+        assert.equal(Object.hasOwn(body.rows[0], field), false, field);
+    }
+    assert.equal(body.public_snapshot.live_unavailable, true);
+});
+
+test('family cooldown, global breaker and single origin scheduler remain bounded in live mode', async () => {
+    const f = await liveFixture();
+    let origins = 0;
+    f.cache.readOrigin = async request => {
+        f.cache.lastOriginAt = 0; origins++;
+        if (request.view === 'home' || request.view === 'browse') throw cacheFailure('CACHE_ORIGIN_TIMEOUT');
+        return publicProjection(source(), request);
+    };
+    assert.equal((await f.get('https://cache.test/?view=home')).status, 503);
+    assert.equal((await f.get('https://cache.test/?view=home')).status, 503);
+    assert.equal(origins, 1);
+    const detail = await f.get(`https://cache.test/?view=detail-live&id=${id}`);
+    assert.equal(detail.status, 200);
+    assert.equal(origins, 2);
+    assert.equal((await f.get()).status, 503);
+    const before = origins;
+    assert.equal((await f.get(`https://cache.test/?view=detail-live&id=${secondId}`)).status, 503);
+    assert.equal(origins, before);
+});
+
+test('private overlays are reused during shared live polling and cannot override newer prices', async () => {
+    let privateCalls = 0;
+    const session = { access_token: 'viewer-token', user: { id: 'viewer' } };
+    const client = { auth: { getSession: async () => ({ data: { session } }) }, rpc: async name => {
+        if (name === 'read_ignore_relationships') return { data: false };
+        privateCalls++;
+        return { data: { privacy_version: 1, rows: [{ id, current_bid: 100, seller_id: 'owner', highest_bidder_id: 'viewer', viewer_is_highest_bidder: true }] } };
+    } };
+    const fetcher = async () => Response.json({ privacy_version: 1, shared_cache_version: 1, rows: [{ id, current_bid: 200 }], bids: [], total: 1,
+        public_snapshot: { live_mode: true } });
+    const reader = createPublicAuctionReader(client, { enabled: true, fetch: fetcher });
+    const request = publicRequest(url);
+    await reader.accepts(request);
+    await reader.load(request);
+    const result = await reader.load(request);
+    assert.equal(privateCalls, 1);
+    assert.equal(result.rows[0].current_bid, 200);
+    assert.equal(result.rows[0].highest_bidder_id, null);
+    assert.equal(result.rows[0].viewer_is_highest_bidder, null);
+    session.access_token = 'changed-authorization';
+    await reader.accepts(request);
+    await reader.load(request);
+    assert.equal(privateCalls, 2);
+});
+
+test('legacy invalidations dirty all live auctions and survive object restart', async () => {
+    const f = await liveFixture();
+    await f.get();
+    await f.cache.fetch(notification('8'));
+    const restarted = await fixture(f.storage);
+    assert.equal(restarted.cache.changed({ view: 'batch-live', ids: [secondId] }, '7'), true);
+    assert.equal(restarted.cache.changed({ view: 'batch-live', ids: [secondId] }, '8'), false);
+});
+
+test('live mode rejects catalogue fallback beyond the five-minute bound', async () => {
+    const f = await liveFixture();
+    await f.get();
+    for (const entry of f.cache.entries.values()) entry.storedAt -= 300001;
+    f.cache.readOrigin = async () => { throw cacheFailure('CACHE_ORIGIN_TIMEOUT'); };
+    const response = await f.get();
+    assert.equal(response.status, 503);
+    assert.doesNotMatch(await response.text(), /Test item|current_bid/);
+});
+
+test('live refresh failure preserves fresh sibling auctions and marks only missing states unavailable', async () => {
+    const f = await liveFixture();
+    const original = f.cache.readOrigin;
+    f.cache.readOrigin = async request => {
+        const data = await original(request);
+        if (request.view === 'browse') data.rows.push({ ...data.rows[0], id: secondId });
+        if (request.view === 'batch-live') data.rows = data.rows.filter(row => row.id !== secondId);
+        return data;
+    };
+    const body = await (await f.get()).json();
+    assert.equal(body.rows.find(row => row.id === id).current_bid, 200);
+    assert.equal(body.rows.find(row => row.id === secondId)._live_unavailable, true);
+    assert.equal(body.public_snapshot.live_unavailable, true);
+});
+
+test('scoped live metadata persists across restart without turning unrelated auctions dirty', async () => {
+    const f = await liveFixture();
+    await f.cache.fetch(scopedNotification('4', secondId));
+    const restarted = await fixture(f.storage);
+    assert.equal(restarted.cache.changed({ view: 'batch-live', ids: [id] }, '0'), false);
+    assert.equal(restarted.cache.changed({ view: 'batch-live', ids: [secondId] }, '0'), true);
+});
+
+test('new live responses require client capability; old clients never receive catalogue-only rows', async () => {
+    const f = await liveFixture();
+    const legacy = await f.cache.fetch(new Request(url));
+    assert.equal(legacy.status, 200);
+    assert.equal((await legacy.json()).public_snapshot.live_mode, undefined);
+    assert.equal(f.calls.filter(q => q.view === 'batch-live').length, 0);
+});
+
+test('site proxy forwards only a fixed live capability and never browser credentials', async () => {
+    let forwarded;
+    const env = { PUBLIC_AUCTION_CACHE: { idFromName: () => 'fixed', get: () => ({ fetch(request) {
+        forwarded = request;
+        return Response.json({ ok: true });
+    } }) } };
+    await onRequest({ env, request: new Request(url, { headers: { 'X-Khub-Live-State': '1', Authorization: 'PRIVATE', Cookie: 'PRIVATE' } }) });
+    assert.equal(forwarded.headers.get('X-Khub-Live-State'), '1');
+    assert.equal(forwarded.headers.get('Authorization'), null);
+    assert.equal(forwarded.headers.get('Cookie'), null);
+});
+
+test('one failed live auction does not block a healthy unrelated live auction', async () => {
+    const f = await liveFixture();
+    let origins = 0;
+    f.cache.readOrigin = async request => {
+        f.cache.lastOriginAt = 0; origins++;
+        if (request.ids?.includes(id)) throw cacheFailure('CACHE_ORIGIN_TIMEOUT');
+        const input = source(); input.rows[0].id = secondId;
+        return publicProjection(input, request);
+    };
+    assert.equal((await f.get(`https://cache.test/?view=detail-live&id=${id}`)).status, 503);
+    assert.equal((await f.get(`https://cache.test/?view=detail-live&id=${id}`)).status, 503);
+    assert.equal(origins, 1);
+    const other = await f.get(`https://cache.test/?view=detail-live&id=${secondId}`);
+    assert.equal(other.status, 200);
+    assert.equal((await other.json()).rows[0].current_bid, 100);
+    assert.equal(origins, 2);
+    assert.equal(f.cache.cooldownUntil, 0);
+});
+
+test('a failed missing-state batch still serves a verified cached sibling state', async () => {
+    const f = await liveFixture();
+    await f.get();
+    const original = f.cache.readOrigin;
+    f.cache.readOrigin = async request => {
+        f.cache.lastOriginAt = 0;
+        if (request.view === 'batch-live') throw cacheFailure('CACHE_ORIGIN_TIMEOUT');
+        const data = await original(request);
+        data.rows.push({ ...data.rows[0], id: secondId });
+        return data;
+    };
+    const response = await f.get(`${url}&sort=ending`);
+    const body = await response.json();
+    assert.equal(body.rows.find(row => row.id === id).current_bid, 200);
+    assert.equal(body.rows.find(row => row.id === secondId)._live_unavailable, true);
 });

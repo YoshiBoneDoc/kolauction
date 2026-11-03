@@ -8,7 +8,7 @@ import { createAuctionService } from '../src/lib/auctions.js';
 
 const { outputFiles } = buildSync({ stdin: { contents: `
     import React from 'react';
-    import { renderToStaticMarkup } from 'react-dom/server';
+    import { renderRouteMarkup as renderToStaticMarkup } from './tests/helpers/renderRouteMarkup.mjs';
     import { StaticRouter } from 'react-router-dom';
     import App from './src/App.jsx';
     import { UserContext } from './src/context/UserContext.jsx';
@@ -19,7 +19,7 @@ const { outputFiles } = buildSync({ stdin: { contents: `
         </UserContext.Provider></StaticRouter>);
     }`, resolveDir: fileURLToPath(new URL('../', import.meta.url)), loader: 'jsx' },
     bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external', jsx: 'automatic',
-    define: { 'import.meta.env': '{}' }, loader: { '.gif': 'dataurl' },
+    define: { 'import.meta.env': '{}' }, loader: { '.gif': 'dataurl', '.css': 'empty' },
 });
 const compiled = { exports: {} };
 const requireModule = createRequire(import.meta.url);
@@ -30,19 +30,19 @@ const auction = { id:'direct', auctionNumber:'1234', sellerId:'seller', owner:'S
     hasWinner:true, winnerId:'buyer', winner:'Buyer', finalPrice:500,
     settlementContacts:{ seller:{username:'Seller',kol_name:'Verified Seller',kol_player_id:777}, buyer:{username:'Buyer',kol_name:'Verified Buyer',kol_player_id:888} } };
 
-test('approval link is above Getting Started and opens the framed KMail page', () => {
-    const info = render({ path: '/info', user: null });
+test('approval link is above Getting Started and opens the framed KMail page', async () => {
+    const info = (await render({ path: '/info', user: null }));
     assert.ok(info.indexOf('Officially approved by KoL management!') < info.indexOf('Getting Started'));
     assert.match(info, /href="\/official-approval" target="_blank" rel="noopener noreferrer"[^>]*>See For Yourself ↗<\/a>/);
-    const viewer = render({ path: '/official-approval', user: null, error: 'Unrelated auction error' });
+    const viewer = (await render({ path: '/official-approval', user: null, error: 'Unrelated auction error' }));
     assert.match(viewer, /class="approval-frame"/);
     assert.match(viewer, /src="\/art\/approval-abstract-frame.png"[^>]*width="500" height="400" class="approval-frame-art"/);
     assert.match(viewer, /Loading approval KMail/);
     assert.doesNotMatch(viewer, /<nav|Unrelated auction error|All Auctions|about_me_Pics/);
 });
 
-test('listing form defaults to escrow and offers direct settlement before publishing', () => {
-    const html = render({path:'/auction-item'});
+test('listing form defaults to escrow and offers direct settlement before publishing', async () => {
+    const html = (await render({path:'/auction-item'}));
     assert.match(html, /Trading Method/);
     assert.match(html, /type="button" aria-pressed="true"[^>]*>Escrow<\/button>/);
     assert.match(html, /type="button" aria-pressed="false"[^>]*>Direct<\/button>/);
@@ -60,17 +60,19 @@ test('listing form defaults to escrow and offers direct settlement before publis
     assert.doesNotMatch(html, /7\.5%/);
     assert.match(html, /Set Buyout Price \(optional\)/);
     assert.doesNotMatch(html, /id="instantPurchasePrice"|20 billion Meat/);
-    assert.match(html, /placeholder="e.g. 1000, 10b, 4.53m, 50k"/);
+    assert.match(html, /id="minimum-price-whole"/);
+    assert.match(html, /id="minimum-price-item"/);
+    assert.match(html, /placeholder="e.g. 50k"/);
     assert.doesNotMatch(html, /listing-amount-help|Use whole numbers or k\/m\/b shorthand/);
 });
 
-test('guarantee links point to the full creation-page explanation, available to guests', () => {
-    const updates = render({ path: '/update-log', user: null });
+test('guarantee links point to the full creation-page explanation, available to guests', async () => {
+    const updates = (await render({ path: '/update-log', user: null }));
     assert.match(updates, /href="\/auction-item#escrow-protection"[^>]*>View the updated policy ↗<\/a>/);
-    const info = render({ path: '/info', user: null });
+    const info = (await render({ path: '/info', user: null }));
     assert.match(info, /href="\/auction-item#escrow-protection"[^>]*>fully reimbursed, without a cap<\/a>/);
     assert.doesNotMatch(info, /id="escrow-protection-guarantee"/);
-    const guide = render({ path: '/auction-item#escrow-protection', user: null });
+    const guide = (await render({ path: '/auction-item#escrow-protection', user: null }));
     assert.match(guide, /id="escrow-protection"/);
     assert.match(guide, /Escrow Protection — How It Works/);
     assert.match(guide, /full reimbursement without a cap/);
@@ -78,9 +80,9 @@ test('guarantee links point to the full creation-page explanation, available to 
     assert.doesNotMatch(guide, /<form/);
 });
 
-test('personal trade cards appear above auctions on home and browse, including all pages', () => {
+test('personal trade cards appear above auctions on home and browse, including all pages', async () => {
     for (const path of ['/', '/auctions']) {
-        const html = render({path,pendingTrades:[auction],pendingTotal:15});
+        const html = (await render({path,pendingTrades:[auction],pendingTotal:15}));
         assert.match(html, /Trades? awaiting your response/);
         assert.match(html, /15 pending trades/);
         assert.match(html, /Confirm Complete/);
@@ -92,28 +94,28 @@ test('personal trade cards appear above auctions on home and browse, including a
     }
 });
 
-test('a saved response switches the reminder to experience feedback only for that participant', () => {
-    const html = render({pendingTrades:[{...auction,sellerConfirmedAt:'2026-10-20'}],pendingTotal:1});
+test('a saved response switches the reminder to experience feedback only for that participant', async () => {
+    const html = (await render({pendingTrades:[{...auction,sellerConfirmedAt:'2026-10-20'}],pendingTotal:1}));
     assert.match(html, /Your pending trades/);assert.match(html,/How was your experience trading with this player/);assert.match(html,/Thumbs up for this buyer/);
     assert.doesNotMatch(html, /Confirm Complete/);
-    const buyer = render({user:{id:'buyer'},pendingTrades:[{...auction,sellerConfirmedAt:'2026-10-20'}],pendingTotal:1});
+    const buyer = (await render({user:{id:'buyer'},pendingTrades:[{...auction,sellerConfirmedAt:'2026-10-20'}],pendingTotal:1}));
     assert.match(buyer, /#1234 · Buyer ·/);
     assert.match(buyer, /Confirm Complete/);
-    const confirmedBuyer=render({user:{id:'buyer'},pendingTrades:[{...auction,buyerConfirmedAt:'2026-10-20'}],pendingTotal:1});
+    const confirmedBuyer=(await render({user:{id:'buyer'},pendingTrades:[{...auction,buyerConfirmedAt:'2026-10-20'}],pendingTotal:1}));
     assert.match(confirmedBuyer,/How was your experience trading with this player/);assert.doesNotMatch(confirmedBuyer,/Confirm Complete/);
-    const waitingSeller=render({pendingTrades:[{...auction,buyerConfirmedAt:'2026-10-20'}],pendingTotal:1});
+    const waitingSeller=(await render({pendingTrades:[{...auction,buyerConfirmedAt:'2026-10-20'}],pendingTotal:1}));
     assert.match(waitingSeller,/Confirm Complete/);
 });
 
-test('anonymous and completed accounts see no personal cards; pending failures are visible', () => {
-    assert.doesNotMatch(render({user:null,pendingTrades:[auction],pendingTotal:1}), /Your pending trades/);
-    assert.doesNotMatch(render({pendingTrades:[],pendingTotal:0}), /Your pending trades/);
-    assert.match(render({pendingError:'Private trades unavailable'}), /Pending trades could not be loaded.*Retry/);
+test('anonymous and completed accounts see no personal cards; pending failures are visible', async () => {
+    assert.doesNotMatch((await render({user:null,pendingTrades:[auction],pendingTotal:1})), /Your pending trades/);
+    assert.doesNotMatch((await render({pendingTrades:[],pendingTotal:0})), /Your pending trades/);
+    assert.match((await render({pendingError:'Private trades unavailable'})), /Pending trades could not be loaded.*Retry/);
 });
 
-test('direct participation discloses unfunded bids and optional tips; escrow retains KMail', () => {
+test('direct participation discloses unfunded bids and optional tips; escrow retains KMail', async () => {
     const active={...auction,status:'active',currentBid:0,hasWinner:false,endTime:Date.now()+3600000,instantPurchasePrice:600};
-    const html=render({path:'/auction/direct',user:{id:'buyer'},auctions:[active]});
+    const html=(await render({path:'/auction/direct',user:{id:'buyer'},auctions:[active]}));
     assert.match(html, /Direct Trade — How It Works/);
     assert.match(html, /does not guarantee payment or delivery/);
     assert.doesNotMatch(html, /Direct settlement: trade with the other player after closing/);
@@ -123,7 +125,7 @@ test('direct participation discloses unfunded bids and optional tips; escrow ret
     assert.match(html, /Buy Now/);
     assert.match(html, /Your bid \(Meat\)/);
     assert.doesNotMatch(html, /Direct settlement \(legacy\)/);
-    const escrow=render({path:'/auction/direct',user:{id:'buyer'},auctions:[{...active,escrowMode:true,feeBps:750}]});
+    const escrow=(await render({path:'/auction/direct',user:{id:'buyer'},auctions:[{...active,escrowMode:true,feeBps:750}]}));
     assert.doesNotMatch(escrow, /7.5%|seller commission|Seller fee:/);
     assert.match(escrow, /Escrow Protection — How It Works/);
     assert.doesNotMatch(escrow, /Your bids are secured by kHub, with up to 1M Meat in loss protection during early access/);
@@ -134,8 +136,8 @@ test('direct participation discloses unfunded bids and optional tips; escrow ret
     assert.doesNotMatch(escrow, /Buy Now|Your bid \(Meat\)/);
 });
 
-test('closed direct details show a compact summary and private trade instructions', () => {
-    const html=render({path:'/auction/direct',auctions:[{...auction,instantPurchasedAt:'2026-10-20T19:56:10Z'}]});
+test('closed direct details show a compact summary and private trade instructions', async () => {
+    const html=(await render({path:'/auction/direct',auctions:[{...auction,instantPurchasedAt:'2026-10-20T19:56:10Z'}]}));
     assert.match(html, /Verified Buyer.*#888/);
     assert.match(html, /<strong>Verified Buyer \(#888\)<\/strong>/);
     assert.match(html, /href="https:\/\/www.kingdomofloathing.com\/sendmessage.php\?towho=888"[^>]*>in-game trade<\/a>/);
@@ -156,7 +158,7 @@ test('closed direct details show a compact summary and private trade instruction
         [{buyerReportedIncomplete:true}, 'DC2626', 'Reported Incomplete'],
         [{status:'cancelled'}, '64748B', 'Cancelled'],
     ]) {
-        const statusHtml=render({path:'/auction/direct',auctions:[{...auction,...changes}]});
+        const statusHtml=(await render({path:'/auction/direct',auctions:[{...auction,...changes}]}));
         assert.ok(statusHtml.includes(`text-lg font-bold text-[#${color}]">${label}</p>`));
         if (changes.tradeReported) {
             assert.match(statusHtml, /text-xs leading-4 text-gray-500">At least one party reported the trade incomplete\.<\/p>/);
@@ -165,13 +167,13 @@ test('closed direct details show a compact summary and private trade instruction
     }
 });
 
-test('closed cards keep a consistent trade badge and summary across modes and viewer roles', () => {
+test('closed cards keep a consistent trade badge and summary across modes and viewer roles', async () => {
     const trade={...auction,owner:'Public Seller',winner:'Public Buyer',publicWinner:true,
         finalizedAt:'2026-10-20T12:00:00Z',instantPurchasedAt:'2026-10-20T12:00:00Z',
         feeMeat:37,feeBps:750,tradeReported:true,ownTradeReport:'B-5678'};
     for (const escrowMode of [false,true]) {
         for (const user of [{id:'seller'},{id:'buyer'},{id:'other'},null,{id:'seller',isBanned:true}]) {
-            const html=render({path:'/auction/direct',user,auctions:[{...trade,escrowMode}]});
+            const html=(await render({path:'/auction/direct',user,auctions:[{...trade,escrowMode}]}));
             const top=html.split('aria-label="Auction outcome"')[0].split('aria-label="Auction escrow"')[0];
             const participant=Boolean(user && !user.isBanned && ['seller','buyer'].includes(user.id));
             assert.match(top,escrowMode ? />Escrow<\/span>/ : />Direct trade<\/span>/);
@@ -202,16 +204,16 @@ test('closed cards keep a consistent trade badge and summary across modes and vi
             assert.doesNotMatch(html,/Confirm Complete|Report Incomplete/);
         }
     }
-    const masked=render({path:'/auction/direct',user:{id:'seller'},auctions:[{...trade,usernamesVisible:false}]});
+    const masked=(await render({path:'/auction/direct',user:{id:'seller'},auctions:[{...trade,usernamesVisible:false}]}));
     assert.doesNotMatch(masked,/Public Seller|Public Buyer|Verified Buyer|Verified Seller|Your trading partner:|Withdraw Incomplete Report|Contact an Administrator|B-5678/);
 });
 
-test('active cards show only the appropriate bidding, buyout and cancellation actions', () => {
+test('active cards show only the appropriate bidding, buyout and cancellation actions', async () => {
     const active={...auction,status:'active',hasWinner:false,currentBid:0,highestBidderId:null,
         winnerId:null,bidCount:0,endTime:Date.now()+3600000,instantPurchasePrice:600};
     for (const escrowMode of [false,true]) {
         for (const user of [{id:'seller'},{id:'buyer'},{id:'other'},null,{id:'buyer',isBanned:true}]) {
-            const html=render({path:'/auction/direct',user,auctions:[{...active,escrowMode}]});
+            const html=(await render({path:'/auction/direct',user,auctions:[{...active,escrowMode}]}));
             assert.match(html,escrowMode ? />Escrow<\/span>/ : />Direct trade<\/span>/);
             if (user?.id === 'seller') {
                 assert.match(html,/This is your listing/);
@@ -253,18 +255,18 @@ test('pending read is paginated, projects contacts and refuses old or failing re
     await assert.rejects(createAuctionService({async rpc() {return {error:{code:'PGRST202'}};}}).pendingTrades(),/pending auction SQL migrations/);
 });
 
-test('unconfirmed participants can open a trade-problem form, while reported and unrelated accounts cannot',()=>{
+test('unconfirmed participants can open a trade-problem form, while reported and unrelated accounts cannot',async () =>{
     const closed={...auction,finalizedAt:'2026-10-20T12:00:00Z'};
-    const cards=render({pendingTrades:[closed],pendingTotal:1});
+    const cards=(await render({pendingTrades:[closed],pendingTotal:1}));
     assert.match(cards,/href="\/auction\/direct\/report-trade"[^>]*>Report Incomplete/);
-    const form=render({path:'/auction/direct/report-trade',auctions:[closed]});
+    const form=(await render({path:'/auction/direct/report-trade',auctions:[closed]}));
     assert.match(form,/<textarea[^>]*maxLength="2000"/);
     assert.match(form,/Report Incomplete/);
     assert.doesNotMatch(form,/<textarea[^>]*(?:required|minLength)/);
-    assert.doesNotMatch(render({path:'/auction/direct/report-trade',user:{id:'stranger'},auctions:[closed]}),/<textarea/);
-    assert.doesNotMatch(render({path:'/auction/direct/report-trade',auctions:[{...closed,sellerConfirmedAt:'2026-10-20'}]}),/<textarea/);
-    assert.match(render({pendingTrades:[{...closed,ownTradeReport:'B-1234'}],pendingTotal:1}),/How was your experience trading with this player/);
-    const reported=render({path:'/auction/direct',auctions:[{...closed,ownTradeReport:'B-1234',tradeReported:true}]});
+    assert.doesNotMatch((await render({path:'/auction/direct/report-trade',user:{id:'stranger'},auctions:[closed]})),/<textarea/);
+    assert.doesNotMatch((await render({path:'/auction/direct/report-trade',auctions:[{...closed,sellerConfirmedAt:'2026-10-20'}]})),/<textarea/);
+    assert.match((await render({pendingTrades:[{...closed,ownTradeReport:'B-1234'}],pendingTotal:1})),/How was your experience trading with this player/);
+    const reported=(await render({path:'/auction/direct',auctions:[{...closed,ownTradeReport:'B-1234',tradeReported:true}]}));
     assert.match(reported,/Reported Incomplete/);
     assert.doesNotMatch(reported,/Negative Feedback Submitted/);
     assert.match(reported,/Reference: B-1234/);
@@ -272,9 +274,9 @@ test('unconfirmed participants can open a trade-problem form, while reported and
     assert.doesNotMatch(reported,/Confirm Complete|Report Incomplete/);
 });
 
-test('a reported trade offers author withdrawal and a participant-only administrator query',()=>{
+test('a reported trade offers author withdrawal and a participant-only administrator query',async () =>{
     const trade={...auction,finalizedAt:'2026-10-20T12:00:00Z',ownTradeReport:'B-1234',tradeReported:true};
-    const html=render({path:'/auction/direct',auctions:[trade]});
+    const html=(await render({path:'/auction/direct',auctions:[trade]}));
     assert.match(html,/<h3 class="mb-2 font-bold text-black">Trade status:<\/h3>/);
     assert.match(html,/Reported Incomplete<\/span><span class="text-xs text-black">by seller/);
     assert.match(html,/Awaiting response<\/span><span class="text-xs text-black">by buyer/);
@@ -282,17 +284,17 @@ test('a reported trade offers author withdrawal and a participant-only administr
     assert.match(html,/Everything sorted out\?/);
     assert.match(html,/Mark Trade Complete<\/button>/);
     assert.match(html,/Contact an Administrator/);
-    const buyer=render({path:'/auction/direct',user:{id:'buyer'},auctions:[{...trade,sellerConfirmedAt:'2026-10-20'}]});
+    const buyer=(await render({path:'/auction/direct',user:{id:'buyer'},auctions:[{...trade,sellerConfirmedAt:'2026-10-20'}]}));
     assert.match(buyer,/Confirmed Complete<\/span><span class="text-xs text-black">by seller/);
     assert.match(buyer,/Reported Incomplete<\/span><span class="text-xs text-black">by buyer/);
-    const withdrawn=render({path:'/auction/direct',auctions:[{...trade,ownTradeReportWithdrawn:true,tradeReported:false}]});
+    const withdrawn=(await render({path:'/auction/direct',auctions:[{...trade,ownTradeReportWithdrawn:true,tradeReported:false}]}));
     assert.match(withdrawn,/Confirm Complete/);
     assert.doesNotMatch(withdrawn,/Withdraw Incomplete Report|Negative Feedback Submitted|Report Incomplete/);
-    assert.match(render({path:'/auction/direct/trade-query',auctions:[trade]}),/<textarea[^>]*minLength="10"/);
-    assert.doesNotMatch(render({path:'/auction/direct/trade-query',auctions:[trade],user:{id:'outsider'}}),/<textarea/);
+    assert.match((await render({path:'/auction/direct/trade-query',auctions:[trade]})),/<textarea[^>]*minLength="10"/);
+    assert.doesNotMatch((await render({path:'/auction/direct/trade-query',auctions:[trade],user:{id:'outsider'}})),/<textarea/);
 });
 
-test('Escrow queries reuse the existing form for sellers and finalized winners only', () => {
+test('Escrow queries reuse the existing form for sellers and finalized winners only', async () => {
     for (const status of ['pending_escrow', 'active', 'settling', 'completed', 'ended_no_bids', 'cancelled']) {
         const closedSale = ['settling', 'completed'].includes(status);
         const lot = { ...auction, escrowMode: true, status, endTime: Date.now() + 86400000,
@@ -301,7 +303,7 @@ test('Escrow queries reuse the existing form for sellers and finalized winners o
             currentBid: closedSale ? 500 : 0 };
         for (const user of [{ id: 'seller' }, { id: 'buyer' }, { id: 'outsider' }, { id: 'seller', isBanned: true }, null]) {
             const allowed = user && !user.isBanned && (user.id === 'seller' || (closedSale && user.id === 'buyer'));
-            const query = render({ path: '/auction/direct/trade-query', auctions: [lot], user });
+            const query = (await render({ path: '/auction/direct/trade-query', auctions: [lot], user }));
             assert.equal(/<textarea/.test(query), Boolean(allowed), `${status}: ${user?.id}`);
             if (allowed) {
                 assert.match(query, /Escrow/);
@@ -310,23 +312,23 @@ test('Escrow queries reuse the existing form for sellers and finalized winners o
             }
             // App replaces the whole site for banned users; test other viewers here.
             if (!user?.isBanned) {
-                const detail = render({ path: '/auction/direct', auctions: [lot], user });
+                const detail = (await render({ path: '/auction/direct', auctions: [lot], user }));
                 assert.equal(/Contact an Administrator/.test(detail), Boolean(allowed), `${status} link: ${user?.id}`);
             }
         }
     }
     const leading = { ...auction, escrowMode: true, status: 'active', endTime: Date.now() + 86400000,
         highestBidderId: 'buyer', winnerId: null, finalizedAt: null };
-    assert.doesNotMatch(render({ path: '/auction/direct/trade-query', auctions: [leading], user: { id: 'buyer' } }), /<textarea/);
+    assert.doesNotMatch((await render({ path: '/auction/direct/trade-query', auctions: [leading], user: { id: 'buyer' } })), /<textarea/);
 });
 
-test('dismissed reports explain administrator action and the cleared mark publicly without completing the trade', () => {
+test('dismissed reports explain administrator action and the cleared mark publicly without completing the trade', async () => {
     for (const role of ['seller', 'buyer']) {
         const target = role === 'seller' ? 'buyer' : 'seller';
         const lot = { ...auction, finalizedAt: '2026-10-21', [`${role}ReportExcluded`]: true,
             [`${target}ConfirmedAt`]: '2026-10-21', tradeReported: false };
         for (const user of [{ id: 'seller' }, { id: 'buyer' }, { id: 'outsider' }, null]) {
-            const html = render({ path: '/auction/direct', auctions: [lot], user });
+            const html = (await render({ path: '/auction/direct', auctions: [lot], user }));
             const top = html.split('aria-label="Auction outcome"')[0];
             assert.match(top, /Awaiting settlement/);
             assert.match(top, new RegExp(`The ${role}’s incomplete report was dismissed by an administrator`));
@@ -334,21 +336,21 @@ test('dismissed reports explain administrator action and the cleared mark public
             assert.match(html, new RegExp(`No incomplete mark is counted against the ${target} for this report`));
             assert.doesNotMatch(html, /Both parties confirmed|Trade completed/);
         }
-        const mixed = render({ path: '/auction/direct', auctions: [{ ...lot, [`${target}ReportedIncomplete`]: true,
-            [`${target}ConfirmedAt`]: null, tradeReported: true }] });
+        const mixed = (await render({ path: '/auction/direct', auctions: [{ ...lot, [`${target}ReportedIncomplete`]: true,
+            [`${target}ConfirmedAt`]: null, tradeReported: true }] }));
         assert.match(mixed, /Reported Incomplete/);
         assert.match(mixed, /dismissed by an administrator/);
     }
-    const both = render({ path: '/auction/direct', auctions: [{ ...auction, sellerReportExcluded: true, buyerReportExcluded: true }] });
+    const both = (await render({ path: '/auction/direct', auctions: [{ ...auction, sellerReportExcluded: true, buyerReportExcluded: true }] }));
     assert.match(both, /Both incomplete reports were dismissed by an administrator/);
     assert.match(both, /No incomplete mark is counted against the buyer for this report/);
     assert.match(both, /No incomplete mark is counted against the seller for this report/);
 });
 
-test('both participants see matching response badges and the neutral withdrawal dialog', () => {
+test('both participants see matching response badges and the neutral withdrawal dialog', async () => {
     const trade={...auction,finalizedAt:'2026-10-20',sellerReportedIncomplete:true,buyerReportedIncomplete:false,buyerConfirmedAt:'2026-10-20',tradeReported:true};
     for (const user of [{id:'seller'},{id:'buyer'}]) {
-        const html=render({path:'/auction/direct',user,auctions:[{...trade,ownTradeReport:user.id==='seller'?'B-1234':null}]});
+        const html=(await render({path:'/auction/direct',user,auctions:[{...trade,ownTradeReport:user.id==='seller'?'B-1234':null}]}));
         assert.match(html,/border-red-200 bg-red-50 text-red-700">Reported Incomplete<\/span><span class="text-xs text-black">by seller/);
         assert.match(html,/border-green-200 bg-green-50 text-green-800">Confirmed Complete<\/span><span class="text-xs text-black">by buyer/);
         if (user.id==='seller') {
@@ -361,52 +363,52 @@ test('both participants see matching response badges and the neutral withdrawal 
         }
         assert.doesNotMatch(html,/negative feedback|Negative Feedback|Give thumbs down|Submit thumbs down/);
     }
-    const stranger=render({path:'/auction/direct',user:{id:'other'},auctions:[trade]});
+    const stranger=(await render({path:'/auction/direct',user:{id:'other'},auctions:[trade]}));
     assert.match(stranger,/>Reported Incomplete<\/span><span class="text-xs text-black">by seller \(Seller\)/);
     assert.match(stranger,/>Confirmed Complete<\/span><span class="text-xs text-black">by buyer \(Buyer\)/);
     assert.doesNotMatch(stranger,/Withdraw Incomplete Report|Trade instructions|Verified Buyer|Verified Seller|Reference: B-/);
-    const awaiting=render({path:'/auction/direct',auctions:[auction]});
+    const awaiting=(await render({path:'/auction/direct',auctions:[auction]}));
     assert.match(awaiting,/border-slate-200 bg-slate-50 text-slate-500">Awaiting response<\/span>/);
 });
 
-test('neutral completion never offers another confirmation or pending reminder', () => {
+test('neutral completion never offers another confirmation or pending reminder', async () => {
     const neutral={...auction,sellerResolvedAt:'2026-10-20',ownTradeReport:'B-1234',ownTradeReportWithdrawn:true};
-    const html=render({path:'/auction/direct',auctions:[neutral]});
+    const html=(await render({path:'/auction/direct',auctions:[neutral]}));
     assert.match(html,/Confirmed Complete<\/span><span class="text-xs text-black">by seller/);
     assert.match(html,/Your incomplete report was withdrawn/);
     assert.doesNotMatch(html,/no positive rating was added/i);
     assert.doesNotMatch(html,/>Confirm Complete<|Withdraw Incomplete Report|Confirm below only after/);
-    const pending=render({pendingTrades:[neutral],pendingTotal:1});
+    const pending=(await render({pendingTrades:[neutral],pendingTotal:1}));
     assert.match(pending,/How was your experience trading with this player/);assert.doesNotMatch(pending,/>Confirm Complete</);
 });
 
-test('a confirmed participant is not told to wait after the other party responded', () => {
+test('a confirmed participant is not told to wait after the other party responded', async () => {
     for (const [id, ownRole, otherRole] of [['buyer','buyer','seller'],['seller','seller','buyer']]) {
         const trade={...auction,finalizedAt:'2026-10-20',tradeReported:true,
             [`${ownRole}ConfirmedAt`]:'2026-10-20',[`${otherRole}ReportedIncomplete`]:true};
-        const html=render({path:'/auction/direct',user:{id},auctions:[trade]});
+        const html=(await render({path:'/auction/direct',user:{id},auctions:[trade]}));
         assert.match(html,/You confirmed this trade as complete, but the other party reported it as incomplete\./);
         assert.doesNotMatch(html,/Awaiting the other party’s response/);
         assert.match(html,/Need to clarify something\?/);
         assert.match(html,/Contact an Administrator/);
-        const both=render({path:'/auction/direct',user:{id},auctions:[{...trade,tradeReported:false,
-            [`${otherRole}ReportedIncomplete`]:false,[`${otherRole}ConfirmedAt`]:'2026-10-20'}]});
+        const both=(await render({path:'/auction/direct',user:{id},auctions:[{...trade,tradeReported:false,
+            [`${otherRole}ReportedIncomplete`]:false,[`${otherRole}ConfirmedAt`]:'2026-10-20'}]}));
         assert.match(both,/Both you and the other party confirmed this trade as complete\./);
         assert.doesNotMatch(both,/Awaiting the other party’s response/);
     }
-    const oldSnapshot=render({path:'/auction/direct',user:{id:'buyer'},auctions:[{...auction,buyerConfirmedAt:'2026-10-20',tradeReported:true}]});
+    const oldSnapshot=(await render({path:'/auction/direct',user:{id:'buyer'},auctions:[{...auction,buyerConfirmedAt:'2026-10-20',tradeReported:true}]}));
     assert.match(oldSnapshot,/the other party reported it as incomplete/);
     assert.doesNotMatch(oldSnapshot,/Awaiting the other party’s response/);
-    const stranger=render({path:'/auction/direct',user:{id:'other'},auctions:[auction]});
+    const stranger=(await render({path:'/auction/direct',user:{id:'other'},auctions:[auction]}));
     assert.doesNotMatch(stranger,/Need to clarify something\?|Contact an Administrator/);
 });
 
-test('public response badges name players only for unrestricted signed-in viewers', () => {
+test('public response badges name players only for unrestricted signed-in viewers', async () => {
     const trade={...auction,owner:'Named Seller',winner:'Named Buyer',publicWinner:true,
         sellerReportedIncomplete:true,buyerReportedIncomplete:false,buyerConfirmedAt:'2026-10-20',tradeReported:true,
         ownTradeReport:'B-1234',finalizedAt:'2026-10-20'};
     for (const user of [{id:'seller'},{id:'buyer'},{id:'other'},null,{id:'other',isBanned:true}]) {
-        const html=render({path:'/auction/direct',user,auctions:[trade]});
+        const html=(await render({path:'/auction/direct',user,auctions:[trade]}));
         assert.match(html,/Reported Incomplete<\/span><span class="text-xs text-black">by seller/);
         assert.match(html,/Confirmed Complete<\/span><span class="text-xs text-black">by buyer/);
         assert.match(html,/At least one party reported the trade incomplete/);
@@ -422,38 +424,38 @@ test('public response badges name players only for unrestricted signed-in viewer
             assert.doesNotMatch(html,/Your trading partner|Verified Buyer|Verified Seller|Reference: B-|Withdraw Incomplete Report|>Confirm Complete<|>Report Incomplete<|Contact an Administrator/);
         }
     }
-    const masked=render({path:'/auction/direct',user:{id:'other'},auctions:[{...trade,usernamesVisible:false}]});
+    const masked=(await render({path:'/auction/direct',user:{id:'other'},auctions:[{...trade,usernamesVisible:false}]}));
     assert.doesNotMatch(masked,/Named Seller|Named Buyer/);
     assert.match(masked,/Reported Incomplete/);
 });
 
-test('buyout history labels do not depend on private bidder IDs', () => {
+test('buyout history labels do not depend on private bidder IDs', async () => {
     const purchasedAt='2026-10-20T19:56:10Z';
     const trade={...auction,publicWinner:true,instantPurchasePrice:500,instantPurchasedAt:purchasedAt,
         bids:[{id:'earlier',bidder:'Bidder 1',bidderId:null,amount:100,timestamp:Date.parse(purchasedAt)-1000},
             {id:'buyout',bidder:'Bidder 2',bidderId:null,amount:500,timestamp:Date.parse(purchasedAt)+1}]};
     for (const user of [{id:'seller'},{id:'buyer'},{id:'other'},null]) {
-        const html=render({path:'/auction/direct',user,auctions:[trade]});
+        const html=(await render({path:'/auction/direct',user,auctions:[trade]}));
         assert.match(html,/500 Meat<\/p><p class="text-xs font-semibold text-green-700">Buyout<\/p><p class="text-xs text-gray-600">/);
         assert.equal((html.match(/>Buyout<\/p>/g)||[]).length,1);
         assert.doesNotMatch(html,/>Winning bid<\/p>/);
     }
-    const unpurchased=render({path:'/auction/direct',auctions:[{...trade,instantPurchasedAt:null}]});
+    const unpurchased=(await render({path:'/auction/direct',auctions:[{...trade,instantPurchasedAt:null}]}));
     assert.doesNotMatch(unpurchased,/>Buyout<\/p>/);
     assert.match(unpurchased,/500 Meat<\/p><p class="text-xs font-semibold text-green-700">Winning bid<\/p><p class="text-xs text-gray-600">/);
     assert.equal((unpurchased.match(/>Winning bid<\/p>/g)||[]).length,1);
     for (const status of ['active','cancelled','ended_no_bids']) {
-        const unfinished=render({path:'/auction/direct',auctions:[{...trade,status,hasWinner:false,instantPurchasedAt:null,endTime:Date.now()+3600000}]});
+        const unfinished=(await render({path:'/auction/direct',auctions:[{...trade,status,hasWinner:false,instantPurchasedAt:null,endTime:Date.now()+3600000}]}));
         assert.doesNotMatch(unfinished,/>Winning bid<\/p>|>Buyout<\/p>/);
     }
 });
 
 
-test('completed escrow fees appear in seller settlement details rather than buyer or public views', () => {
+test('completed escrow fees appear in seller settlement details rather than buyer or public views', async () => {
     const settled = { ...auction, escrowMode: true, status: 'completed', feeMeat: 37 };
-    assert.match(render({ path: '/auction/direct', user: { id: 'seller' }, auctions: [settled] }), /Tiered Fee \([0-9.]+%\): 37 Meat/);
+    assert.match((await render({ path: '/auction/direct', user: { id: 'seller' }, auctions: [settled] })), /Tiered Fee \([0-9.]+%\): 37 Meat/);
     for (const user of [{ id: 'buyer' }, { id: 'outsider' }, null]) {
-        const html = render({ path: '/auction/direct', user, auctions: [settled] });
+        const html = (await render({ path: '/auction/direct', user, auctions: [settled] }));
         assert.doesNotMatch(html, /Tiered Fee|Seller fee:|seller commission|7.5%/);
     }
 });
@@ -472,29 +474,29 @@ test('creation sends starting bids above 1M for default Escrow, explicit Escrow 
 });
 
 
-test('experience reminders follow either completion response and disappear after a saved vote',()=>{
+test('experience reminders follow either completion response and disappear after a saved vote',async () =>{
  for(const path of ['/', '/auctions'])for(const userId of ['seller','buyer']){
   for(const response of [{[`${userId}ConfirmedAt`]:'2026-10-23'},{ownTradeReport:'B-1'},{[`${userId}ResolvedAt`]:'2026-10-23',ownTradeReport:'B-1',ownTradeReportWithdrawn:true}]){
    const trade={...auction,...response};
-   const html=render({path,user:{id:userId},pendingTrades:[trade],pendingTotal:1});
+   const html=(await render({path,user:{id:userId},pendingTrades:[trade],pendingTotal:1}));
    assert.match(html,/bg-amber-50/);assert.match(html,/How was your experience trading with this player\?/);
    assert.match(html,/Thumbs up for/);assert.match(html,/Thumbs down for/);
    assert.doesNotMatch(html,/Was this trade completed|Confirm Complete|Report Incomplete|Rate This/);
-   for(const ownFeedback of [1,-1])assert.doesNotMatch(render({path,user:{id:userId},pendingTrades:[{...trade,ownFeedback}],pendingTotal:1}),/Your pending trades/);
+   for(const ownFeedback of [1,-1])assert.doesNotMatch((await render({path,user:{id:userId},pendingTrades:[{...trade,ownFeedback}],pendingTotal:1})),/Your pending trades/);
   }
  }
  const complete={...auction,status:'completed',sellerConfirmedAt:'2026-10-23',buyerConfirmedAt:'2026-10-23'};
- assert.match(render({pendingTrades:[complete],pendingTotal:1}),/How was your experience/);
- for(const user of [null,{id:'other'},{id:'seller',isBanned:true}])assert.doesNotMatch(render({user,pendingTrades:[complete],pendingTotal:1}),/How was your experience/);
+ assert.match((await render({pendingTrades:[complete],pendingTotal:1})),/How was your experience/);
+ for(const user of [null,{id:'other'},{id:'seller',isBanned:true}])assert.doesNotMatch((await render({user,pendingTrades:[complete],pendingTotal:1})),/How was your experience/);
 });
 
-test('concluded auction overview shows actual bidding end time, including early buyouts',()=>{
+test('concluded auction overview shows actual bidding end time, including early buyouts',async () =>{
     const endTime=Date.parse('2026-10-20T18:00:00Z');
     const closed={...auction,endTime,finalizedAt:'2026-10-21T19:00:00Z'};
-    const regular=render({path:'/auction/direct',auctions:[closed]});
+    const regular=(await render({path:'/auction/direct',auctions:[closed]}));
     assert.match(regular,/Auction ended: <time dateTime="2026-10-20T18:00:00\.000Z"/);
-    const buyout=render({path:'/auction/direct',auctions:[{...closed,instantPurchasedAt:'2026-10-20T17:00:00Z'}]});
+    const buyout=(await render({path:'/auction/direct',auctions:[{...closed,instantPurchasedAt:'2026-10-20T17:00:00Z'}]}));
     assert.match(buyout,/Auction ended: <time dateTime="2026-10-20T17:00:00\.000Z"/);
-    const live=render({path:'/auction/direct',auctions:[{...auction,status:'active',endTime:Date.now()+3600000}]});
+    const live=(await render({path:'/auction/direct',auctions:[{...auction,status:'active',endTime:Date.now()+3600000}]}));
     assert.doesNotMatch(live,/Auction ended:/);
 });

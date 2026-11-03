@@ -18,7 +18,7 @@ const { outputFiles } = buildSync({ stdin: { contents: `
     export { AuctionsContext } from './src/context/AuctionsContext.jsx';
     export { UserContext } from './src/context/UserContext.jsx';
 `, resolveDir: fileURLToPath(new URL('../', import.meta.url)), loader: 'jsx' }, bundle: true, write: false,
-    platform: 'node', format: 'cjs', packages: 'external', jsx: 'automatic', define: { 'import.meta.env': '{}' }, loader: { '.gif': 'dataurl' },
+    platform: 'node', format: 'cjs', packages: 'external', jsx: 'automatic', define: { 'import.meta.env': '{}' }, loader: { '.gif': 'dataurl', '.css': 'empty' },
 });
 let active;
 let user = { id: 'buyer' };

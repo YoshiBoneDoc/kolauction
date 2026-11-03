@@ -10,7 +10,7 @@ import { getAuctionResult } from '../src/lib/auctionLifecycle.js';
 
 const { outputFiles } = buildSync({ stdin: { contents: `
     import React from 'react';
-    import { renderToStaticMarkup } from 'react-dom/server';
+    import { renderRouteMarkup as renderToStaticMarkup } from './tests/helpers/renderRouteMarkup.mjs';
     import { StaticRouter } from 'react-router-dom';
     import App from './src/App.jsx';
     import { UserContext } from './src/context/UserContext.jsx';
@@ -21,7 +21,7 @@ const { outputFiles } = buildSync({ stdin: { contents: `
         </UserContext.Provider></StaticRouter>);
     }`, resolveDir: fileURLToPath(new URL('../', import.meta.url)), loader: 'jsx' },
     bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external', jsx: 'automatic',
-    define: { 'import.meta.env': '{}' }, loader: { '.gif': 'dataurl' },
+    define: { 'import.meta.env': '{}' }, loader: { '.gif': 'dataurl', '.css': 'empty' },
 });
 const compiled = { exports: {} };
 const requireModule = createRequire(import.meta.url);
@@ -55,17 +55,17 @@ const auction = { id: 'lot', sellerId: 'seller', owner: 'Seller', item: 'Test lo
     winner: 'Bidder 1', finalPrice: 300, endTime: 1, bids: [] };
 const seller = { id: 'seller', username: 'Seller', stats: { escrow_buys:0,direct_bought_value:'20000000',escrow_bought_value:'0',seller_confirmed:1,buyer_confirmed:0,seller_incomplete:0,buyer_incomplete:0,seller_positive:0,seller_negative:0,buyer_positive:0,buyer_negative:0,escrow_sales: 2, escrow_value: '9007199254740993', escrow_units: '4', active: 0, pending: 1, unsold: 3, cancelled: 0, legacy_sales: 1, legacy_value: '300', buy_order_sales: 2, buy_order_units: 1326, buy_order_value: '561200' } };
 
-test('seller profile back link goes to the owner account only for the signed-in owner', () => {
+test('seller profile back link goes to the owner account only for the signed-in owner', async () => {
     for (const path of ['/seller/seller', '/seller/seller?view=stats']) {
         const state = { path, seller, auctions: [], total: 0 };
-        assert.match(render({ ...state, user: { id: 'seller' } }), /href="\/profile"[^>]*>← Back to Account Profile<\/a>/);
-        assert.match(render({ ...state, user: { id: 'viewer', khubUsername: 'Seller' } }), /href="\/auctions"[^>]*>← Back to Auctions<\/a>/);
-        assert.match(render(state), /href="\/auctions"[^>]*>← Back to Auctions<\/a>/);
+        assert.match((await render({ ...state, user: { id: 'seller' } })), /href="\/profile"[^>]*>← Back to Account Profile<\/a>/);
+        assert.match((await render({ ...state, user: { id: 'viewer', khubUsername: 'Seller' } })), /href="\/auctions"[^>]*>← Back to Auctions<\/a>/);
+        assert.match((await render(state)), /href="\/auctions"[^>]*>← Back to Auctions<\/a>/);
     }
 });
 
-test('public seller route renders history, separate sale evidence and compact large totals without login', () => {
-    const html = render({ seller, auctions: [auction], total: 25 });
+test('public seller route renders history, separate sale evidence and compact large totals without login', async () => {
+    const html = (await render({ seller, auctions: [auction], total: 25 }));
     assert.match(html, /Escrow Trades/);
     assert.match(html, /9,007,199\.3b[\s\S]*?Sold/);
     assert.match(html, /Trade History/);
@@ -88,8 +88,8 @@ test('public seller route renders history, separate sale evidence and compact la
     assert.doesNotMatch(html, /Change password|Get verification code|Confirm my trade/);
 });
 
-test('escrow-only sellers have no direct-settlement track record', () => {
-    const html = render({ seller: { ...seller, stats: { ...seller.stats, escrow_sales: 200, legacy_sales: 0, legacy_value: '0', seller_confirmed: 0 } }, auctions: [], total: 0 });
+test('escrow-only sellers have no direct-settlement track record', async () => {
+    const html = (await render({ seller: { ...seller, stats: { ...seller.stats, escrow_sales: 200, legacy_sales: 0, legacy_value: '0', seller_confirmed: 0 } }, auctions: [], total: 0 }));
     assert.match(html, /<span class="font-medium text-gray-500">Sales: 0<\/span>/);
     assert.match(html, /0[\s\S]*?Sold/);
     assert.match(html, /Sales: 200/);
@@ -98,8 +98,8 @@ test('escrow-only sellers have no direct-settlement track record', () => {
     assert.doesNotMatch(html, /100%|positive ratings: 200/i);
 });
 
-test('detailed seller view explains metrics while preserving listing filters', () => {
-    const html = render({ path: '/seller/seller?view=stats&status=all&q=hat&page=2', seller, auctions: [], total: 25 });
+test('detailed seller view explains metrics while preserving listing filters', async () => {
+    const html = (await render({ path: '/seller/seller?view=stats&status=all&q=hat&page=2', seller, auctions: [], total: 25 }));
     assert.match(html, /Negative feedback doesn’t necessarily mean a trade was incomplete/);
     assert.match(html, /<em>Incomplete reports may be disputed and dismissed after administrator review\.<\/em>/);
     assert.match(html, /How this works/);
@@ -109,22 +109,22 @@ test('detailed seller view explains metrics while preserving listing filters', (
     assert.doesNotMatch(html, /Auction history|Seller auctions|Search items|public-profile-auction-list|Listing activity|Page 2 of 2/);
 });
 
-test('switching public profile tabs preserves search, status and sorting, with All auctions as the default', () => {
-    const auctions = render({ path: '/seller/seller?status=cancelled&sort=price-desc&q=boots&page=2', seller, auctions: [], total: 0 });
+test('switching public profile tabs preserves search, status and sorting, with All auctions as the default', async () => {
+    const auctions = (await render({ path: '/seller/seller?status=cancelled&sort=price-desc&q=boots&page=2', seller, auctions: [], total: 0 }));
     assert.match(auctions, /href="\/seller\/seller\?status=cancelled&amp;sort=price-desc&amp;q=boots&amp;page=2&amp;view=stats"/);
-    const profile = render({ path: '/seller/seller?view=stats&status=cancelled&sort=newest&q=coat&page=3', seller, auctions: [], total: 0 });
+    const profile = (await render({ path: '/seller/seller?view=stats&status=cancelled&sort=newest&q=coat&page=3', seller, auctions: [], total: 0 }));
     assert.match(profile, /href="\/seller\/seller\?status=cancelled&amp;sort=newest&amp;q=coat&amp;page=3"/);
-    const defaultAuctions = render({ path: '/seller/seller', seller, auctions: [], total: 0 });
+    const defaultAuctions = (await render({ path: '/seller/seller', seller, auctions: [], total: 0 }));
     assert.match(defaultAuctions, /href="\/seller\/seller\?view=stats"/);
     assert.doesNotMatch(defaultAuctions, /href="\/seller\/seller\?view=stats&amp;status=/);
     assert.match(defaultAuctions, /<option value="all" selected="">All auctions<\/option>/);
     assert.match(defaultAuctions, /<option value="ending" selected="">Ending soon<\/option>/);
 });
 
-test('seller links on auction cards and details navigate to the public profile', () => {
-    const detail = render({ path: '/auction/lot', user:{id:'viewer'}, seller, auctions: [auction], total: 1 });
+test('seller links on auction cards and details navigate to the public profile', async () => {
+    const detail = (await render({ path: '/auction/lot', user:{id:'viewer'}, seller, auctions: [auction], total: 1 }));
     assert.match(detail, /href="\/seller\/seller"[^>]*>Seller<\/a>/);
-    const profile = render({ path: '/seller/seller', user:{id:'viewer'}, seller, auctions: [auction], total: 1 });
+    const profile = (await render({ path: '/seller/seller', user:{id:'viewer'}, seller, auctions: [auction], total: 1 }));
     for (const html of [detail, profile]) {
         assert.match(html, /Winner:|Winning bidder:/);
         assert.match(html, /Bidder 1/);
@@ -132,14 +132,14 @@ test('seller links on auction cards and details navigate to the public profile',
     assert.doesNotMatch(profile.match(/<article class="public-profile-auction-row[\s\S]*?<\/article>/)[0], />Seller<\/a>/);
 });
 
-test('public profile sell and buy cards show compact auction details and actions', () => {
+test('public profile sell and buy cards show compact auction details and actions', async () => {
     const image = 'https://images.kingdomofloathing.com/itemimages/tooth.gif';
     const sell = { ...auction, status: 'active', hasWinner: false, winnerId: null, currentBid: 0,
         image, endTime: Date.now() + 3600000, auctionNumber: 41 };
     const buy = { ...sell, id: 'buy-lot', auctionKind: 'buy', pricePerItem: 400, quantity: 10,
         purchasedQuantity: 4, reducedQuantity: 1, reservedQuantity: 2 };
-    const html = render({ path: '/seller/seller?status=all', user: { id: 'viewer' }, seller,
-        auctions: [sell, buy], total: 2 });
+    const html = (await render({ path: '/seller/seller?status=all', user: { id: 'viewer' }, seller,
+        auctions: [sell, buy], total: 2 }));
 
     assert.match(html, /profile-auction-kind-sell/);
     assert.match(html, /profile-auction-kind-buy/);
@@ -156,15 +156,15 @@ test('public profile sell and buy cards show compact auction details and actions
     assert.equal((html.match(new RegExp(`<img[^>]*src="${image}"`, 'g')) || []).length, 2);
 });
 
-test('public profile countdown urgency follows the one-hour and one-day thresholds', () => {
+test('public profile countdown urgency follows the one-hour and one-day thresholds', async () => {
     for (const [remaining, expectedClass] of [[30 * 60 * 1000, 'is-urgent'], [2 * 60 * 60 * 1000, 'is-soon'], [25 * 60 * 60 * 1000, '']]) {
-        const html = render({ path: '/seller/seller', seller, total: 1, auctions: [{ ...auction,
-            status: 'active', hasWinner: false, endTime: Date.now() + remaining }] });
+        const html = (await render({ path: '/seller/seller', seller, total: 1, auctions: [{ ...auction,
+            status: 'active', hasWinner: false, endTime: Date.now() + remaining }] }));
         assert.match(html, new RegExp(`<time class="${expectedClass}"[^>]*>·`));
     }
 });
 
-test('public profile cards retain active, completed, canceled and unsuccessful outcome labels', () => {
+test('public profile cards retain active, completed, canceled and unsuccessful outcome labels', async () => {
     const outcomes = [
         ['active', 'Active'],
         ['completed', 'Trade completed'],
@@ -173,27 +173,27 @@ test('public profile cards retain active, completed, canceled and unsuccessful o
         ['ended_no_bids', 'Ended without bids'],
     ];
     for (const [status, label] of outcomes) {
-        const html = render({ path: '/seller/seller?status=all', seller, total: 1,
+        const html = (await render({ path: '/seller/seller?status=all', seller, total: 1,
             auctions: [{ ...auction, status, endTime: status === 'active' ? Date.now() + 3600000 : 1,
-                hasWinner: status === 'completed', winnerId: null }] });
+                hasWinner: status === 'completed', winnerId: null }] }));
         assert.match(html, new RegExp(`profile-public-row-status[^>]*><strong>${label}<`));
     }
 });
 
-test('profile has distinct loading, unavailable, absent and empty-filter states', () => {
-    assert.match(render({ isLoading: true }), /Loading seller/);
-    assert.match(render({ error: 'database failure' }), /This seller could not be loaded/);
+test('profile has distinct loading, unavailable, absent and empty-filter states', async () => {
+    assert.match((await render({ isLoading: true })), /Loading seller/);
+    assert.match((await render({ error: 'database failure' })), /This seller could not be loaded/);
     // The shared layout retains the global error banner; the seller page itself
     // must still show an unavailable state rather than a missing profile.
-    const unavailable = render({ error: 'database failure' }).match(/<main[\s\S]*?<\/main>/)[0];
+    const unavailable = (await render({ error: 'database failure' })).match(/<main[\s\S]*?<\/main>/)[0];
     assert.doesNotMatch(unavailable, /Seller not found|database failure/);
-    assert.match(render({ seller: null }), /Seller not found/);
-    assert.match(render({ seller, auctions: [], total: 0 }), /No auctions match these filters/);
+    assert.match((await render({ seller: null })), /Seller not found/);
+    assert.match((await render({ seller, auctions: [], total: 0 })), /No auctions match these filters/);
 });
 
-test('public outcomes retain winning prices without an exposed winner ID or private controls', () => {
+test('public outcomes retain winning prices without an exposed winner ID or private controls', async () => {
     const direct = { ...auction, escrowMode: false, status: 'awaiting_trade' };
-    const html = render({ path: '/auction/lot', auctions: [direct] });
+    const html = (await render({ path: '/auction/lot', auctions: [direct] }));
     assert.match(html, /Winning bidder:.*Winner/);
     assert.match(html, /300 Meat/);
     assert.doesNotMatch(html, /Confirm Complete|Your trading partner/);
@@ -201,13 +201,13 @@ test('public outcomes retain winning prices without an exposed winner ID or priv
     assert.equal(getAuctionResult(direct).winnerId, null);
 });
 
-test('a masked bidder ID cannot enable seller cancellation on a funded auction', () => {
-    const html = render({ path: '/auction/lot', user: { id: 'seller' }, auctions: [{ ...auction, status: 'active', hasWinner: false, endTime: Date.now()+3600000 }] });
+test('a masked bidder ID cannot enable seller cancellation on a funded auction', async () => {
+    const html = (await render({ path: '/auction/lot', user: { id: 'seller' }, auctions: [{ ...auction, status: 'active', hasWinner: false, endTime: Date.now()+3600000 }] }));
     assert.doesNotMatch(html, /Cancel listing/);
 });
 
-test('seller names are escaped and profile URLs encode their stable ID', () => {
-    const html = render({ user:{id:'viewer'}, seller: { ...seller, username: '<script>bad</script>' }, auctions: [], total: 0 });
+test('seller names are escaped and profile URLs encode their stable ID', async () => {
+    const html = (await render({ user:{id:'viewer'}, seller: { ...seller, username: '<script>bad</script>' }, auctions: [], total: 0 }));
     assert.match(html, /&lt;script&gt;bad&lt;\/script&gt;/);
     assert.doesNotMatch(html, /<script>/);
 });
@@ -231,20 +231,20 @@ test('old unprotected RPC responses are rejected until the privacy migration is 
     await assert.rejects(service.load(), /privacy update/);
 });
 
-test('seller search controls stay mounted while results load or fail', () => {
+test('seller search controls stay mounted while results load or fail', async () => {
     for (const state of [{isLoading:true},{error:'network failure'}]) {
-        const html=render({ path:'/seller/seller?q=vil',seller,auctions:[],total:0,...state });
+        const html=(await render({ path:'/seller/seller?q=vil',seller,auctions:[],total:0,...state }));
         assert.match(html, /type="search"[^>]*value="vil"/);
         assert.match(html, /Seller profile views/);
         assert.doesNotMatch(html, /Loading seller|No auctions match|0 auctions found|Seller not found/);
     }
-    assert.match(render({seller,auctions:[],total:0,isLoading:true}),/Loading auctions/);
-    assert.match(render({seller,auctions:[],total:0,error:'network failure'}),/These auctions could not be loaded/);
+    assert.match((await render({seller,auctions:[],total:0,isLoading:true})),/Loading auctions/);
+    assert.match((await render({seller,auctions:[],total:0,error:'network failure'})),/These auctions could not be loaded/);
 });
 
-test('profiles show role-specific direct feedback and publicly closed winners link to their profile',()=>{
+test('profiles show role-specific direct feedback and publicly closed winners link to their profile',async () =>{
     const feedback={...seller,stats:{...seller.stats,seller_positive:8,seller_negative:2,buyer_positive:4,buyer_negative:1}};
-    const html=render({seller:feedback,auctions:[],total:0,path:'/seller/seller?view=stats'});
+    const html=(await render({seller:feedback,auctions:[],total:0,path:'/seller/seller?view=stats'}));
     assert.match(html,/Trade History/);
     assert.match(html,/Trade Feedback/);
     assert.doesNotMatch(html,/Feedback score|>Score<|<table/);
@@ -255,29 +255,29 @@ test('profiles show role-specific direct feedback and publicly closed winners li
         assert.equal((group.match(/<svg/g) || []).length, 2, `${role} retains both thumb icons`);
     }
 
-    const winner=render({path:'/auction/lot',user:{id:'viewer'},auctions:[{...auction,publicWinner:true,winnerId:'buyer',winner:'Public Buyer'}]});
+    const winner=(await render({path:'/auction/lot',user:{id:'viewer'},auctions:[{...auction,publicWinner:true,winnerId:'buyer',winner:'Public Buyer'}]}));
     assert.match(winner,/href="\/seller\/buyer"[^>]*>Public Buyer/);
     assert.match(winner,/href="\/seller\/seller"[^>]*>Seller/);
     assert.doesNotMatch(winner,/Your trading partner|Confirm Complete/);
 });
 
-test('signed-out and banned viewers cannot see names even from a stale named snapshot',()=>{
+test('signed-out and banned viewers cannot see names even from a stale named snapshot',async () =>{
     const named={...auction,owner:'Private Seller Name',winner:'Private Winner Name',publicWinner:true,winnerId:'buyer'};
     for(const user of [null,{id:'viewer',isBanned:true}]){
-        const detail=render({path:'/auction/lot',user,auctions:[named]});
+        const detail=(await render({path:'/auction/lot',user,auctions:[named]}));
         assert.doesNotMatch(detail,/Private Seller Name|Private Winner Name/);
-        const profile=render({user,seller:{...seller,username:'Private Seller Name'},auctions:[named],total:1});
+        const profile=(await render({user,seller:{...seller,username:'Private Seller Name'},auctions:[named],total:1}));
         assert.doesNotMatch(profile,/Private Seller Name|Private Winner Name/);
         assert.match(profile,/Player profile/);
     }
-    const masked=render({path:'/auction/lot',user:{id:'viewer'},auctions:[{...named,usernamesVisible:false}]});
+    const masked=(await render({path:'/auction/lot',user:{id:'viewer'},auctions:[{...named,usernamesVisible:false}]}));
     assert.doesNotMatch(masked,/Private Seller Name|Private Winner Name/);
 });
 
 
-test('compact history groups each role on one line and keeps independent feedback as thumb icons', () => {
+test('compact history groups each role on one line and keeps independent feedback as thumb icons', async () => {
     const stats = { ...seller.stats, seller_confirmed: 24, seller_incomplete: 2, buyer_confirmed: 12, buyer_incomplete: 3, seller_positive: 8, buyer_positive: 4, seller_negative: 1, buyer_negative: 2, legacy_value: '99000000000' };
-    const html = render({ seller: { ...seller, stats }, auctions: [], total: 0 });
+    const html = (await render({ seller: { ...seller, stats }, auctions: [], total: 0 }));
     assert.match(html, /<p[^>]*whitespace-nowrap[^>]*><span class="font-medium text-green-700">Sales: 24<\/span>[\s\S]*?<span class="text-xs text-red-700">Incomplete: 2<\/span><\/p>/);
     assert.match(html, /<p[^>]*whitespace-nowrap[^>]*><span class="font-medium text-green-700">Winning bids: 12<\/span>[\s\S]*?<span class="text-xs text-red-700">Incomplete: 3<\/span><\/p>/);
     assert.match(html, /99b[\s\S]*?Sold/);
@@ -287,9 +287,9 @@ test('compact history groups each role on one line and keeps independent feedbac
 });
 
 
-test('zero trade counts stay gray and paired rows share centered equal columns', () => {
+test('zero trade counts stay gray and paired rows share centered equal columns', async () => {
     const stats = { ...seller.stats, seller_confirmed: 0, buyer_confirmed: 0, seller_incomplete: 0, buyer_incomplete: 0, escrow_sales: 0 };
-    const html = render({ seller: { ...seller, stats }, auctions: [], total: 0 });
+    const html = (await render({ seller: { ...seller, stats }, auctions: [], total: 0 }));
     for (const label of ['Sales: 0', 'Winning bids: 0']) {
         assert.match(html, new RegExp(`<span class="font-medium text-gray-500">${label}</span>`));
     }
@@ -299,9 +299,9 @@ test('zero trade counts stay gray and paired rows share centered equal columns',
 });
 
 
-test('direct and escrow Meat totals show separate sold and bought values with divider above escrow', () => {
+test('direct and escrow Meat totals show separate sold and bought values with divider above escrow', async () => {
     const stats = { ...seller.stats, legacy_value: '55000000', direct_bought_value: '20000000', escrow_value: '1200000000', escrow_bought_value: '34000000' };
-    const html = render({ seller: { ...seller, stats }, auctions: [], total: 0 });
+    const html = (await render({ seller: { ...seller, stats }, auctions: [], total: 0 }));
     assert.equal((html.match(/>Meat Totals<\/h4>/g) || []).length, 2);
     assert.match(html, /55m[\s\S]*?Sold[\s\S]*?Bought[\s\S]*?20m/);
     assert.match(html, /1\.2b[\s\S]*?Sold[\s\S]*?Bought[\s\S]*?34m/);
@@ -310,9 +310,9 @@ test('direct and escrow Meat totals show separate sold and bought values with di
 });
 
 
-test('Seller Profile uses compact statistic cards and separate feedback without auction content', () => {
+test('Seller Profile uses compact statistic cards and separate feedback without auction content', async () => {
     const stats = { ...seller.stats, seller_confirmed: 24, buyer_confirmed: 12, seller_incomplete: 2, buyer_incomplete: 0, legacy_value: '55000000', direct_bought_value: '20000000', escrow_value: '1200000000', escrow_bought_value: '34000000' };
-    const html = render({ path: '/seller/seller?view=stats', seller: { ...seller, stats }, auctions: [auction], total: 1 });
+    const html = (await render({ path: '/seller/seller?view=stats', seller: { ...seller, stats }, auctions: [auction], total: 1 }));
     const direct = groupWithHeading(html, 'Direct Trades');
     const escrow = groupWithHeading(html, 'Escrow Trades');
     expectStat(direct, 'Sales', '24');
@@ -330,7 +330,7 @@ test('Seller Profile uses compact statistic cards and separate feedback without 
     assert.match(html, /How this works/);
     assert.doesNotMatch(html, /public-profile-auction-list|Search items|Test lot|Feedback score|Direct-settlement history/);
 
-    const sidebar = render({ seller: { ...seller, stats }, auctions: [], total: 0 });
+    const sidebar = (await render({ seller: { ...seller, stats }, auctions: [], total: 0 }));
     assert.match(sidebar, /Sales: 24/);
     assert.match(sidebar, /Winning bids: 12/);
     assert.match(sidebar, /Incomplete: 2/);
@@ -338,39 +338,39 @@ test('Seller Profile uses compact statistic cards and separate feedback without 
     assert.doesNotMatch(sidebar, /public-profile-dashboard-cards|public-profile-feedback-grid/);
 });
 
-test('detailed direct statistics keep completed totals separate from incomplete reports and feedback', () => {
+test('detailed direct statistics keep completed totals separate from incomplete reports and feedback', async () => {
     const stats = { ...seller.stats, seller_confirmed: 24, buyer_confirmed: 12, seller_incomplete: 2, buyer_incomplete: 1, legacy_value: '55000000', direct_bought_value: '20000000', seller_incomplete_value: '10000000000', buyer_incomplete_value: '10000' };
-    const html = render({ path: '/seller/seller?view=stats', seller: { ...seller, stats }, auctions: [], total: 0 });
+    const html = (await render({ path: '/seller/seller?view=stats', seller: { ...seller, stats }, auctions: [], total: 0 }));
     const direct = groupWithHeading(html, 'Direct Trades');
     expectStat(direct, 'Sales', '24');
     expectStat(direct, 'Winning bids', '12');
     expectStat(direct, 'Meat sold', '55m Meat');
     expectStat(direct, 'Meat bought', '20m Meat');
     assert.doesNotMatch(direct, /10b Meat|10k Meat|Completion rate|positive feedback/);
-    const compact = render({ seller: { ...seller, stats }, auctions: [], total: 0 });
+    const compact = (await render({ seller: { ...seller, stats }, auctions: [], total: 0 }));
     assert.match(compact, /Incomplete: 2/);
     assert.match(compact, /Incomplete: 1/);
     assert.doesNotMatch(compact, /10b Meat|10k Meat/);
-    const huge = render({ path: '/seller/seller?view=stats', seller: { ...seller, stats: { ...stats, seller_confirmed: '9007199254740993', legacy_value: '9007199254740993' } }, auctions: [], total: 0 });
+    const huge = (await render({ path: '/seller/seller?view=stats', seller: { ...seller, stats: { ...stats, seller_confirmed: '9007199254740993', legacy_value: '9007199254740993' } }, auctions: [], total: 0 }));
     const hugeDirect = groupWithHeading(huge, 'Direct Trades');
     expectStat(hugeDirect, 'Sales', '9,007,199,254,740,993');
     expectStat(hugeDirect, 'Meat sold', '9,007,199.3b Meat');
 });
 
-test('escrow displays completed sales, winning bids and their own Meat totals in both views', () => {
+test('escrow displays completed sales, winning bids and their own Meat totals in both views', async () => {
     const stats = { ...seller.stats, escrow_sales: 2, escrow_buys: 3, escrow_value: '1200000000', escrow_bought_value: '34000000' };
-    const html = render({ path: '/seller/seller?view=stats', seller: { ...seller, stats }, auctions: [], total: 0 });
+    const html = (await render({ path: '/seller/seller?view=stats', seller: { ...seller, stats }, auctions: [], total: 0 }));
     const escrow = groupWithHeading(html, 'Escrow Trades');
     expectStat(escrow, 'Sales', '2');
     expectStat(escrow, 'Winning bids', '3');
     expectStat(escrow, 'Meat sold', '1.2b Meat');
     expectStat(escrow, 'Meat bought', '34m Meat');
     assert.doesNotMatch(escrow, /Incomplete|Meat Totals|Completion rate/);
-    const zero = render({ path: '/seller/seller?view=stats', seller: { ...seller, stats: { ...stats, escrow_buys: 0, escrow_bought_value: '0' } }, auctions: [], total: 0 });
+    const zero = (await render({ path: '/seller/seller?view=stats', seller: { ...seller, stats: { ...stats, escrow_buys: 0, escrow_bought_value: '0' } }, auctions: [], total: 0 }));
     expectStat(groupWithHeading(zero, 'Escrow Trades'), 'Winning bids', '0');
     expectStat(groupWithHeading(zero, 'Escrow Trades'), 'Meat bought', '0 Meat');
 
-    const compact = render({ seller: { ...seller, stats }, auctions: [], total: 0 });
+    const compact = (await render({ seller: { ...seller, stats }, auctions: [], total: 0 }));
     const sidebarEscrow = groupWithHeading(compact, 'Escrow Trades');
     assert.match(sidebarEscrow, /Sales: 2/);
     assert.match(sidebarEscrow, /Winning bids: 3/);
@@ -380,22 +380,22 @@ test('escrow displays completed sales, winning bids and their own Meat totals in
 });
 
 
-test('Buy item images appear on browse, home and auction view, not the Seller Profile tab',()=>{
+test('Buy item images appear on browse, home and auction view, not the Seller Profile tab',async () =>{
  const buy={...auction,auctionKind:'buy',pricePerItem:100,purchasedQuantity:2,remainingQuantity:0,availableQuantity:0,reservedQuantity:0,reducedQuantity:0,fulfilledByMe:true,mySaleMeat:200,image:'https://images.kingdomofloathing.com/itemimages/tooth.gif',completedAt:'2026-10-23T12:00:00Z'};
  for(const path of ['/', '/auctions?status=all', '/seller/seller']){
-  const html=render({path,user:{id:'seller'},seller,auctions:[buy],total:1});
+  const html=(await render({path,user:{id:'seller'},seller,auctions:[buy],total:1}));
   assert.match(html,/<img[^>]*src="https:\/\/images.kingdomofloathing.com\/itemimages\/tooth.gif"[^>]*loading="lazy"/);
   assert.match(html,/Test lot/);
  }
- const profile=render({path:'/seller/seller?view=stats',user:{id:'seller'},seller,auctions:[buy],total:1});
+ const profile=(await render({path:'/seller/seller?view=stats',user:{id:'seller'},seller,auctions:[buy],total:1}));
  assert.match(profile,/aria-label="Trade History"/);
  assert.doesNotMatch(profile,/itemimages\/tooth.gif|Test lot|public-profile-auction-list|Seller auctions/);
 });
 
 
-test('Seller Profile separates funded Buy orders created from orders fulfilled without changing sidebar', () => {
+test('Seller Profile separates funded Buy orders created from orders fulfilled without changing sidebar', async () => {
     const data = {...seller, stats: {...seller.stats, buy_orders_created: '3', buy_orders_bought_units: '77', buy_orders_spent: '123000'}};
-    const html = render({path:'/seller/seller?view=stats', seller:data, auctions:[], total:0});
+    const html = (await render({path:'/seller/seller?view=stats', seller:data, auctions:[], total:0}));
     assert.match(html, /Buy Orders Created/);
     assert.match(html, /Orders created/);
     assert.match(html, /Items bought/);
@@ -403,6 +403,6 @@ test('Seller Profile separates funded Buy orders created from orders fulfilled w
     assert.match(html, /Buy Orders Fulfilled/);
     assert.match(html, /Orders fulfilled/);
     assert.match(html, /561.2k Meat/);
-    const sidebar = render({path:'/seller/seller', seller:data, auctions:[], total:0});
+    const sidebar = (await render({path:'/seller/seller', seller:data, auctions:[], total:0}));
     assert.doesNotMatch(sidebar, /Buy Orders Created|Buy Orders Fulfilled/);
 });

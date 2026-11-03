@@ -1,6 +1,6 @@
 import { readInvalidation } from '../../../workers/public-auction-cache/invalidation.js';
 
-// Only a tiny signed revision crosses this endpoint. No bid row, user identity,
+// Only signed public freshness metadata crosses this endpoint (revision and optional auction UUID). No bid row, user identity,
 // cookie or browser authorization header is forwarded or stored.
 export async function onRequest({ request, env }) {
     const headers = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };

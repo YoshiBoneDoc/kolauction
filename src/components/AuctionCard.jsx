@@ -1,3 +1,4 @@
+import AuctionLiveUnavailable from './AuctionLiveUnavailable';
 import { giveawayConditionLabel } from '../lib/giveaway';
 import RelistButton from './RelistButton';
 import { auctionQuantityLabel } from '../lib/bundles';
@@ -22,6 +23,7 @@ export default function AuctionCard({ auction, now }) {
     const { currentUser } = useContext(UserContext);
     const location = useLocation();
     const linkState = { browseFrom: `${location.pathname}${location.search}` };
+    if (auction.liveUnavailable) return <AuctionLiveUnavailable auction={auction} />;
     const result = getAuctionResult(auction, now);
     const active = result.status === 'active';
     const displayStatus = getAuctionDisplayStatus(auction, result);

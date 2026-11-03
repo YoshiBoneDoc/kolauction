@@ -13,7 +13,7 @@ import PendingTrades from '../components/PendingTrades';
 import useAuctionSearch from '../hooks/useAuctionSearch';
 
 export default function AllAuctions() {
-    const { auctions, total, priceBounds, isLoading, error, hasLoaded = !isLoading && !error, refreshAuctions } = useContext(AuctionsContext);
+    const { auctions, total, listingOrderDelayed = false, priceBounds, isLoading, error, hasLoaded = !isLoading && !error, refreshAuctions } = useContext(AuctionsContext);
     const { currentUser } = useContext(UserContext);
     const { params, setParams, rememberSearch, resetSession, navigationType, locationKey } = useAuctionBrowseSession({ priceBounds: AUCTION_PRICE_RANGE_ENABLED ? priceBounds : null, isLoading, error });
     const [searchInput, setSearchInput] = useAuctionSearch(setParams);
@@ -151,7 +151,7 @@ export default function AllAuctions() {
                 </p>}
                 {isLoading ? <p role="status">Loading auctions…</p> : <>
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
-                        {hasLoaded && <p role="status">{found} {found === 1 ? 'auction' : 'auctions'} found</p>}
+                        {hasLoaded && <p role="status">{listingOrderDelayed ? 'Results may be out of date. Count and ordering are being refreshed.' : `${found} ${found === 1 ? 'auction' : 'auctions'} found`}</p>}
                         <button onClick={clearAdvancedFilters} className="min-h-9 border-0 bg-transparent px-2 text-sm text-blue-700 underline">Reset filters</button>
                     </div>
                     {!error && pageRows.length === 0 && <p className="rounded-lg border bg-white p-6">{trade === 'none' ? 'Select Escrow or Direct to show auctions.' : mineOnly ? 'No auctions of yours match these filters.' : 'No auctions match your search and filters. Try another item name or status.'}</p>}
@@ -163,7 +163,7 @@ export default function AllAuctions() {
                     </div>
                     {(found > 24 || page > 1) && <nav aria-label="Auction pages" className="mt-6 flex items-center justify-center gap-4">
                         <button disabled={page <= 1} onClick={() => update('page', String(page - 1))} className="min-h-11 rounded border bg-white px-4 py-2 disabled:opacity-50">Previous</button>
-                        <span>Page {page} of {Math.max(1, Math.ceil(found / 24))}</span>
+                        <span>Page {page}{!listingOrderDelayed && <> of {Math.max(1, Math.ceil(found / 24))}</>}</span>
                         <button disabled={page * 24 >= found} onClick={() => update('page', String(page + 1))} className="min-h-11 rounded border bg-white px-4 py-2 disabled:opacity-50">Next</button>
                     </nav>}
                 </>}

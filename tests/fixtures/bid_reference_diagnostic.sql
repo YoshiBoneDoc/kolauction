@@ -1,5 +1,4 @@
--- Read-only investigation. Run in Supabase SQL Editor as the database owner.
--- D-1170 / KMail 206062864, as supplied by the player. No mail is sent.
+-- Read-only test fixture; the database test substitutes its synthetic delivery reference.
 with target as (
     select d.reference_number,d.receipt_id,d.created_at rejected_at,d.sent_at refund_sent_at,d.meat refund_meat,
         r.sender_id,r.received_at,r.created_at recorded_at,r.result,r.payload

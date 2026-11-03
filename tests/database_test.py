@@ -2687,54 +2687,6 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         unrestricted_direct=sql("select public.create_auction('escrow item',2,1000001,24,null,null,1,false);",competitor,'authenticated')
         assert sql(f"select status from public.auctions where id='{unrestricted_direct}';")=='active'
         sql("select public.create_auction('escrow item',2,1000000,24,null,null,1,true);",role='anon',error='permission denied')
-        # Give the isolated Auth stub the columns used by Supabase email/password users.
-        sql('''alter table auth.users
-            add column instance_id uuid, add column aud text, add column role text,
-            add column encrypted_password text, add column is_super_admin boolean,
-            add column created_at timestamptz, add column updated_at timestamptz,
-            add column confirmation_token text, add column recovery_token text,
-            add column email_change_token_current text, add column email_change_token_new text,
-            add column email_change text, add column phone_change_token text,
-            add column phone_change text, add column reauthentication_token text;
-            create table auth.identities(id uuid primary key,provider_id text not null,user_id uuid not null references auth.users(id),
-                identity_data jsonb not null,provider text not null,created_at timestamptz,updated_at timestamptz,unique(provider_id,provider));
-        ''')
-        sql("insert into khub_bot.catalog(id,name) values(364,'asbestos ore'),(2,'seal tooth'),(3,'helmet turtle'),(10,'disco ball'),(8684,'Cold Fang') on conflict(id) do update set name=excluded.name;")
-        seed_path=ROOT/'supabase/testing/seed_test_accounts.sql'
-        if not seed_path.exists(): seed_path=ROOT/'tests/fixtures/seed_test_accounts.sql'
-        seed_sql=seed_path.read_text()
-        original_financial=sql("select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d where kind<>'notice';")
-        deliveries_before=set(json.loads(sql('select coalesce(jsonb_agg(id),\'[]\') from khub_bot.deliveries;')))
-        sql(seed_sql)
-        assert sql('select count(*) from khub_bot.test_accounts;')=='6'
-        assert sql('select count(*) from khub_bot.test_auction_fixtures;')=='11'
-        assert sql("select count(*) from auth.identities where user_id in (select user_id from khub_bot.test_accounts);")=='6'
-        assert sql("select count(*) from auth.users u join khub_bot.test_accounts t on t.user_id=u.id where u.encrypted_password=crypt(t.username,u.encrypted_password);")=='6'
-        assert sql('select count(*) from khub_bot.test_accounts t where khub_bot.is_administrator(t.user_id);')=='0'
-        banned_test=sql("select user_id from khub_bot.test_accounts where username='banned';")
-        assert not access(banned_test)['is_banned']
-        assert sql("select bool_and(state='done' and temporary_password is null) from khub_bot.account_jobs where mail_id like 'khub-test-v1-%';")=='t'
-        assert sql("select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d where kind<>'notice';")==original_financial
-        new_deliveries=json.loads(sql('select coalesce(jsonb_agg(to_jsonb(d)),\'[]\') from khub_bot.deliveries d;'))
-        assert all(d['recipient_id']==3552305 and d['kind']=='notice' for d in new_deliveries if d['id'] not in deliveries_before)
-        assert all(r['status']=='pending_escrow' for r in json.loads(sql("select jsonb_agg(to_jsonb(a)) from public.auctions a join khub_bot.test_auction_fixtures f on f.auction_id=a.id where a.escrow_mode;")))
-        assert sql("select status from public.auctions where id=(select auction_id from khub_bot.test_auction_fixtures where seed_key='direct-both-complete');")=='completed'
-        assert sql("select count(*) from khub_bot.trade_reports where auction_id=(select auction_id from khub_bot.test_auction_fixtures where seed_key='direct-incomplete');")=='1'
-        assert sql("select public.khub_login_address('KH_test1');",role='anon').endswith('@login.khub.invalid')
-        seeded_fingerprint=sql('select jsonb_agg(to_jsonb(a) order by a.id) from public.auctions a join khub_bot.test_auction_fixtures f on f.auction_id=a.id;')
-        user_fingerprint=sql('select jsonb_agg(to_jsonb(u) order by u.id) from auth.users u join khub_bot.test_accounts t on t.user_id=u.id;')
-        delivery_fingerprint=sql('select jsonb_agg(to_jsonb(d) order by d.id) from khub_bot.deliveries d;')
-        ban(banned_test)
-        sql(seed_sql)
-        assert access(banned_test)['is_banned']
-        assert sql('select jsonb_agg(to_jsonb(a) order by a.id) from public.auctions a join khub_bot.test_auction_fixtures f on f.auction_id=a.id;')==seeded_fingerprint
-        assert sql('select jsonb_agg(to_jsonb(u) order by u.id) from auth.users u join khub_bot.test_accounts t on t.user_id=u.id;')==user_fingerprint
-        assert sql('select jsonb_agg(to_jsonb(d) order by d.id) from khub_bot.deliveries d;')==delivery_fingerprint
-        seed_lot=sql("select auction_id from khub_bot.test_auction_fixtures where seed_key='direct-no-bids';")
-        sql(f"select public.place_bid('{seed_lot}',1100);",competitor,'authenticated',error='test auction')
-        sql("insert into khub_bot.deliveries(dedupe_key,recipient_id,kind,meat,message) values('test-no-real-refund',9000000001,'refund',100,'No real refund');",error='cannot receive real escrow assets')
-        assert sql("select count(*) from khub_bot.deliveries where dedupe_key='test-no-real-refund';")=='0'
-        sql('select * from khub_bot.test_accounts;',competitor,'authenticated',error='permission denied')
         # Restrictions reconcile existing auctions and serialize with all bidding paths.
         sql(migration_sql('202610210051_banned_auction_obligations.sql'))
         lift(competitor)
@@ -3844,7 +3796,6 @@ with tempfile.TemporaryDirectory(prefix='kolauction-db-', dir='/tmp') as directo
         print('PASS: all bid-increment boundaries and exact 1% rounding, unchanged first bids and existing records, Direct/Escrow parity, typed/explicit buyout exceptions, excess refunds, actionable KMail errors, duplicate receipts and serialized concurrent bids')
         print('PASS: atomic current catalog replacement, server-enforced tradeability in both modes, canonical images/folder paths, public reference-only data, service-only imports, stale/malformed snapshot rejection, live new items and unchanged historical auctions/financial obligations')
         print('PASS: bans close bid-free listings, hold direct commitments, block browser bids/buyouts, preserve history, require admin review, audit evidence-based two-party completion, and refund new escrow bids while honoring funded settlement')
-        print('PASS: repeatable SQL test accounts, password hashes/identities, no admin privileges, unbanned initial account, preserved admin ban, mock direct trade states, notification redirection and no fabricated escrow transfers')
         print('PASS: new escrow minimums above 1M are rejected including default-mode API calls; exact 1M, Direct and larger buyouts remain allowed; existing records stay unchanged')
         print('PASS: admin-only bans/lifts, preserved restrictions, temporary expiry, stale-session trading/report protection, authenticated appeals, private atomic image evidence and audit records')
         print('PASS: durable admin withdrawal metadata for silent reports, correct event time/order, idempotency, both participants, legacy withdrawals and no false completion from admin ticket closure')

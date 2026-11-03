@@ -1,3 +1,4 @@
+import { withReadDeadline } from '../lib/readDeadline';
 import { useEffect, useState } from 'react';
 import { mapAuction } from '../lib/auctions';
 import { auctionClockRequestStarted, auctionNow, observeAuctionServerTime } from '../lib/auctionClock';
@@ -11,34 +12,36 @@ export default function useFeaturedGiveaway() {
         let active = true;
         let current = null;
         let failures = 0;
+        let liveMode = false;
         const controller = new AbortController();
         const stop = startAuctionRefresh({
             document,
             delay: () => Math.max(failures ? Math.min(60000, 5000 * 2 ** failures) : 0,
-                current && current.endTime > auctionNow() ? Math.min(30000, current.endTime - auctionNow()) : 30000),
+                current && current.endTime > auctionNow() ? Math.min(liveMode ? 5000 : 30000, current.endTime - auctionNow()) : liveMode ? 5000 : 30000),
             refresh: async () => {
                 const started = auctionClockRequestStarted();
                 try {
-                    const response = await fetch('/api/public-auctions?view=featured', {
+                    const response = await withReadDeadline(signal => fetch('/api/public-auctions?view=featured', {
                         credentials: 'omit', cache: 'no-store', redirect: 'error',
-                        headers: { Accept: 'application/json' }, signal: controller.signal,
-                    });
+                        headers: { Accept: 'application/json', 'X-Khub-Live-State': '1' }, signal,
+                    }), { signal: controller.signal });
                     if (!response.ok) throw new Error('Featured giveaway unavailable.');
                     const data = await response.json();
                     if (data?.privacy_version !== 1 || data.shared_cache_version !== 1 || !Array.isArray(data.rows)
                         || data.rows.length > 1 || !Number.isFinite(Date.parse(data.server_time))) throw new Error('Invalid featured giveaway.');
                     if (!active) return;
                     observeAuctionServerTime(data.server_time, started);
+                    liveMode = data.public_snapshot?.live_mode === true;
                     current = data.rows.length ? mapAuction(data.rows[0], []) : null;
                     failures = 0;
-                    setAuction(current);
+                    setAuction(current ? { ...current, observedAt: Date.now() } : null);
                 } catch {
-                    if (active) failures++;
+                    if (active) { failures++; setAuction(previous => previous ? { ...previous, liveUnavailable: true } : null); }
                 }
             },
         });
         return () => { active = false; stop(); controller.abort(); };
     }, []);
     // Never display an expired cached banner while waiting for a network refresh.
-    return auction?.status === 'active' && auction.endTime > now ? auction : null;
+    return auction && now - auction.observedAt <= 300000 && (auction.liveUnavailable || auction.status === 'active' && auction.endTime > now) ? auction : null;
 }

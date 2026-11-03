@@ -48,7 +48,7 @@ test('missing username and unavailable lookup never attempt a login', async () =
 });
 
 function profileClient(profile) {
-    return { async rpc(name) { assert.equal(name, 'read_my_account_access'); return { data: profile && {
+    return { async rpc(name) { if (name === 'khub_is_administrator') return { data: false }; assert.equal(name, 'read_my_account_access'); return { data: profile && {
         server_now: new Date().toISOString(), ban_expires_at: null, ...profile,
     } }; } };
 }
@@ -57,6 +57,7 @@ test('bot-created profiles hide internal email and load the server-owned access 
     const auth = build(profileClient({ id: 'user-1', khub_username: 'Player', account_method: 'kmail', is_banned: false, kol_player_id: 3552305, kol_player_name: 'Player' }));
     const user = await auth.loadProfile({ id: 'user-1', email: 'private@login.khub.invalid' });
     assert.equal(user.id, 'user-1'); assert.equal(user.khubUsername, 'Player'); assert.equal(user.email, null);
+    assert.equal(user.isAdmin, false); // A familiar player ID does not replace the authorized admin RPC.
     assert.equal(user.accountMethod, 'kmail'); assert.equal(user.isBanned, false); assert.equal(user.banExpiresAt, null);
     assert.equal(user.kolPlayerId, 3552305); assert.equal(user.kolPlayerName, 'Player');
     assert.ok(Number.isFinite(user.serverOffset));

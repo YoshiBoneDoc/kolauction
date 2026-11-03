@@ -9,7 +9,7 @@ const { outputFiles } = buildSync({
     stdin: {
         contents: `
             import React from 'react';
-            import { renderToStaticMarkup } from 'react-dom/server';
+            import { renderRouteMarkup as renderToStaticMarkup } from './tests/helpers/renderRouteMarkup.mjs';
             import { StaticRouter } from 'react-router-dom';
             import App from './src/App.jsx';
             import { browseAuctions } from './src/lib/auctionBrowsing.js';
@@ -37,15 +37,15 @@ const { outputFiles } = buildSync({
         resolveDir: fileURLToPath(new URL('../', import.meta.url)), loader: 'jsx',
     },
     bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external',
-    define: { 'import.meta.env': '{}' }, jsx: 'automatic', loader: { '.gif': 'dataurl' },
+    define: { 'import.meta.env': '{}' }, jsx: 'automatic', loader: { '.gif': 'dataurl', '.css': 'empty' },
 });
 const compiled = { exports: {} };
 const requireModule = createRequire(import.meta.url);
 new Function('require', 'module', 'exports', outputFiles[0].text)((name) => name === 'react-router-dom' ? router : requireModule(name), compiled, compiled.exports);
 const { render } = compiled.exports;
 
-test('Info explains first bids, both trade modes and exact buyouts alongside all eight hybrid threshold rows', () => {
-    const html = render('/info', []);
+test('Info explains first bids, both trade modes and exact buyouts alongside all eight hybrid threshold rows', async () => {
+    const html = (await render('/info', []));
     assert.match(html, /Minimum Bid Increases/);
     assert.match(html, /first bid must meet the seller/);
     assert.match(html, /both Escrow and Direct Trade/);
@@ -68,19 +68,19 @@ const auctions = [
     { ...base, id: 'expired', item: 'Expired accessory', status: 'ended_no_bids', endTime: Date.now() - 1000, bids: Array(10).fill({bidder: 'Buyer', amount: 200, timestamp: Date.now() - 10000}) },
 ];
 
-test('auction details render server-authorized bidder names without replacing them with aliases', () => {
+test('auction details render server-authorized bidder names without replacing them with aliases', async () => {
     const listing = { ...auctions[0], owner: 'Actual Seller', currentBid: 200,
         highestBidderId: 'bidder-b', highestBidder: 'Actual Bidder B', usernamesVisible: true,
         bids: [{ id: 'a', bidderId: 'bidder-a', bidder: 'Actual Bidder A', amount: 100, timestamp: Date.now() },
             { id: 'b', bidderId: 'bidder-b', bidder: 'Actual Bidder B', amount: 200, timestamp: Date.now() }] };
-    const html = render('/auction/active', [listing], { id: 'administrator' });
+    const html = (await render('/auction/active', [listing], { id: 'administrator' }));
     assert.match(html, /Actual Seller/);
     assert.match(html, /Actual Bidder A/);
     assert.match(html, /Actual Bidder B/);
 });
 
-test('browse route applies URL search and completed filter together to real auction cards', () => {
-    const html = render('/auctions?q=ACCESSORY&status=completed&sort=price-desc', auctions);
+test('browse route applies URL search and completed filter together to real auction cards', async () => {
+    const html = (await render('/auctions?q=ACCESSORY&status=completed&sort=price-desc', auctions));
     assert.match(html, /Completed accessory/);
     assert.match(html, /1 auction found/);
     for (const name of ['Active accessory', 'Pending accessory', 'Expired accessory']) assert.doesNotMatch(html, new RegExp(name));
@@ -90,7 +90,7 @@ test('browse route applies URL search and completed filter together to real auct
     assert.doesNotMatch(html, /More Info|View outcome and history|Sold by|Auction #/);
 });
 
-test('browse cards and detail summaries show the same trade status for every viewer', () => {
+test('browse cards and detail summaries show the same trade status for every viewer', async () => {
     for (const [changes,label,color] of [
         [{status:'awaiting_trade'},'Awaiting settlement','476A91'],
         [{status:'awaiting_trade',tradeReported:true},'Reported Incomplete','DC2626'],
@@ -102,8 +102,8 @@ test('browse cards and detail summaries show the same trade status for every vie
         const listing={...base,id:'status',item:'Status item',escrowMode:false,currentBid:200,finalPrice:200,
             winnerId:'buyer',winner:'Buyer',hasWinner:true,publicWinner:true,...changes};
         for (const user of [null,{id:'seller'},{id:'buyer'},{id:'other'}]) {
-            const card=render('/auctions?status=all',[listing],user);
-            const details=render('/auction/status',[listing],user);
+            const card=(await render('/auctions?status=all',[listing],user));
+            const details=(await render('/auction/status',[listing],user));
             assert.ok(card.includes(`text-xs font-semibold text-[#${color}]">${label}</p>`));
             assert.doesNotMatch(card, /Winner:|Sold by|Auction #/);
             assert.ok(details.includes(`text-lg font-bold text-[#${color}]">${label}</p>`));
@@ -113,64 +113,64 @@ test('browse cards and detail summaries show the same trade status for every vie
     }
 });
 
-test('homepage separates active listings from successful completed trades', () => {
-    const html = render('/', auctions);
+test('homepage separates active listings from successful completed trades', async () => {
+    const html = (await render('/', auctions));
     assert.match(html, /Active accessory/);
     assert.match(html, /Recently Completed Trades/);
     assert.match(html, /Completed accessory/);
     assert.match(html, /bg-green-50/);
     for (const name of ['Pending accessory', 'Expired accessory']) assert.doesNotMatch(html, new RegExp(name));
-    assert.match(render('/', auctions.slice(1)), /No active auctions right now/);
+    assert.match((await render('/', auctions.slice(1))), /No active auctions right now/);
 });
 
-test('direct detail routes expose bid fields only to eligible signed-in bidders', () => {
-    assert.match(render('/auction/active', auctions), /Log in to bid/);
-    const eligible = render('/auction/active', auctions, {id: 'buyer'});
+test('direct detail routes expose bid fields only to eligible signed-in bidders', async () => {
+    assert.match((await render('/auction/active', auctions)), /Log in to bid/);
+    const eligible = (await render('/auction/active', auctions, {id: 'buyer'}));
     assert.match(eligible, /Your bid \(Meat\)/);
     assert.match(eligible, /inputMode="decimal"/);
-    assert.doesNotMatch(render('/auction/active', auctions, {id: 'seller'}), /Your bid \(Meat\)/);
-    assert.doesNotMatch(render('/auction/expired', auctions, {id: 'buyer'}), /Your bid \(Meat\)/);
+    assert.doesNotMatch((await render('/auction/active', auctions, {id: 'seller'})), /Your bid \(Meat\)/);
+    assert.doesNotMatch((await render('/auction/expired', auctions, {id: 'buyer'})), /Your bid \(Meat\)/);
 });
 
-test('instant purchase controls appear for eligible buyers including the highest bidder, but never the seller or expired listings', () => {
+test('instant purchase controls appear for eligible buyers including the highest bidder, but never the seller or expired listings', async () => {
     const listing = { ...auctions[0], instantPurchasePrice: 1000, highestBidderId: 'buyer' };
-    const buyer = render('/auction/active', [listing], {id: 'buyer'});
+    const buyer = (await render('/auction/active', [listing], {id: 'buyer'}));
     assert.match(buyer, /Buy Now/);
     assert.match(buyer, /You are the highest bidder/);
-    const seller = render('/auction/active', [listing], {id: 'seller'});
+    const seller = (await render('/auction/active', [listing], {id: 'seller'}));
     assert.doesNotMatch(seller, /<button[^>]*>Buy Now/);
     assert.match(seller, /Your optional buyout offer/);
-    const loggedOut = render('/auction/active', [listing]);
+    const loggedOut = (await render('/auction/active', [listing]));
     assert.doesNotMatch(loggedOut, /Log in to buy/);
     assert.match(loggedOut, /Log in to bid/);
     assert.match(loggedOut, /1,000 Meat/);
-    assert.doesNotMatch(render('/auction/active', [{ ...listing, endTime: 1 }], {id: 'buyer'}), /Buy Now/);
-    assert.doesNotMatch(render('/auction/active', auctions, {id: 'buyer'}), /Buyout Price/);
+    assert.doesNotMatch((await render('/auction/active', [{ ...listing, endTime: 1 }], {id: 'buyer'})), /Buy Now/);
+    assert.doesNotMatch((await render('/auction/active', auctions, {id: 'buyer'})), /Buyout Price/);
 });
 
-test('listing form labels instant purchase optional and compact homepage cards focus on the current price', () => {
-    assert.match(render('/auction-item', auctions, {id: 'seller'}), /Set Buyout Price \(optional\)/);
-    assert.doesNotMatch(render('/', [{ ...auctions[0], instantPurchasePrice: 1000 }]), /Buyout Price: 1k/);
+test('listing form labels instant purchase optional and compact homepage cards focus on the current price', async () => {
+    assert.match((await render('/auction-item', auctions, {id: 'seller'})), /Set Buyout Price \(optional\)/);
+    assert.doesNotMatch((await render('/', [{ ...auctions[0], instantPurchasePrice: 1000 }])), /Buyout Price: 1k/);
 });
 
-test('empty item search shows a typing hint without a catalog dropdown', () => {
-    const html = render('/auction-item', auctions, {id: 'seller'});
+test('empty item search shows a typing hint without a catalog dropdown', async () => {
+    const html = (await render('/auction-item', auctions, {id: 'seller'}));
     assert.doesNotMatch(html, /<select id="item"|Showing the first 100 of|No items match your search/);
     assert.match(html, /Start typing an item name…/);
 });
 
-test('instant purchase outcome retains pending settlement and hides further purchase controls', () => {
+test('instant purchase outcome retains pending settlement and hides further purchase controls', async () => {
     const listing = { ...auctions[0], status: 'awaiting_trade', instantPurchasePrice: 1000, instantPurchasedAt: '2026-10-19T12:00:00Z', finalPrice: 1000, winnerId: 'buyer', winner: 'Buyer' };
-    const html = render('/auction/active', [listing], {id: 'buyer'});
+    const html = (await render('/auction/active', [listing], {id: 'buyer'}));
     assert.match(html, /Buyout accepted for 1,000 Meat/);
     assert.match(html, /Awaiting settlement/);
     assert.doesNotMatch(html, /Trade completed/);
     assert.doesNotMatch(html, /Buy Now/);
 });
 
-test('escrow auctions show one BID command and the optional instant price beside the current bid', () => {
+test('escrow auctions show one BID command and the optional instant price beside the current bid', async () => {
     const listing = { ...auctions[0], auctionNumber: '1001', escrowMode: true, itemId: 1, currentBid: 200, instantPurchasePrice: 1000 };
-    const html = render('/auction/active', [listing], {id:'buyer'});
+    const html = (await render('/auction/active', [listing], {id:'buyer'}));
     assert.match(html, /BID 1001/);
     assert.match(html, /Place a Bid/);
     assert.match(html, /Attach at least 210 Meat, with no items/);
@@ -187,14 +187,14 @@ test('escrow auctions show one BID command and the optional instant price beside
     assert.match(html, /kHub \(#3888760\)/);
     assert.doesNotMatch(html, /<button[^>]*>Buy Now/);
     assert.doesNotMatch(html, /Your bid \(Meat\)/);
-    const withoutInstant = render('/auction/active', [{ ...listing, instantPurchasePrice: null }], {id: 'buyer'});
+    const withoutInstant = (await render('/auction/active', [{ ...listing, instantPurchasePrice: null }], {id: 'buyer'}));
     assert.equal((withoutInstant.match(/BID 1001/g) || []).length, 1);
     assert.doesNotMatch(withoutInstant, /Buyout Price/);
 });
 
-test('pending item deposits display seller deposit instructions without internal item IDs', () => {
+test('pending item deposits display seller deposit instructions without internal item IDs', async () => {
     const listing = { ...auctions[0], auctionNumber:'1001', escrowMode:true, status:'pending_escrow', itemId:1, auctionTime:24, startOnDeposit:true };
-    const html = render('/auction/active', [listing], {id:'seller'});
+    const html = (await render('/auction/active', [listing], {id:'seller'}));
     assert.match(html,/LIST 1001/);
     assert.match(html,/accept your deposit within 24 hours of creating this listing/);
     assert.match(html,/late deposits are returned/);
@@ -203,20 +203,20 @@ test('pending item deposits display seller deposit instructions without internal
     assert.doesNotMatch(html,/Your bid \(Meat\)/);
 });
 
-test('escrow settlement has no manual confirmation control and profile separates pending deposits', () => {
+test('escrow settlement has no manual confirmation control and profile separates pending deposits', async () => {
     const listing = { ...auctions[0], escrowMode:true, status:'settling', itemId:1, winnerId:'buyer', winner:'Buyer', finalPrice:1000 };
-    const html=render('/auction/active',[listing],{id:'buyer'});
+    const html=(await render('/auction/active',[listing],{id:'buyer'}));
     assert.match(html,/Sending escrow deliveries/);
     assert.doesNotMatch(html,/Confirm Complete/);
-    const profile=render('/profile',[{...listing,status:'pending_escrow'}],{id:'seller'});
+    const profile=(await render('/profile',[{...listing,status:'pending_escrow'}],{id:'seller'}));
     assert.match(profile,/Awaiting item deposit/);
     assert.match(profile,/Get verification code/);
 });
 
 
-test('auction lists abbreviate prices while individual details keep exact amounts', () => {
+test('auction lists abbreviate prices while individual details keep exact amounts', async () => {
     const listing={...auctions[0],currentBid:59600000,minBidMeat:1500,instantPurchasePrice:6200000000};
-    const cards=render('/auctions',[listing],{id:'buyer'});
+    const cards=(await render('/auctions',[listing],{id:'buyer'}));
     assert.match(cards,/>59.6m Meat</);
     assert.match(cards,/Bid \(1 total\)/);
     assert.match(cards,/>59.6m Meat</);
@@ -224,27 +224,27 @@ test('auction lists abbreviate prices while individual details keep exact amount
     assert.match(cards,/Buyout: 6.2b/);
     assert.doesNotMatch(cards,/>Buy Now<\/button>|<dialog/);
     assert.doesNotMatch(cards,/For the entire listing|A bid reaching this amount|Instant Purchase Price/);
-    const escrowCards=render('/auctions',[{...listing,escrowMode:true}],{id:'buyer'});
+    const escrowCards=(await render('/auctions',[{...listing,escrowMode:true}],{id:'buyer'}));
     assert.match(escrowCards,/>Place Bid<\/button>/);
     assert.doesNotMatch(escrowCards,/Use the same BID command/);
-    const details=render('/auction/active',[listing],{id:'buyer'});
+    const details=(await render('/auction/active',[listing],{id:'buyer'}));
     assert.match(details,/>59,600,000 Meat<\/p>/);
     assert.match(details,/>6,200,000,000 Meat<\/p>/);
     assert.match(details,/>Buy Now<\/button>/);
-    const home=render('/',[listing]);
+    const home=(await render('/',[listing]));
     assert.match(home,/>59.6m Meat<\/span>/);
     assert.doesNotMatch(home,/Buyout Price: 6.2b/);
 });
 
 
-test('My Account renders consistently with a trailing slash', () => {
+test('My Account renders consistently with a trailing slash', async () => {
     const user = { id: 'seller', khubUsername: 'Seller' };
-    assert.equal(render('/profile/', auctions, user), render('/profile', auctions, user));
+    assert.equal((await render('/profile/', auctions, user)), (await render('/profile', auctions, user)));
 });
 
-test('unknown routes display a useful fallback without requesting auction data', () => {
+test('unknown routes display a useful fallback without requesting auction data', async () => {
     for (const path of ['/does-not-exist', '/profile/unknown', '/auction/example/unknown']) {
-        const html = render(path, []);
+        const html = (await render(path, []));
         assert.match(html, /404/);
         assert.match(html, /Page not found/);
         assert.match(html, /href="\/"/);
@@ -254,10 +254,10 @@ test('unknown routes display a useful fallback without requesting auction data',
 });
 
 
-test('active seller controls remain available without a separate status card in either trade mode', () => {
+test('active seller controls remain available without a separate status card in either trade mode', async () => {
     for (const escrowMode of [true, false]) {
         const listing = { ...auctions[0], escrowMode };
-        const seller = render('/auction/active', [listing], { id: 'seller' });
+        const seller = (await render('/auction/active', [listing], { id: 'seller' }));
         assert.match(seller, /Cancel this listing/);
         assert.match(seller, /This is your listing\. You may cancel before the first bid\./);
         assert.ok(seller.indexOf('aria-label="Auction bidding"') < seller.indexOf('Cancel this listing'));
@@ -265,57 +265,57 @@ test('active seller controls remain available without a separate status card in 
         assert.match(seller, />Live<\/span>/);
         assert.ok(seller.indexOf('Sold by:') < seller.indexOf('>Live</span>'));
         assert.ok(seller.indexOf('>Live</span>') < seller.indexOf('Ends in'));
-        const expired = render('/auction/active', [{ ...listing, endTime: Date.now() - 1000 }], { id: 'buyer' });
+        const expired = (await render('/auction/active', [{ ...listing, endTime: Date.now() - 1000 }], { id: 'buyer' }));
         assert.doesNotMatch(expired, />Live<\/span>/);
         assert.doesNotMatch(expired, /aria-label="Auction bidding"/);
         assert.doesNotMatch(seller, /<h2[^>]*>Active<\/h2>/);
-        assert.doesNotMatch(render('/auction/active', [listing], { id: 'buyer' }), /Cancel this listing/);
-        assert.doesNotMatch(render('/auction/active', [{ ...listing, currentBid: 200, highestBidderId: 'buyer' }], { id: 'seller' }), /Cancel this listing/);
-        const withBids = render('/auction/active', [{ ...listing, currentBid: 200, highestBidderId: 'buyer' }], { id: 'seller' });
+        assert.doesNotMatch((await render('/auction/active', [listing], { id: 'buyer' })), /Cancel this listing/);
+        assert.doesNotMatch((await render('/auction/active', [{ ...listing, currentBid: 200, highestBidderId: 'buyer' }], { id: 'seller' })), /Cancel this listing/);
+        const withBids = (await render('/auction/active', [{ ...listing, currentBid: 200, highestBidderId: 'buyer' }], { id: 'seller' }));
         assert.match(withBids, /This is your listing\./);
         assert.doesNotMatch(withBids, /You may cancel before the first bid/);
-        const cancelled = render('/auction/active', [{ ...listing, status: 'cancelled' }], { id: 'seller' });
+        const cancelled = (await render('/auction/active', [{ ...listing, status: 'cancelled' }], { id: 'seller' }));
         assert.match(cancelled, /aria-label="Auction (?:escrow|outcome)"/);
         assert.doesNotMatch(cancelled, />Live<\/span>/);
     }
 });
 
 
-test('compact browse cards show minimums, private owner indicators and inline bidding triggers without seller metadata', () => {
+test('compact browse cards show minimums, private owner indicators and inline bidding triggers without seller metadata', async () => {
     const listing = { ...auctions[0], auctionNumber: '1234', image: '/item.gif', item: 'A very long item name that needs two lines', quantity: 2500 };
     for (const escrowMode of [true, false]) {
-        const buyer = render('/auctions', [{ ...listing, escrowMode }], { id: 'buyer' });
+        const buyer = (await render('/auctions', [{ ...listing, escrowMode }], { id: 'buyer' }));
         assert.match(buyer, /Min: <\/span>100 Meat/);
         assert.match(buyer, /aria-expanded="false"/);
         assert.match(buyer, /href="\/auction\/active"/);
         assert.doesNotMatch(buyer, /Sold by|Auction #1234|More Info|Your Listing/);
-        const owner = render('/auctions', [{ ...listing, escrowMode }], { id: 'seller' });
+        const owner = (await render('/auctions', [{ ...listing, escrowMode }], { id: 'seller' }));
         assert.match(owner, /Your Listing/);
         assert.doesNotMatch(owner, />Place Bid<\/button>|<dialog/);
-        const withoutBids = render('/auctions', [{ ...listing, escrowMode }]);
+        const withoutBids = (await render('/auctions', [{ ...listing, escrowMode }]));
         assert.match(withoutBids, />Place Bid<\/button>/);
     }
 });
 
 
-test('Info explains marginal seller fees and displays the five agreed fee tiers', () => {
-    const html = render('/info', []);
+test('Info explains marginal seller fees and displays the five agreed fee tiers', async () => {
+    const html = (await render('/info', []));
     const table = html.match(/<table[^>]*>\s*<caption[^>]*>Tiered escrow seller commission[\s\S]*?<\/table>/)[0];
     assert.equal((table.match(/<tr/g) || []).length, 6);
     for (const rate of ['5%', '4%', '3%', '2%', '1%']) assert.ok(table.includes(rate));
-    assert.match(html, /Each rate applies only to the portion within that tier/);
+    assert.match(html, /Each rate applies only to the portion of the sale within that tier/);
     assert.match(html, /410,000 Meat \(4.1%\)/);
     assert.match(html, /rounded down to whole Meat/);
     assert.doesNotMatch(html, /7\.5%/);
 });
 
-test('individual auction pages display the exact hybrid minimum in Direct inputs and Escrow KMail instructions', () => {
+test('individual auction pages display the exact hybrid minimum in Direct inputs and Escrow KMail instructions', async () => {
     for (const [currentBid, minimum] of [[0,'100'],[1750000,'1,810,000'],[7500000,'7,730,000'],
         [15000000,'15,300,000'],[350000000,'353,500,000'],[15000000000,'15,075,000,000'],
         [100000001,'101,500,001']]) {
         for (const escrowMode of [false, true]) {
             const listing = { ...auctions[0], minBidMeat: 100, currentBid, escrowMode, instantPurchasePrice: null, highestBidderId: 'other-bidder' };
-            const html = render('/auction/active', [listing], { id: 'buyer' });
+            const html = (await render('/auction/active', [listing], { id: 'buyer' }));
             if (escrowMode) assert.ok(html.includes(`Attach at least ${minimum} Meat, with no items.`), `Escrow at ${currentBid}`);
             else {
                 assert.ok(html.includes(`placeholder="${minimum} · Full amounts or k/m/b shorthand."`), `Direct at ${currentBid}`);
@@ -325,9 +325,9 @@ test('individual auction pages display the exact hybrid minimum in Direct inputs
     }
 });
 
-test('homepage has one See all auctions link beside Explore Auctions and caps the Explore strip with navigation to the full list', () => {
+test('homepage has one See all auctions link beside Explore Auctions and caps the Explore strip with navigation to the full list', async () => {
     const listings = Array.from({ length: 31 }, (_, i) => ({ ...auctions[0], id: `carousel-${i}`, item: `Carousel item ${i}`, bidCount: 31-i }));
-    const html = render('/', listings);
+    const html = (await render('/', listings));
     assert.equal((html.match(/>See all auctions<\/a>/g) || []).length, 1);
     assert.doesNotMatch(html, /Browse active auctions|See more active auctions/);
     assert.match(html, /Explore Auctions<\/h2>/);
@@ -340,44 +340,44 @@ test('homepage has one See all auctions link beside Explore Auctions and caps th
 });
 
 
-test('All Auctions cards put the total bid count below current prices and retain Min for unbid listings', () => {
+test('All Auctions cards put the total bid count below current prices and retain Min for unbid listings', async () => {
     const listing = { ...auctions[0], currentBid: 1100, bidCount: 40, bids: [{ amount: 1100 }] };
-    const html = render('/auctions', [listing]);
+    const html = (await render('/auctions', [listing]));
     assert.match(html, />1.1k Meat<\/p>/);
     assert.match(html, />Bid \(40 total\)<\/p>/);
     assert.doesNotMatch(html, /Bid: <\/span>/);
     assert.ok(html.indexOf('>1.1k Meat</p>') < html.indexOf('>Bid (40 total)</p>'));
-    const unbid = render('/auctions', [{ ...listing, currentBid: 0, bidCount: 0, bids: [] }]);
+    const unbid = (await render('/auctions', [{ ...listing, currentBid: 0, bidCount: 0, bids: [] }]));
     assert.match(unbid, /Min: <\/span>100 Meat/);
     assert.doesNotMatch(unbid, /Bid \([0-9,]+ total\)/);
-    const buyout = render('/auctions', [{ ...listing, instantPurchasePrice: 50000 }]);
+    const buyout = (await render('/auctions', [{ ...listing, instantPurchasePrice: 50000 }]));
     assert.match(buyout, /Bid \(40 total\)/);
     assert.match(buyout, /Buyout: 50k/);
     assert.match(buyout, /h-\[134px\]/);
 });
 
-test('only active cards with the global hot flag show a fire emoji immediately before the price', () => {
+test('only active cards with the global hot flag show a fire emoji immediately before the price', async () => {
     const hot = { ...auctions[0], currentBid: 1100, bidCount: 40, isHot: true };
-    const html = render('/auctions', [hot]);
+    const html = (await render('/auctions', [hot]));
     assert.match(html, /Top 10% of active auctions by total bids/);
     assert.match(html, /🔥<\/span>1.1k Meat/);
     assert.equal((html.match(/🔥/g) || []).length, 1);
-    assert.doesNotMatch(render('/auctions', [{ ...hot, isHot: false, bidCount: 400 }]), /🔥/);
-    assert.doesNotMatch(render('/auctions?status=all', [{ ...hot, status: 'completed', finalPrice: 1100 }]), /🔥/);
-    assert.doesNotMatch(render('/auctions?status=all', [{ ...hot, endTime: Date.now()-1000 }]), /🔥/);
+    assert.doesNotMatch((await render('/auctions', [{ ...hot, isHot: false, bidCount: 400 }])), /🔥/);
+    assert.doesNotMatch((await render('/auctions?status=all', [{ ...hot, status: 'completed', finalPrice: 1100 }])), /🔥/);
+    assert.doesNotMatch((await render('/auctions?status=all', [{ ...hot, endTime: Date.now()-1000 }])), /🔥/);
 });
 
 
-test('completed card shading excludes every pending and unsuccessful outcome in both trade modes', () => {
+test('completed card shading excludes every pending and unsuccessful outcome in both trade modes', async () => {
     for (const escrowMode of [true, false]) {
         for (const status of ['completed', 'awaiting_trade', 'settling', 'cancelled', 'voided', 'expired', 'ended_no_bids', 'pending_escrow', 'on_hold']) {
             const listing = {...auctions[0], escrowMode, status, finalPrice: 5000, currentBid: 6000};
-            const card = render('/auctions?status=all', [listing]);
+            const card = (await render('/auctions?status=all', [listing]));
             assert.equal(card.includes('bg-green-50'), status === 'completed', `${escrowMode}: ${status}`);
             assert.equal(card.includes('bg-[#ECEDEF]'), ['cancelled','voided'].includes(status), `${escrowMode}: ${status}`);
             assert.equal(card.includes('bg-yellow-50'), ['awaiting_trade','settling'].includes(status), `${escrowMode}: ${status}`);
             assert.equal(card.includes('bg-[#FFF0E5]'), ['expired', 'ended_no_bids'].includes(status), `${escrowMode}: ${status}`);
-            const home = render('/', [listing]);
+            const home = (await render('/', [listing]));
             const recent = home.slice(home.indexOf('aria-label="Recently completed trades"'));
             assert.equal(recent.includes('Active accessory'), status === 'completed');
             if (status === 'completed') {
@@ -389,44 +389,44 @@ test('completed card shading excludes every pending and unsuccessful outcome in 
 });
 
 
-test('auction bid history labels server-authorized delivery references and their actual states', () => {
+test('auction bid history labels server-authorized delivery references and their actual states', async () => {
     const listing = {...auctions[0], bids:[{id:'bid-ref',bidder:'Actual Bidder',amount:100,timestamp:Date.now(),adminDeliveryReferences:[
         {reference:'D-1001',label:'Accepted',state:'sent'}, {reference:'D-1002',label:'Bid refund',state:'pending'},
     ]}]};
-    const admin = render('/auction/active',[listing],{id:'administrator'});
+    const admin = (await render('/auction/active',[listing],{id:'administrator'}));
     assert.match(admin, /Administrator message references/);
     assert.match(admin, /Accepted: <span[^>]*>D-1001<\/span> \(sent\)/);
     assert.match(admin, /Bid refund: <span[^>]*>D-1002<\/span> \(pending\)/);
-    assert.doesNotMatch(render('/auction/active',[listing]), /D-1001|Administrator message references/);
+    assert.doesNotMatch((await render('/auction/active',[listing])), /D-1001|Administrator message references/);
     const publicListing={...listing,bids:listing.bids.map(b=>({...b,adminDeliveryReferences:[]}))};
-    assert.doesNotMatch(render('/auction/active',[publicListing],{id:'ordinary'}), /D-1001|Administrator message references/);
+    assert.doesNotMatch((await render('/auction/active',[publicListing],{id:'ordinary'})), /D-1001|Administrator message references/);
 });
 
 
-test('receipt-time closing auctions show only a brief finalizing status and no premature winner or bid controls', () => {
+test('receipt-time closing auctions show only a brief finalizing status and no premature winner or bid controls', async () => {
     const listing={...auctions[0],escrowMode:true,receiptTimeBidding:true,endTime:Date.now()-1000,currentBid:100,highestBidderId:'leader',highestBidder:'Leader'};
-    const html=render('/auction/active',[listing],{id:'viewer'});
+    const html=(await render('/auction/active',[listing],{id:'viewer'}));
     assert.match(html,/Finalizing bids…/);
     assert.doesNotMatch(html,/Winning bidder:|Final price:|You won|Place a Bid|KoL is unavailable|60 seconds/);
 });
 
 
-test('ownership filters keep showing the right sellers while View All remains a reset control', () => {
+test('ownership filters keep showing the right sellers while View All remains a reset control', async () => {
     const listings=[{...auctions[0],id:'mine',item:'Own listing',sellerId:'viewer'},{...auctions[0],id:'other',item:'Other listing',sellerId:'someone'}];
-    const all=render('/auctions',listings,{id:'viewer'});
+    const all=(await render('/auctions',listings,{id:'viewer'}));
     assert.match(all,/aria-label="View all auctions"/);assert.match(all,/Own listing/);assert.match(all,/Other listing/);
-    const mine=render('/auctions?mine=1',listings,{id:'viewer'});
+    const mine=(await render('/auctions?mine=1',listings,{id:'viewer'}));
     assert.match(mine,/aria-label="View all auctions"/);assert.match(mine,/Own listing/);assert.doesNotMatch(mine,/Other listing/);
-    const others=render('/auctions?mine=others',listings,{id:'viewer'});
+    const others=(await render('/auctions?mine=others',listings,{id:'viewer'}));
     assert.match(others,/aria-label="View all auctions"/);assert.match(others,/Other listing/);assert.doesNotMatch(others,/Own listing/);
-    const guest=render('/auctions?mine=others',listings);
+    const guest=(await render('/auctions?mine=others',listings));
     assert.doesNotMatch(guest,/aria-label="Auction ownership:/);
     assert.match(guest,/Own listing/);assert.match(guest,/Other listing/);
 });
 
 
-test('Info separates Buy operation from per-item fee examples and explains free whole-quantity gift batches',()=>{
- const html=render('/info',[]);
+test('Info separates Buy operation from per-item fee examples and explains free whole-quantity gift batches',async () =>{
+ const html=(await render('/info',[]));
  const types=html.indexOf('Escrow and Direct Trade auction comparison');
  const buy=html.indexOf('>Auctions for Buying Items</h2>');
  const fees=html.indexOf('>Escrow Fees</h2>');
@@ -437,26 +437,26 @@ test('Info separates Buy operation from per-item fee examples and explains free 
  assert.match(html,/all accumulated items are sent/);
  const feeNote=html.slice(fees);
  const feeText=feeNote.replace(/<[^>]*>/g,'');
- assert.match(feeText,/When Selling:/);
- assert.match(feeText,/When Buying:/);
+ assert.match(feeText,/Selling:/);
+ assert.match(feeText,/Buying:/);
  assert.match(feeText,/Example: Selling an Item/);
  assert.match(feeText,/Total commission: 410,000 Meat \(4.1%\)/);
  assert.match(feeText,/Example: Buying Items/);
  assert.match(feeText,/1,000 items × 10,000 Meat → 500,000 Meat fee \(5%\)/);
  assert.match(feeText,/1 item × 10M Meat → 410,000 Meat fee \(4.1%\)/);
- assert.match(feeText,/Buyers pay the fee; sellers receive the full listed price/);
+ assert.match(feeText,/Fees are calculated per item and paid by the buyer\. Sellers receive the full listed price/);
  assert.doesNotMatch(feeNote,/Hardcore|top-up|gift expenses|Fund within 24 hours/i);
 });
 
 
-test('homepage High Rollers mixes active and genuinely completed cards with correct prices and green completion styling',()=>{
+test('homepage High Rollers mixes active and genuinely completed cards with correct prices and green completion styling',async () =>{
     const base={...auctions[0],endTime:Date.now()+3600000};
     const rows=[{...base,id:'high-live',item:'High live item',status:'active',currentBid:60000000},
         {...base,id:'high-done',item:'High completed item',status:'completed',finalPrice:80000000,completedAt:'2026-10-24T00:00:00Z'},
         {...base,id:'high-pending',item:'Not a completed trade',status:'settling',finalPrice:90000000},
         {...base,id:'low',item:'Exactly 50M',status:'active',currentBid:50000000},
         {...base,id:'market-high',item:'Market-only high roller',status:'active',currentBid:100,marketValueMeat:60000000}];
-    const html=render('/',rows);const section=html.split('aria-label="High Rollers"')[1].split('</section>')[0];
+    const html=(await render('/',rows));const section=html.split('aria-label="High Rollers"')[1].split('</section>')[0];
     assert.match(section,/High live item/);assert.match(section,/High completed item/);assert.match(section,/Market-only high roller/);
     assert.doesNotMatch(section,/Not a completed trade/);assert.match(section,/Exactly 50M/);
     assert.match(section,/bg-green-50/);assert.match(section,/Final: 80,000,000 Meat/);assert.match(section,/Completed ·/);assert.match(section,/Ends in/);
@@ -465,10 +465,10 @@ test('homepage High Rollers mixes active and genuinely completed cards with corr
 });
 
 
-test('all home strips use compact cards, only recently completed trades auto-scroll',()=>{
+test('all home strips use compact cards, only recently completed trades auto-scroll',async () =>{
     const rows=[...Array.from({length:6},(_,i)=>({...auctions[0],id:'live-'+i,item:'Live '+i,currentBid:60000000,image:'/test.gif'})),
         ...Array.from({length:6},(_,i)=>({...auctions[0],id:'done-'+i,item:'Done '+i,image:'/test.gif',status:'completed',finalPrice:70000000,completedAt:'2026-10-24T12:00:00Z'}))];
-    const html=render('/',rows);
+    const html=(await render('/',rows));
     for(const label of ['High Rollers','Explore auctions','Recently completed trades']) {
         const section=html.split(`aria-label="${label}"`)[1].split('</section>')[0];
         assert.match(section,/grid h-24/);assert.match(section,/h-10 w-10/);assert.doesNotMatch(section,/h-\[192px\]/);
@@ -477,12 +477,12 @@ test('all home strips use compact cards, only recently completed trades auto-scr
     }
 });
 
-test('every home strip distinguishes Buy cards and keeps per-item Sell price breakdowns',()=>{
+test('every home strip distinguishes Buy cards and keeps per-item Sell price breakdowns',async () =>{
     const rows=['active','completed'].flatMap(status=>[
         {...auctions[0],id:`buy-${status}`,item:`Buy item ${status}`,auctionKind:'buy',pricePerItem:60000000,quantity:20,status,completedAt:'2026-10-24T12:00:00Z',escrowMode:true},
         {...auctions[0],id:`sell-${status}`,item:`Sell item ${status}`,quantity:20,currentBid:80000000,finalPrice:80000000,status,completedAt:'2026-10-24T12:00:00Z',escrowMode:false},
     ]);
-    const html=render('/',rows);
+    const html=(await render('/',rows));
     for(const label of ['High Rollers','Explore auctions','Recently completed trades']) {
         const section=html.split(`aria-label="${label}"`)[1].split('</section>')[0];
         const state=label==='Recently completed trades'?'completed':'active';
@@ -496,47 +496,47 @@ test('every home strip distinguishes Buy cards and keeps per-item Sell price bre
 });
 
 
-test('live market estimates mount on active detail pages; historical completions, other outcomes and cards stay unchanged', () => {
+test('live market estimates mount on active detail pages; historical completions, other outcomes and cards stay unchanged', async () => {
     const sell = {...auctions[0], itemId: 2};
     const buy = {...sell, id: 'buy-market', auctionKind: 'buy', pricePerItem: 100, quantity: 20,
         purchasedQuantity: 0, remainingQuantity: 20, availableQuantity: 20, reservedQuantity: 0, fulfillments: []};
-    assert.match(render(`/auction/${sell.id}`, [sell]), /Loading market price/);
-    assert.match(render(`/auction/${buy.id}`, [buy]), /Loading market price/);
+    assert.match((await render(`/auction/${sell.id}`, [sell])), /Loading market price/);
+    assert.match((await render(`/auction/${buy.id}`, [buy])), /Loading market price/);
     for (const listing of [sell, buy]) {
         for (const status of ['completed', 'cancelled', 'expired', 'pending_escrow']) {
             const closed = {...listing, status, endTime: Date.now() - 1000};
-            assert.doesNotMatch(render(`/auction/${closed.id}`, [closed]), /Loading market price|Approximate Market Value/);
+            assert.doesNotMatch((await render(`/auction/${closed.id}`, [closed])), /Loading market price|Approximate Market Value/);
         }
     }
-    assert.doesNotMatch(render('/auctions', [sell, buy]), /Loading market price|Approximate Market Value/);
+    assert.doesNotMatch((await render('/auctions', [sell, buy])), /Loading market price|Approximate Market Value/);
 });
 
-test('Ended and Completed pages select Recently Ended and show recent closures first', () => {
+test('Ended and Completed pages select Recently Ended and show recent closures first', async () => {
     const lots = [
         { ...base, id: 'old-closed', item: 'Older closure fixture', status: 'completed', endTime: 2000 },
         { ...base, id: 'recent-closed', item: 'Recent closure fixture', status: 'completed', endTime: 5000 },
     ];
     for (const status of ['ended', 'completed']) {
-        const html = render(`/auctions?status=${status}`, lots);
+        const html = (await render(`/auctions?status=${status}`, lots));
         assert.match(html, /aria-label="Recently Ended" aria-pressed="true"/);
         assert.ok(html.indexOf('Recent closure fixture') < html.indexOf('Older closure fixture'));
     }
 });
 
-test('closed Sell and Buy cards center an actual-ending timestamp at the bottom', () => {
+test('closed Sell and Buy cards center an actual-ending timestamp at the bottom', async () => {
     const end = Date.parse('2026-10-26T03:16:00Z');
     for (const auctionKind of ['sell', 'buy']) {
         const listing = { ...base, id: `closed-${auctionKind}`, item: 'Closed timestamp fixture', status: 'completed',
             auctionKind, pricePerItem: 100, endTime: end + 3600000, instantPurchasedAt: new Date(end).toISOString() };
-        const html = render('/auctions?status=completed', [listing]);
+        const html = (await render('/auctions?status=completed', [listing]));
         assert.match(html, /<footer[^>]*>[\s\S]*text-center[^>]*>Ended: <time dateTime="2026-10-26T03:16:00.000Z">/);
         assert.doesNotMatch(html, />View order<\/a>/);
     }
-    assert.doesNotMatch(render('/auctions', [auctions[0]]), /Auction ended:/);
+    assert.doesNotMatch((await render('/auctions', [auctions[0]])), /Auction ended:/);
 });
 
 
-test('closed card timestamps use outcome labels and colors', () => {
+test('closed card timestamps use outcome labels and colors', async () => {
     for (const [status, label, color] of [
         ['completed', 'Ended', '#27804A'],
         ['ended_no_bids', 'Expired', '#A85D45'],
@@ -544,14 +544,14 @@ test('closed card timestamps use outcome labels and colors', () => {
         ['cancelled', 'Cancelled', '#64748B'],
         ['voided', 'Cancelled', '#64748B'],
     ]) {
-        const html = render('/auctions?status=ended', [{ ...base, id: status, item: 'Outcome fixture', status, endTime: 2000,
-            cancelledAt: new Date(2000).toISOString() }]);
+        const html = (await render('/auctions?status=ended', [{ ...base, id: status, item: 'Outcome fixture', status, endTime: 2000,
+            cancelledAt: new Date(2000).toISOString() }]));
         assert.ok(html.includes(`text-[${color}]`));
         assert.ok(html.includes(`${label}: <time`));
     }
 });
 
-test('individual Sell and Buy pages share the cards’ outcome timestamp labels and colors', () => {
+test('individual Sell and Buy pages share the cards’ outcome timestamp labels and colors', async () => {
     for (const auctionKind of ['sell', 'buy']) {
         for (const [status, label, color] of [
             ['completed', 'Ended', '#27804A'],
@@ -563,33 +563,33 @@ test('individual Sell and Buy pages share the cards’ outcome timestamp labels 
             if (auctionKind === 'buy' && status === 'ended_no_bids') continue;
             const listing = { ...base, id: 'outcome-detail', item: 'Outcome detail fixture', status, auctionKind,
                 pricePerItem: 100, endTime: 2000, cancelledAt: new Date(2000).toISOString(), fulfillments: [] };
-            const html = render('/auction/outcome-detail', [listing]);
+            const html = (await render('/auction/outcome-detail', [listing]));
             assert.ok(html.includes(`text-sm leading-6 text-[${color}]`));
             assert.ok(html.includes(`${label}: <time dateTime="1970-01-01T00:00:02.000Z">`));
         }
     }
 });
 
-test('cancelled Sell and Buy cards show the cancellation timestamp, not the future deadline', () => {
+test('cancelled Sell and Buy cards show the cancellation timestamp, not the future deadline', async () => {
     const cancelledAt = '2026-10-24T02:40:56.070Z';
     const deadline = '2026-10-31T02:40:11.927Z';
     for (const auctionKind of ['sell', 'buy']) {
         for (const status of ['cancelled', 'voided']) {
             const listing = { ...base, id: `${auctionKind}-${status}`, item: 'Cancelled fixture', status, auctionKind,
                 pricePerItem: 100, endTime: Date.parse(deadline), cancelledAt, fulfillments: [] };
-            const card = render('/auctions?status=cancelled', [listing]);
+            const card = (await render('/auctions?status=cancelled', [listing]));
             assert.ok(card.includes(`Cancelled: <time dateTime="${cancelledAt}">`));
             assert.ok(!card.includes(`dateTime="${deadline}"`));
-            const missing = render('/auctions?status=cancelled', [{ ...listing, cancelledAt: null }]);
+            const missing = (await render('/auctions?status=cancelled', [{ ...listing, cancelledAt: null }]));
             assert.ok(!missing.includes('Cancelled: <time'));
         }
     }
 });
 
 
-test('browse renders a bounded server page with accurate total and pagination', () => {
+test('browse renders a bounded server page with accurate total and pagination', async () => {
     const many = Array.from({length: 50}, (_, i) => ({...base, id: `page-${String(i).padStart(2,'0')}`, item: `Page Item ${String(i).padStart(2,'0')}`}));
-    const html = render('/auctions?page=2', many);
+    const html = (await render('/auctions?page=2', many));
     assert.match(html, /50 auctions found/);
     assert.match(html, /Page 2 of 3/);
     assert.match(html, /Page Item 24/);
@@ -597,25 +597,25 @@ test('browse renders a bounded server page with accurate total and pagination', 
     assert.doesNotMatch(html, /Page Item 23|Page Item 48/);
 });
 
-test('initial timeouts show retry without claiming that no auctions exist', () => {
+test('initial timeouts show retry without claiming that no auctions exist', async () => {
     for (const path of ['/', '/auctions']) {
-        const html = render(path, [], null, {error:'timeout',hasLoaded:false});
+        const html = (await render(path, [], null, {error:'timeout',hasLoaded:false}));
         assert.match(html, /Auctions could not be loaded/);
         assert.match(html, /Retry/);
         assert.doesNotMatch(html, /0 auctions found|No auctions match|No active auctions right now|No completed trades yet/);
     }
 });
 
-test('temporary refresh failures retain cached cards with an explicit stale-data notice', () => {
+test('temporary refresh failures retain cached cards with an explicit stale-data notice', async () => {
     for (const path of ['/', '/auctions']) {
-        const html = render(path, [auctions[0]], null, {error:'timeout',hasLoaded:true});
+        const html = (await render(path, [auctions[0]], null, {error:'timeout',hasLoaded:true}));
         assert.match(html, /Showing previously loaded auctions/);
         assert.match(html, /Active accessory/);
     }
 });
 
-test('pending-trade timeouts do not claim that the signed-in viewer has zero pending trades', () => {
-    const html = render('/', [], {id:'viewer'}, {pendingError:'timeout',pendingHasLoaded:false});
+test('pending-trade timeouts do not claim that the signed-in viewer has zero pending trades', async () => {
+    const html = (await render('/', [], {id:'viewer'}, {pendingError:'timeout',pendingHasLoaded:false}));
     assert.match(html, /Pending trades could not be loaded/);
     assert.doesNotMatch(html, /0 pending trades/);
 });

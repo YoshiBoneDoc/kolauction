@@ -73,7 +73,7 @@ export function createAuctionReadCache(read, { now = Date.now } = {}) {
                             || [401, 403].includes(failure.status)) invalidate(true);
                         record.failures++;
                         record.retryAt = now() + Math.min(60000, 5000 * 2 ** Math.min(record.failures - 1, 4));
-                        record.state = { ...record.state, error: failure.message || 'Auctions are temporarily unavailable.', refreshing: false, attemptedAt: now() };
+                        record.state = { ...record.state, data: record.state.data ? { ...record.state.data, auctions: record.state.data.auctions.map(auction => ({ ...auction, liveUnavailable: true })) } : null, error: failure.message || 'Auctions are temporarily unavailable.', refreshing: false, attemptedAt: now() };
                     }
                 }
             }).finally(() => {

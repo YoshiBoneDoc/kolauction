@@ -1,3 +1,4 @@
+import AuctionLiveUnavailable from './AuctionLiveUnavailable';
 import RelistButton from './RelistButton';
 import { auctionQuantityLabel } from '../lib/bundles';
 import { useContext, useId, useState } from 'react';
@@ -20,6 +21,7 @@ export default function PublicProfileAuctionCard({ auction, now }) {
     const formId = useId();
     const [showBid, setShowBid] = useState(false);
     const linkState = { browseFrom: `${location.pathname}${location.search}` };
+    if (auction.liveUnavailable) return <AuctionLiveUnavailable auction={auction} />;
     const isBuy = auction.auctionKind === 'buy';
     const result = getAuctionResult(auction, now);
     const displayStatus = getAuctionDisplayStatus(auction, result);

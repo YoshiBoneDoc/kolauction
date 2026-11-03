@@ -23,7 +23,7 @@ function slot(initial) {
     return [harness.slots[index], value => { harness.slots[index] = typeof value === 'function' ? value(harness.slots[index]) : value; }];
 }
 const hooks = { ...React, useState: slot, useRef: value => slot({ current: value })[0],
-    useContext: context => active.contexts.get(context), useEffect() {}, useMemo: fn => fn(), useDeferredValue: value => value };
+    useContext: context => active.contexts.get(context), useEffect() {}, useMemo: fn => fn(), useCallback: fn => fn, useDeferredValue: value => value };
 const compiled = { exports: {} };
 const requireModule = createRequire(import.meta.url);
 new Function('require', 'module', 'exports', outputFiles[0].text)(name => name === 'react' ? hooks
@@ -31,6 +31,7 @@ new Function('require', 'module', 'exports', outputFiles[0].text)(name => name =
 const { AuctionAnItem, UserContext, AuctionsContext } = compiled.exports;
 function nodes(element) {
     if (!element || typeof element !== 'object') return [];
+    if (typeof element.type === 'function' && element.type.name === 'ListingPriceInputs') return [element, ...nodes(element.type(element.props))];
     return [element, ...React.Children.toArray(element.props?.children).flatMap(nodes)];
 }
 function harness(addAuction) {
@@ -50,14 +51,14 @@ function harness(addAuction) {
         preview(escrow, { quantity = '1', minimum = '100', buyout = '', duration = '24', customEndTime = '' } = {}) {
             result.render();
             result.button(escrow ? 'Escrow' : 'Direct').props.onClick(); result.render();
-            result.input('listing-item-search', 'asbestos ore').input('item', '364').input('quantity', quantity).input('minBidMeat', minimum).input('auctionTime', duration);
+            result.input('listing-item-search', 'asbestos ore').input('item', '364').input('quantity', quantity).input('minimum-price-whole', minimum).input('auctionTime', duration);
             if (buyout) {
                 const original = globalThis.requestAnimationFrame;
                 globalThis.requestAnimationFrame = callback => callback();
                 try { result.button('Set Buyout Price (optional)').props.onClick(); }
                 finally { if (original) globalThis.requestAnimationFrame = original; else delete globalThis.requestAnimationFrame; }
                 result.render();
-                result.input('instantPurchasePrice', buyout);
+                result.input('buyout-price-whole', buyout);
             }
             const originalFrame = globalThis.requestAnimationFrame;
             globalThis.requestAnimationFrame = callback => callback();
@@ -156,7 +157,7 @@ test('preview preserves listing values and editing choices in the compact summar
         assert.deepEqual(actions.map(node => node.props.children), ['Back to Edit', 'Continue to Publish']);
         page.button('Back to Edit').props.onClick(); page.render();
         assert.equal(page.find(node => node.props?.id === 'quantity').props.value, '2500');
-        assert.equal(page.find(node => node.props?.id === 'instantPurchasePrice').props.value, '2000000');
+        assert.equal(page.find(node => node.props?.id === 'buyout-price-whole').props.value, '2000000');
         assert.equal(page.button(escrow ? 'Escrow' : 'Direct').props['aria-pressed'], true);
         assert.equal(writes.length, 0);
     }
@@ -219,7 +220,7 @@ test('Buy mode defaults from Sell, disables Direct, removes sell terms and publi
     assert.equal(page.button('Direct').props.disabled,true);assert.equal(page.button('Escrow').props['aria-pressed'],true);
     assert.equal(nodes(page.tree).some(n=>n.props?.children==='Set Buyout Price (optional)'),false);
     assert.equal(nodes(page.tree).some(n=>n.type==='strong'&&n.props.children==='Escrow Protection Guarantee:'),false);
-    page.input('listing-item-search','asbestos ore').input('item','364').input('quantity','20').input('minBidMeat','2m').input('deliveryMode','finished');
+    page.input('listing-item-search','asbestos ore').input('item','364').input('quantity','20').input('minimum-price-item','2m').input('deliveryMode','finished');
     const original=globalThis.requestAnimationFrame;globalThis.requestAnimationFrame=fn=>fn();
     try {page.find(n=>n.type==='form').props.onSubmit({preventDefault(){}});}finally{if(original)globalThis.requestAnimationFrame=original;else delete globalThis.requestAnimationFrame;}
     page.render();assert.equal(nodes(page.tree).some(n=>n.type==='dt'&&n.props.children==='Price per item'),true);

@@ -1,3 +1,4 @@
+import AuctionLiveUnavailable from './AuctionLiveUnavailable';
 import { giveawayConditionLabel } from '../lib/giveaway';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
@@ -19,6 +20,7 @@ export function GiveawayCountdown({ endTime, now }) {
     return <span className="giveaway-countdown"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 6v6l4 3" /></svg><time dateTime={new Date(endTime).toISOString()}>{Math.floor(seconds / 3600)}h {Math.floor(seconds % 3600 / 60)}m {seconds % 60}s left</time></span>;
 }
 export default function GiveawayCard({ auction, now, compact = false }) {
+    if (auction.liveUnavailable) return <AuctionLiveUnavailable auction={auction} />;
     const bid = `${(auction.currentBid || auction.minBidMeat).toLocaleString('en-US')} Meat`;
     const title = auction.giveawayTitle;
     return <Link to={`/auction/${auction.id}`} aria-label={`${title}: ${auction.item}, ${auction.quantity.toLocaleString('en-US')} items`} className={`giveaway-card ${compact ? 'giveaway-card--compact h-[134px]' : 'giveaway-card--banner h-24'}`}>

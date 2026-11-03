@@ -1,22 +1,11 @@
 # kolauction website runtime and shared cache
 
-## Findings
+The website is a Cloudflare Worker with static assets, not a Pages deployment.
+The site adapter reuses the handlers in `functions/api/`; those files alone do not
+make a static-only Worker serve API routes. Use the existing Worker names and
+account; no new Pages project is needed.
 
-The supplied Cloudflare screenshot identifies **kolauction** as a **Worker** and
-explicitly reports that it contains only static assets. It is not a Pages project.
-The repository previously had no root Wrangler configuration or website Worker entry
-point. `functions/api/...` and `public/_routes.json` are Pages conventions; uploading
-Vite assets to a static-only Worker does not turn those files into API handlers.
-This explains why the dashboard would not accept runtime bindings.
-
-The screenshot establishes the displayed deployment type. No authenticated Cloudflare
-account access or live website URL was available, so remote build settings and actual
-live HTTP responses were not independently inspected. No deployment was performed.
-The local `.env` and `.env.local` did not set `VITE_SHARED_AUCTION_CACHE`; a plain Vite
-build therefore has no local configuration enabling this feature. Cloudflare's remote
-build variables cannot be inferred from those files.
-
-## Prepared architecture
+## Runtime architecture
 
 ```
 Browser → kolauction (Worker + Vite static assets)
@@ -52,7 +41,7 @@ The build log prints the chosen boolean. It also emits `build/khub-build.json`, 
 only `runtime` and `sharedAuctionCache`, so the deployed setting can be verified without
 examining minified JavaScript or exposing any credentials.
 
-## What to do afterward — not executed by Codex
+## Production deployment procedure
 
 1. Ensure the existing Supabase migrations required by the current code, including
    148 and 149, have been applied. This configuration correction adds no new SQL.
@@ -134,3 +123,87 @@ The existing 30-second failure cooldown remains in place, including after restar
 - [SPA routing and Worker-first API paths](https://developers.cloudflare.com/workers/static-assets/routing/single-page-application/)
 - [Durable Object bindings](https://developers.cloudflare.com/durable-objects/get-started/)
 - [Workers Builds settings](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/)
+
+## Enable accepted-bid notifications
+
+After setting up the shared cache above:
+
+1. Apply `supabase/migrations/202610280136_accepted_bid_cache_invalidation.sql` in
+   Supabase SQL Editor. It installs `pgcrypto` if needed and creates the trigger, private
+   configuration and freshness metadata. With no configured destination, it sends nothing.
+2. Redeploy the updated cache Worker and website Worker. No bot update/restart is required:
+   the existing database bid insert is the event source for both bidding paths.
+3. Generate a signing key privately, for example in your own terminal:
+
+   ```bash
+   openssl rand -hex 32
+   ```
+
+   Add that value to the **cache Worker** as an encrypted secret named
+   `PUBLIC_CACHE_INVALIDATION_SECRET`, then save/deploy. Do not put it in website frontend
+   `VITE_` variables, Git, the bot environment, a browser request or a public RPC.
+4. In Supabase SQL Editor, enable asynchronous HTTP and privately configure the matching
+   key and your production website URL. Replace the placeholders before running:
+
+   ```sql
+   create extension if not exists pg_net with schema extensions;
+
+   begin;
+   insert into khub_bot.public_cache_webhook_config(id, endpoint, signing_secret)
+   values (
+       true,
+       'https://YOUR-SITE/api/public-auctions/invalidate',
+       'REPLACE_WITH_THE_SAME_64_CHARACTER_HEX_KEY'
+   )
+   on conflict(id) do update
+   set endpoint = excluded.endpoint, signing_secret = excluded.signing_secret;
+
+   -- Flush any pre-configuration snapshots and test delivery after commit.
+   update khub_bot.public_cache_revision set revision = revision + 1 where id;
+   select khub_bot.send_public_cache_invalidation();
+   commit;
+   ```
+
+   Keep the signing key private, including saved/shared SQL snippets. The HTTPS destination
+   must end exactly in `/api/public-auctions/invalidate`. Do not create a generic Supabase
+   row webhook that forwards the entire bid row or an Authorization header.
+5. Inspect the enqueue status without displaying the key:
+
+   ```sql
+   select revision, last_queued_revision, last_request_id, enqueue_failures, last_error_code
+   from khub_bot.public_cache_revision;
+
+   select r.id, r.status_code, r.timed_out, r.error_msg
+   from net._http_response r
+   where r.id = (select last_request_id from khub_bot.public_cache_revision);
+   ```
+
+   The second result can be empty until the asynchronous request finishes. Expect HTTP
+   200. A 403 indicates a mismatched/missing Worker signing key; a 404 generally indicates
+   the updated website route was not deployed. A recorded enqueue error indicates `pg_net`
+   or its configuration needs attention. No API role can invoke the signing helper.
+   After correcting configuration, safely resend the latest revision:
+
+   ```sql
+   select khub_bot.send_public_cache_invalidation();
+   ```
+
+   Request a warmed public endpoint after notification delivery. Expect
+   `X-Khub-Cache: REVALIDATED`, then `HIT` on subsequent requests. Verify the next genuine
+   accepted bid increments the revision and sends another successful notification.
+
+To disable only notifications, delete the private configuration row in SQL Editor:
+`delete from khub_bot.public_cache_webhook_config where id;`. Normal TTL caching and
+all auction processing continue. Do not remove bid, escrow or delivery records.
+
+
+## Cache deployment credentials and rollback
+
+The GitHub workflow requires account-scoped `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID` repository secrets. Keep Supabase public origin credentials
+and `PUBLIC_CACHE_INVALIDATION_SECRET` in the cache Worker's runtime settings;
+never use a service-role key there. `--keep-vars` preserves runtime variables.
+
+To disable frontend shared reads, set build variable `VITE_SHARED_AUCTION_CACHE=false`
+and rebuild/redeploy the website. Installed RPCs/ledger data remain; do not delete
+financial state as a cache rollback. Disabling notifications alone is described above.

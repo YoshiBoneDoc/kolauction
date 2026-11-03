@@ -8,7 +8,7 @@ import { createBugReportService } from '../src/lib/bugReports.js';
 
 const { outputFiles } = buildSync({ stdin: { contents: `
     import React from 'react';
-    import { renderToStaticMarkup } from 'react-dom/server';
+    import { renderRouteMarkup as renderToStaticMarkup } from './tests/helpers/renderRouteMarkup.mjs';
     import { StaticRouter } from 'react-router-dom';
     import App from './src/App.jsx';
     import { UserContext } from './src/context/UserContext.jsx';
@@ -26,9 +26,9 @@ const requireModule=createRequire(import.meta.url);
 new Function('require','module','exports',outputFiles[0].text)(name=>name==='react-router-dom'?router:requireModule(name),compiled,compiled.exports);
 const {render}=compiled.exports;
 
-test('shared footers show the same destinations and mark the current page',()=>{
+test('shared footers show the same destinations and mark the current page',async () =>{
     for (const path of ['/', '/donate', '/report-a-bug', '/meet-the-creator', '/update-log']) {
-        const footer=render(path).match(/<nav aria-label="Footer links"[\s\S]*?<\/nav>/)?.[0];
+        const footer=(await render(path)).match(/<nav aria-label="Footer links"[\s\S]*?<\/nav>/)?.[0];
         assert.ok(footer, path);
         for (const [href,label] of [['/donate','Donate'],['/report-a-bug','Report a Bug'],['/meet-the-creator','Meet the Creator']]) {
             const link=[...footer.matchAll(/<a\b[^>]*>[^<]*<\/a>/g)].map(match=>match[0]).find(item=>item.includes(`href="${href}"`));
@@ -38,33 +38,33 @@ test('shared footers show the same destinations and mark the current page',()=>{
     }
 });
 
-test('creator page displays all six creator photo slots while images load',()=>{
-    const gallery=render('/meet-the-creator').match(/<section aria-label="Photo journal"[\s\S]*?<\/section>/)?.[0];
+test('creator page displays all six creator photo slots while images load',async () =>{
+    const gallery=(await render('/meet-the-creator')).match(/<section aria-label="Photo journal"[\s\S]*?<\/section>/)?.[0];
     assert.ok(gallery);
     for (const label of ['Casual group photo', 'Graduation photo', 'Operating room photo', 'Waterfront photo', 'Savannah photo', 'Yosemite photo']) assert.ok(gallery.includes(label), label);
     assert.doesNotMatch(gallery, /OFFICIAL APPROVAL/);
     assert.doesNotMatch(gallery, /<img\b/);
 });
 
-test('anonymous users get login/contact guidance, signed-in users get a private report form',()=>{
-    const anonymous=render('/report-a-bug');
+test('anonymous users get login/contact guidance, signed-in users get a private report form',async () =>{
+    const anonymous=(await render('/report-a-bug'));
     assert.match(anonymous,/Log in/);
     assert.match(anonymous,/towho=3552305/);
     assert.doesNotMatch(anonymous,/<textarea|Send bug report|Open administrator bug inbox/);
-    const signedIn=render('/report-a-bug',{id:'reporter'});
+    const signedIn=(await render('/report-a-bug',{id:'reporter'}));
     assert.match(signedIn,/<textarea[^>]*maxLength="2000"/);
     assert.match(signedIn,/Send bug report/);
     assert.match(signedIn,/Reports are private to administrators/);
     assert.doesNotMatch(signedIn,/Open administrator bug inbox/);
 });
 
-test('Info support link opens the general support form with login guidance for guests',()=>{
-    assert.match(render('/info'),/href="\/support"[^>]*>Submit a support ticket/);
-    const guest=render('/support');
+test('Info support link opens the general support form with login guidance for guests',async () =>{
+    assert.match((await render('/info')),/href="\/support"[^>]*>Submit a support ticket/);
+    const guest=(await render('/support'));
     assert.match(guest,/Submit a Support Ticket/);
     assert.match(guest,/Log in/);
     assert.doesNotMatch(guest,/<textarea/);
-    const signedIn=render('/support',{id:'reporter'});
+    const signedIn=(await render('/support',{id:'reporter'}));
     assert.match(signedIn,/How can we help\?/);
     assert.match(signedIn,/Submit support ticket/);
     assert.match(signedIn,/Support tickets are private to administrators/);
@@ -81,9 +81,9 @@ test('general support submits text and a stable key to its dedicated server rout
     await assert.rejects(createBugReportService({async rpc(){return {data:{}};}}).submitSupportTicket('id','Please help with my account.'),/retry/);
 });
 
-test('administrator route never embeds cached private reports before authentication/authorization',()=>{
-    assert.match(render('/admin/bug-reports'),/Log in.*administrator account/);
-    const signedIn=render('/admin/bug-reports',{id:'normal'});
+test('administrator route never embeds cached private reports before authentication/authorization',async () =>{
+    assert.match((await render('/admin/bug-reports')),/Log in.*administrator account/);
+    const signedIn=(await render('/admin/bug-reports',{id:'normal'}));
     assert.match(signedIn,/Loading private messages/);
     assert.doesNotMatch(signedIn,/Reply by KMail|Mark resolved/);
 });
@@ -119,9 +119,9 @@ test('admin reads and status changes use server-checked RPCs and expose safe den
     await assert.rejects(cooldown.submit('id','A valid report description.'),/wait a minute/);
 });
 
-test('shared inbox has category tabs and keeps report submission in the shared footer', () => {
-    const html=render('/admin/inbox',{id:'normal'});
-    assert.match(html,/Administrator inbox/);
+test('shared inbox has category tabs and keeps report submission in the shared footer', async () => {
+    const html=(await render('/admin/inbox',{id:'normal'}));
+    assert.match(html,/>Administration<\/h1>/);
     assert.match(html,/Inbox categories/);
     assert.match(html,/Bug reports/);
     assert.match(html,/Trade queries/);
@@ -131,7 +131,7 @@ test('shared inbox has category tabs and keeps report submission in the shared f
     assert.ok(main);
     assert.doesNotMatch(main,/href="\/report-a-bug"|Open administrator bug inbox/);
     assert.match(html,/href="\/report-a-bug"[^>]*>Report a Bug/);
-    assert.doesNotMatch(render('/',{id:'normal'}),/href="\/admin\/inbox"/);
+    assert.doesNotMatch((await render('/',{id:'normal'})),/href="\/admin\/inbox"/);
 });
 
 test('shared inbox sends category and pagination to the server and audits category updates',async()=>{
@@ -145,14 +145,14 @@ test('shared inbox sends category and pagination to the server and audits catego
     await assert.rejects(denied.setCategory('id','other'),/Administrator access required/);
 });
 
-test('wall appeal link opens the private appeal form, including for restricted signed-in sessions',()=>{
-    assert.match(render('/wall-of-shame'),/href="\/submit-appeal"[^>]*>Submit an appeal/);
-    assert.doesNotMatch(render('/wall-of-shame'),/KMail teres minor.*to appeal/);
-    assert.match(render('/submit-appeal'),/Log in to appeal/);
-    const signedIn=render('/submit-appeal',{id:'player'});
+test('wall appeal link opens the private appeal form, including for restricted signed-in sessions',async () =>{
+    assert.match((await render('/wall-of-shame')),/href="\/submit-appeal"[^>]*>Submit an appeal/);
+    assert.doesNotMatch((await render('/wall-of-shame')),/KMail teres minor.*to appeal/);
+    assert.match((await render('/submit-appeal')),/Log in to appeal/);
+    const signedIn=(await render('/submit-appeal',{id:'player'}));
     assert.match(signedIn,/<textarea[^>]*maxLength="2000"/);
     assert.match(signedIn,/Submit appeal/);
-    const restricted=render('/submit-appeal',null,'restricted-player');
+    const restricted=(await render('/submit-appeal',null,'restricted-player'));
     assert.match(restricted,/<textarea/);
     assert.doesNotMatch(restricted,/Log in to appeal/);
 });
@@ -203,17 +203,17 @@ test('author withdrawal and separate trade queries never accept caller-supplied 
     assert.deepEqual(calls,[['withdraw_trade_rating',{p_auction_id:'auction'}],['submit_trade_query',{p_request_id:'request',p_auction_id:'auction',p_body:'Please review this trade concern.'}]]);
 });
 
-test('administrator sections isolate bans and analytics from message categories', () => {
+test('administrator sections isolate bans and analytics from message categories', async () => {
     const user = {id:'normal'};
-    const inbox = render('/admin/inbox', user);
+    const inbox = (await render('/admin/inbox', user));
     assert.match(inbox, /Administrator sections/);
     assert.doesNotMatch(inbox, /Account bans|Auctions affected by bans|Loading analytics/);
-    const bans = render('/admin/inbox?tab=bans', user);
+    const bans = (await render('/admin/inbox?tab=bans', user));
     assert.match(bans, /Account bans/);
     assert.match(bans, /Auctions affected by bans/);
     assert.doesNotMatch(bans, /Inbox categories|Loading analytics/);
-    const analytics = render('/admin/inbox?tab=analytics', user);
+    const analytics = (await render('/admin/inbox?tab=analytics', user));
     assert.match(analytics, /Loading analytics/);
     assert.doesNotMatch(analytics, /Account bans|Inbox categories/);
-    assert.doesNotMatch(render('/admin/inbox?tab=analytics'), /Loading analytics/);
+    assert.doesNotMatch((await render('/admin/inbox?tab=analytics')), /Loading analytics/);
 });

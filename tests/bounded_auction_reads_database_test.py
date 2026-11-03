@@ -4,6 +4,7 @@ credentials, network, real bot, KoL account or live database is used.
 Run: python3 tests/bounded_auction_reads_database_test.py
 """
 import json
+from helpers.local_supabase import add_storage_fixture
 from pathlib import Path
 import subprocess
 import tempfile
@@ -13,7 +14,7 @@ ROOT=Path(__file__).resolve().parents[1]
 BIN=Path(subprocess.check_output(['pg_config','--bindir'],text=True).strip())
 with tempfile.TemporaryDirectory(prefix='khub-bounded-reads-',dir='/tmp') as folder:
     data=Path(folder)/'data'
-    subprocess.run([str(BIN/'initdb'),'-D',str(data),'-A','trust','--no-locale'],check=True,capture_output=True)
+    subprocess.run([str(BIN/'initdb'),'-D',str(data),'-A','trust','--no-locale','--encoding=UTF8'],check=True,capture_output=True)
     def pg(*args):
         return subprocess.run([str(BIN/'pg_ctl'),'-D',str(data),*args],check=True,capture_output=True)
     started=False
@@ -45,11 +46,12 @@ with tempfile.TemporaryDirectory(prefix='khub-bounded-reads-',dir='/tmp') as fol
             grant usage on schema public,auth to anon,authenticated,service_role;
             grant execute on function auth.uid() to anon,authenticated;
         ''')
+        add_storage_fixture(sql)
         migrations=sorted([*ROOT.glob('supabase/migrations/*.sql'),*ROOT.glob('supabase/migrations/queue/*.sql')],key=lambda p:p.name)
         assert len({p.name for p in migrations})==len(migrations)
         upgrade=next(p for p in migrations if p.name.startswith('202610280126_'))
         for migration in migrations:
-            if migration!=upgrade:sql(migration.read_text())
+            if migration.name<upgrade.name:sql(migration.read_text())
         definitions="""select jsonb_object_agg(p.oid::regprocedure::text,pg_get_functiondef(p.oid)) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
             where n.nspname in ('public','khub_bot') and p.prokind='f' and p.proname in
             ('bot_ingest_mail','bot_tick','bot_claim_delivery','bot_ack_delivery','finish_listing','finish_buy_order','bot_liabilities');"""

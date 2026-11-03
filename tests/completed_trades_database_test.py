@@ -12,7 +12,7 @@ ROOT=Path(__file__).resolve().parents[1]
 BIN=Path(subprocess.check_output(['pg_config','--bindir'],text=True).strip())
 with tempfile.TemporaryDirectory(prefix='khub-completed-',dir='/tmp') as folder:
     data=Path(folder)/'data'
-    subprocess.run([str(BIN/'initdb'),'-D',str(data),'-A','trust','--no-locale'],check=True,capture_output=True)
+    subprocess.run([str(BIN/'initdb'),'-D',str(data),'-A','trust','--no-locale','--encoding=UTF8'],check=True,capture_output=True)
     def pg(*args):
         return subprocess.run([str(BIN/'pg_ctl'),'-D',str(data),*args],check=True,capture_output=True)
     started=False
@@ -46,7 +46,11 @@ with tempfile.TemporaryDirectory(prefix='khub-completed-',dir='/tmp') as folder:
         ''')
         migrations=sorted([*ROOT.glob('supabase/migrations/*.sql'),*ROOT.glob('supabase/migrations/queue/*.sql')],key=lambda p:p.name)
         assert len({p.name for p in migrations})==len(migrations)
-        for migration in migrations: sql(migration.read_text())
+        # This suite tests reapplication of the completed/order/filter upgrades.
+        # Later reader rewrites are covered by the current read/cache suites;
+        # replaying migration 115 over them is deliberately rejected by its guard.
+        for migration in migrations:
+            if migration.name<'202610270117_':sql(migration.read_text())
         catalog_path=ROOT/'src/data/items.json'
         if not catalog_path.exists(): catalog_path=ROOT/'catalog/items.json'
         catalog=json.loads(catalog_path.read_text())

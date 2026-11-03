@@ -1,3 +1,4 @@
+import { withReadDeadline } from './readDeadline.js';
 import { parsePrice } from './auctionPriceRange.js';
 import { resolveAuctionSort } from './auctionBrowsing.js';
 import { observeAuctionServerTime, auctionClockRequestStarted } from './auctionClock.js';
@@ -19,6 +20,7 @@ export function mapAuction(row, bidRows) {
     const latestBid = lastBid?.amount >= Number(row.current_bid) ? lastBid : null;
     return {
         id: row.id,
+        liveUnavailable: row._live_unavailable === true,
         auctionKind: row.auction_kind || 'sell',
         giveawayTitle: row.giveaway_title || null,
         giveawayWinCondition: row.giveaway_win_condition || 'last_bid',
@@ -119,14 +121,17 @@ function databaseError(error) {
     return Object.assign(failure || new Error(error.message || 'The database request failed. Please try again.'), { code: error.code, status: error.status });
 }
 
-export function createAuctionService(client, { publicReader = null } = {}) {
+export function createAuctionService(client, { publicReader = null, readDeadlineMs = 12000 } = {}) {
     function requireClient() {
         if (!client) throw new Error('Auction storage is not configured yet.');
         return client;
     }
 
     return {
-        async load({ view = 'browse', id = null, sellerId = null, excludeOwn = false, kind = 'all', buyout = 'any', bundle = 'any', summaryOnly = false, search = '', status = 'active', sort = resolveAuctionSort(status), trade = 'all', page = 1, minPrice = null, maxPrice = null, signal, fresh = false } = {}) {
+        load(options = {}) {
+            return withReadDeadline(signal => this.loadWithinDeadline({ ...options, signal }), { ...options, milliseconds: readDeadlineMs });
+        },
+        async loadWithinDeadline({ view = 'browse', id = null, sellerId = null, excludeOwn = false, kind = 'all', buyout = 'any', bundle = 'any', summaryOnly = false, search = '', status = 'active', sort = resolveAuctionSort(status), trade = 'all', page = 1, minPrice = null, maxPrice = null, signal, fresh = false } = {}) {
             // Browsing is read-only. The existing bot tick expires all auction
             // types; write RPCs independently validate deadlines under their locks.
             const requestStartedAt = auctionClockRequestStarted();
@@ -175,7 +180,11 @@ export function createAuctionService(client, { publicReader = null } = {}) {
                     ? { min: Number(data.price_bounds.min), max: Number(data.price_bounds.max) } : null } : {}),
             };
         },
-        async pendingTrades(page = 1, { signal } = {}) {
+        pendingTrades(page = 1, options = {}) {
+            return withReadDeadline(signal => this.pendingTradesWithinDeadline(page, { signal }),
+                { ...options, milliseconds: readDeadlineMs });
+        },
+        async pendingTradesWithinDeadline(page = 1, { signal } = {}) {
             const request = requireClient().rpc('read_pending_trades', { p_page: page });
             if (signal && request.abortSignal) request.abortSignal(signal);
             const { data, error, status: statusCode } = await request;

@@ -1,3 +1,4 @@
+import AuctionLiveUnavailable from '../components/AuctionLiveUnavailable';
 import PopularAuctions from '../components/PopularAuctions';
 import HighRollers from '../components/HighRollers';
 import GiveawayCard from '../components/GiveawayCard';
@@ -15,11 +16,11 @@ import HomePoll from '../components/HomePoll';
 import SiteTradeTotals from '../components/SiteTradeTotals';
 
 export default function Home() {
-    const { auctions, homeSections, siteTotals, isLoading, error, hasLoaded = !isLoading && !error, refreshAuctions } = useContext(AuctionsContext);
+    const { auctions, homeSections, siteTotals, listingOrderDelayed = false, isLoading, error, hasLoaded = !isLoading && !error, refreshAuctions } = useContext(AuctionsContext);
     const now = useNow();
     const featuredGiveaway = useFeaturedGiveaway();
     const featuredPollTarget = useRef(null);
-    const hasActiveAuctions = auctions.some(auction => ['active', 'finalizing'].includes(getAuctionStatus(auction, now)));
+    const hasActiveAuctions = auctions.some(auction => auction.liveUnavailable || ['active', 'finalizing'].includes(getAuctionStatus(auction, now)));
 
     const highRollers = useMemo(() => highRollerAuctions(homeSections?.highRollers || auctions, now), [auctions, homeSections, now]);
     const completed = useMemo(() => recentCompletedAuctions(homeSections?.recent || auctions), [auctions, homeSections]);
@@ -39,8 +40,12 @@ export default function Home() {
                     {hasLoaded ? 'Refresh delayed. Showing previously loaded auctions.' : 'Auctions could not be loaded. Please try again.'}{' '}
                     <button onClick={refreshAuctions} className="underline">Retry</button>
                 </p>}
+                {listingOrderDelayed && <p role="status" className="mb-4">Auction selection and ordering are being refreshed. Available prices are verified separately.</p>}
+                {auctions.some(auction => auction.liveUnavailable) && <div className="mb-4 grid gap-3 sm:grid-cols-2">
+                    {auctions.filter(auction => auction.liveUnavailable).map(auction => <AuctionLiveUnavailable key={auction.id} auction={auction} />)}
+                </div>}
                 <PendingTrades />
-                {featuredGiveaway && getAuctionStatus(featuredGiveaway, now) === 'active' && <div className="mb-8">
+                {featuredGiveaway && (featuredGiveaway.liveUnavailable || getAuctionStatus(featuredGiveaway, now) === 'active') && <div className="mb-8">
                     <GiveawayCard auction={featuredGiveaway} now={now} />
                     <p className="mt-1.5 text-center text-xs"><Link to="/giveaways" className="text-blue-700 underline hover:text-blue-800 dark:text-blue-300 dark:hover:text-blue-200">How Does This Giveaway Work?</Link></p>
                 </div>}

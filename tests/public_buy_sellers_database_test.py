@@ -148,6 +148,18 @@ with tempfile.TemporaryDirectory(prefix='khub-private-buy-fees-',dir='/tmp') as 
             current=read(regular,uid)
             for field in ['rows','bids','total','seller','privacy_version']:
                 assert sell_before[str(uid)][field]==current[field],field
+        # This historical suite intentionally stops at migration 112. Install
+        # only the additive live RPC here, not unrelated later financial SQL.
+        live_migration=next(p for p in migrations if p.name=='202611030172_shared_live_auction_state.sql').read_text()
+        sql('create function public.read_public_auction_live_batch'+live_migration.split('create function public.read_public_auction_live_batch',1)[1].split('-- v2',1)[0])
+        # Shared live quantities must agree with the existing authoritative
+        # display projection for active reservations and historical fills.
+        for ident in [live,historical]:
+            before=read(ident,None)['rows'][0]
+            state=json.loads(sql(f"set role anon;select public.read_public_auction_live_batch(array['{ident}'::uuid]);"))['rows'][0]
+            for key in ['current_bid','price_per_item','purchased_quantity','remaining_quantity','available_quantity','reserved_quantity','reduced_quantity','delivery_mode','buy_closing_reason']:
+                assert state[key]==before[key],(key,state,before)
+            assert not set(state)&{'seller_id','seller_username','balance_meat','fulfillments','my_reservation','winner_id','highest_bidder_id'}
         sql(f"update public.profiles set is_banned=true where id='{buyer}';")
         restricted=read(historical,buyer)['rows'][0]
         assert restricted['fulfillments'][0]['seller']==name

@@ -34,7 +34,7 @@ test('timeout retains the previous complete data, distinguishes failed initial l
     const data={auctions:[{id:'known'}]};
     const cache=createAuctionReadCache(async()=>{calls++;if(fail)throw new Error('timeout');return data;},{now:()=>now});
     await cache.load('dataset');fail=true;now+=30000;await cache.load('dataset');
-    assert.equal(cache.snapshot('dataset').data,data);assert.equal(cache.snapshot('dataset').error,'timeout');
+    assert.deepEqual(cache.snapshot('dataset').data,{auctions:[{id:'known',liveUnavailable:true}]});assert.equal(cache.snapshot('dataset').error,'timeout');
     assert.equal(cache.snapshot('dataset').refreshing,false);
     await cache.load('dataset');assert.equal(calls,2);
     await cache.load('new-detail');assert.equal(cache.snapshot('new-detail').data,null);

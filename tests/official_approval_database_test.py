@@ -38,10 +38,9 @@ with tempfile.TemporaryDirectory(prefix='khub-approval-',dir='/tmp') as folder:
         """)
         migration=matches[0].read_text()
         sql(migration)
-        source=ROOT/'about_me_Pics/OFFICIAL APPROVAL.png'
         expected=re.search(r'Source SHA256: ([0-9a-f]{64})',migration).group(1)
-        # The private photo folder is intentionally absent from fresh checkouts.
-        if source.exists(): assert hashlib.sha256(source.read_bytes()).hexdigest()==expected
+        # Validate the published migration payload below, independently of
+        # mutable private source photos that are absent from fresh checkouts.
         for role in ['anon','authenticated','service_role']:
             result=json.loads(sql(f'begin read only;set local role {role};select public.read_official_approval_image();commit;'))
             assert set(result)=={'mime_type','base64'} and result['mime_type']=='image/png'

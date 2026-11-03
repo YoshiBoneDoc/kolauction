@@ -1,3 +1,4 @@
+import AuctionLiveUnavailable from './AuctionLiveUnavailable';
 import RelistButton from './RelistButton';
 import AuctionEndedTime from './AuctionEndedTime';
 import { useContext, useId, useRef, useState } from 'react';
@@ -24,6 +25,7 @@ export default function BuyAuctionCard({ auction, now, inlineReserve = false, ex
     const [notice, setNotice] = useState('');
     const [saved, setSaved] = useState(null);
     const [resolvedId, setResolvedId] = useState(null);
+    if (auction.liveUnavailable) return <AuctionLiveUnavailable auction={auction} />;
     const result = getAuctionResult(auction, now);
     const status = getAuctionDisplayStatus(auction, result);
     const ended = ['completed', 'awaiting_trade', 'settling', 'ended_no_bids', 'expired', 'cancelled', 'voided'].includes(result.status);

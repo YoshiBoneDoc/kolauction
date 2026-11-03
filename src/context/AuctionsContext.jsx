@@ -66,6 +66,7 @@ export const AuctionsProvider = ({ children }) => {
     const hasLoaded = snapshot.data != null;
     const isLoading = Boolean(key && !hasLoaded && !error);
     const isRefreshing = snapshot.refreshing;
+    const listingOrderDelayed = snapshot.data?.publicSnapshot?.ordering_delayed === true || Boolean(error && hasLoaded);
     const publicDataDelayed = snapshot.data?.publicSnapshot?.delayed === true;
 
     const [pendingSelection, setPendingSelection] = useState({ scope, page: 1 });
@@ -90,13 +91,13 @@ export const AuctionsProvider = ({ children }) => {
 
     useEffect(() => {
         if (!key || networkRequest.view === 'profile' && !currentUser?.id) return;
-        const delay = () => Math.max(auctionRefreshDelay(networkRequest, cache.snapshot(key).data?.auctions || [], auctionNow(), import.meta.env.VITE_SHARED_AUCTION_CACHE === 'true'), cache.retryAfter(key));
+        const delay = () => Math.max(cache.snapshot(key).data?.publicSnapshot?.live_mode ? 5000 : auctionRefreshDelay(networkRequest, cache.snapshot(key).data?.auctions || [], auctionNow(), import.meta.env.VITE_SHARED_AUCTION_CACHE === 'true'), cache.retryAfter(key));
         const previous = cache.snapshot(key);
         const initialDelay = previous.error ? cache.retryAfter(key)
             : previous.updatedAt == null ? (networkRequest.view === 'browse' && (networkRequest.minPrice != null || networkRequest.maxPrice != null) ? 250 : 0)
                 : Math.max(0, delay() - (Date.now() - previous.updatedAt));
         const stop = startAuctionRefresh({
-            refresh: () => cache.load(key, { maxAge: shared ? 60000 : Math.min(5000, delay()) }),
+            refresh: () => cache.load(key, { maxAge: shared ? cache.snapshot(key).data?.publicSnapshot?.live_mode ? 2000 : 60000 : Math.min(5000, delay()) }),
             delay, document, initialDelay, jitter: shared ? 0.2 : 0,
         });
         return () => { stop(); cache.cancel(key); };
@@ -204,7 +205,7 @@ export const AuctionsProvider = ({ children }) => {
     };
 
     return (
-        <AuctionsContext.Provider value={{ auctions, total, homeSections, siteTotals, priceBounds, seller, isLoading, isRefreshing, hasLoaded, publicDataDelayed, error, pendingTrades, pendingTotal, pendingPage, setPendingPage, pendingError, pendingHasLoaded, addAuction, placeBid, purchaseAuction, confirmTrade, rateTrade, reserveBuyQuantity, cancelBuyReservation, cancelAuction, refreshAuctions }}>
+        <AuctionsContext.Provider value={{ auctions, total, homeSections, siteTotals, priceBounds, seller, isLoading, isRefreshing, hasLoaded, publicDataDelayed, listingOrderDelayed, error, pendingTrades, pendingTotal, pendingPage, setPendingPage, pendingError, pendingHasLoaded, addAuction, placeBid, purchaseAuction, confirmTrade, rateTrade, reserveBuyQuantity, cancelBuyReservation, cancelAuction, refreshAuctions }}>
             {children}
         </AuctionsContext.Provider>
     );

@@ -78,7 +78,10 @@ with tempfile.TemporaryDirectory(prefix='khub-detail-cache-',dir='/tmp') as fold
         for viewer in [None,owner,other,restricted,administrator]:
             full=json.loads(sql(f"select public.read_auction_page(p_view=>'detail',p_id=>'{aid}');",viewer))
             narrow=json.loads(sql(f"select public.read_auction_detail_context(p_id=>'{aid}');",viewer))
-            assert narrow['bids']==full['bids'],(viewer,narrow,full)
+            # The UI maps an omitted giveaway_winner flag to false. Compare
+            # those equivalent active-history values; a true flag must still match.
+            history=lambda payload: [dict(b,giveaway_winner=b.get('giveaway_winner',False)) for b in payload['bids']]
+            assert history(narrow)==history(full),(viewer,narrow,full)
             row=narrow['rows'][0]
             for key in ['usernames_visible','seller_username','highest_bidder_id','highest_bidder_username','viewer_is_highest_bidder','bidding_restricted','escrow_timing_review']:
                 assert row[key]==full['rows'][0][key],(key,row,full['rows'][0])

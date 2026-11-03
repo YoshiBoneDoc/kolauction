@@ -12,7 +12,7 @@ const number = value => BigInt(value ?? 0).toLocaleString('en-US');
 
 export default function SellerProfile() {
     const { currentUser } = useContext(UserContext);
-    const { seller, auctions, total, isLoading, error, refreshAuctions } = useContext(AuctionsContext);
+    const { seller, auctions, total, listingOrderDelayed = false, isLoading, error, refreshAuctions } = useContext(AuctionsContext);
     const { id: sellerId } = useParams();
     const isOwnProfile = Boolean(currentUser?.id && currentUser.id === sellerId);
     const [params, setParams] = useSearchParams();
@@ -62,7 +62,7 @@ export default function SellerProfile() {
                 </section> : <div className="public-profile-layout">
                     <div className="public-profile-section-heading">
                         <h2>Auctions</h2>
-                        {!isLoading && !error && <p role="status">{number(total)} found</p>}
+                        {!isLoading && !error && <p role="status">{listingOrderDelayed ? 'Results may be out of date. Count and ordering are being refreshed.' : `${number(total)} found`}</p>}
                     </div>
                     <div className="public-profile-toolbar">
                         <label className="public-profile-filter public-profile-search">Search items
@@ -96,7 +96,7 @@ export default function SellerProfile() {
                             </div>
                             {(total > 24 || page > 1) && <nav aria-label="Seller auction pages" className="flex flex-wrap items-center justify-center gap-4">
                                 <button disabled={page <= 1} onClick={() => update('page', String(page - 1))} className="min-h-11 rounded border bg-white px-4 disabled:opacity-50">Previous</button>
-                                <span>Page {page} of {Math.max(1, Math.ceil(total / 24))}</span>
+                                <span>Page {page}{!listingOrderDelayed && <> of {Math.max(1, Math.ceil(total / 24))}</>}</span>
                                 <button disabled={page * 24 >= total} onClick={() => update('page', String(page + 1))} className="min-h-11 rounded border bg-white px-4 disabled:opacity-50">Next</button>
                             </nav>}
                         </>}

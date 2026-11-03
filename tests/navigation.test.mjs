@@ -9,7 +9,7 @@ const { outputFiles } = buildSync({
     stdin: {
         contents: `
             import React from 'react';
-            import { renderToStaticMarkup } from 'react-dom/server';
+            import { renderRouteMarkup as renderToStaticMarkup } from './tests/helpers/renderRouteMarkup.mjs';
             import { StaticRouter } from 'react-router-dom';
             import App from './src/App.jsx';
             import { AuctionsContext } from './src/context/AuctionsContext.jsx';
@@ -27,20 +27,20 @@ const { outputFiles } = buildSync({
         resolveDir: fileURLToPath(new URL('../', import.meta.url)), loader: 'jsx',
     },
     bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external',
-    define: { 'import.meta.env': '{}' }, jsx: 'automatic', loader: { '.gif': 'dataurl' },
+    define: { 'import.meta.env': '{}' }, jsx: 'automatic', loader: { '.gif': 'dataurl', '.css': 'empty' },
 });
 const compiled = { exports: {} };
 new Function('require', 'module', 'exports', outputFiles[0].text)(createRequire(import.meta.url), compiled, compiled.exports);
 const { render } = compiled.exports;
 const navigation = html => html.match(/<nav aria-label="Main navigation"[\s\S]*?<\/nav>/)?.[0];
 
-test('all routed pages render one shared navbar with every primary destination', () => {
+test('all routed pages render one shared navbar with every primary destination', async () => {
     const paths = ['/', '/auctions', '/auction/example', '/auction/example/trade-query', '/auction/example/report-trade',
         '/seller/example', '/auction-item', '/info', '/donate', '/wall-of-shame', '/login', '/register',
         '/forgot-password', '/resend-confirmation', '/reset-password', '/change-password', '/auth/confirm',
         '/profile', '/update-log', '/admin/banner', '/support', '/report-a-bug', '/submit-appeal', '/admin/inbox', '/admin/bug-reports', '/unknown-page'];
     for (const path of paths) {
-        const html = render(path);
+        const html = (await render(path));
         assert.equal((html.match(/aria-label="Main navigation"/g) || []).length, 1, path);
         assert.doesNotMatch(html, /aria-label="Page navigation"/, path);
         const nav = navigation(html);
@@ -50,14 +50,14 @@ test('all routed pages render one shared navbar with every primary destination',
     }
 });
 
-test('active links follow nested auction, account, help and admin routes without marking Home', () => {
+test('active links follow nested auction, account, help and admin routes without marking Home', async () => {
     const cases = [['/', '/'], ['/auctions/?q=tooth', '/auctions'], ['/auction/example', '/auctions'],
         ['/auction/example/trade-query', '/auctions'], ['/seller/example?view=stats', '/auctions'],
         ['/auction-item', '/auction-item'], ['/info', '/info'], ['/support', '/info'], ['/donate', '/info'],
         ['/wall-of-shame', '/wall-of-shame'], ['/profile/', '/profile'], ['/change-password', '/profile'],
         ['/login', '/login'], ['/register', '/register']];
     for (const [path, expected] of cases) {
-        const nav = navigation(render(path, { id: 'user', khubUsername: 'KH_Tester' }));
+        const nav = navigation((await render(path, { id: 'user', khubUsername: 'KH_Tester' })));
         const active = [...nav.matchAll(/<a\b[^>]*aria-current="page"[^>]*>/g)];
         // Signed-in visitors retain their account link rather than guest links.
         if (expected === '/login' || expected === '/register') assert.equal(active.length, 0);
@@ -68,28 +68,28 @@ test('active links follow nested auction, account, help and admin routes without
     assert.equal(activeNavigationPath('/unrecognized'), null);
 });
 
-test('account links and useful Back links remain available without duplicate Home headers', () => {
-    const nav = navigation(render('/profile', { id: 'user', khubUsername: 'KH_Tester' }));
+test('account links and useful Back links remain available without duplicate Home headers', async () => {
+    const nav = navigation((await render('/profile', { id: 'user', khubUsername: 'KH_Tester' })));
     assert.match(nav, /KH_Tester/);
     assert.match(nav, /Log Out/);
     assert.doesNotMatch(nav, />Log In<|>Register</);
-    assert.match(render('/auction/example'), /Back to Auctions/);
-    assert.match(render('/auction/example/trade-query'), /Back to auction/);
+    assert.match((await render('/auction/example')), /Back to Auctions/);
+    assert.match((await render('/auction/example/trade-query')), /Back to auction/);
     for (const path of ['/donate', '/login', '/register', '/auction-item', '/profile', '/change-password']) {
-        assert.doesNotMatch(render(path), />Back<\/button>/, path);
+        assert.doesNotMatch((await render(path)), />Back<\/button>/, path);
     }
-    assert.doesNotMatch(render('/'), />Back<\/button>/);
+    assert.doesNotMatch((await render('/')), />Back<\/button>/);
     for (const state of [{ isLoading: true }, { error: 'Unavailable' }]) {
-        assert.ok(navigation(render('/auction/example', null, state)));
+        assert.ok(navigation((await render('/auction/example', null, state))));
     }
 });
 
 
-test('load-error messages stay below the navbar and restricted appeals retain signed-in navigation', () => {
-    const html = render('/auctions', null, { error: 'Auction data unavailable' });
+test('load-error messages stay below the navbar and restricted appeals retain signed-in navigation', async () => {
+    const html = (await render('/auctions', null, { error: 'Auction data unavailable' }));
     assert.ok(html.indexOf('Main navigation') < html.indexOf('Auction data unavailable'));
     assert.match(html, />Retry<\/button>/);
-    const appeal = render('/submit-appeal', null, {}, { restrictedAccount: { id: 'restricted', khubUsername: 'KH_Restricted' }, signedInUserId: 'restricted' });
+    const appeal = (await render('/submit-appeal', null, {}, { restrictedAccount: { id: 'restricted', khubUsername: 'KH_Restricted' }, signedInUserId: 'restricted' }));
     const nav = navigation(appeal);
     assert.match(nav, /KH_Restricted/);
     assert.match(nav, /Log Out/);
@@ -98,8 +98,8 @@ test('load-error messages stay below the navbar and restricted appeals retain si
 });
 
 
-test('update log explains completed bidder visibility and escrow-only Buy Auctions', () => {
-    const html = render('/update-log');
+test('update log explains completed bidder visibility and escrow-only Buy Auctions', async () => {
+    const html = (await render('/update-log'));
     assert.match(html, /<h1[^>]*>Update Log<\/h1>/);
     assert.match(html, /items have been exchanged/);
     assert.match(html, /Buy Auctions are here/);
@@ -110,25 +110,25 @@ test('update log explains completed bidder visibility and escrow-only Buy Auctio
 });
 
 
-test('What’s New links to the update log beside the centered title on Home only', () => {
-    const html = render('/');
+test('What’s New links to the update log beside the centered title on Home only', async () => {
+    const html = (await render('/'));
     assert.match(html, /<h1[^>]*>KoL Auction Hub<\/h1>[\s\S]*?href="\/update-log"[^>]*>What’s New/);
     assert.doesNotMatch(html, />Beta</);
     assert.doesNotMatch(navigation(html), /update-log/);
-    assert.doesNotMatch(render('/auctions'), /href="\/update-log"/);
+    assert.doesNotMatch((await render('/auctions')), /href="\/update-log"/);
 });
 
-test('theme switch is available to guests and signed-in users across routes', () => {
+test('theme switch is available to guests and signed-in users across routes', async () => {
     for (const user of [null, { id: 'member', khubUsername: 'Member' }]) for (const path of ['/', '/auctions', '/auction-item', '/profile', '/login', '/info', '/wall-of-shame']) {
-        const html = navigation(render(path, user));
+        const html = navigation((await render(path, user)));
         assert.match(html, /aria-label="Switch to dark mode" aria-pressed="false"/);
         assert.match(html, /Dark<\/span>|Dark mode/);
     }
 });
 
-test('mobile menu starts collapsed and controls the shared links while Home and theme stay outside', () => {
+test('mobile menu starts collapsed and controls the shared links while Home and theme stay outside', async () => {
     for (const user of [null, { id: 'member', khubUsername: 'Member' }]) {
-        const nav = navigation(render('/', user));
+        const nav = navigation((await render('/', user)));
         assert.match(nav, /aria-expanded="false" aria-controls="main-navigation-links"/);
         assert.equal((nav.match(/id="main-navigation-links"/g) || []).length, 1);
         assert.equal((nav.match(/href="\/"/g) || []).length, 1);

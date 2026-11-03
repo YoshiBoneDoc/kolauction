@@ -49,6 +49,7 @@ export default function AuctionBidForm({ auction, showTerms = true, showHeading 
         }
     }
 
+    if (auction.liveUnavailable) return <p role="status">Live bidding information is temporarily unavailable.</p>;
     if (!currentUser) return <Link to="/login" className="flex min-h-11 items-center justify-center rounded bg-blue-600 px-4 py-3 text-white">Log in to bid</Link>;
     if (currentUser.isBanned) return <p className="text-sm text-gray-600">Bidding is unavailable for this account.</p>;
     if (currentUser.id === auction.sellerId) return <p className="text-sm text-gray-600">This is your listing.</p>;
