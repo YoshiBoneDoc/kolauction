@@ -10,3 +10,5 @@ Anonymous bidder aliases are backfilled in historical first-bid timestamp/UUID o
 Active Sell card overlays use a narrow projection; Buy and historical cards retain the full projection to preserve private reservation, winner and settlement display behavior.
 
 Activity writes occur at most once per minute across tabs with Web Locks and shared local storage. Browsers without Web Locks use timestamp coordination as a best-effort fallback; storage-disabled browsers cannot coordinate across tabs. Admin counts refresh every minute. No edge tracking service is involved.
+
+Apply `supabase/migrations/queue/202611030174_read_only_home_totals.sql` after 173. It fixes Home failures with expired trade totals: visitor reads now return the existing totals snapshot, and existing minute maintenance refreshes it when its 15-minute TTL expires. No website or bot rebuild is required specifically for 174; the existing maintenance RPC name is unchanged. If the snapshot is missing, Home returns null totals until maintenance recreates it.

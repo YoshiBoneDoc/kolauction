@@ -112,6 +112,19 @@ with tempfile.TemporaryDirectory(prefix='khub-detail-cache-',dir='/tmp') as fold
         assert sql(f"select string_agg(ordinal::text,',' order by ordinal) from khub_bot.auction_bidder_labels where auction_id='{aid}';")=='1,2,3'
         assert sql("select prosrc from pg_proc where oid='public.khub_record_site_activity(uuid)'::regprocedure;").lower().find('delete')==-1
         assert 'refresh_public_discovery' not in sql("select prosrc from pg_proc where oid='public.read_public_home_auctions()'::regprocedure;")
+        # PostgREST executes STABLE RPCs in READ ONLY transactions, even on POST.
+        sql("update khub_bot.site_trade_totals_snapshot set refreshed_at=now()-interval '1 day';")
+        before_totals=sql('select row_to_json(s) from khub_bot.site_trade_totals_snapshot s;')
+        for role in ['anon','authenticated']:
+            sql(f"begin read only; set local role {role}; select public.read_public_home_auctions(); commit;")
+        assert sql('select row_to_json(s) from khub_bot.site_trade_totals_snapshot s;')==before_totals
+        sql('set role service_role; select public.bot_refresh_public_discovery(); reset role;')
+        assert sql("select refreshed_at>now()-interval '1 minute' from khub_bot.site_trade_totals_snapshot;")=='t'
+        saved=sql('select totals from khub_bot.site_trade_totals_snapshot;')
+        sql('delete from khub_bot.site_trade_totals_snapshot;')
+        sql('begin read only; set local role anon; select public.read_public_home_auctions(); commit;')
+        sql('set role service_role; select public.bot_refresh_public_discovery(); reset role;')
+        assert sql('select totals from khub_bot.site_trade_totals_snapshot;')==saved
         assert sql(definitions)==financial_before
         print('Detail migrations applied to PostgreSQL; narrow history/privacy, public state and unchanged financial functions passed.')
     finally:
