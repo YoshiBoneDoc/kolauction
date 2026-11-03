@@ -103,3 +103,15 @@ test('recurring detail reads use narrow context, preserve static data and refres
     assert.equal(data.rows[0].giveaway_title, 'Fixture');
     assert.equal(data.rows[0].seller_id, undefined);
 });
+
+test('initial authoritative detail renders without waiting for the shared cache', async () => {
+    let publicCalls = 0;
+    const data = { privacy_version: 1, rows: [{ id, status: 'active', auction_kind: 'sell', current_bid: 123, item: 'Fresh item' }],
+        bids: [], total: 1, server_time: new Date().toISOString() };
+    const reader = createPublicAuctionReader({
+        auth: { getSession: async () => ({ data: { session: null } }) },
+        rpc: async name => { assert.equal(name, 'read_auction_page'); return { data }; },
+    }, { enabled: true, fetch: async () => { publicCalls++; throw new Error('Shared cache unavailable'); } });
+    assert.deepEqual(await reader.load({ view: 'detail', id }), data);
+    assert.equal(publicCalls, 0);
+});
