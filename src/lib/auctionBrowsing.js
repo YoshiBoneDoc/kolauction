@@ -56,7 +56,7 @@ export function browseAuctions(auctions, { search = '', status = 'active', sort 
                         : lifecycle === status || status === 'active' && lifecycle === 'finalizing');
         const price = auctionFilterPrice(auction);
         const isBundle = (auction.bundleItems?.length || 0) > 1;
-        return (bundle === 'any' || (bundle === 'with' ? isBundle : !isBundle)) && (buyout === 'any' || (buyout === 'with' ? Number(auction.instantPurchasePrice) > 0 : !(Number(auction.instantPurchasePrice) > 0))) && (minPrice == null || price >= minPrice) && (maxPrice == null || price <= maxPrice) && matchesStatus && (kind === 'all' || (auction.auctionKind || 'sell') === kind) && (trade === 'all' || trade !== 'none' && auction.escrowMode === (trade === 'escrow')) && auction.item.toLocaleLowerCase().includes(query);
+        return (bundle === 'any' || (bundle === 'with' ? isBundle : !isBundle)) && (buyout === 'any' || (buyout === 'with' ? Number(auction.instantPurchasePrice) > 0 : !(Number(auction.instantPurchasePrice) > 0))) && (minPrice == null || price >= minPrice) && (maxPrice == null || price <= maxPrice) && matchesStatus && (kind === 'all' || (auction.auctionKind || 'sell') === kind) && (trade === 'all' || trade !== 'none' && auction.escrowMode === (trade === 'escrow')) && (auction.item.toLocaleLowerCase().includes(query) || /^[0-9]+$/.test(query) && auction.auctionNumber != null && BigInt(query) === BigInt(auction.auctionNumber));
     }).sort((a, b) => {
         let comparison = 0;
         if (sort === 'bids-desc') comparison = (b.bidCount ?? b.bids?.length ?? 0) - (a.bidCount ?? a.bids?.length ?? 0);

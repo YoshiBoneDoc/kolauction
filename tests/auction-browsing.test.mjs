@@ -242,3 +242,14 @@ test('cancelled and voided auctions use the actual cancellation time for display
     assert.ok(Number.isNaN(auctionEndTime({ ...older, cancelledAt: null })));
     assert.ok(Number.isNaN(auctionEndTime({ ...older, cancelledAt: 'invalid' })));
 });
+
+
+test('numeric search includes both exact auction number and literal item-name matches', () => {
+    const rows = [
+        { ...base, id: 'number', item: 'unrelated item', auctionNumber: 1236 },
+        { ...base, id: 'name', item: 'Item 1236 edition', auctionNumber: 9000 },
+        { ...base, id: 'partial', item: 'unrelated item', auctionNumber: 12360 },
+    ];
+    assert.deepEqual(new Set(ids(browseAuctions(rows, { search: ' 1236 ', now }))), new Set(['number','name']));
+    assert.deepEqual(ids(browseAuctions(rows, { search: '9'.repeat(120), now })), []);
+});

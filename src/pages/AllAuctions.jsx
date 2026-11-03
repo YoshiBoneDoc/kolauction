@@ -100,7 +100,7 @@ export default function AllAuctions() {
                         <div className="min-w-32 flex-1">
                             <label htmlFor="auction-search" className="sr-only">Search item names</label>
                             <input id="auction-search" type="search" value={searchInput} onChange={event => { rememberSearch(event.target.value); setSearchInput(event.target.value); }}
-                                placeholder="Search for an item…" className="h-9 w-full rounded border border-gray-400 bg-white px-3 text-sm text-gray-900" />
+                                placeholder="Search by item or auction number…" className="h-9 w-full rounded border border-gray-400 bg-white px-3 text-sm text-gray-900" />
                         </div>
                         <div role="group" aria-label="Sort auctions" className="flex flex-wrap items-center gap-2">
                             {[
