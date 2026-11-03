@@ -1,3 +1,5 @@
+import { itemCatalog } from './itemCatalog.js';
+import { runMaintenance } from './maintenance.js';
 import { onRequest as publicAuctions } from '../../functions/api/public-auctions.js';
 import { onRequest as publicBanner } from '../../functions/api/public-banner.js';
 import { onRequestGet as giveawayImage } from '../../functions/api/giveaway-image.js';
@@ -13,8 +15,10 @@ const routes = new Map([
 ]);
 
 export default {
-    async fetch(request, env) {
+    async scheduled(event, env) { await runMaintenance(event, env); },
+    async fetch(request, env, ctx) {
         const pathname = new URL(request.url).pathname.replace(/\/+$/, '') || '/';
+        if (pathname === '/api/item-catalog') return itemCatalog(request, env, ctx);
         const handler = routes.get(pathname);
         if (handler) return handler({ request, env });
         // API misses must never return the SPA HTML as a successful JSON read.

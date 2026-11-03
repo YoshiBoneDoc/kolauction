@@ -227,7 +227,7 @@ test('detail, seller and profile browsing never require financial maintenance or
         const calls=[];
         const service=createAuctionService({async rpc(name,args){
             calls.push([name,args]);
-            assert.equal(name,'read_auction_page','Browsing must not execute a maintenance/write RPC');
+            assert.equal(name,request.view==='detail'?'read_auction_detail_static':'read_auction_page','Browsing must not execute a maintenance/write RPC');
             return {data:{privacy_version:1,rows:[row],bids:[],total:1}};
         }});
         const data=await service.load(request);

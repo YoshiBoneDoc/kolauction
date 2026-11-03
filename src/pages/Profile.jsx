@@ -1,3 +1,4 @@
+import ProfileTimeLeft from '../components/ProfileTimeLeft';
 import RelistButton from '../components/RelistButton';
 import { auctionQuantityLabel } from '../lib/bundles';
 import WinnerLink from '../components/WinnerLink';
@@ -9,7 +10,7 @@ import { getAuctionResult, getAuctionStatus } from "../lib/auctionLifecycle";
 import KolVerification from "../components/KolVerification";
 import AuctionItemImage from '../components/AuctionItemImage';
 import { formatCompactMeat } from '../lib/formatMeat';
-import { useNow } from "../hooks/useNow";
+import { useAuctionBoundaryNow as useNow } from "../hooks/useAuctionBoundaryNow";
 import MeatStack from '../components/MeatStack';
 import { toggleProfileSection } from '../lib/profileSections';
 import { auctionEndTime } from '../lib/auctionBrowsing';
@@ -18,19 +19,11 @@ import { profileBidAuctions, latestProfileBid } from '../lib/profileBids';
 const formatNumber = (number) => number.toLocaleString('en-US');
 const historyTime = auction => Date.parse(auction.completedAt) || auctionEndTime(auction) || auction.endTime || auction.createdAt;
 
-const formatTimeLeft = (endTime, now) => {
-    const remaining = Math.max(0, Math.ceil((endTime - now) / 1000));
-    const days = Math.floor(remaining / 86400);
-    const hours = Math.floor((remaining % 86400) / 3600);
-    const minutes = Math.floor((remaining % 3600) / 60);
-    const seconds = remaining % 60;
-    return `${days ? `${days}d ` : ''}${hours}h ${minutes}m ${seconds}s left`;
-};
 
 const Profile = () => {
     const { currentUser } = useContext(UserContext);
     const { auctions, isLoading, error, refreshAuctions } = useContext(AuctionsContext);
-    const now = useNow();
+    const now = useNow(auctions);
     const [retrying, setRetrying] = useState(false);
     const [expandedSections, setExpandedSections] = useState({});
     const [collapsedSections, setCollapsedSections] = useState({});
@@ -145,7 +138,7 @@ const Profile = () => {
                                             dateTime={new Date(auction.endTime).toISOString()}
                                             title={`Ends ${new Date(auction.endTime).toLocaleString()}`}
                                             className="profile-entry-endtime"
-                                        >{formatTimeLeft(auction.endTime, now)}</time> : <span className={`profile-entry-status${historyStatus}`}>{result.label}</span>}</div>
+                                        ><ProfileTimeLeft endTime={auction.endTime} /></time> : <span className={`profile-entry-status${historyStatus}`}>{result.label}</span>}</div>
                                     </div>
 
                                     <div className="profile-entry-row">

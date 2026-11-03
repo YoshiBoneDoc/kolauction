@@ -1,3 +1,4 @@
+import { buildItemCatalog } from './buildItemCatalog.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { writeFile } from 'node:fs/promises';
@@ -14,6 +15,8 @@ const result = spawnSync(process.execPath, [fileURLToPath(new URL('../node_modul
 });
 if (result.error) throw result.error;
 if (result.status !== 0) process.exit(result.status || 1);
+
+await buildItemCatalog(fileURLToPath(new URL('../build/catalog', import.meta.url)));
 
 // Public, non-secret proof of which flag was compiled into the deployed assets.
 await writeFile(new URL('../build/khub-build.json', import.meta.url), JSON.stringify({

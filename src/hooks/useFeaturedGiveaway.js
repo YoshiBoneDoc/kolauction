@@ -3,11 +3,11 @@ import { useEffect, useState } from 'react';
 import { mapAuction } from '../lib/auctions';
 import { auctionClockRequestStarted, auctionNow, observeAuctionServerTime } from '../lib/auctionClock';
 import { startAuctionRefresh } from '../lib/auctionRefresh';
-import { useNow } from './useNow';
+import { useAuctionBoundaryNow } from './useAuctionBoundaryNow';
 
 export default function useFeaturedGiveaway() {
     const [auction, setAuction] = useState(null);
-    const now = useNow();
+    const now = useAuctionBoundaryNow(auction ? [auction, { endTime: auction.observedAt + 300000 }] : []);
     useEffect(() => {
         let active = true;
         let current = null;

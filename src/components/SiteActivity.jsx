@@ -73,16 +73,11 @@ export default function SiteActivity({ children }) {
         {administrator && <aside aria-label="Site activity" className="m-4 rounded border border-gray-300 p-3 text-sm lg:sticky lg:top-4 lg:mr-0">
             <h2 className="mb-2 font-bold">Site activity</h2>
             {activity ? <div className="space-y-2">
-                {[['viewers', 'Viewing now'], ['logged_in', 'Logged in']].map(([key, label]) => <details key={key}>
-                    <summary className="cursor-pointer rounded focus-visible:outline focus-visible:outline-2">
-                        {label}<span className="block text-lg font-bold">{Math.max(0, activity[key] - ownPresence)}</span>
-                    </summary>
-                    {Array.isArray(activity.users) ? <ul aria-label={`${label} users`} className="mt-1 max-h-60 space-y-1 overflow-y-auto break-words text-xs">
-                        {otherUsers.map(user => <li key={user.id}>{user.username}</li>)}
-                        {key === 'viewers' && activity.guests > 0 && <li>Anonymous guests: {activity.guests}</li>}
-                        {activity[key] - ownPresence === 0 && <li>No active users</li>}
-                    </ul> : <p className="mt-1 text-xs">User list unavailable until the database update is applied.</p>}
-                </details>)}
+                <p>Viewing now<span className="block text-lg font-bold">{Math.max(0, activity.viewers - ownPresence)}</span></p>
+                {Array.isArray(activity.users) ? <ul aria-label="Viewing now users" className="mt-1 max-h-60 space-y-1 overflow-y-auto break-words text-xs">
+                    {otherUsers.map(user => <li key={user.id}>{user.username}</li>)}
+                    <li>Other users: {activity.guests ?? 0}</li>
+                </ul> : <p className="mt-1 text-xs">User list unavailable until the database update is applied.</p>}
             </div> : <p role="status">Activity unavailable</p>}
             <p className="mt-2 text-xs opacity-70">Active in the last 2 minutes. Excludes you. Updates every 60 seconds.</p>
         </aside>}

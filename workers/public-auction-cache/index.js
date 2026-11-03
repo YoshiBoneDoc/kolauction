@@ -1,3 +1,4 @@
+import { createOriginScheduler } from './scheduler.js';
 import { overlayLive, unavailableRow } from './liveState.js';
 import { CACHE_VERSION, publicRequest, publicProjection, originRequest } from './protocol.js';
 import { readInvalidation, verifyInvalidation, validRevision } from './invalidation.js';
@@ -11,6 +12,7 @@ const MAX_ENTRIES = 48;
 const MAX_BYTES = 1024 * 1024;
 const jsonBytes = value => new TextEncoder().encode(JSON.stringify(value)).byteLength;
 const MAX_PENDING = 4;
+const META_KEY = `public-freshness-v${CACHE_VERSION}`;
 const STORE_KEY = `public-snapshots-v${CACHE_VERSION}`;
 const unavailable = cacheFailure;
 const changedDuringRead = () => unavailable('CACHE_CHANGED');
@@ -23,7 +25,8 @@ export class PublicAuctionCache {
         this.env = env;
         this.entries = new Map();
         this.inflight = new Map();
-        this.queue = Promise.resolve();
+        this.pendingLive = 0;
+        this.schedule = createOriginScheduler();
         this.cooldownUntil = 0;
         this.lastFailureCode = 'CACHE_UNAVAILABLE';
         this.lastOriginAt = 0;
@@ -34,22 +37,28 @@ export class PublicAuctionCache {
         this.liveStates = new Map();
         ctx.blockConcurrencyWhile(async () => {
             const saved = await ctx.storage.get(STORE_KEY);
-            this.revision = validRevision(saved?.revision) ? saved.revision : '0';
-            this.legacyRevision = validRevision(saved?.legacyRevision) ? saved.legacyRevision : this.revision;
-            this.auctionRevisions = new Map(saved?.auctionRevisions || []);
-            this.failures = new Map((saved?.failures || []).filter(([, failure]) => failure.until > Date.now()));
+            const metadata = await ctx.storage.get(META_KEY) || saved;
+            this.revision = validRevision(metadata?.revision) ? metadata.revision : '0';
+            this.legacyRevision = validRevision(metadata?.legacyRevision) ? metadata.legacyRevision : this.revision;
+            this.auctionRevisions = new Map(metadata?.auctionRevisions || []);
+            this.failures = new Map((metadata?.failures || []).filter(([, failure]) => failure.until > Date.now()));
             const now = Date.now();
             for (const [key, entry] of saved?.entries || []) {
                 if (now - entry.storedAt <= MAX_AGE_MS) this.entries.set(key, entry);
             }
-            this.cooldownUntil = Math.min(saved?.cooldownUntil || 0, now + 30000);
-            this.lastFailureCode = safeCacheCode(saved?.failureCode);
+            this.cooldownUntil = Math.min(metadata?.cooldownUntil || 0, now + 30000);
+            this.lastFailureCode = safeCacheCode(metadata?.failureCode);
         });
     }
 
-    async persist() {
-        // Capture the latest map after asynchronous refreshes finish, with bounded storage.
-        await this.ctx.storage.put(STORE_KEY, { entries: [...this.entries], cooldownUntil: this.cooldownUntil, revision: this.revision, failureCode: this.lastFailureCode, legacyRevision: this.legacyRevision, auctionRevisions: [...this.auctionRevisions], failures: [...this.failures] });
+    async persist(payload = true) {
+        // Metadata writes never serialize catalogue payloads. Await the revision
+        // write before acknowledging invalidation; TTLs reconcile missed webhooks.
+        const metadata = { cooldownUntil: this.cooldownUntil, revision: this.revision,
+            failureCode: this.lastFailureCode, legacyRevision: this.legacyRevision,
+            auctionRevisions: [...this.auctionRevisions], failures: [...this.failures] };
+        if (payload) await this.ctx.storage.put({ [STORE_KEY]: { entries: [...this.entries].filter(([, entry]) => !entry.ephemeral) }, [META_KEY]: metadata });
+        else await this.ctx.storage.put(META_KEY, metadata);
     }
 
     async invalidate(request) {
@@ -75,7 +84,7 @@ export class PublicAuctionCache {
             this.legacyRevision = payload.revision;
         }
         if (BigInt(payload.revision) > BigInt(this.revision)) this.revision = payload.revision;
-        await this.persist();
+        await this.persist(false);
         return Response.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } });
     }
 
@@ -159,8 +168,11 @@ export class PublicAuctionCache {
         if (this.inflight.has(key)) return this.inflight.get(key);
         const blocked = this.blocked(request);
         if (blocked) return Promise.reject(unavailable(blocked));
-        if (this.inflight.size >= MAX_PENDING) return Promise.reject(unavailable('CACHE_QUEUE_FULL'));
-        const task = this.queue.then(async () => {
+        const livePriority = this.family(request) === 'live';
+        const samePriorityCount = livePriority ? this.pendingLive : this.inflight.size-this.pendingLive;
+        // Reserve admission for both families, as well as fair execution order.
+        if (this.inflight.size >= MAX_PENDING || this.env.LIVE_AUCTION_STATE === 'true' && samePriorityCount >= MAX_PENDING-1) return Promise.reject(unavailable('CACHE_QUEUE_FULL'));
+        const task = this.schedule(async () => {
             const blocked = this.blocked(request);
             if (blocked) throw unavailable(blocked);
             try {
@@ -173,8 +185,13 @@ export class PublicAuctionCache {
                     const revision = this.revision;
                     const data = await this.readOrigin(this.env.LIVE_AUCTION_STATE === 'true' && request.view === 'detail-live'
                         ? { view: 'batch-live', ids: [request.id] } : request);
-                    if (this.changed(request, revision)) continue;
-                    entry = { data, storedAt: Date.now(), revision };
+                    const provisionalSelection = this.env.LIVE_AUCTION_STATE === 'true'
+                        && ['home', 'browse', 'seller', 'featured'].includes(request.view);
+                    // Selection may be provisional during rapid bidding. Live
+                    // overlays are independently verified; never retry catalogue
+                    // work indefinitely because an unrelated auction changed.
+                    if (this.changed(request, revision) && !provisionalSelection) continue;
+                    entry = { data, storedAt: Date.now(), revision, ephemeral: this.family(request) === 'live' };
                     break;
                 }
                 if (!entry) throw changedDuringRead();
@@ -185,7 +202,7 @@ export class PublicAuctionCache {
                 }
                 this.failures.delete(this.failureScope(request));
                 if (Date.now() >= this.cooldownUntil) { this.cooldownUntil = 0; this.lastFailureCode = 'CACHE_UNAVAILABLE'; }
-                await this.persist();
+                await this.persist(!entry.ephemeral);
                 return entry;
             } catch (error) {
                 // A failing database gets breathing room, not a retry from every visitor.
@@ -206,13 +223,13 @@ export class PublicAuctionCache {
                 }
                 this.lastFailureCode = safeCacheCode(error.code);
                 console.warn(`[PUBLIC_CACHE] ${this.lastFailureCode} view=${request.view} circuit=${Date.now() < this.cooldownUntil ? 'global' : 'scoped'} pending=${this.inflight.size}`);
-                await this.persist();
+                await this.persist(false);
                 throw unavailable(this.lastFailureCode);
             }
-        });
+        }, livePriority);
         this.inflight.set(key, task);
-        this.queue = task.catch(() => {});
-        task.finally(() => this.inflight.delete(key)).catch(() => {});
+        if (livePriority) this.pendingLive++;
+        task.finally(() => { this.inflight.delete(key); if (livePriority) this.pendingLive--; }).catch(() => {});
         return task;
     }
 
@@ -229,7 +246,11 @@ export class PublicAuctionCache {
         }
         // Rebuild membership/order at the existing 30s cadence, not on every
         // individual bid. No stale page claims an exact current ranking/total.
-        if (!entry || age > staticLimit || query.view === 'detail-live' && dirty || listing && age > FRESH_MS) {
+        if (listing && entry && age <= MAX_AGE_MS && age > FRESH_MS) {
+            // Let verified live state proceed before admitting background catalogue work.
+            dirty = true;
+        }
+        if (!entry || age > staticLimit || query.view === 'detail-live' && dirty) {
             try { entry = await this.refresh(key, query); age = Math.max(0, Date.now() - entry.storedAt); dirty = false; }
             catch (error) {
                 if (!entry || age > MAX_AGE_MS) return Response.json(cacheErrorBody(error.code), {
@@ -284,6 +305,9 @@ export class PublicAuctionCache {
                 }
             }
             if (rows.length) live = { rows, server_time: serverTime };
+        }
+        if (listing && entry && Date.now() - entry.storedAt > FRESH_MS) {
+            this.ctx.waitUntil(this.refresh(key, query).catch(() => {}));
         }
         const orderingDelayed = listing && (dirty || this.changed(query, entry.revision) || Date.now() - entry.storedAt > FRESH_MS);
         data = overlayLive(data, live, { orderingDelayed, unavailable: !live });

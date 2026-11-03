@@ -53,29 +53,28 @@ test('downloads validate the whole snapshot and record source provenance without
     await assert.rejects(fetchItemCatalog({ fetchImpl: async () => new Response('Unavailable', { status: 503 }) }), /download failed/);
 });
 
-test('website reads live tradeable items once per cache interval and receives new items without rebuilding', async () => {
-    let now = 1, reads = 0;
-    let items = [{ id: 12344, name: 'New item', image: 'new.gif', tradeable: true }];
-    const service = createItemCatalogService({ async rpc(name) { assert.equal(name, 'read_item_catalog'); reads++; return { data: { ready: true, items } }; } }, fallback, () => now);
-    const [first, second] = await Promise.all([service.load(), service.load()]);
-    assert.deepEqual(first, items); assert.equal(second, first); assert.equal(reads, 1);
-    items = [{ id: 12345, name: 'Next week item', image: 'next.gif', tradeable: true }];
-    now += 300001;
-    assert.deepEqual(await service.load(), items); assert.equal(reads, 2);
-    assert.equal(validTradeableItems([{ ...items[0], tradeable: false }]), false);
-    assert.equal(validTradeableItems([items[0], items[0]]), false);
+test('versioned catalogue coalesces loads and only fetches changed bodies', async () => {
+    let now=1, version='a'.repeat(64), bodies=0, manifests=0;
+    let items=[{id:12344,name:'New item',image:'new.gif',tradeable:true}];
+    const fetcher=async url => {
+        if(url==='/api/item-catalog') { manifests++; return Response.json({version,url:`/api/item-catalog?version=${version}`}); }
+        bodies++;return Response.json({ready:true,items});
+    };
+    const service=createItemCatalogService(null,fallback,()=>now,fetcher);
+    const [first,second]=await Promise.all([service.load(),service.load()]);
+    assert.deepEqual(first,items);assert.equal(second,first);assert.equal(bodies,1);assert.equal(manifests,1);
+    now+=300001;await service.load();assert.equal(bodies,1);assert.equal(manifests,2);
+    version='b'.repeat(64);items=[{id:12345,name:'Updated item',image:'new.gif',tradeable:true}];
+    now+=300001;assert.deepEqual(await service.load(),items);assert.equal(bodies,2);
 });
 
-test('website keeps its validated fallback after missing migrations, failures or unsafe item data, then retries', async () => {
-    for (const result of [{ error: { message: 'Offline' } }, { data: { ready: false, items: [] } }, { data: { ready: true, items: [{ ...fallback[0], tradeable: false }] } }]) {
-        const service = createItemCatalogService({ async rpc() { return result; } }, fallback);
-        assert.equal(await service.load(), fallback);
-    }
-    let now = 1, calls = 0;
-    const service = createItemCatalogService({ rpc() { calls++; throw new Error('Network'); } }, fallback, () => now);
-    assert.equal(await service.load(), fallback);
-    now += 30001;
-    assert.equal(await service.load(), fallback); assert.equal(calls, 2);
+test('catalogue retains fallback on failed or unsafe responses and retries conservatively', async()=>{
+    let now=1,calls=0;
+    const service=createItemCatalogService(null,fallback,()=>now,async()=>{calls++;throw new Error('Offline');});
+    assert.equal(await service.load(),fallback);await service.load();assert.equal(calls,1);
+    now+=30001;assert.equal(await service.load(),fallback);assert.equal(calls,2);
+    const invalid=createItemCatalogService(null,fallback,()=>now,async()=>Response.json({version:'a'.repeat(64),url:'https://unsafe.example'}));
+    assert.equal(await invalid.load(),fallback);
 });
 
 test('bundled website catalog includes gift collectibles, excludes every package and keeps normal item/image data', async () => {

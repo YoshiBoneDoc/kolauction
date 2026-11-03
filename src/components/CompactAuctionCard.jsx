@@ -1,3 +1,4 @@
+import RemainingTime from './RemainingTime';
 import AuctionLiveUnavailable from './AuctionLiveUnavailable';
 import RelistButton from './RelistButton';
 import { auctionQuantityLabel } from '../lib/bundles';
@@ -11,7 +12,6 @@ import PropTypes from 'prop-types';
 import { Link, useLocation } from 'react-router-dom';
 import { UserContext } from '../context/UserContext';
 import { getAuctionResult, getAuctionDisplayStatus, auctionCardBackground } from '../lib/auctionLifecycle';
-import { timeRemaining } from '../lib/auctionBrowsing';
 import { formatCompactMeat } from '../lib/formatMeat';
 import AuctionBidForm from './AuctionBidForm';
 
@@ -47,7 +47,7 @@ export default function CompactAuctionCard({ auction, now, expanded = false, onT
             </Link>
             <div className="flex max-w-[45%] shrink-0 flex-col items-end gap-1.5 text-right">
                 {active ? <p className={`text-[11px] leading-3 tabular-nums ${auction.endTime - now <= 10800000 ? 'text-red-700' : auction.endTime - now <= 86400000 ? 'text-amber-700' : 'text-gray-500'}`}>
-                    <time dateTime={new Date(auction.endTime).toISOString()} title={`Ends ${new Date(auction.endTime).toLocaleString()}`}>{timeRemaining(auction.endTime, now)}</time> left
+                    <time dateTime={new Date(auction.endTime).toISOString()} title={`Ends ${new Date(auction.endTime).toLocaleString()}`}><RemainingTime endTime={auction.endTime} /></time> left
                 </p> : <p title={status.label} className={`max-w-full truncate leading-3 text-xs font-semibold ${status.color}`}>{status.label}</p>}
                 <TradeTypeBadge escrow={auction.escrowMode} compact short />
             </div>

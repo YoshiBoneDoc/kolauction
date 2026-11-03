@@ -15,7 +15,7 @@ test('Home and All Auctions reuse one complete dataset without refetching for na
     now+=30000;await cache.load('dataset');assert.equal(calls,2);
 });
 
-test('coalesces identical requests and serializes dataset, detail and pending reads', async () => {
+test('coalesces identical requests and allows two independent bounded reads', async () => {
     let running=0, maximum=0; const jobs=[];
     const cache=createAuctionReadCache(async key => {
         maximum=Math.max(maximum,++running);const job=deferred();jobs.push({key,...job});
@@ -23,10 +23,10 @@ test('coalesces identical requests and serializes dataset, detail and pending re
     });
     const first=cache.load('dataset');assert.equal(cache.load('dataset'),first);
     const pending=cache.load('pending:1');await settle();
-    assert.deepEqual(jobs.map(x=>x.key),['dataset']);
+    assert.deepEqual(jobs.map(x=>x.key),['dataset','pending:1']);
     jobs[0].resolve({auctions:[]});await first;await settle();
     assert.deepEqual(jobs.map(x=>x.key),['dataset','pending:1']);
-    jobs[1].resolve({auctions:[]});await pending;assert.equal(maximum,1);
+    jobs[1].resolve({auctions:[]});await pending;assert.equal(maximum,2);
 });
 
 test('timeout retains the previous complete data, distinguishes failed initial load, and backs off retries', async () => {

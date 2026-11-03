@@ -69,9 +69,9 @@ test('recurring detail reads use narrow context, preserve static data and refres
             auth: { getSession: async () => ({ data: { session: null } }) },
             rpc: async name => {
                 calls.push(name);
-                const row = name === 'read_auction_page'
-                    ? { id, status: ended ? 'completed' : 'active', auction_kind: 'sell', item: 'Static item', giveaway_title: 'Title' }
-                    : { id, _detail_full_required: ended, viewer_is_highest_bidder: true };
+                const row = name === 'read_auction_detail_static'
+                    ? { id, status: ended ? 'completed' : 'active', auction_kind: 'sell', current_bid: 100, viewer_is_highest_bidder: true, item: 'Static item', giveaway_title: 'Title' }
+                    : { id, _detail_full_required: ended, current_bid: 100, viewer_is_highest_bidder: true };
                 return { data: { privacy_version: 1, rows: blocked ? [] : [row], bids: [{ id: 'bid' }], total: 1, server_time: new Date(now).toISOString() } };
             },
         };
@@ -81,18 +81,18 @@ test('recurring detail reads use narrow context, preserve static data and refres
         }) });
         const request = { view: 'detail', id };
         await reader.load(request);
-        now += 6000;
+        now += 31000;
         const result = await reader.load(request);
         assert.equal(result.rows[0].item, 'Static item');
         assert.equal(result.rows[0].current_bid, 100);
         assert.equal(result.rows[0].viewer_is_highest_bidder, true);
-        assert.deepEqual(calls, ['read_auction_page', 'read_auction_detail_context']);
-        now += 6000; ended = true;
+        assert.deepEqual(calls, ['read_auction_detail_static', 'read_auction_viewer_context']);
+        now += 31000; ended = true;
         await reader.load(request);
-        assert.deepEqual(calls.slice(-2), ['read_auction_detail_context', 'read_auction_page']);
-        now += 6000; blocked = true;
+        assert.deepEqual(calls.slice(-2), ['read_auction_viewer_context', 'read_auction_detail_static']);
+        now += 31000; blocked = true;
         assert.deepEqual((await reader.load(request)).rows, [], 'private denial cannot resurrect cached public details');
-        assert.equal(await reader.accepts({ ...request, fresh: true }), false);
+        assert.equal(await reader.accepts({ ...request, fresh: true }), true);
     } finally { Date.now = realNow; }
 });
 
@@ -110,7 +110,7 @@ test('initial authoritative detail renders without waiting for the shared cache'
         bids: [], total: 1, server_time: new Date().toISOString() };
     const reader = createPublicAuctionReader({
         auth: { getSession: async () => ({ data: { session: null } }) },
-        rpc: async name => { assert.equal(name, 'read_auction_page'); return { data }; },
+        rpc: async name => { assert.equal(name, 'read_auction_detail_static'); return { data }; },
     }, { enabled: true, fetch: async () => { publicCalls++; throw new Error('Shared cache unavailable'); } });
     assert.deepEqual(await reader.load({ view: 'detail', id }), data);
     assert.equal(publicCalls, 0);

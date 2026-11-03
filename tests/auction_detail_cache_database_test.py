@@ -48,13 +48,15 @@ with tempfile.TemporaryDirectory(prefix='khub-detail-cache-',dir='/tmp') as fold
         sql("create schema storage; create table storage.buckets(id text primary key,public boolean); insert into storage.buckets values('creator-photos',false); create table storage.objects(bucket_id text,name text);")
         migrations=sorted([*ROOT.glob('supabase/migrations/*.sql'),*ROOT.glob('supabase/migrations/queue/*.sql')],key=lambda p:p.name)
         assert len({p.name for p in migrations})==len(migrations)
-        
-        for migration in migrations:
-            sql(migration.read_text())
+
         definitions="""select jsonb_object_agg(p.oid::regprocedure::text,pg_get_functiondef(p.oid)) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
             where n.nspname in ('public','khub_bot') and p.prokind='f' and p.proname in
             ('bot_ingest_mail','bot_tick','bot_claim_delivery','bot_ack_delivery','finish_listing','finish_buy_order','bot_liabilities');"""
-        financial_before=sql(definitions)
+        financial_before=None
+        for migration in migrations:
+            if migration.name.startswith('202611030176_'): financial_before=sql(definitions)
+            sql(migration.read_text())
+        assert financial_before is not None and sql(definitions)==financial_before, 'Financial function definitions changed by performance migrations'
         catalog=json.loads((ROOT/'src/data/items.json').read_text())
         catalog += [{'id':1900000+i,'name':f'Untradeable fixture {i}','image':'test.gif','tradeable':False}
             for i in range(max(0,10000-len(catalog)))]
@@ -74,6 +76,9 @@ with tempfile.TemporaryDirectory(prefix='khub-detail-cache-',dir='/tmp') as fold
         aid=sql(f"insert into public.auctions(seller_id,seller_username,item,quantity,min_bid_meat,current_bid,duration_hours,end_time,status,giveaway_title) values('{owner}','Traffic Seller','Giveaway fixture',1,100,100,24,now()+interval '1 hour','active','Fixture') returning id;")
         sql(f"insert into public.bids(auction_id,bidder_id,bidder_username,amount) values('{aid}','{other}','Traffic Buyer',100);")
         sql(f"update public.auctions set highest_bidder_id='{other}',highest_bidder_username='Traffic Buyer' where id='{aid}';")
+        # A second auction must never leak into full/narrow detail histories.
+        unrelated=sql(f"insert into public.auctions(seller_id,seller_username,item,quantity,min_bid_meat,current_bid,duration_hours,end_time,status) values('{other}','Traffic Buyer','Unrelated fixture',1,100,100,24,now()+interval '1 hour','active') returning id;")
+        sql(f"insert into public.bids(auction_id,bidder_id,bidder_username,amount) values('{unrelated}','{owner}','Traffic Seller',100);")
         administrator=account(98004,3552305,'Administrator Fixture')
         for viewer in [None,owner,other,restricted,administrator]:
             full=json.loads(sql(f"select public.read_auction_page(p_view=>'detail',p_id=>'{aid}');",viewer))
@@ -82,6 +87,27 @@ with tempfile.TemporaryDirectory(prefix='khub-detail-cache-',dir='/tmp') as fold
             # those equivalent active-history values; a true flag must still match.
             history=lambda payload: [dict(b,giveaway_winner=b.get('giveaway_winner',False)) for b in payload['bids']]
             assert history(narrow)==history(full),(viewer,narrow,full)
+            static=json.loads(sql(f"select public.read_auction_detail_static(p_view=>'detail',p_id=>'{aid}');",viewer))
+            identity=json.loads(sql(f"select public.read_auction_viewer_context(p_id=>'{aid}');",viewer))
+            recent=json.loads(sql(f"select public.read_auction_bid_history('{aid}');",viewer))
+            assert static['bids']==[] and identity['bids']==[]
+            assert recent['bids']==full['bids'],(viewer,recent,full)
+            assert not recent['has_more']
+            unchanged=json.loads(sql(f"select public.read_auction_bid_history('{aid}',p_known_revision=>{recent['revision']});",viewer))
+            if viewer!=administrator:
+                assert unchanged['unchanged'] and unchanged['bids']==[],unchanged
+            else:assert unchanged['bids']==recent['bids']
+
+
+            for payload in [full,narrow]:
+                assert len(payload['bids'])==1,(viewer,payload)
+                assert {bid['auction_id'] for bid in payload['bids']}=={aid},(viewer,payload)
+            # Missing IDs cannot return global history through an empty page.
+            missing=str(uuid4())
+            for rpc in ['read_auction_page','read_auction_detail_context']:
+                empty=json.loads(sql(f"select public.{rpc}(p_view=>'detail',p_id=>'{missing}');",viewer))
+                assert empty['rows']==[] and empty['bids']==[],(viewer,rpc,empty)
+
             if viewer:
                 card=json.loads(sql(f"select public.read_auction_card_context(array['{aid}'::uuid]);",viewer))['rows'][0]
                 for key in ['seller_id','seller_username','highest_bidder_id','highest_bidder_username','usernames_visible','viewer_is_highest_bidder','bidding_restricted','escrow_timing_review']:
@@ -126,6 +152,65 @@ with tempfile.TemporaryDirectory(prefix='khub-detail-cache-',dir='/tmp') as fold
         sql('set role service_role; select public.bot_refresh_public_discovery(); reset role;')
         assert sql('select totals from khub_bot.site_trade_totals_snapshot;')==saved
         assert sql(definitions)==financial_before
-        print('Detail migrations applied to PostgreSQL; narrow history/privacy, public state and unchanged financial functions passed.')
+        # Paginated history preserves ordering, exact scope, aliases and cursors.
+        sql(f"insert into public.bids(auction_id,bidder_id,bidder_username,amount) select '{aid}','{other}','Traffic Buyer',500+n from generate_series(1,120) n;")
+        expected=int(sql(f"select count(*) from public.bids where auction_id='{aid}';"))
+        assert int(sql(f"select display_bid_count from public.auctions where id='{aid}';"))==expected
+        seen=set();cursor={};pages=0
+        while True:
+            args='' if not cursor else f",{cursor['amount']},'{cursor['id']}'"
+            page=json.loads(sql(f"select public.read_auction_bid_history('{aid}'{args});",other))
+            ids={b['id'] for b in page['bids']}
+            assert len(ids)<=50 and not seen.intersection(ids)
+            assert all(b['auction_id']==aid for b in page['bids'])
+            seen.update(ids);pages+=1
+            if not page['has_more']:break
+            cursor=page['next_cursor']
+        assert len(seen)==expected and pages==3,(len(seen),expected,pages)
+        assert json.loads(sql(f"select public.read_auction_bid_history('{uuid4()}');"))['bids']==[]
+        # Ignore-list filtering must still authorize history before any rows or
+        # revision metadata are returned, even to a previously cached viewer.
+        sql(f"insert into public.player_ignores(user_id,kol_player_id) values('{other}',48889801);")
+        hidden=json.loads(sql(f"select public.read_auction_bid_history('{aid}');",other))
+        assert hidden['bids']==[] and hidden['visible'] is False and hidden['revision'] is None,hidden
+        sql(f"delete from public.player_ignores where user_id='{other}';")
+
+        sql(f"delete from public.bids where auction_id='{aid}' and amount>500;")
+        assert int(sql(f"select display_bid_count from public.auctions where id='{aid}';"))==expected-120
+        # Moving/deleting a bid changes only auction-local count/revision state.
+        moved=sql(f"select id from public.bids where auction_id='{aid}' order by amount desc limit 1;")
+        old_count=int(sql(f"select display_bid_count from public.auctions where id='{aid}';"))
+        sql(f"update public.bids set auction_id='{unrelated}',amount=99999 where id='{moved}';")
+        assert int(sql(f"select display_bid_count from public.auctions where id='{aid}';"))==old_count-1
+        assert sql(f"select display_bid_count=(select count(*) from public.bids where auction_id='{unrelated}') from public.auctions where id='{unrelated}';")=='t'
+        # The maintenance role has exactly the explicit RPC grants, no financial access.
+        sql("set role anon; select public.site_refresh_discovery();",error='permission denied')
+        sql("set role khub_site_maintenance; select public.bot_tick();",error='permission denied')
+        sql("set role khub_site_maintenance; select public.activate_site_maintenance();",error='permission denied')
+        sql("select public.activate_site_maintenance();",error='Verify all three')
+        sql("insert into public.site_activity(visitor_id,last_seen) select gen_random_uuid(),now()-interval '1 hour' from generate_series(1,1001);")
+        for rpc in ['site_refresh_discovery','site_cleanup_activity','site_refresh_totals']:
+            result=json.loads(sql(f"set role khub_site_maintenance; select public.{rpc}(); reset role;"))
+            assert result['state']=='ok',(rpc,result)
+        assert sql("select count(*) from public.site_activity where last_seen<now()-interval '5 minutes';")=='1'
+        sql("select public.activate_site_maintenance();")
+        assert json.loads(sql("select public.bot_worker_status();"))['siteMaintenanceOwned']
+        sql("update khub_bot.site_trade_totals_snapshot set refreshed_at=now()-interval '1 day';")
+        sql("select public.bot_refresh_public_discovery();")
+        assert sql("select refreshed_at<now()-interval '1 hour' from khub_bot.site_trade_totals_snapshot;")=='t'
+        # A failing totals task must retain its snapshot and defer optional work.
+        before=sql("select row_to_json(s) from khub_bot.site_trade_totals_snapshot s;")
+        sql("update khub_bot.site_maintenance_state set next_attempt='-infinity'; insert into khub_bot.site_totals_dirty values(txid_current()) on conflict do nothing;")
+        sql("alter function khub_bot.refresh_site_trade_totals() rename to fixture_saved_totals; create function khub_bot.refresh_site_trade_totals() returns jsonb language plpgsql as $$begin raise exception 'fixture timeout' using errcode='57014'; end;$$;")
+        failure=json.loads(sql("set role khub_site_maintenance; select public.site_refresh_totals(); reset role;"))
+        assert failure=={'state':'deferred','code':'57014'},failure
+        assert sql("select row_to_json(s) from khub_bot.site_trade_totals_snapshot s;")==before
+        assert sql("select bool_and(next_attempt>now()) from khub_bot.site_maintenance_state;")=='t'
+        assert sql("select count(*)>0 from khub_bot.site_totals_dirty;")=='t'
+        manifest=json.loads(sql("set role anon; select public.read_item_catalog_manifest(); reset role;"))
+        snapshot=json.loads(sql("set role anon; select public.read_item_catalog_snapshot("+lit(manifest['version'])+"); reset role;"))
+        assert snapshot['ready'] and len(snapshot['items'])>8000
+        assert sql("set role anon;select public.read_item_catalog_snapshot('missing');reset role;")==''
+        print('PostgreSQL checks passed: history scope/privacy/pagination/revisions, counters, maintenance ownership/ACLs/backoff, catalogue versions, and unchanged financial definitions.')
     finally:
         if started:pg('-m','immediate','-w','stop')

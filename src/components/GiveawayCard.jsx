@@ -1,3 +1,4 @@
+import { useNow } from '../hooks/useNow';
 import AuctionLiveUnavailable from './AuctionLiveUnavailable';
 import { giveawayConditionLabel } from '../lib/giveaway';
 import PropTypes from 'prop-types';
@@ -15,7 +16,8 @@ export function GiveawayDecorations({ source }) {
         {sprites.map(([x,y,size,angle], i) => <GiveawayItemImage key={`s${i}`} source={source} className={`giveaway-sprite giveaway-sprite-${i}`} style={{ left: `${x}%`, top: `${y}%`, '--size': `${size}cqh`, '--angle': `${angle}deg` }} />)}
     </div>;
 }
-export function GiveawayCountdown({ endTime, now }) {
+export function GiveawayCountdown({ endTime }) {
+    const now = useNow();
     const seconds = Math.max(0, Math.ceil((endTime - now) / 1000));
     return <span className="giveaway-countdown"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 6v6l4 3" /></svg><time dateTime={new Date(endTime).toISOString()}>{Math.floor(seconds / 3600)}h {Math.floor(seconds % 3600 / 60)}m {seconds % 60}s left</time></span>;
 }

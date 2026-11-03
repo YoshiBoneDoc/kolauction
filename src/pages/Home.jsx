@@ -9,7 +9,7 @@ import { Link } from 'react-router-dom';
 import { AuctionsContext } from '../context/AuctionsContext';
 import { recentCompletedAuctions, highRollerAuctions } from '../lib/auctionBrowsing';
 import { getAuctionStatus } from '../lib/auctionLifecycle';
-import { useNow } from '../hooks/useNow';
+import { useAuctionBoundaryNow as useNow } from '../hooks/useAuctionBoundaryNow';
 import PendingTrades from '../components/PendingTrades';
 import SiteFooter from '../components/SiteFooter';
 import HomePoll from '../components/HomePoll';
@@ -17,7 +17,7 @@ import SiteTradeTotals from '../components/SiteTradeTotals';
 
 export default function Home() {
     const { auctions, homeSections, siteTotals, listingOrderDelayed = false, isLoading, error, hasLoaded = !isLoading && !error, refreshAuctions } = useContext(AuctionsContext);
-    const now = useNow();
+    const now = useNow(auctions);
     const featuredGiveaway = useFeaturedGiveaway();
     const featuredPollTarget = useRef(null);
     const hasActiveAuctions = auctions.some(auction => auction.liveUnavailable || ['active', 'finalizing'].includes(getAuctionStatus(auction, now)));

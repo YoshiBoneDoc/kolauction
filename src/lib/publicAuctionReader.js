@@ -30,7 +30,7 @@ export function createPublicAuctionReader(client, { enabled = false, fetch: fetc
         async accepts(request) {
             if (request.fresh) { details.clear(); overlays.clear(); }
             if (!enabled || !client || !['home', 'browse', 'seller', 'detail'].includes(request.view)
-                || request.sellerId || request.excludeOwn || request.fresh || request.summaryOnly
+                || request.sellerId || request.excludeOwn || request.fresh && request.view !== 'detail' || request.summaryOnly
                 || ['seller', 'detail'].includes(request.view) && !request.id) return false;
             // Personalized visibility must be applied before pagination and totals.
             const { data, error } = await client.auth.getSession();
@@ -50,10 +50,15 @@ export function createPublicAuctionReader(client, { enabled = false, fetch: fetc
                 // Token scopes prevent reuse across sign-in, sign-out or authorization changes.
                 const key = `${request.id}:${auth.session?.access_token || 'anon'}`;
                 let context = details.get(key);
+                const previous = context;
+                // An existing published page can verify live data while private
+                // context refreshes. Drafts never enter the public transport.
+                const livePromise = previous?.data.rows.length && previous.data.rows[0].status !== 'pending_escrow'
+                    ? this.load({ ...request, view: 'detail-live' }).then(data => ({ data }), error => ({ error })) : null;
                 let authoritativeRead = false;
-                if (!context || Date.now() - context.at >= 5000) {
+                if (!context || Date.now() - context.at >= 30000) {
                     const full = !context || Date.now() - context.staticAt >= 300000 || context.data.rows[0]?.status !== 'active' || context.data.rows[0]?.auction_kind === 'buy';
-                    let query = client.rpc(full ? 'read_auction_page' : 'read_auction_detail_context', { p_view: 'detail', p_id: request.id,
+                    let query = client.rpc(full ? 'read_auction_detail_static' : 'read_auction_viewer_context', { p_view: 'detail', p_id: request.id,
                         p_search: '', p_status: 'active', p_sort: 'ending', p_page: 1 });
                     if (request.signal && query.abortSignal) query = query.abortSignal(request.signal);
                     let { data, error } = await query;
@@ -62,7 +67,7 @@ export function createPublicAuctionReader(client, { enabled = false, fetch: fetc
                     if (data?.privacy_version !== 1 || !Array.isArray(data.rows) || !Array.isArray(data.bids)) throw new Error('Invalid private auction detail.');
                     const transitioned = !full && data.rows.some(row => row._detail_full_required);
                     if (transitioned) {
-                        let authoritative = client.rpc('read_auction_page', { p_view: 'detail', p_id: request.id, p_search: '', p_status: 'active', p_sort: 'ending', p_page: 1 });
+                        let authoritative = client.rpc('read_auction_detail_static', { p_view: 'detail', p_id: request.id, p_search: '', p_status: 'active', p_sort: 'ending', p_page: 1 });
                         if (request.signal && authoritative.abortSignal) authoritative = authoritative.abortSignal(request.signal);
                         ({ data, error } = await authoritative);
                         if (error) throw error;
@@ -76,13 +81,19 @@ export function createPublicAuctionReader(client, { enabled = false, fetch: fetc
                     details.set(key, context);
                 }
                 // Unpublished drafts stay exclusively on the private transport.
-                if (authoritativeRead || !context.data.rows.length || context.data.rows[0].status === 'pending_escrow') return context.data;
+                if (!livePromise && authoritativeRead || !context.data.rows.length || context.data.rows[0].status === 'pending_escrow') return context.data;
                 // The full private read already supplies static fields. Only live
                 // state needs the shared transport on subsequent polls.
-                const live = await this.load({ ...request, view: 'detail-live' });
+                const result = livePromise ? await livePromise : { data: await this.load({ ...request, view: 'detail-live' }) };
+                if (result.error) throw result.error;
+                const live = result.data;
+                const transitioned = live.rows.some(row => row.status !== context.data.rows.find(old => old.id === row.id)?.status);
+                if (transitioned) { details.delete(key); return this.load(request); }
                 return { ...context.data, server_time: live.server_time, public_snapshot: live.public_snapshot,
                     rows: context.data.rows.map(row => ({ ...row,
                         ...(Date.parse(live.public_snapshot?.captured_at) >= context.staticAt ? live.rows.find(value => value.id === row.id) : row),
+                        ...(Number(live.rows.find(value => value.id === row.id)?.current_bid) !== Number(row.current_bid)
+                            ? { highest_bidder_id: null, highest_bidder_username: null, viewer_is_highest_bidder: null } : {}),
                         _live_unavailable: live.public_snapshot?.live_unavailable === true })) };
             }
 

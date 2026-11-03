@@ -4,7 +4,7 @@ import { AuctionsContext } from '../context/AuctionsContext';
 import { UserContext } from '../context/UserContext';
 import PublicProfileAuctionCard from '../components/PublicProfileAuctionCard';
 import { auctionFilters, auctionSorts, resolveAuctionSort } from '../lib/auctionBrowsing';
-import { useNow } from '../hooks/useNow';
+import { useAuctionBoundaryNow as useNow } from '../hooks/useAuctionBoundaryNow';
 import useAuctionSearch from '../hooks/useAuctionSearch';
 import TradeHistorySummary from '../components/TradeHistorySummary';
 
@@ -17,7 +17,7 @@ export default function SellerProfile() {
     const isOwnProfile = Boolean(currentUser?.id && currentUser.id === sellerId);
     const [params, setParams] = useSearchParams();
     const [search, setSearch] = useAuctionSearch();
-    const now = useNow();
+    const now = useNow(auctions);
     const detailed = params.get('view') === 'stats';
     function viewLink(showStats) {
         const next = new URLSearchParams(params);

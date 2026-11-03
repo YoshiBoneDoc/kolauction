@@ -3,7 +3,16 @@ const EMPTY = Object.freeze({ data: null, error: '', updatedAt: null, attemptedA
 
 export function createAuctionReadCache(read, { now = Date.now, random = Math.random } = {}) {
     const entries = new Map(), listeners = new Set();
-    let queue = Promise.resolve(), active = true, retained = new Set();
+    let active = true, retained = new Set(), running = 0;
+    const waiting = [];
+    const pump = () => {
+        while (running < 2 && waiting.length) {
+            const { run, resolve, reject } = waiting.shift();
+            running++;
+            Promise.resolve().then(run).then(resolve, reject).finally(() => { running--; pump(); });
+        }
+    };
+    const schedule = run => new Promise((resolve, reject) => { waiting.push({ run, resolve, reject }); pump(); });
     const entry = key => {
         if (!entries.has(key)) entries.set(key, { state: EMPTY, version: 0, request: null, controller: null, failures: 0, retryAt: 0 });
         return entries.get(key);
@@ -52,9 +61,8 @@ export function createAuctionReadCache(read, { now = Date.now, random = Math.ran
             const controller = new AbortController();
             record.controller = controller;
             record.state = { ...state, refreshing: true };
-            // Serialize different resources too: navigation/pending trades cannot
-            // start a second read alongside an auction page refresh.
-            const task = queue.then(async () => {
+            // Two bounded slots let a slow private read coexist with the visible page.
+            const task = schedule(async () => {
                 if (!active || version !== record.version) return;
                 record.state = { ...record.state, attemptedAt: now() };
                 try {
@@ -81,7 +89,6 @@ export function createAuctionReadCache(read, { now = Date.now, random = Math.ran
                 publish();
             });
             record.request = task;
-            queue = task.catch(() => {});
             publish();
             return task;
         },

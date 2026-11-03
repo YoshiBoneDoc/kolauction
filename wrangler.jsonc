@@ -4,6 +4,7 @@
   "main": "workers/site/index.js",
   "compatibility_date": "2026-10-28",
   "keep_vars": true,
+  "triggers": { "crons": ["* * * * *"] },
   "build": {
     "command": "npm run build:cloudflare"
   },

@@ -5,7 +5,7 @@ import useAuctionBrowseSession from '../hooks/useAuctionBrowseSession';
 import { AuctionsContext } from '../context/AuctionsContext';
 import { UserContext } from '../context/UserContext';
 import { auctionFilters, resolveBrowseSort } from '../lib/auctionBrowsing';
-import { useNow } from '../hooks/useNow';
+import { useAuctionBoundaryNow as useNow } from '../hooks/useAuctionBoundaryNow';
 import CompactAuctionCard from '../components/CompactAuctionCard';
 import GiveawayCard from '../components/GiveawayCard';
 import useFeaturedGiveaway from '../hooks/useFeaturedGiveaway';
@@ -17,7 +17,7 @@ export default function AllAuctions() {
     const { currentUser } = useContext(UserContext);
     const { params, setParams, rememberSearch, resetSession, navigationType, locationKey } = useAuctionBrowseSession({ priceBounds: AUCTION_PRICE_RANGE_ENABLED ? priceBounds : null, isLoading, error });
     const [searchInput, setSearchInput] = useAuctionSearch(setParams);
-    const now = useNow();
+    const now = useNow(auctions);
     const featuredGiveaway = useFeaturedGiveaway();
     const [openBid, setOpenBid] = useState(null);
     const [filtersOpen, setFiltersOpen] = useState(false);

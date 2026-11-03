@@ -12,7 +12,6 @@ import { useState, useContext, useDeferredValue, useEffect, useMemo, useRef } fr
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AuctionsContext } from '../context/AuctionsContext';
 import { UserContext } from '../context/UserContext';
-import items from '../data/items.json';
 import { supabase } from '../lib/supabase';
 import { createItemCatalogService, itemImageUrl, isAuctionableItem } from '../lib/itemCatalog';
 import { parseAuctionAmount, parseMeatAmount, normalizeAuctionAmount } from '../lib/auctionInputs';
@@ -22,7 +21,7 @@ import DirectTradeHelp from '../components/DirectTradeHelp';
 import { auctionNow } from '../lib/auctionClock';
 import { customAuctionEnd, localDateTimeInput, formatAuctionEnd, MAX_AUCTION_DURATION_MS } from '../lib/auctionSchedule';
 
-const catalog = createItemCatalogService(supabase, items);
+const catalog = createItemCatalogService(supabase, () => import('../data/items.json').then(module => module.default));
 const resultLimit = 100;
 const coverPrices = createMarketPriceService(supabase);
 const fieldClass = 'mb-4 block min-h-11 w-full min-w-0 rounded border border-gray-400 bg-white p-3 text-base text-gray-900';
@@ -34,7 +33,7 @@ export default function AuctionAnItem() {
     const navigate = useNavigate();
     const { hash, state, key: locationKey } = useLocation();
     const relistHandled = useRef(null);
-    const [catalogItems, setCatalogItems] = useState(items);
+    const [catalogItems, setCatalogItems] = useState([]);
     useEffect(() => {
         let active = true;
         catalog.load().then(updated => { if (active) setCatalogItems(updated); });

@@ -72,7 +72,7 @@ function source() {
 async function fixture(storage = new Map()) {
     const waits = [];
     let ready;
-    const ctx = { storage: { get: async key => structuredClone(storage.get(key)), put: async (key, data) => { storage.set(key, structuredClone(data)); } },
+    const ctx = { storage: { get: async key => structuredClone(storage.get(key)), put: async (key, data) => { if (typeof key === 'object') { for (const [k,v] of Object.entries(key)) storage.set(k, structuredClone(v)); } else storage.set(key, structuredClone(data)); } },
         blockConcurrencyWhile(fn) { ready = fn(); }, waitUntil(task) { waits.push(task); } };
     const cache = new PublicAuctionCache(ctx, {});
     await ready;
@@ -331,7 +331,7 @@ test('an accepted-bid notification makes the next five visitors share a fresh re
     const responses = await Promise.all(Array.from({ length: 5 }, () => f.get()));
     assert.equal(f.reads(), 2);
     for (const response of responses) assert.equal(response.headers.get('X-Khub-Cache'), 'REVALIDATED');
-    const saved = [...f.storage.values()][0];
+    const saved = f.storage.get('public-freshness-v1');
     assert.equal(saved.revision, '1');
     assert.doesNotMatch(JSON.stringify(saved), /signature|abababab/);
 });
@@ -816,4 +816,32 @@ test('a failed missing-state batch still serves a verified cached sibling state'
     const body = await response.json();
     assert.equal(body.rows.find(row => row.id === id).current_bid, 200);
     assert.equal(body.rows.find(row => row.id === secondId)._live_unavailable, true);
+});
+
+test('expired live-mode selection refresh runs behind live verification and does not delay its response', async () => {
+    const f=await liveFixture();await f.get();
+    const entry=[...f.cache.entries.values()].find(e=>!e.ephemeral);
+    entry.storedAt=Date.now()-31000;
+    f.cache.liveStates.clear();
+    for(const e of f.cache.entries.values())if(e.ephemeral)e.storedAt=Date.now()-3000;
+    let release;const held=new Promise(resolve=>{release=resolve;});
+    const read=f.cache.readOrigin;
+    f.cache.readOrigin=async request=>{
+        if(request.view==='browse')await held;
+        return await read(request);
+    };
+    const response=await f.get();
+    const body=await response.json();
+    assert.equal(body.rows[0].current_bid,200);
+    assert.equal(body.public_snapshot.ordering_delayed,true);
+    release();await Promise.all(f.waits);
+});
+
+test('bid invalidation writes only freshness metadata and live payloads are reconstructible',async()=>{
+    const f=await liveFixture();await f.get();
+    const payload=structuredClone(f.storage.get('public-snapshots-v1'));
+    assert.ok(payload.entries.every(([,entry])=>!entry.ephemeral));
+    await f.cache.fetch(scopedNotification('9'));
+    assert.deepEqual(f.storage.get('public-snapshots-v1'),payload);
+    assert.equal(f.storage.get('public-freshness-v1').revision,'9');
 });

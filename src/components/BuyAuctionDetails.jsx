@@ -1,3 +1,5 @@
+import { useAuctionBoundaryNow } from '../hooks/useAuctionBoundaryNow';
+import RemainingTime from './RemainingTime';
 import AuctionEndedTime from './AuctionEndedTime';
 import MarketPrice from './MarketPrice';
 import { effectiveFeePercent } from '../lib/feeDisplay';
@@ -10,7 +12,7 @@ import { UserContext } from '../context/UserContext';
 import { AuctionsContext } from '../context/AuctionsContext';
 import { getAuctionResult } from '../lib/auctionLifecycle';
 import { parseAuctionAmount } from '../lib/auctionInputs';
-import { auctionEndTime, timeRemaining } from '../lib/auctionBrowsing';
+import { auctionEndTime } from '../lib/auctionBrowsing';
 import { canSendTradeQuery } from '../lib/tradeQueries';
 import EscrowProtection from './EscrowProtection';
 import CopyMessage from './CopyMessage';
@@ -20,7 +22,7 @@ import AuctionItemImage from './AuctionItemImage';
 
 const fulfillmentColumns = 'grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,.7fr)_minmax(0,1.1fr)] gap-x-2 sm:gap-x-3';
 
-export default function BuyAuctionDetails({ auction, now, backLink }) {
+export default function BuyAuctionDetails({ auction, backLink }) {
     const { currentUser } = useContext(UserContext);
     const { cancelAuction, reserveBuyQuantity, cancelBuyReservation } = useContext(AuctionsContext);
     const [pending, setPending] = useState(false);
@@ -29,6 +31,7 @@ export default function BuyAuctionDetails({ auction, now, backLink }) {
     const [localReservation, setLocalReservation] = useState(null);
     const [resolvedReservation, setResolvedReservation] = useState(null);
     const [notice, setNotice] = useState('');
+    const now = useAuctionBoundaryNow([auction, { endTime: Date.parse(auction.myReservation?.expires_at) }, { endTime: Date.parse(localReservation?.expires_at) }]);
     const candidate = auction.myReservation && Date.parse(auction.myReservation.expires_at) > now
         ? auction.myReservation : localReservation && Date.parse(localReservation.expires_at) > now ? localReservation : null;
     const reservation = candidate?.id === resolvedReservation ? null : candidate;
@@ -126,7 +129,7 @@ export default function BuyAuctionDetails({ auction, now, backLink }) {
                     <div className="min-w-0 space-y-1">
                         <h2 className="text-xs font-medium text-[#64748B]">{active && !closed ? 'Time Remaining' : 'Status'}</h2>
                         {active && !closed ? <>
-                            <p className="text-xl font-semibold leading-tight text-gray-900">{timeRemaining(auction.endTime, now)}</p>
+                            <p className="text-xl font-semibold leading-tight text-gray-900"><RemainingTime endTime={auction.endTime} /></p>
                             {Number.isFinite(ending.getTime()) && <p className="text-xs text-[#64748B]">Ends <time dateTime={ending.toISOString()}>{formatDate(ending)}</time></p>}
                         </> : <>
                             <p className="text-sm font-medium text-gray-800">{result.status === 'pending_escrow' ? 'Starts after funding' : outcomeLabel}</p>
@@ -180,7 +183,7 @@ export default function BuyAuctionDetails({ auction, now, backLink }) {
                     </div>
                     <div className="space-y-0.5">
                         <p className={`buy-reservation-deadline text-base font-semibold ${reservationDeadline - now < 120000 ? 'text-red-700' : 'text-[#B7791F]'}`}>
-                            {reservationDeadline > now ? <>Send within <time dateTime={reservation.expires_at}>{timeRemaining(reservationDeadline, now)}</time></> : 'Deadline passed'}
+                            {reservationDeadline > now ? <>Send within <time dateTime={reservation.expires_at}><RemainingTime endTime={reservationDeadline} /></time></> : 'Deadline passed'}
                         </p>
                         <p className="text-xs text-[#64748B]">Expires <time dateTime={reservation.expires_at}>{formatDate(new Date(reservation.expires_at))}</time></p>
                         {reservationDeadline <= now && <p className="text-xs text-[#64748B]">kHub is checking timely incoming mail before releasing this reservation.</p>}

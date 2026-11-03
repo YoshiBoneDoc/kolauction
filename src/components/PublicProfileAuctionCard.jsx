@@ -1,3 +1,4 @@
+import RemainingTime from './RemainingTime';
 import AuctionLiveUnavailable from './AuctionLiveUnavailable';
 import RelistButton from './RelistButton';
 import { auctionQuantityLabel } from '../lib/bundles';
@@ -11,7 +12,7 @@ import WinnerLink from './WinnerLink';
 import { UserContext } from '../context/UserContext';
 import { getAuctionDisplayStatus, getAuctionResult } from '../lib/auctionLifecycle';
 import { formatCompactMeat } from '../lib/formatMeat';
-import { auctionEndTime, timeRemaining } from '../lib/auctionBrowsing';
+import { auctionEndTime } from '../lib/auctionBrowsing';
 
 const itemCount = value => Number(value || 0).toLocaleString('en-US');
 
@@ -32,7 +33,7 @@ export default function PublicProfileAuctionCard({ auction, now }) {
     const buyRemaining = Math.max(0, buyTarget - buyPurchased);
     const endTimestamp = active ? auction.endTime : auctionEndTime(auction);
     const endDate = Number.isFinite(endTimestamp) ? new Date(endTimestamp) : null;
-    const endLabel = active ? timeRemaining(auction.endTime, now).replace(/ \d+s$/, '')
+    const endLabel = active ? <RemainingTime endTime={auction.endTime} hideSeconds />
         : endDate?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const statusClass = result.status === 'completed' ? 'is-completed'
         : ['cancelled', 'voided'].includes(result.status) ? 'is-cancelled'

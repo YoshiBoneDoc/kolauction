@@ -1,3 +1,5 @@
+import RemainingTime from '../components/RemainingTime';
+import BidHistory from '../components/BidHistory';
 import AuctionLiveUnavailable from '../components/AuctionLiveUnavailable';
 import { giveawayConditionLabel } from '../lib/giveaway';
 import { GiveawayDecorations, GiveawayCountdown } from '../components/GiveawayCard';
@@ -19,8 +21,8 @@ import AuctionItemImage from '../components/AuctionItemImage';
 import AuctionBidForm from '../components/AuctionBidForm';
 import InstantPurchaseAction from '../components/InstantPurchaseAction';
 import { getAuctionResult, getAuctionDisplayStatus } from '../lib/auctionLifecycle';
-import { auctionEndTime, timeRemaining } from '../lib/auctionBrowsing';
-import { useNow } from '../hooks/useNow';
+import { auctionEndTime } from '../lib/auctionBrowsing';
+import { useAuctionBoundaryNow as useNow } from '../hooks/useAuctionBoundaryNow';
 import SellerLink from '../components/SellerLink';
 import WinnerLink from '../components/WinnerLink';
 import DirectTradeHelp from '../components/DirectTradeHelp';
@@ -36,7 +38,7 @@ export default function AuctionDetails() {
     const backTo = typeof browseFrom === 'string' && (browseFrom === '/auctions' || browseFrom.startsWith('/auctions?')) ? browseFrom : '/auctions';
     const { auctions, isLoading, error } = useContext(AuctionsContext);
     const { currentUser } = useContext(UserContext);
-    const now = useNow();
+    const now = useNow(auctions);
     const auction = auctions.find((listing) => String(listing.id) === id);
     const giveawayImage = useGiveawayCutout(auction?.giveawayTitle ? auction.image : null);
     const backLink = <div className="mx-auto mb-4 max-w-6xl">
@@ -102,8 +104,8 @@ export default function AuctionDetails() {
                             {!closedSale && active && <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
                                 <span className="inline-flex rounded border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Live</span>
                                 <span aria-hidden="true" className="text-gray-400">·</span>
-                                {auction.giveawayTitle ? <GiveawayCountdown endTime={auction.endTime} now={now} /> : <p className={auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-600'}>Ends in <time dateTime={new Date(auction.endTime).toISOString()}>{timeRemaining(auction.endTime, now)}</time></p>}
-                                <p className="w-full text-[11px] text-gray-500">{auction.giveawayTitle ? <>Giveaway ends at the scheduled time. <span className="giveaway-bid-warning">Minimum increases only. <strong>Overbids won't count!</strong></span></> : 'Late bids extend the auction by 1 minute.'}</p>
+                                {auction.giveawayTitle ? <GiveawayCountdown endTime={auction.endTime} now={now} /> : <p className={auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-600'}>Ends in <time dateTime={new Date(auction.endTime).toISOString()}><RemainingTime endTime={auction.endTime} /></time></p>}
+                                <p className="w-full text-[11px] text-gray-500">{auction.giveawayTitle ? <>Giveaway ends at the scheduled time. <span className="giveaway-bid-warning">Minimum increases only. <strong>Overbids won&apos;t count!</strong></span></> : 'Late bids extend the auction by 1 minute.'}</p>
                             </div>}
                         </div>
                         {closedSale ? <>
@@ -127,30 +129,7 @@ export default function AuctionDetails() {
                 </div>
             </div>
             {!active && <AuctionOutcome key={auction.id} auction={auction} now={now} />}
-            <section aria-label="Bid history" className="mx-auto mt-6 max-w-4xl rounded-lg border border-gray-200 bg-white p-4 shadow sm:p-6">
-                <h2 className="mb-4 text-2xl font-bold text-gray-800">Bid History</h2>
-                {auction.bids?.length ? <ul className="divide-y divide-gray-200">
-                    {auction.bids.slice().reverse().map((bid, index) => (
-                        <li key={bid.id || index} className="flex flex-col gap-1 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                            <div className="min-w-0">
-                                <span className="break-words font-medium text-gray-700">{bid.bidder}</span>
-                                {currentUser && bid.adminDeliveryReferences?.length > 0 && <ul aria-label="Administrator message references" className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
-                                    {bid.adminDeliveryReferences.map(delivery => <li key={delivery.reference}>
-                                        {delivery.label}: <span className="font-mono">{delivery.reference}</span> ({delivery.state})
-                                    </li>)}
-                                </ul>}
-                            </div>
-                            <div className="sm:text-right">
-                                <p className="font-bold text-gray-900">{bid.amount.toLocaleString('en-US')} Meat</p>
-                                {auction.instantPurchasedAt && bid.amount === auction.instantPurchasePrice && <p className="text-xs font-semibold text-green-700">Buyout</p>}
-                                {auction.giveawayTitle ? bid.giveawayWinner && result.hasWinner && <p className="giveaway-winner-label text-xs font-semibold text-green-700">Giveaway Winner</p>
-                                    : !auction.instantPurchasedAt && result.hasWinner && bid.amount === result.finalPrice && <p className="text-xs font-semibold text-green-700">Winning bid</p>}
-                                <p className="text-xs text-gray-600">{new Date(bid.timestamp).toLocaleString()}</p>
-                            </div>
-                        </li>
-                    ))}
-                </ul> : <p className="text-gray-600">No bids yet.</p>}
-            </section>
+            <BidHistory auction={auction} currentUser={currentUser} result={result} />
         </main>
     );
 }

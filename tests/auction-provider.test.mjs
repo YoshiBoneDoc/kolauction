@@ -30,9 +30,9 @@ function setup(){
  fixture={cursor:0,slots:[],effects:[],user:{id:'viewer'},location:{pathname:'/',search:''},calls:[],fail:false};
  fixture.rpc=async(name,args)=>{
   fixture.calls.push([name,args]);
-  if(fixture.fail&&['read_home_auctions','read_filtered_auction_page','read_auction_page'].includes(name))return {error:{code:'57014',message:'timeout'}};
+  if(fixture.fail&&['read_home_auctions','read_filtered_auction_page','read_auction_page','read_auction_detail_static'].includes(name))return {error:{code:'57014',message:'timeout'}};
   if(name==='read_pending_trades')return {data:{privacy_version:1,rows:[],total:0}};
-  if(['read_home_auctions','read_filtered_auction_page','read_auction_page'].includes(name)){
+  if(['read_home_auctions','read_filtered_auction_page','read_auction_page','read_auction_detail_static'].includes(name)){
    const rows=Array.from({length:25},(_,i)=>({id:`a-${i}`,seller_id:'seller',seller_username:fixture.user?'Authorized seller':'Seller',usernames_visible:!!fixture.user,
     item:`Item ${i}`,quantity:1,min_bid_meat:100,current_bid:100,status:'active',created_at:'2026-10-20',end_time:'2027-01-01',market_value_meat:200}));
    return {data:{privacy_version:1,rows:rows.slice(((args?.p_page||1)-1)*24,(args?.p_page||1)*24),bids:[],total:25, ...(name==='read_home_auctions'?{sections:{popular:rows.slice(0,24).map(r=>r.id),new:[],ending:[],highRollers:[],recent:[]}}:{})}};

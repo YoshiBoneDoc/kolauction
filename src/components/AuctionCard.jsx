@@ -1,3 +1,4 @@
+import RemainingTime from './RemainingTime';
 import AuctionLiveUnavailable from './AuctionLiveUnavailable';
 import { giveawayConditionLabel } from '../lib/giveaway';
 import RelistButton from './RelistButton';
@@ -11,7 +12,6 @@ import { useContext, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Link, useLocation } from 'react-router-dom';
 import { getAuctionResult, getAuctionDisplayStatus, auctionCardBackground } from '../lib/auctionLifecycle';
-import { timeRemaining } from '../lib/auctionBrowsing';
 import AuctionBidForm from './AuctionBidForm';
 import { UserContext } from '../context/UserContext';
 import InstantPurchaseAction from './InstantPurchaseAction';
@@ -45,7 +45,7 @@ export default function AuctionCard({ auction, now }) {
             </div>
             {active ? (
                 <p className={`text-center text-sm ${auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-600'}`}>
-                    Ends in <time dateTime={new Date(auction.endTime).toISOString()}>{timeRemaining(auction.endTime, now)}</time>
+                    Ends in <time dateTime={new Date(auction.endTime).toISOString()}><RemainingTime endTime={auction.endTime} /></time>
                 </p>
             ) : (
                 <div className="space-y-1 text-center text-sm">

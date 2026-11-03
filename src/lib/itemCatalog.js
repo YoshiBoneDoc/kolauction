@@ -23,25 +23,39 @@ export function isAuctionableItem(item) {
     return (item.tradeable === true || item.giftable === true) && item.is_gift_package !== true;
 }
 
-// One public reference-data read per five minutes, shared across page mounts.
+// Versioned static reference data; only the small manifest revalidates every five minutes.
 // A failed read uses the checked-in auctionable snapshot; server validation remains
 // authoritative if an item's eligibility has changed since that snapshot.
-export function createItemCatalogService(client, fallback, now = Date.now) {
-    let cached = fallback;
+export function createItemCatalogService(client, fallback, now = Date.now, fetcher = globalThis.fetch) {
+    let cached = typeof fallback === 'function' ? null : fallback;
     let expires = 0;
     let loading;
+    let version;
     return {
         async load() {
-            if (!client || now() < expires) return cached;
+            if (now() < expires) return cached;
             if (loading) return loading;
             loading = (async () => {
                 try {
-                    const { data, error } = await client.rpc('read_item_catalog');
-                    if (!error && data?.ready === true && validTradeableItems(data.items)) {
+                    const manifestResponse = await fetcher('/api/item-catalog', { cache: 'no-cache', signal: AbortSignal.timeout(5000) });
+                    if (!manifestResponse.ok) throw new Error('Catalogue manifest unavailable');
+                    const manifest = await manifestResponse.json();
+                    if (!/^[a-f0-9]{64}$/.test(manifest.version) || ![`/catalog/items-${manifest.version}.json`, `/api/item-catalog?version=${manifest.version}`].includes(manifest.url)) throw new Error('Invalid catalogue manifest');
+                    if (manifest.version === version) { expires = now() + 300000; return cached; }
+                    const response = await fetcher(manifest.url, { cache: 'force-cache', signal: AbortSignal.timeout(5000) });
+                    if (!response.ok) throw new Error('Catalogue unavailable');
+                    const data = await response.json();
+                    if (data?.ready === true && validTradeableItems(data.items)) {
                         cached = data.items;
+                        version = manifest.version;
                         expires = now() + 5 * 60 * 1000;
-                    } else expires = now() + 30000;
-                } catch { expires = now() + 30000; }
+                    } else throw new Error('Invalid catalogue items');
+                } catch {
+                    expires = now() + 30000;
+                    if (!cached?.length && typeof fallback === 'function') {
+                        try { cached = await fallback(); } catch { cached = []; }
+                    }
+                }
                 return cached;
             })().finally(() => { loading = null; });
             return loading;
