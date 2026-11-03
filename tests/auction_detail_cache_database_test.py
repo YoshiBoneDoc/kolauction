@@ -82,10 +82,17 @@ with tempfile.TemporaryDirectory(prefix='khub-detail-cache-',dir='/tmp') as fold
             # those equivalent active-history values; a true flag must still match.
             history=lambda payload: [dict(b,giveaway_winner=b.get('giveaway_winner',False)) for b in payload['bids']]
             assert history(narrow)==history(full),(viewer,narrow,full)
+            if viewer:
+                card=json.loads(sql(f"select public.read_auction_card_context(array['{aid}'::uuid]);",viewer))['rows'][0]
+                for key in ['seller_id','seller_username','highest_bidder_id','highest_bidder_username','usernames_visible','viewer_is_highest_bidder','bidding_restricted','escrow_timing_review']:
+                    assert card[key]==full['rows'][0][key],(viewer,key,card,full['rows'][0])
+                assert 'settlement_contacts' not in card
             row=narrow['rows'][0]
             for key in ['usernames_visible','seller_username','highest_bidder_id','highest_bidder_username','viewer_is_highest_bidder','bidding_restricted','escrow_timing_review']:
                 assert row[key]==full['rows'][0][key],(key,row,full['rows'][0])
             assert not set(row)&{'item','image','current_bid','bid_count','end_time','quantity'}
+        assert sql(f"select ordinal from khub_bot.auction_bidder_labels where auction_id='{aid}' and bidder_id='{other}';")=='1'
+        assert 'khub_bot.auction_bidder_labels' in sql("select prosrc from pg_proc where oid='public.read_auction_detail_context(text,uuid,text,text,text,integer)'::regprocedure;")
         public=json.loads(sql(f"select public.read_public_auction_detail_state('{aid}');"))
         assert public['rows'][0]['bid_count']==1
         assert 'seller_id' not in public['rows'][0]
@@ -94,6 +101,17 @@ with tempfile.TemporaryDirectory(prefix='khub-detail-cache-',dir='/tmp') as fold
         assert 'select count(*) from public.bids b where b.auction_id=a.id' not in body
         sql(f"update public.auctions set status='awaiting_trade',winner_username='Traffic Buyer',final_price=100,finalized_at=now(),winner_id='{other}' where id='{aid}';")
         assert json.loads(sql(f"select public.read_auction_detail_context(p_id=>'{aid}');"))['rows'][0]['_detail_full_required']
+        # Two concurrent first bidders serialize label assignment on the auction row.
+        jobs=[]
+        for amount,bidder in enumerate([administrator,restricted],200):
+            jobs.append(subprocess.Popen([str(BIN/'psql'),'-h',folder,'-d','postgres','-X','-qAt','-v','ON_ERROR_STOP=1','-c',
+                f"insert into public.bids(auction_id,bidder_id,bidder_username,amount) values('{aid}','{bidder}','Fixture',{amount});"],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True))
+        for job in jobs:
+            out,err=job.communicate(timeout=10)
+            assert job.returncode==0,err
+        assert sql(f"select string_agg(ordinal::text,',' order by ordinal) from khub_bot.auction_bidder_labels where auction_id='{aid}';")=='1,2,3'
+        assert sql("select prosrc from pg_proc where oid='public.khub_record_site_activity(uuid)'::regprocedure;").lower().find('delete')==-1
+        assert 'refresh_public_discovery' not in sql("select prosrc from pg_proc where oid='public.read_public_home_auctions()'::regprocedure;")
         assert sql(definitions)==financial_before
         print('Detail migrations applied to PostgreSQL; narrow history/privacy, public state and unchanged financial functions passed.')
     finally:

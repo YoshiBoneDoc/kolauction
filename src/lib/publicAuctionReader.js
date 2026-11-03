@@ -93,7 +93,11 @@ export function createPublicAuctionReader(client, { enabled = false, fetch: fetc
                 method: 'GET', credentials: 'omit', cache: 'no-store', redirect: 'error',
                 headers: { Accept: 'application/json', 'X-Khub-Live-State': '1' }, signal: request.signal,
             });
-            if (!response.ok) throw Object.assign(new Error('Public listings are temporarily busy. Please retry shortly.'), { status: response.status });
+            if (!response.ok) {
+                const retry = response.headers?.get('Retry-After');
+                const retryAfterMs = retry == null ? 0 : /^\d+(?:\.\d+)?$/.test(retry) ? Number(retry) * 1000 : Math.max(0, Date.parse(retry) - Date.now()) || 0;
+                throw Object.assign(new Error('Public listings are temporarily busy. Please retry shortly.'), { status: response.status, retryAfterMs });
+            }
             const data = await response.json();
             if (data?.shared_cache_version !== 1 || data?.privacy_version !== 1 || !Array.isArray(data.rows)
                 || data.rows.length > (request.view === 'home' ? 120 : 24)) {

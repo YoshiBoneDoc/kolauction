@@ -35,8 +35,19 @@ export default function SiteActivity({ children }) {
             if (document.visibilityState !== 'visible' || pending) return;
             pending = true;
             try {
-                const heartbeat = await supabase.rpc('khub_record_site_activity', { p_visitor_id: id });
-                if (heartbeat.error) throw heartbeat.error;
+                const heartbeat = async () => {
+                    const key = 'khub-activity-last-heartbeat';
+                    let last = 0;
+                    const identity = signedInUserId || 'guest';
+                    try { if (localStorage.getItem(key + '-identity') === identity) last = Number(localStorage.getItem(key)) || 0; } catch { /* Storage unavailable. */ }
+                    if (Date.now() - last < 60000) return;
+                    const result = await supabase.rpc('khub_record_site_activity', { p_visitor_id: id });
+                    if (result.error) throw result.error;
+                    try { localStorage.setItem(key, String(Date.now())); localStorage.setItem(key + '-identity', identity); } catch { /* Storage unavailable. */ }
+                };
+                // Web Locks serialize the timestamp check across tabs, including slow RPCs.
+                if (navigator.locks) await navigator.locks.request('khub-site-activity', heartbeat);
+                else await heartbeat();
                 if (administrator) {
                     const { data, error } = await supabase.rpc('khub_site_activity_counts');
                     if (error) throw error;
@@ -49,7 +60,7 @@ export default function SiteActivity({ children }) {
             }
         }
         refresh();
-        const timer = setInterval(refresh, 30_000);
+        const timer = setInterval(refresh, 60_000);
         document.addEventListener('visibilitychange', refresh);
         return () => {
             cancelled = true;
@@ -73,7 +84,7 @@ export default function SiteActivity({ children }) {
                     </ul> : <p className="mt-1 text-xs">User list unavailable until the database update is applied.</p>}
                 </details>)}
             </div> : <p role="status">Activity unavailable</p>}
-            <p className="mt-2 text-xs opacity-70">Active in the last 2 minutes. Excludes you. Updates every 30 seconds.</p>
+            <p className="mt-2 text-xs opacity-70">Active in the last 2 minutes. Excludes you. Updates every 60 seconds.</p>
         </aside>}
         <div className="min-w-0 flex-1">{children}</div>
     </div>;

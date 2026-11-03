@@ -7,7 +7,7 @@ const settle = async () => { for(let i=0;i<8;i++) await Promise.resolve(); };
 
 test('Home and All Auctions reuse one complete dataset without refetching for navigation or local controls', async () => {
     let calls=0, now=100;
-    const cache=createAuctionReadCache(async key => { calls++; assert.equal(key,'dataset'); return {auctions:[{id:'a'}]}; },{now:()=>now});
+    const cache=createAuctionReadCache(async key => { calls++; assert.equal(key,'dataset'); return {auctions:[{id:'a'}]}; },{now:()=>now, random:()=>0});
     await cache.load('dataset');
     const snapshot=cache.snapshot('dataset');
     for(let i=0;i<30;i++) await cache.load('dataset');
@@ -32,7 +32,7 @@ test('coalesces identical requests and serializes dataset, detail and pending re
 test('timeout retains the previous complete data, distinguishes failed initial load, and backs off retries', async () => {
     let fail=false,calls=0,now=100;
     const data={auctions:[{id:'known'}]};
-    const cache=createAuctionReadCache(async()=>{calls++;if(fail)throw new Error('timeout');return data;},{now:()=>now});
+    const cache=createAuctionReadCache(async()=>{calls++;if(fail)throw new Error('timeout');return data;},{now:()=>now, random:()=>0});
     await cache.load('dataset');fail=true;now+=30000;await cache.load('dataset');
     assert.deepEqual(cache.snapshot('dataset').data,{auctions:[{id:'known',liveUnavailable:true}]});assert.equal(cache.snapshot('dataset').error,'timeout');
     assert.equal(cache.snapshot('dataset').refreshing,false);
@@ -53,7 +53,7 @@ test('write invalidation discards a pre-write response and queues a new read',as
 
 test('repeated database failures increase cooldown to one minute and successful forced reads reset it',async()=>{
     let now=100,calls=0,fail=true;
-    const cache=createAuctionReadCache(async()=>{calls++;if(fail)throw new Error('timeout');return {auctions:[]};},{now:()=>now});
+    const cache=createAuctionReadCache(async()=>{calls++;if(fail)throw new Error('timeout');return {auctions:[]};},{now:()=>now, random:()=>0});
     for(const wait of [5000,10000,20000,40000,60000,60000]) {
         await cache.load('dataset');
         assert.equal(cache.retryAfter('dataset'),wait);
@@ -103,4 +103,17 @@ test('long filter histories stay bounded while visible pending data is retained'
     assert.equal(cache.snapshot('pending:1').data.key,'pending:1');
     assert.equal(cache.snapshot('filter:79').data.key,'filter:79');
     assert.equal(cache.snapshot('filter:0').data,null);
+});
+
+test('server retry guidance is a lower bound on jittered failure backoff', async () => {
+    let calls = 0, now = 0;
+    const cache = createAuctionReadCache(async () => {
+        calls++;
+        throw Object.assign(new Error('busy'), { retryAfterMs: 90000 });
+    }, { now: () => now, random: () => 1 });
+    await cache.load('detail');
+    assert.equal(cache.retryAfter('detail'), 90000);
+    now = 89999;
+    await cache.load('detail');
+    assert.equal(calls, 1);
 });
