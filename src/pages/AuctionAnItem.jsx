@@ -44,6 +44,7 @@ export default function AuctionAnItem() {
         .map(item => ({ ...item, searchName: item.name.toLocaleLowerCase() })), [catalogItems]);
     const [itemSearch, setItemSearch] = useState('');
     const [selectedItem, setSelectedItem] = useState('');
+    const selectedCatalogItem = catalogItems.find(item => String(item.id) === selectedItem);
     const [quantity, setQuantity] = useState('1');
     const [showBuyout, setShowBuyout] = useState(false);
     const buyoutInput = useRef(null);
@@ -391,13 +392,16 @@ export default function AuctionAnItem() {
                     </div>
                     {(hasItemSearch || selectedItem) && <>
                     <label htmlFor="item" className="mb-2 block text-sm font-bold">Select an Item:</label>
-                    <select id="item" required={!isBundle} value={selectedItem} onChange={(event) => setSelectedItem(event.target.value)} aria-describedby={hasItemSearch ? 'listing-search-help' : undefined} className={fieldClass}>
+                    <div className="mb-4 flex min-w-0 items-center gap-2">
+                    <select id="item" required={!isBundle} value={selectedItem} onChange={(event) => setSelectedItem(event.target.value)} aria-describedby={hasItemSearch ? 'listing-search-help' : undefined} className="block w-full min-w-0 flex-1 border border-gray-400 text-gray-900">
                         <option value="" disabled>Select an item</option>
                         {selectedItem && !searchResults.some(item => String(item.id) === selectedItem)
                             && catalogItems.some(item => String(item.id) === selectedItem && isAuctionableItem(item))
                             && <option value={selectedItem}>{catalogItems.find(item => String(item.id) === selectedItem).name}</option>}
                         {searchResults.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
                     </select>
+                    {selectedCatalogItem?.image && <img key={selectedCatalogItem.id} src={itemImageUrl(selectedCatalogItem.image)} alt={selectedCatalogItem.name} width="36" height="36" className="h-9 w-9 shrink-0 rounded-md bg-white object-contain p-0.5 [image-rendering:pixelated]" />}
+                    </div>
                     </>}
                     {hasItemSearch && <p id="listing-search-help" className="-mt-3 mb-3 text-xs text-gray-600">{itemSearch !== deferredSearch ? 'Searching items…' : matchingItems.length > resultLimit ? `Showing the first ${resultLimit} of ${matchingItems.length.toLocaleString('en-US')} matches. Keep typing to narrow the list.` : `${matchingItems.length} matching items.`}</p>}
                     {hasItemSearch && itemSearch === deferredSearch && searchResults.length === 0 && <p role="status" className="mb-4 text-sm text-gray-600">No items match your search.{selectedItem ? ' Your previous selection is still selected.' : ''}</p>}

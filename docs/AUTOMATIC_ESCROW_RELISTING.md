@@ -16,7 +16,8 @@ Creation time remains unchanged; private relist events retain every attempt's ti
 and prices. The creation preview displays the selected retry policy.
 
 Relisting runs inside the existing completed-inbox-scan settlement boundary and
-financial advisory lock. It requires funded items, no bids, no buyout, no timing
+financial advisory lock. Migration 194 reduces the settlement grace to 30 seconds;
+a complete scan must still start after that boundary. It requires funded items, no bids, no buyout, no timing
 review, no seller restriction and no existing asset-dispatch obligations. Cancellation
 uses normal settlement immediately; accepting any bid prevents further attempts.
 After all attempts are exhausted, the existing unsold item-return flow takes over.
@@ -38,8 +39,10 @@ relist escrow checks; winning sales and cancellations skip the helper entirely.
 3. Apply `supabase/migrations/queue/202611030193_automatic_escrow_relisting.sql`
    after the full existing prerequisites through 192. The standalone copy under
    `bot/supabase/migrations/` is the same script, not a second migration to apply.
-4. After success, the owner moves the website script to the migrations parent directory.
-5. Resume one worker and deploy the website. No bot image rebuild is required:
+4. Apply `202611030194_thirty_second_settlement_grace.sql` after 193 to enable
+   the 30-second grace period. It requires no bot rebuild.
+5. After success, the owner moves the website script to the migrations parent directory.
+6. Resume one worker and deploy the website. No bot image rebuild is required:
    its existing inbox completion/settlement RPCs execute the updated database logic.
 
 Do not deploy the opted-in creation form before SQL is applied; opted-in creation

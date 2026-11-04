@@ -54,7 +54,8 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
         for migration in migrations:
             if '193_automatic' in migration.name: before_reads=sql(read_probe)
             sql(migration.read_text())
-        assert sql(read_probe)==before_reads, 'Relisting changed browsing, polling or finalization entry points'
+            if '193_automatic' in migration.name:
+                assert sql(read_probe)==before_reads, 'Relisting changed browsing, polling or finalization entry points'
         # Capture webhook payloads locally, without network or credentials.
         sql("""create schema net;
             create table net.test_requests(body jsonb);
@@ -234,6 +235,25 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
         sql(f"set role service_role;select public.bot_stage_inbox_scan('"+json.loads(sql('set role service_role;select public.bot_begin_inbox_scan();'))['id']+f"',{lit(json.dumps([out_of_order]))});")
         sql('set role service_role;select public.bot_ingest_mail('+lit(json.dumps(out_of_order))+');')
         assert state(boundary)['status']=='on_hold' and state(boundary)['escrow_timing_review']
-        print('Automatic relisting database checks passed')
+        # 194: a scan started at +29s cannot settle; one started at +30s can.
+        # Both paths use the real complete-scan entry point, not wall-clock expiry.
+        for enrolled in [False, True]:
+            grace=create(1,0);fund(grace)
+            if not enrolled: sql(f"delete from khub_bot.auction_relist_plans where auction_id='{grace}';")
+            sql(f"update public.auctions set created_at=now()-interval '1 day',end_time=now()-interval '45 seconds' where id='{grace}';")
+            for delay in [29,30]:
+                scan=sql(f"insert into khub_bot.inbox_scans(started_at,staged_at) select end_time+make_interval(secs=>{delay}),now() from public.auctions where id='{grace}' returning id;")
+                sql(f"set role service_role;select public.bot_finish_inbox_scan('{scan}');")
+                if delay==29:
+                    assert state(grace)['status']=='active'
+                    assert sql(f"select count(*) from khub_bot.deliveries where auction_id='{grace}' and kind='return_item';")=='0'
+                elif enrolled:
+                    assert state(grace)['status']=='active'
+                    assert sql(f"select completed from khub_bot.auction_relist_plans where auction_id='{grace}';")=='1'
+                else: assert state(grace)['settlement_outcome']=='ended_no_bids'
+            live=json.loads(sql(f"set role anon;select public.read_public_auction_live_batch(array['{grace}'::uuid]);"))['rows'][0]
+            assert sql(f"select ({lit(live['finalization_not_before'])}::timestamptz-{lit(live['end_time'])}::timestamptz)=interval '30 seconds';")=='t'
+        assert "interval '60 seconds'" in sql("select pg_get_functiondef('khub_bot.expire_buy_reservations()'::regprocedure);")
+        print('Automatic relisting and 30-second settlement grace checks passed')
     finally:
         if started: pg('-m','immediate','-w','stop')
