@@ -41,3 +41,11 @@ test('a stalled pending-trade read releases the serialized queue for detail load
     assert.equal(cache.snapshot('detail').error, '');
     assert.deepEqual(cache.snapshot('detail').data.auctions, []);
 });
+
+test('database cancellations show a recoverable read message and preserve the diagnostic code', async () => {
+    const { createAuctionService } = await import('../src/lib/auctions.js');
+    let calls = 0;
+    const service = createAuctionService({ rpc() { calls++; return Promise.resolve({ error: { code: '57014', message: 'canceling statement due to statement timeout' } }); } });
+    await assert.rejects(service.load({ view: 'home' }), error => error.code === '57014' && /retry shortly/i.test(error.message));
+    assert.equal(calls, 1, 'read failures must not create per-visitor retry storms');
+});

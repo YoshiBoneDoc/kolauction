@@ -117,6 +117,7 @@ export function mapAuction(row, bidRows) {
 
 function databaseError(error) {
     let failure;
+    if (error.code === '57014') failure = new Error('Auction data took too long to load. Please retry shortly.');
     if (['PGRST205', 'PGRST202', '42P01', '42883', '42501'].includes(error.code)) {
         failure = new Error('Auction storage is not ready. Apply any pending auction SQL migrations (including the auction page-read migration) in Supabase, then retry.');
     }
@@ -196,6 +197,14 @@ export function createAuctionService(client, { publicReader = null, readDeadline
             return { auctions: data.rows.map((row) => mapAuction(row, [])), total: Number(data.total) };
         },
         async create(auction) {
+            if (auction.autoRelist) {
+                const { data, error } = await requireClient().rpc('create_relisting_auction', {
+                    p_listing: auction, p_relist_count: auction.relistCount,
+                    p_reduction_percent: auction.relistReduction,
+                });
+                if (error) throw databaseError(error);
+                return data;
+            }
             if (auction.bundleItems?.length) {
                 const title = normalizeBundleTitle(auction.bundleTitle ?? '');
                 const { data, error } = await requireClient().rpc('create_bundle_auction', {

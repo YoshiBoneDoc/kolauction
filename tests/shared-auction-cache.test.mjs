@@ -845,3 +845,28 @@ test('bid invalidation writes only freshness metadata and live payloads are reco
     assert.deepEqual(f.storage.get('public-snapshots-v1'),payload);
     assert.equal(f.storage.get('public-freshness-v1').revision,'9');
 });
+
+test('a relist overlays its reduced minimum and new custom deadline with one shared live refresh', async () => {
+    const f = await liveFixture();
+    let relisted = false;
+    const origin = f.cache.readOrigin;
+    f.cache.readOrigin = async request => {
+        const data = await origin(request);
+        if (request.view === 'batch-live') data.rows = data.rows.map(row => ({ ...row,
+            min_bid_meat: relisted ? 95 : 100,
+            custom_end_at: relisted ? '2027-01-02T00:00:00Z' : '2027-01-01T00:00:00Z',
+        }));
+        return data;
+    };
+    await f.get();
+    relisted = true;
+    await f.cache.fetch(scopedNotification('1'));
+    const responses = await Promise.all(Array.from({ length: 100 }, () => f.get()));
+    for (const response of responses) {
+        const row = (await response.json()).rows[0];
+        assert.equal(row.min_bid_meat, 95);
+        assert.equal(row.custom_end_at, '2027-01-02T00:00:00Z');
+    }
+    assert.equal(f.calls.filter(q => q.view === 'browse').length, 1);
+    assert.equal(f.calls.filter(q => q.view === 'batch-live').length, 2);
+});
