@@ -1,3 +1,4 @@
+import { bookmarkCountOverlay } from '../lib/bookmarkCountOverlay';
 import AuctionItemImage from './AuctionItemImage';
 import { auctionQuantityLabel } from '../lib/bundles';
 import { formatCompactMeat } from '../lib/formatMeat';
@@ -23,6 +24,7 @@ export default function SavedAuctions({ auctionId }) {
 SavedAuctions.propTypes = { auctionId: PropTypes.string };
 
 function SavedAuctionPanel({ auctionId }) {
+    const { currentUser } = useContext(UserContext);
     const sequence = useRef(0);
     const [defaultMinutes, setDefaultMinutes] = useState(null);
     const [rows, setRows] = useState(null);
@@ -51,8 +53,11 @@ function SavedAuctionPanel({ auctionId }) {
     }, [auctionId, reload]);
     async function update(id, saved, minutes = null) {
         setBusy(true); setError('');
+        const wasSaved = Boolean(rows?.some(row => row.id === id));
+        const startedAt = Date.now();
         try {
             await service.set(id, saved, minutes);
+            bookmarkCountOverlay.changed(currentUser.id, id, wasSaved, saved, startedAt, Date.now());
             // Update locally even when a follow-up read is temporarily unavailable.
             setRows(previous => saved ? [...(previous || []).filter(row => row.id !== id),
                 { ...(previous || []).find(row => row.id === id), id, reminder_minutes: minutes ?? defaultMinutes ?? 0 }] : (previous || []).filter(row => row.id !== id));

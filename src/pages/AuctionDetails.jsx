@@ -1,3 +1,4 @@
+import AuctionWatching from '../components/AuctionWatching';
 import SavedAuctions from '../components/SavedAuctions';
 import RemainingTime from '../components/RemainingTime';
 import BidHistory from '../components/BidHistory';
@@ -73,6 +74,7 @@ export default function AuctionDetails() {
             {auction.giveawayTitle && <div className="giveaway-page-art" aria-hidden="true"><GiveawayDecorations source={auction.image} /></div>}
             {backLink}
             <div className={`relative mx-auto max-w-4xl rounded-lg border border-gray-200 bg-white p-4 shadow-lg sm:p-6 ${auction.giveawayTitle ? 'giveaway-detail-card' : ''}`}>
+                <AuctionWatching auctionId={auction.id} />
                 <SavedAuctions auctionId={auction.id} />
                 <section aria-label="Auction overview" className="grid min-w-0 pr-8 grid-cols-1 items-start gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:gap-6">
                     <div className="flex min-w-0 items-center justify-center sm:pt-2">

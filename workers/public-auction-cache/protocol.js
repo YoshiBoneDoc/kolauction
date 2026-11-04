@@ -29,6 +29,12 @@ export function publicRequest(url) {
         if (query.size) throw new Error('Banner does not accept filters.');
         return { view: 'banner' };
     }
+    if (parsed.pathname === '/public-bookmark-counts') {
+        const ids = (query.get('ids') || '').split(',');
+        if (query.size !== 1 || query.getAll('ids').length !== 1 || ids.length > 24
+            || ids.some(id => !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(id))) throw new Error('Invalid count batch.');
+        return { view: 'bookmarks', ids: [...new Set(ids.map(id => id.toLowerCase()))].sort() };
+    }
     for (const key of query.keys()) {
         if (!params.has(key) || query.getAll(key).length !== 1) throw new Error('Unsupported public parameter.');
     }
@@ -68,6 +74,12 @@ export function publicRequest(url) {
 }
 
 export function publicProjection(data, request) {
+    if (request.view === 'bookmarks') {
+        if (!Array.isArray(data) || data.length > request.ids.length
+            || new Set(data.map(row => row.auction_id)).size !== data.length
+            || data.some(row => !request.ids.includes(row.auction_id) || !Number.isSafeInteger(Number(row.bookmark_count)) || Number(row.bookmark_count) < 0)) throw new Error('Invalid counts.');
+        return { counts: data.map(row => ({ auction_id: row.auction_id, bookmark_count: Number(row.bookmark_count) })), server_time: new Date().toISOString() };
+    }
     if (request.view === 'featured') {
         data = { privacy_version: 1, server_time: new Date().toISOString(), rows: data ? [data] : [], bids: [], total: data ? 1 : 0 };
     }
@@ -107,6 +119,7 @@ export function publicProjection(data, request) {
 }
 
 export function originRequest(request) {
+    if (request.view === 'bookmarks') return { rpc: 'read_auction_bookmark_counts', args: { p_ids: request.ids } };
     if (request.view === 'batch-live') return { rpc: 'read_public_auction_live_batch', args: { p_ids: request.ids } };
     if (request.view === 'featured') return { rpc: 'read_featured_giveaway', args: {} };
     if (request.view.startsWith('detail-')) return { rpc: 'read_public_auction_detail_state', args: { p_id: request.id } };

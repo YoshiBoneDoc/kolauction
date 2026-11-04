@@ -6,6 +6,9 @@ import { AuctionsContext } from '../context/AuctionsContext';
 import { UserContext } from '../context/UserContext';
 import { auctionFilters, resolveBrowseSort } from '../lib/auctionBrowsing';
 import { useAuctionBoundaryNow as useNow } from '../hooks/useAuctionBoundaryNow';
+import useMySavedAuctionIds from '../hooks/useMySavedAuctionIds';
+import useAuctionBookmarkCounts from '../hooks/useAuctionBookmarkCounts';
+import './AuctionBookmarkRibbon.css';
 import CompactAuctionCard from '../components/CompactAuctionCard';
 import GiveawayCard from '../components/GiveawayCard';
 import useFeaturedGiveaway from '../hooks/useFeaturedGiveaway';
@@ -51,6 +54,8 @@ export default function AllAuctions() {
     const found = total;
     const page = Math.min(requestedPage, Math.max(1, Math.ceil(found / 24)));
     const pageRows = auctions;
+    const bookmarkCounts = useAuctionBookmarkCounts(pageRows);
+    const mySavedAuctionIds = useMySavedAuctionIds();
     useEffect(() => {
         if (hasLoaded && requestedPage !== page) setParams(previous => {
             const next = new URLSearchParams(previous);
@@ -161,9 +166,18 @@ export default function AllAuctions() {
                     {!error && pageRows.length === 0 && <p className="rounded-lg border bg-white p-6">{trade === 'none' ? 'Select Escrow or Direct to show auctions.' : mineOnly ? 'No auctions of yours match these filters.' : 'No auctions match your search and filters. Try another item name or status.'}</p>}
                     <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         {featuredGiveaway && featuredGiveaway.endTime > now && <GiveawayCard compact auction={featuredGiveaway} now={now} />}
-                        {pageRows.filter(auction => !(featuredGiveaway?.endTime > now && auction.id === featuredGiveaway.id)).map((auction) => <CompactAuctionCard key={auction.id} auction={auction} now={now}
+                        {pageRows.filter(auction => !(featuredGiveaway?.endTime > now && auction.id === featuredGiveaway.id)).map((auction) => <div key={auction.id} className={`auction-bookmark-card relative min-w-0 ${bookmarkCounts[auction.id] > 0 && !auction.liveUnavailable ? 'has-bookmark-ribbon' : ''}`}>
+                            {bookmarkCounts[auction.id] > 0 && !auction.liveUnavailable && <span className={`auction-bookmark-ribbon${mySavedAuctionIds.has(auction.id) ? ' is-saved' : ''}`}
+                                role="img" aria-label={`${bookmarkCounts[auction.id]} players have bookmarked this auction${mySavedAuctionIds.has(auction.id) ? '; saved by you' : ''}`}
+                                title={`${bookmarkCounts[auction.id]} ${bookmarkCounts[auction.id] === 1 ? 'player has' : 'players have'} bookmarked this auction${mySavedAuctionIds.has(auction.id) ? ' · Saved by you' : ''}`}>
+                                {!mySavedAuctionIds.has(auction.id) && <svg aria-hidden="true" className="auction-bookmark-outline" viewBox="0 0 24 32" preserveAspectRatio="none">
+                                    <path d="M.5.5h23v30.65L12 25.36.5 31.15Z" />
+                                </svg>}
+                                {bookmarkCounts[auction.id] > 999 ? '999+' : bookmarkCounts[auction.id]}
+                            </span>}
+                            <CompactAuctionCard auction={auction} now={now}
                             expanded={openBid?.id === auction.id && openBid?.browseKey === browseKey}
-                            onToggleBid={() => setOpenBid(previous => previous?.id === auction.id && previous?.browseKey === browseKey ? null : { id: auction.id, browseKey })} />)}
+                            onToggleBid={() => setOpenBid(previous => previous?.id === auction.id && previous?.browseKey === browseKey ? null : { id: auction.id, browseKey })} /></div>)}
                     </div>
                     {(found > 24 || page > 1) && <nav aria-label="Auction pages" className="mt-6 flex items-center justify-center gap-4">
                         <button disabled={page <= 1} onClick={() => update('page', String(page - 1))} className="min-h-11 rounded border bg-white px-4 py-2 disabled:opacity-50">Previous</button>

@@ -1,3 +1,4 @@
+import { createBookmarkCountPreview } from './scripts/bookmarkCountPreview.mjs';
 import { defineConfig, loadEnv } from 'vite'
 import { cwd } from 'node:process'
 import react from '@vitejs/plugin-react'
@@ -11,6 +12,14 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), assetSecurityPlugin(), {
       name: 'giveaway-image-preview',
       configureServer(server) {
+        const bookmarkCounts = createBookmarkCountPreview(loadEnv(mode, cwd(), 'VITE_'));
+        server.middlewares.use('/api/public-bookmark-counts', async (req, res) => {
+          try {
+            const response = await bookmarkCounts(new Request(new URL(req.url, 'http://localhost'), { method: req.method }));
+            res.writeHead(response.status, Object.fromEntries(response.headers));
+            res.end(new Uint8Array(await response.arrayBuffer()));
+          } catch { res.writeHead(503, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Bookmark counts unavailable.' })); }
+        });
         server.middlewares.use('/api/giveaway-image', async (req, res, next) => {
           if (req.method !== 'GET') return next();
           try {

@@ -1094,10 +1094,13 @@ html[data-theme="dark"] .profile-dashboard .profile-history-tab:is(:hover, :focu
   line-height: 18px;
 }
 
-/* Deep red ribbon with a pale interior on hover or when bookmarked. */
+/* Saved ribbons return to deep red on hover or keyboard focus. */
 .auction-bookmark-tab { --auction-bookmark-fill: #B51D3B; }
 .auction-bookmark-tab:is(:hover, :focus-visible, [aria-pressed="true"]) {
   --auction-bookmark-fill: #F7CBD3;
+}
+.auction-bookmark-tab[aria-pressed="true"]:is(:hover, :focus-visible) {
+  --auction-bookmark-fill: #B51D3B;
 }
 .auction-bookmark-tab svg { transition: fill 150ms ease; }
 

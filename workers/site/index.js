@@ -1,3 +1,4 @@
+import { onRequest as bookmarkCounts } from '../../functions/api/public-bookmark-counts.js';
 import { itemCatalog } from './itemCatalog.js';
 import { runMaintenance } from './maintenance.js';
 import { onRequest as publicAuctions } from '../../functions/api/public-auctions.js';
@@ -8,6 +9,7 @@ import { onRequest as invalidateAuctions } from '../../functions/api/public-auct
 // Reuse the existing handlers: the same privacy, signing and method checks apply
 // to Workers Static Assets and to any retained Pages deployment.
 const routes = new Map([
+    ['/api/public-bookmark-counts', bookmarkCounts],
     ['/api/public-auctions', publicAuctions],
     ['/api/public-banner', publicBanner],
     ['/api/giveaway-image', giveawayImage],

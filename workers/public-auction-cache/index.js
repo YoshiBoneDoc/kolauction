@@ -6,6 +6,8 @@ import { cacheFailure, cacheErrorBody, originFailureCode, safeCacheCode } from '
 
 const FRESH_MS = 30000;
 const MAX_AGE_MS = 300000;
+// Display-only counts refresh on demand, at most once per batch per 5 minutes.
+const BOOKMARK_TTL_MS = 5 * 60 * 1000;
 const MAX_ENTRIES = 48;
 // SQLite-backed Durable Object KV values have a 2 MB key+value limit.
 // Keep the full persisted cache below 1 MB, including non-ASCII item names.
@@ -44,7 +46,7 @@ export class PublicAuctionCache {
             this.failures = new Map((metadata?.failures || []).filter(([, failure]) => failure.until > Date.now()));
             const now = Date.now();
             for (const [key, entry] of saved?.entries || []) {
-                if (now - entry.storedAt <= MAX_AGE_MS) this.entries.set(key, entry);
+                if (now - entry.storedAt <= (entry.data?.counts ? BOOKMARK_TTL_MS : MAX_AGE_MS)) this.entries.set(key, entry);
             }
             this.cooldownUntil = Math.min(metadata?.cooldownUntil || 0, now + 30000);
             this.lastFailureCode = safeCacheCode(metadata?.failureCode);
@@ -132,6 +134,7 @@ export class PublicAuctionCache {
         let result;
         try { result = publicProjection(JSON.parse(text), request); }
         catch { throw unavailable('CACHE_INVALID_RESPONSE'); }
+        if (request.view === 'bookmarks') result.read_started_at = new Date(startedAt).toISOString();
         result.server_time = new Date(Date.parse(result.server_time) + (Date.now() - startedAt) / 2).toISOString();
         return result;
     }
@@ -328,14 +331,14 @@ export class PublicAuctionCache {
         const key = JSON.stringify(query);
         let entry = this.entries.get(key);
         const age = entry ? Date.now() - entry.storedAt : Infinity;
-        const detail = query.view.startsWith('detail-') || query.view === 'featured';
-        const ttl = query.view === 'detail-live' ? 2000 : query.view === 'featured' ? 30000 : 300000;
-        const dirty = entry && this.changed(query, entry.revision || '0');
+        const detail = query.view.startsWith('detail-') || ['featured', 'bookmarks'].includes(query.view);
+        const ttl = query.view === 'bookmarks' ? BOOKMARK_TTL_MS : query.view === 'detail-live' ? 2000 : query.view === 'featured' ? 30000 : 300000;
+        const dirty = query.view !== 'bookmarks' && entry && this.changed(query, entry.revision || '0');
         let state = 'HIT';
         const expiredFeature = query.view === 'featured' && entry?.data.rows.some(row => Date.parse(row.bid_deadline || row.end_time) <= Date.parse(entry.data.server_time) + age);
         // Versioned rollout: deploy SQL and the unavailable-state frontend
         // before enabling this flag. Legacy behavior remains available otherwise.
-        if (this.env.LIVE_AUCTION_STATE === 'true' && request.headers.get('X-Khub-Live-State') === '1' && query.view !== 'banner') {
+        if (this.env.LIVE_AUCTION_STATE === 'true' && request.headers.get('X-Khub-Live-State') === '1' && !['banner', 'bookmarks'].includes(query.view)) {
             return this.readWithLiveState(key, query, entry, age, dirty);
         }
         if (expiredFeature || (!detail && dirty) || age > (detail ? ttl : query.view === 'banner' ? FRESH_MS : MAX_AGE_MS)) {
