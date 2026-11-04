@@ -29,7 +29,7 @@ export default function Home() {
         <div className="site-page-background flex flex-1 w-full flex-col bg-[#F9F9F9] px-4 sm:px-6">
             <header className="mx-auto w-full max-w-6xl text-center">
                 <div className="mt-4 grid grid-cols-1 items-baseline gap-y-1 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-                    <h1 className="text-4xl font-extrabold text-[#7695FF] sm:text-6xl lg:col-start-2">KoL Auction Hub</h1>
+                    <h1 className="home-title text-[#7695FF] lg:col-start-2">KoL Auction Hub</h1>
                     <Link to="/update-log" className="justify-self-center whitespace-nowrap text-sm font-normal text-blue-700 hover:underline lg:col-start-3 lg:ml-2 lg:justify-self-start">What’s New <span aria-hidden="true">↗</span></Link>
                 </div>
                 <SiteTradeTotals totals={siteTotals} />

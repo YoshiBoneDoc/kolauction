@@ -4,7 +4,7 @@ import { formatSiteMeat, parseSiteTradeTotals } from '../lib/siteTradeTotals';
 export default function SiteTradeTotals({ totals }) {
     const values = parseSiteTradeTotals(totals);
     if (!values) return null;
-    return <div className="mx-auto mt-[22px] mb-[1.5px] w-full max-w-6xl text-center" aria-label="kHub Milestones">
+    return <div className="mx-auto mt-[10px] mb-[1.5px] w-full max-w-6xl text-center" aria-label="kHub Milestones">
         <div className="flex items-center gap-3 sm:gap-4">
             <span aria-hidden="true" className="h-px flex-1 bg-gray-300 dark:bg-slate-600" />
             <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm font-medium text-slate-700 dark:text-slate-200 sm:gap-x-4">

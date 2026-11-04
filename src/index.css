@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+.home-title {
+  font-family: 'Itim', cursive;
+  font-size: clamp(36px, calc(16px + 6.25vw), 80px);
+  font-weight: 400;
+}
+
 .approval-gallery {
   --approval-gallery-padding-y: clamp(8px, 1.5svh, 16px);
   min-height: 100vh;

@@ -69,8 +69,8 @@ export default function SiteActivity({ children }) {
         };
     }, [administrator, signedInUserId]);
 
-    return <div className={administrator ? 'grid flex-1 items-start lg:grid-cols-[10rem_minmax(0,1fr)]' : 'flex flex-1 flex-col'}>
-        {administrator && <aside aria-label="Site activity" className="m-4 rounded border border-gray-300 p-3 text-sm lg:sticky lg:top-4 lg:mr-0">
+    return <div className="relative flex flex-1 flex-col">
+        {administrator && <aside aria-label="Site activity" className="m-4 rounded border border-gray-300 p-3 text-sm lg:absolute lg:left-0 lg:top-0 lg:z-10 lg:w-36">
             <h2 className="mb-2 font-bold">Site activity</h2>
             {activity ? <div className="space-y-2">
                 <p>Viewing now<span className="block text-lg font-bold">{Math.max(0, activity.viewers - ownPresence)}</span></p>
@@ -79,7 +79,7 @@ export default function SiteActivity({ children }) {
                     <li>Other users: {activity.guests ?? 0}</li>
                 </ul> : <p className="mt-1 text-xs">User list unavailable until the database update is applied.</p>}
             </div> : <p role="status">Activity unavailable</p>}
-            <p className="mt-2 text-xs opacity-70">Active in the last 2 minutes. Excludes you. Updates every 60 seconds.</p>
+            <p className="mt-2 text-xs opacity-70">Active last 2 minutes.<br />Updated every 60 sec</p>
         </aside>}
         <div className="min-w-0 flex-1">{children}</div>
     </div>;
