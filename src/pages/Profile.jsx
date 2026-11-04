@@ -138,7 +138,7 @@ const Profile = () => {
                             const historyRow = title === 'Listing history';
                             const shadedRow = historyRow || title === 'Active listings';
                             const cancelled = ['cancelled', 'voided'].includes(result.status);
-                            const historyClass = shadedRow ? ` profile-history-entry ${cancelled ? 'is-cancelled' : result.status === 'ended_no_bids' ? 'is-unsold' : isBuy ? 'is-buy' : 'is-sell'}` : '';
+                            const historyClass = ` profile-history-entry ${cancelled ? 'is-cancelled' : result.status === 'completed' ? 'is-completed' : ['expired', 'ended_no_bids'].includes(result.status) ? 'is-unsold' : isBuy ? 'is-buy' : 'is-sell'}`;
                             const historyStatus = historyRow ? result.status === 'completed' ? ' is-completed'
                                 : cancelled ? ' is-cancelled' : ['expired', 'ended_no_bids'].includes(result.status) ? ' is-expired' : '' : '';
                             const personallyFulfilled = auction.mySaleQuantity;
@@ -178,7 +178,7 @@ const Profile = () => {
                                             {isBuy && title === 'Buy order fulfillments' && <span>{formatNumber(auction.pricePerItem)} Meat/item · Earned: <strong>{formatCompactMeat(auction.mySaleMeat)} Meat</strong></span>}
                                             {isBuy && title !== 'Buy order fulfillments' && <span>{formatNumber(auction.pricePerItem)} Meat / item · {formatNumber(auction.purchasedQuantity)} / {formatNumber(auction.quantity)} purchased</span>}
                                             {!isBuy && result.status === 'active' && <span>Current bid: <strong>{auction.currentBid > 0 ? `${formatCompactMeat(auction.currentBid)} Meat` : 'No bids yet'}</strong></span>}
-                                            {result.hasWinner && <span>{result.winnerId === currentUser.id && ['awaiting_trade', 'completed'].includes(result.status) ? null : <>Winner: <WinnerLink auction={auction} /> · </>}Final: <strong>{formatCompactMeat(result.finalPrice)}</strong></span>}
+                                            {result.hasWinner && <span className="profile-entry-winner">{result.winnerId === currentUser.id && ['awaiting_trade', 'completed'].includes(result.status) ? null : <>Winner: <WinnerLink auction={auction} /> · </>}Final: <strong>{formatCompactMeat(result.finalPrice)}</strong></span>}
                                             {personalBid && <span>Your bid: <strong>{formatCompactMeat(personalBid.amount)} Meat</strong></span>}
                                             {historyRow && <RelistButton auction={auction} now={now} subtle />}
                                         </div>

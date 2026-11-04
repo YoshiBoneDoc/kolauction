@@ -123,7 +123,7 @@ function SavedAuctionPanel({ auctionId }) {
             const status = row.status ? getAuctionStatus({ status: row.status, endTime: end }, now) : null;
             const buy = row.auction_kind === 'buy';
             const cancelled = ['cancelled', 'voided'].includes(status);
-            const shade = cancelled ? 'is-cancelled' : ['expired', 'ended_no_bids'].includes(status) ? 'is-unsold' : buy ? 'is-buy' : 'is-sell';
+            const shade = cancelled ? 'is-cancelled' : status === 'completed' ? 'is-completed' : ['expired', 'ended_no_bids'].includes(status) ? 'is-unsold' : buy ? 'is-buy' : 'is-sell';
             return <li key={row.id} className={`profile-saved-entry profile-transaction-entry profile-history-entry ${shade}`}>
                 {row.image ? <AuctionItemImage src={row.image} item={row.item} size="tiny" className="profile-entry-image" fallbackText="No image" />
                     : <span className="profile-entry-image profile-entry-image-fallback" role="img" aria-label={`${row.item} image unavailable`}>No image</span>}

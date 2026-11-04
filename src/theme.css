@@ -444,7 +444,8 @@ html[data-theme="dark"] .bundle-preview-back:hover { background-color: var(--the
   --profile-card: #FFFAF7;
   --profile-nested: #FFF7F2;
   --profile-hover: #FFF0E8;
-  --profile-tab-highlight: #FFEEDF;
+  --profile-tab-highlight: #FFE7D6;
+  --profile-tab-hover: #FFD9BF;
   --profile-tab-accent: #D97727;
   --profile-border: #EADBD3;
   --profile-divider: #EEE1DA;
@@ -463,6 +464,7 @@ html[data-theme="dark"] .profile-dashboard {
   --profile-nested: #1e2c40;
   --profile-hover: #293b52;
   --profile-tab-highlight: #352A24;
+  --profile-tab-hover: #463328;
   --profile-tab-accent: #F0A05A;
   --profile-border: #41516a;
   --profile-divider: #34455F;
@@ -887,21 +889,29 @@ html[data-theme="dark"] hr.info-contact-divider {
   background: transparent;
 }
 
-/* Account Profile active listings and listing history; other sections retain their surfaces. */
+/* Account Profile rows use lifecycle colors across listings, bids and saved auctions. */
 .profile-dashboard .profile-history-entry { --profile-label: #647084; --profile-muted: #596579; }
-.profile-dashboard .profile-history-entry.is-buy { background-color: #FFF1EE; }
-.profile-dashboard .profile-history-entry.is-sell { background-color: #F0F7F1; }
-.profile-dashboard .profile-history-entry.is-cancelled { background-color: #F2F3F5; }
-.profile-dashboard .profile-history-entry.is-unsold { background-color: #FFF9E8; }
-.profile-dashboard .profile-history-entry.is-buy:hover { background-color: #F9E8E2; }
-.profile-dashboard .profile-history-entry.is-sell:hover { background-color: #E7F1EA; }
-.profile-dashboard .profile-history-entry.is-cancelled:hover { background-color: #E9EBEF; }
-.profile-dashboard .profile-history-entry.is-unsold:hover { background-color: #FBF2D9; }
+html:not([data-theme="dark"]) .profile-dashboard .profile-history-entry.is-buy { background-color: #F9E5E1; border-color: #EACBC5; }
+html:not([data-theme="dark"]) .profile-dashboard .profile-history-entry.is-sell { background-color: #E4F1E7; border-color: #C9DFCF; }
+html:not([data-theme="dark"]) .profile-dashboard .profile-history-entry.is-completed { background-color: #DBEEE2; border-color: #BBDAC7; }
+html:not([data-theme="dark"]) .profile-dashboard .profile-history-entry.is-cancelled { background-color: #EDEBE9; border-color: #D9D4D0; }
+html:not([data-theme="dark"]) .profile-dashboard .profile-history-entry.is-unsold { background-color: #F8ECD5; border-color: #E8D6B3; }
+/* Keep hover feedback on every status without changing its meaning. */
+html:not([data-theme="dark"]) .profile-dashboard .profile-history-entry.is-buy:hover { background-color: #F3DAD5; }
+html:not([data-theme="dark"]) .profile-dashboard .profile-history-entry.is-sell:hover { background-color: #D9EADF; }
+html:not([data-theme="dark"]) .profile-dashboard .profile-history-entry.is-completed:hover { background-color: #CFE5D8; }
+html:not([data-theme="dark"]) .profile-dashboard .profile-history-entry.is-cancelled:hover { background-color: #E3DFDC; }
+html:not([data-theme="dark"]) .profile-dashboard .profile-history-entry.is-unsold:hover { background-color: #F0E1C3; }
+/* Bid activity uses one neutral peach surface regardless of outcome. */
+html:not([data-theme="dark"]) .profile-dashboard #profile-panel-bids .profile-transaction-entry { background-color: #FFEDE1; border-color: #E8CEB9; }
+html:not([data-theme="dark"]) .profile-dashboard #profile-panel-bids .profile-transaction-entry:hover { background-color: #FFDBC0; }
 .profile-dashboard .profile-history-entry .profile-entry-status.is-completed { color: #16834A; }
 .profile-dashboard .profile-history-entry .profile-entry-status.is-cancelled { color: #B64B43; }
 .profile-dashboard .profile-history-entry .profile-entry-status.is-expired { color: #A66A15; }
 html[data-theme="dark"] .profile-dashboard .profile-history-entry { --profile-label: #B2BFD1; --profile-muted: #B2BFD1; }
 html[data-theme="dark"] .profile-dashboard .profile-history-entry.is-buy { background-color: #342624; }
+html[data-theme="dark"] .profile-dashboard .profile-history-entry.is-completed { background-color: #20362B; }
+html[data-theme="dark"] .profile-dashboard .profile-history-entry.is-completed:hover { background-color: #294736; }
 html[data-theme="dark"] .profile-dashboard .profile-history-entry.is-sell { background-color: #202E28; }
 html[data-theme="dark"] .profile-dashboard .profile-history-entry.is-cancelled { background-color: #282D35; }
 html[data-theme="dark"] .profile-dashboard .profile-history-entry.is-unsold { background-color: #332F22; }
@@ -1025,11 +1035,11 @@ html[data-theme="dark"] .profile-dashboard :is(.profile-auction-tab, .profile-hi
   border: 0;
   background: transparent;
   padding: 0;
-  color: #607a9e;
+  color: #155EEF;
   transition: color 150ms;
 }
 .profile-dashboard .profile-relist-action:hover { color: var(--profile-blue); }
-html[data-theme="dark"] .profile-dashboard .profile-relist-action { color: #9fb4d3; }
+html[data-theme="dark"] .profile-dashboard .profile-relist-action { color: #155EEF; }
 html[data-theme="dark"] .profile-dashboard .profile-relist-action:hover { color: var(--profile-blue); }
 
 .profile-dashboard .profile-saved-entry {
@@ -1130,3 +1140,9 @@ html[data-theme="dark"] .profile-dashboard .profile-saved-apply {
 
 html[data-theme="dark"] .profile-dashboard .profile-saved-apply { color: var(--profile-blue); }
 html[data-theme="dark"] .profile-dashboard .profile-saved-apply:hover:not(:disabled) { color: var(--profile-blue); }
+
+html .profile-dashboard :is(.profile-auction-tab, .profile-history-tab)[aria-selected="true"]:hover {
+  background: var(--profile-tab-hover);
+}
+
+.profile-dashboard .profile-entry-winner a { font-weight: 400; color: #167C80; }
