@@ -6,7 +6,7 @@
     min-width: 24px;
     height: 32px;
     padding: 4px 3px 9px;
-    background: #fff;
+    background: #F7CBD3;
     color: #a60f2c;
     clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 81%, 0 100%);
     text-align: center;
@@ -31,6 +31,6 @@
     pointer-events: none;
     fill: none;
     stroke: #a60f2c;
-    stroke-width: 1;
+    stroke-width: 1.5;
 }
 .auction-bookmark-outline path { vector-effect: non-scaling-stroke; }

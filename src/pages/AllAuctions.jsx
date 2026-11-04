@@ -6,6 +6,7 @@ import { AuctionsContext } from '../context/AuctionsContext';
 import { UserContext } from '../context/UserContext';
 import { auctionFilters, resolveBrowseSort } from '../lib/auctionBrowsing';
 import { useAuctionBoundaryNow as useNow } from '../hooks/useAuctionBoundaryNow';
+import useAdminAuctionBookmarkers from '../hooks/useAdminAuctionBookmarkers';
 import useMySavedAuctionIds from '../hooks/useMySavedAuctionIds';
 import useAuctionBookmarkCounts from '../hooks/useAuctionBookmarkCounts';
 import './AuctionBookmarkRibbon.css';
@@ -56,6 +57,8 @@ export default function AllAuctions() {
     const pageRows = auctions;
     const bookmarkCounts = useAuctionBookmarkCounts(pageRows);
     const mySavedAuctionIds = useMySavedAuctionIds();
+    const [showBookmarkers, setShowBookmarkers] = useState(false);
+    const bookmarkers = useAdminAuctionBookmarkers(pageRows, showBookmarkers);
     useEffect(() => {
         if (hasLoaded && requestedPage !== page) setParams(previous => {
             const next = new URLSearchParams(previous);
@@ -168,8 +171,10 @@ export default function AllAuctions() {
                         {featuredGiveaway && featuredGiveaway.endTime > now && <GiveawayCard compact auction={featuredGiveaway} now={now} />}
                         {pageRows.filter(auction => !(featuredGiveaway?.endTime > now && auction.id === featuredGiveaway.id)).map((auction) => <div key={auction.id} className={`auction-bookmark-card relative min-w-0 ${bookmarkCounts[auction.id] > 0 && !auction.liveUnavailable ? 'has-bookmark-ribbon' : ''}`}>
                             {bookmarkCounts[auction.id] > 0 && !auction.liveUnavailable && <span className={`auction-bookmark-ribbon${mySavedAuctionIds.has(auction.id) ? ' is-saved' : ''}`}
+                                onMouseEnter={() => setShowBookmarkers(true)} onFocus={() => setShowBookmarkers(true)}
+                                tabIndex={bookmarkers.admin ? 0 : undefined}
                                 role="img" aria-label={`${bookmarkCounts[auction.id]} players have bookmarked this auction${mySavedAuctionIds.has(auction.id) ? '; saved by you' : ''}`}
-                                title={`${bookmarkCounts[auction.id]} ${bookmarkCounts[auction.id] === 1 ? 'player has' : 'players have'} bookmarked this auction${mySavedAuctionIds.has(auction.id) ? ' · Saved by you' : ''}`}>
+                                title={`${bookmarkCounts[auction.id]} ${bookmarkCounts[auction.id] === 1 ? 'player has' : 'players have'} bookmarked this auction${mySavedAuctionIds.has(auction.id) ? ' · Saved by you' : ''}${bookmarkers.admin ? bookmarkers.loaded ? bookmarkers.error ? '\nBookmarker names unavailable' : `\nBookmarked by: ${(bookmarkers.names[auction.id] || []).join(', ') || 'No current bookmarks'}` : '\nLoading bookmarkers…' : ''}`}>
                                 {!mySavedAuctionIds.has(auction.id) && <svg aria-hidden="true" className="auction-bookmark-outline" viewBox="0 0 24 32" preserveAspectRatio="none">
                                     <path d="M.5.5h23v30.65L12 25.36.5 31.15Z" />
                                 </svg>}
