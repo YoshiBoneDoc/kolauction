@@ -35,6 +35,7 @@ const Profile = () => {
     const activityRef = useRef(null);
     const [selectedTab, setSelectedTab] = useState(hash === '#profile-tab-saved' ? 'saved' : 'auctions');
     const [historyTab, setHistoryTab] = useState('listing');
+    const [hideCanceled, setHideCanceled] = useState(false);
     const [retrying, setRetrying] = useState(false);
     const [expandedSections, setExpandedSections] = useState({});
     const [collapsedSections, setCollapsedSections] = useState({});
@@ -92,7 +93,8 @@ const Profile = () => {
         { title: 'Awaiting settlement', records: awaitingTrades },
         { title: 'Active listings', records: selling.filter((auction) => getAuctionStatus(auction, now) === 'active') },
         { title: 'Active bids', records: bidding.filter((auction) => getAuctionStatus(auction, now) === 'active').sort((a, b) => a.endTime - b.endTime) },
-        { title: 'Listing history', records: selling.filter((auction) => !['active','pending_escrow','settling'].includes(getAuctionStatus(auction, now))).sort((a, b) => historyTime(b) - historyTime(a) || b.createdAt - a.createdAt) },
+        { title: 'Listing history', records: selling.filter((auction) => !['active','pending_escrow','settling'].includes(getAuctionStatus(auction, now))
+            && (!hideCanceled || !['cancelled', 'voided'].includes(getAuctionResult(auction, now).status))).sort((a, b) => historyTime(b) - historyTime(a) || b.createdAt - a.createdAt) },
         { title: 'Bid history', records: bidding.filter((auction) => !['active','settling'].includes(getAuctionStatus(auction, now))).sort((a, b) => historyTime(b) - historyTime(a)) },
     ];
 
@@ -268,7 +270,14 @@ const Profile = () => {
                                                 document.getElementById(`profile-history-tab-${historyTabs[next][0]}`)?.focus({ preventScroll: true });
                                             }}>{label}</button>)}
                                     </div>
-                                    {renderSectionToggle(selectedHistorySection.title, selectedHistorySection.records.length)}
+                                    <div className="flex shrink-0 items-center gap-3">
+                                        {historyTab === 'listing' && <button type="button" className="text-[11px] profile-label hover:underline focus-visible:underline"
+                                            aria-pressed={hideCanceled} aria-controls="profile-history-panel-listing"
+                                            onClick={() => setHideCanceled(previous => !previous)}>
+                                            {hideCanceled ? 'Show canceled' : 'Hide canceled'}
+                                        </button>}
+                                        {renderSectionToggle(selectedHistorySection.title, selectedHistorySection.records.length)}
+                                    </div>
                                     </div>
                                     {historyTabs.map(([id, title]) => <div key={id} role="tabpanel" id={`profile-history-panel-${id}`}
                                         aria-labelledby={`profile-history-tab-${id}`} hidden={historyTab !== id}>
