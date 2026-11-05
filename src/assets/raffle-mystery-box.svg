@@ -5,6 +5,8 @@
   <linearGradient id="lining" x1="170" y1="100" x2="205" y2="235" gradientUnits="userSpaceOnUse"><stop stop-color="#332b38"/><stop offset="1" stop-color="#66503e"/></linearGradient>
   <radialGradient id="light"><stop stop-color="#ffdc87" stop-opacity=".95"/><stop offset=".5" stop-color="#f5c365" stop-opacity=".5"/><stop offset="1" stop-color="#f5c365" stop-opacity="0"/></radialGradient>
   <linearGradient id="inside" x1="190" y1="185" x2="210" y2="248" gradientUnits="userSpaceOnUse"><stop stop-color="#d9ad58"/><stop offset="1" stop-color="#ffe9a2"/></linearGradient>
+  <radialGradient id="radiantGold"><stop stop-color="#fff3b0" stop-opacity=".9"/><stop offset=".3" stop-color="#ffd34f" stop-opacity=".65"/><stop offset=".65" stop-color="#efad23" stop-opacity=".25"/><stop offset="1" stop-color="#efad23" stop-opacity="0"/></radialGradient>
+  <linearGradient id="goldRays" x1="202" y1="215" x2="202" y2="65" gradientUnits="userSpaceOnUse"><stop stop-color="#fff2a6" stop-opacity=".7"/><stop offset=".5" stop-color="#ffd45c" stop-opacity=".24"/><stop offset="1" stop-color="#ffd45c" stop-opacity="0"/></linearGradient>
  </defs>
  <ellipse cx="206" cy="377" rx="163" ry="19" fill="#a17ab4" opacity=".16"/>
  <g stroke="#302637" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
@@ -17,6 +19,9 @@
   <!-- Gold light sits inside the opening, with the front rim in front. -->
   <path d="m65 216 203-26 88 29-219 30Z" fill="url(#inside)"/>
  </g>
+ <!-- Radiance rises from the opening; the original front rim stays above it. -->
+ <ellipse cx="202" cy="170" rx="150" ry="123" fill="url(#radiantGold)"/>
+ <path d="m177 215-69-133 41-16 48 145-9-156 38 3-12 153 65-145 35 27-88 124Z" fill="url(#goldRays)"/>
  <ellipse cx="202" cy="206" rx="109" ry="76" fill="url(#light)"/>
  <g stroke="#ffe7a3" stroke-width="5" stroke-linecap="round">
   <path d="m142 211-17-20m42 11-15-33m40 27-3-40m29 37 9-34m13 40 17-23"/>

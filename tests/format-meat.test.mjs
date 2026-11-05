@@ -28,3 +28,9 @@ test('per-item equivalents divide the exact total before compact rounding', () =
         assert.equal(formatPerItemMeat(total,quantity),expected);
     }
 });
+
+test('optional two-decimal shorthand preserves prize range precision', () => {
+    for (const [value, expected] of [[100, '100'], [2400, '2.4k'], [1300000, '1.3m'], [1240000000, '1.24b']]) {
+        assert.equal(formatCompactMeat(value, 2), expected);
+    }
+});

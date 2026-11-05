@@ -169,12 +169,14 @@ html[data-theme=dark] .raffle-ticket-history li{border-color:#50405f}
 /* Floating prize reveal: crisp ink artwork, no item cards or orbit rings. */
 .raffle-summary.raffle-showcase{padding:24px 26px 20px;overflow:hidden;background:#fffcf8;border-color:#d3c6dc}
 .raffle-showcase-heading{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:14px}
-.raffle-showcase-heading>.raffle-showcase-status{grid-column:2;grid-row:1}
+.raffle-status-line{grid-column:2;grid-row:1;display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px 12px}
+.raffle-header-countdown{font-size:12px;color:#756b80;white-space:nowrap}
+html[data-theme=dark] .raffle-header-countdown{color:#b9aec5}
 .raffle-showcase .raffle-badges{gap:8px;font-size:12px}
-.raffle-showcase .raffle-label{border-radius:999px;padding:3px 8px;font-size:11px;line-height:1.2;background:#ebe7ee;color:#51465d;font-weight:500}
-html[data-theme=dark] .raffle-showcase .raffle-label{background:#37323f;color:#eee9f2}
+.raffle-showcase .raffle-label{border-radius:999px;padding:4px 10px;font-size:12px;line-height:1.2;background:#ebe7ee;color:#51465d;font-weight:500}
+html[data-theme=dark] .raffle-showcase .raffle-label{background:#62536f;color:#f5effa}
 .raffle-showcase-titleline{grid-column:1/-1;grid-row:2;display:flex;flex-direction:column;align-items:flex-start;gap:12px;min-width:0}
-.raffle-pool-heading{margin:30px 0 0;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:600;color:#887194}
+.raffle-pool-heading{margin:30px 0 0;font-size:15px;text-transform:uppercase;letter-spacing:1.5px;font-weight:600;color:#887194}
 .raffle-showcase-status{padding:5px 11px;border:1px solid #d7c9e2;border-radius:7px;background:#eee5f4;font-size:11px;font-weight:600;color:#674a7d}
 .raffle-showcase-status.is-concluded{color:#166534;border-color:#a7d8b8;background:#e4f4e9}
 .raffle-summary.raffle-showcase h2{margin:0;font-size:28px;line-height:1.2;overflow-wrap:anywhere;letter-spacing:-.4px}
@@ -189,7 +191,8 @@ html[data-theme=dark] .raffle-showcase .raffle-label{background:#37323f;color:#e
 .raffle-question.q-four{top:-5%;left:108%;right:auto;font-size:29px;transform:rotate(-12deg)}
 .raffle-box-caption{position:absolute;bottom:-2%;font-size:11px;font-style:italic;color:#756b80;text-align:center}
 .raffle-prize-icon{display:grid;place-items:center;flex-shrink:0;width:57px;height:57px;position:relative}
-.raffle-prize-icon img{width:48px;height:48px;object-fit:contain;image-rendering:pixelated;background:transparent;border-radius:4px}
+/* Normal interpolation cleans up enlarged cutouts without a blur filter. */
+.raffle-prize-icon img{width:48px;height:48px;object-fit:contain;image-rendering:auto;background:transparent;border-radius:4px}
 .raffle-prize-description{display:flex;flex-direction:column;gap:5px;min-width:0}
 .raffle-prize-description strong{font-size:13px;font-weight:600;line-height:1.35;overflow-wrap:anywhere}
 .raffle-prize-description>span{font-size:11px;line-height:1.35;color:#756b80}
@@ -269,3 +272,60 @@ html:not([data-theme=dark]) .raffle-orbit-prize:not(.is-winning-prize) .raffle-p
 /* These sprites are already trimmed cutouts; do not restore the global
    dark-mode backing intended for ordinary, unprocessed KoL images. */
 html[data-theme=dark] .raffle-showcase .raffle-prize-icon img{background:transparent;padding:0;border-radius:0}
+/* Backlight sits behind the cutout; it does not blur the item artwork. */
+.raffle-prize-icon{isolation:isolate}
+.raffle-prize-icon:before{content:'';position:absolute;inset:-14px;z-index:-1;border-radius:50%;background:radial-gradient(ellipse at center,#929bff65 0%,#929bff30 38%,#929bff00 72%);pointer-events:none}
+
+.raffle-prize-value-range{display:inline-block;margin-left:7px;font-size:11px;letter-spacing:0;text-transform:none;font-weight:400;color:#4169b0;white-space:nowrap}
+html[data-theme=dark] .raffle-prize-value-range{color:#929bff}
+
+.raffle-summary.raffle-management{padding:14px 16px;font-size:12px}
+.raffle-management-header{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.raffle-management-header h2{font-size:15px;margin:0;line-height:1.4}
+.raffle-management-status{font-size:10px;text-transform:capitalize;border:1px solid #d8cce2;border-radius:20px;padding:2px 7px;color:#756080}
+.raffle-management button{font-size:11px;background:transparent;box-shadow:none}
+.raffle-management .raffle-management-refresh{display:grid;place-items:center;margin-left:auto;padding:5px;border:0;color:inherit}
+.raffle-management-deposit{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.raffle-management-deposit .copy-message-field{background:transparent;border:1px solid #d8cce2;border-radius:4px}
+.raffle-management-deposit input{width:12ch;color:inherit}
+.raffle-management-deposit button{color:inherit}
+.raffle-management p.raffle-management-note{margin:4px 0 12px;font-size:11px}
+.raffle-management p.raffle-management-proceeds{margin:0 0 12px;color:inherit}
+.raffle-management-proceeds strong{font-size:14px}
+.raffle-management-reserves{border-top:1px solid #dfd4e6;border-bottom:1px solid #dfd4e6;padding:9px 0}
+.raffle-management-reserves summary{display:flex;align-items:baseline;gap:7px;cursor:pointer;list-style:none}
+.raffle-management-reserves summary::-webkit-details-marker{display:none}
+.raffle-management-reserves summary>svg{flex-shrink:0;align-self:center;transition:transform .15s}
+.raffle-management-reserves[open] summary>svg{transform:rotate(90deg)}
+.raffle-management-inventory{margin-left:auto;text-align:right;font-size:11px;overflow-wrap:anywhere;min-width:0;flex:1}
+.raffle-management-history{margin:12px 0 2px 21px}
+.raffle-management-history h3{font-size:12px;font-weight:600;margin-bottom:6px}
+.raffle-management-history li{display:flex;flex-wrap:wrap;gap:4px 12px;padding:6px 0;border-top:1px solid #dfd4e6}
+.raffle-management-history time,.raffle-management-deposit-status{font-size:10px;opacity:.75}
+.raffle-management-history li>span:nth-child(2){flex:1;min-width:120px}
+.raffle-management .raffle-management-cancel{margin-top:12px;padding:5px 9px;border:1px solid #d9a6a6;border-radius:5px;color:#aa3838}
+.raffle-management .raffle-management-cancel:hover{background:#b535350c}
+.raffle-management button:disabled{opacity:.5;cursor:default}
+html[data-theme=dark] .raffle-management :is(.raffle-management-status,.copy-message-field,.raffle-management-reserves,.raffle-management-history li){border-color:#50405f}
+html[data-theme=dark] .raffle-management-status{color:#cbb6dc}
+html[data-theme=dark] .raffle-management .raffle-management-cancel{color:#f0a0a0;border-color:#885353}
+.raffle-management-ticket-total{font-size:11px;font-weight:400;color:#85808d}
+html[data-theme=dark] .raffle-management-ticket-total{color:#aaa3b2}
+
+/* Active raffle badges share the vivid purple accent in both themes. */
+html .raffle-showcase-status.is-active,
+html[data-theme=dark] .raffle-showcase-status.is-active,
+html .raffle-management-status.is-active,
+html[data-theme=dark] .raffle-management .raffle-management-status.is-active{background:#7c3aed;border-color:#7c3aed;color:#fff}
+
+html .raffle-management button.raffle-management-refresh,
+html .raffle-management button.raffle-management-refresh:is(:hover,:focus-visible,:active){background:transparent;border:0;box-shadow:none;outline:none;color:#fff}
+.raffle-management-refresh svg{transition:filter .15s ease}
+.raffle-management-refresh:is(:hover,:focus-visible):not(:disabled) svg{filter:drop-shadow(0 0 4px #fff) drop-shadow(0 0 8px #ffffff80)}
+
+/* Let the chest's gold radiance spill above the lid and out to the right. */
+.raffle-box-illustration::before{content:'';position:absolute;pointer-events:none;left:20%;top:-38%;width:118%;height:122%;background:radial-gradient(ellipse at 45% 68%,#ffe49670 0%,#ffd05245 23%,#efad2326 44%,#efad230d 59%,#efad2300 74%)}
+
+.raffle-prize-range-row{display:flex;justify-content:flex-start;margin:4px 0 0;margin-left:calc(21% + var(--first-prize-offset, 0px) - 28px)}
+.raffle-prize-range-row .raffle-prize-value-range{margin-left:0;white-space:normal;text-align:left}
+@media(max-width:760px){.raffle-prize-range-row{margin-left:0}}

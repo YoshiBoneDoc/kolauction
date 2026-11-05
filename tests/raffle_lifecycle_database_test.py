@@ -139,6 +139,29 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
                 if uncertain and d['kind']=='sale_item':return d
             raise AssertionError('delivery queue did not drain')
         rid=create_raffle()
+        # Owner purchases refund every attachment once and never change ticket balances.
+        for attachments in [[], [dict(id=2,quantity=2)]]:
+            rejected=mail(rid,meat=100,items=attachments,actor=48889601)
+            assert ingest(rejected)=='raffle_refund'
+            assert ingest(rejected)=='duplicate'
+            assert account_value(rid,'ticket_count')=='0'
+            assert account_value(rid,'revenue')=='0'
+            assert account_value(rid,'held_meat')=='0'
+            assert sql(f"select count(*) from khub_bot.raffle_purchases where receipt_id='{rejected['id']}'")=='0'
+            assert sql(f"select sum(meat) from khub_bot.deliveries where receipt_id='{rejected['id']}'")=='100'
+            assert sql(f"select coalesce(sum(quantity),0) from khub_bot.deliveries where receipt_id='{rejected['id']}'")==str(2 if attachments else 0)
+        # A different administrator is also excluded, while ordinary buyers remain eligible.
+        sql(f"insert into khub_bot.administrators(user_id,note) values('{other}','temporary participation test');")
+        admin_purchase=mail(rid,meat=200,actor=48889603)
+        assert ingest(admin_purchase)=='raffle_refund'
+        assert ingest(admin_purchase)=='duplicate'
+        assert account_value(rid,'ticket_count')=='0'
+        assert account_value(rid,'revenue')=='0'
+        assert sql(f"select sum(meat) from khub_bot.deliveries where receipt_id='{admin_purchase['id']}'")=='200'
+        changed={**admin_purchase,'meat':300}
+        sql('select public.bot_ingest_mail('+lit(json.dumps(changed))+');',error='Receipt payload conflict')
+        sql(f"delete from khub_bot.administrators where user_id='{other}';")
+        print('PASS: host/admin purchase refunds are exact and idempotent without issuing tickets')
         unverified=mail(rid,'raffle_supply',0,[dict(id=2,quantity=100)],48889601)
         unverified['raw']={'type':'normal','gift_original':{'id':unverified['id']}}
         sql('select public.bot_ingest_mail('+lit(json.dumps(unverified))+');',error='Gift contents have not been verified')
@@ -160,6 +183,21 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
         for text in ['Fixture raffle','10 ticket(s)',f'{offset+1} through {offset+10}','equal chance of winning']:assert text in confirmation
         history=json.loads(call(f"select public.read_my_raffle_tickets('{rid}')",uid=buyer))
         assert history['ticket_count']=='10'
+        admin_history=json.loads(call(f"select public.read_admin_raffle_ticket_history('{rid}')"))
+        assert len(admin_history)==1
+        assert admin_history[0]['receipt_id']==payment['id']
+        assert admin_history[0]['username']=='Bundle Buyer'
+        assert admin_history[0]['player_id']=='48889602'
+        assert admin_history[0]['ticket_count']=='10'
+        assert admin_history[0]['meat']=='1000'
+        assert admin_history[0]['received_at']
+        assert json.loads(call(f"select public.read_admin_raffle_ticket_history('{rid}',50)"))==[]
+        call(f"select public.read_admin_raffle_ticket_history('{rid}')",uid=buyer,error='Administrator required')
+        call(f"select public.read_admin_raffle_ticket_history('{rid}',-1)",error='Invalid offset')
+        assert json.loads(call(f"select public.read_raffle_management('{rid}')"))['ticket_count']=='10'
+        assert sql("select has_function_privilege('anon','public.read_admin_raffle_ticket_history(uuid,integer)','execute')")=='f'
+        print('PASS: admin purchase history includes buyer, time, quantities and exact totals; private access enforced')
+
         assert history['purchases'][0]['first_ticket']==str(offset+1)
         assert history['purchases'][0]['last_ticket']==str(offset+10)
         assert sql(f"select first_ticket=1 and last_ticket=10 from khub_bot.raffle_purchases where receipt_id='{payment['id']}'")=='t'

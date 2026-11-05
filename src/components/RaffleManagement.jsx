@@ -1,17 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
+import CopyMessage from './CopyMessage';
 import { supabase } from '../lib/supabase';
 
 export default function RaffleManagement({ raffleId, ownerId, onChange }) {
     const [data, setData] = useState(null);
     const [error, setError] = useState('');
     const [busy, setBusy] = useState(false);
-    const [amount, setAmount] = useState('');
     const [revision, setRevision] = useState(0);
-    const storageKey = `raffle-advance:${ownerId}:${raffleId}`;
-    const [request, setRequest] = useState(() => {
-        try { return JSON.parse(sessionStorage.getItem(storageKey) || 'null'); } catch { return null; }
-    });
     const acting = useRef(false);
     useEffect(() => {
         let active = true;
@@ -27,42 +23,32 @@ export default function RaffleManagement({ raffleId, ownerId, onChange }) {
         acting.current = true;
         setBusy(true); setError('');
         try {
-            let params = { p_id: raffleId };
-            if (action === 'request_raffle_advance') {
-                if (!request && (!/^[1-9][0-9]*$/.test(amount) || BigInt(amount) > BigInt(data.available_advance))) throw new Error('Enter an amount within available proceeds.');
-                // Retain identity and amount on ambiguous failures. A retry cannot send twice.
-                const pending = request ?? { id: crypto.randomUUID(), amount };
-                // Persist before the RPC so reloads retain the exact idempotency key.
-                sessionStorage.setItem(storageKey, JSON.stringify(pending));
-                setRequest(pending);
-                params = { ...params, p_request_id: pending.id, p_amount: pending.amount };
-            }
+            const params = { p_id: raffleId };
             const { error: failure } = await supabase.rpc(action, params);
             if (failure) throw new Error('Action not confirmed. Refresh or retry the same request safely.');
-            if (action === 'request_raffle_advance') { sessionStorage.removeItem(storageKey); setRequest(null); }
-            setAmount(''); setRevision(v => v + 1); onChange();
+            setRevision(v => v + 1); onChange();
         } catch (failure) { setError(failure.message); }
         finally { acting.current = false; setBusy(false); }
     }
-    const missing = data?.prize ? BigInt(data.prize.quantity) - BigInt(data.inventory.find(i => i.item_id === data.prize.item_id)?.quantity ?? '0') : 0n;
-    const prizeDeliveries = data?.deliveries.filter(d => d.reference.includes(':prize:')) ?? [];
-    return <section className="raffle-summary mt-4" aria-label="Raffle management">
-        <h2>Manage raffle{data?.raffle_number && ` #${data.raffle_number}`}</h2>
+    return <section className="raffle-summary raffle-management mt-4" aria-label="Raffle management">
+        <header className="raffle-management-header">
+            <h2>Manage Raffle{data?.raffle_number && ` #${data.raffle_number}`}</h2>
+            {data && <span className={`raffle-management-status ${data.state === 'active' ? 'is-active' : ''}`}>{data.state.replaceAll('_', ' ')}</span>}
+            <button type="button" className="raffle-management-refresh" aria-label="Refresh raffle management" title="Refresh" disabled={busy} onClick={() => { setRevision(v => v + 1); onChange(); }}>
+                <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M20 4v6h-6M4 20v-6h6"/><path d="M4.8 9a7.5 7.5 0 0 1 12.4-4.3L20 10M4 14l2.8 5.3A7.5 7.5 0 0 0 19.2 15"/></svg>
+            </button>
+        </header>
         {error && <p role="alert">{error}</p>}
-        <button disabled={busy} onClick={() => { setRevision(v => v + 1); onChange(); }}>Refresh status</button>
+        {!data && !error && <p role="status">Loading management…</p>}
         {data && <>
-            <p>Status: {data.state}{data.completion_reason && ` · ${data.completion_reason.replaceAll('_', ' ')}`}. Real Meat and item transfers are enabled.</p>
-            {data.state === 'preview' && <button disabled={busy || !data.activation_enabled} onClick={() => act('activate_mystery_raffle')}>Activate raffle</button>}
-            {['preview', 'active'].includes(data.state) && <button disabled={busy} onClick={() => act('cancel_mystery_raffle')}>Cancel raffle and refund tickets</button>}
-            {data.prize && <p>Selected prize: {data.prize.quantity} × {data.prize.name} (#{data.prize.item_id}). Winner: #{data.winner_player_id}.</p>}
-            {prizeDeliveries.length ? <p>Prize delivery: {prizeDeliveries.every(d => d.state === 'sent') ? 'Verified' : 'Awaiting verification'}. Never resend an uncertain transfer.</p> : data.state === 'fulfilling' && <p>Action needed: acquire and deposit {missing > 0n ? missing.toString() : '0'} missing prize items.</p>}
-            {['active', 'fulfilling'].includes(data.state) && !prizeDeliveries.length && <p>KMail kHub (#3888760): <code>SUPPLY {data.raffle_number}</code> with listed prize items attached. Partial and repeat deposits are supported. Attach prize items only, without Meat.</p>}
-            <p>Ticket proceeds: {data.revenue} Meat · Advances committed: {data.advanced_meat} Meat · Still reserved: {data.held_meat} Meat.</p>
-            {(BigInt(data.available_advance) > 0n || request) && <div><label>Advance from available proceeds ({data.available_advance} Meat)<input inputMode="numeric" value={request?.amount ?? amount} disabled={busy || !!request} onChange={e => setAmount(e.target.value)} /></label><button disabled={busy} onClick={() => act('request_raffle_advance')}>{request ? 'Retry same advance' : 'Request Meat advance'}</button></div>}
-            <h3>Reserved items</h3><ul>{data.inventory.map(i => <li key={i.item_id}>{i.name}: {i.quantity}</li>)}</ul>
-            <h3>Deposit history</h3><ul>{data.deposits.map(d => <li key={d.receipt_id}>KMail {d.receipt_id}: prize items{d.items.map(i => ` · #${i.id} × ${i.quantity}`).join('')}</li>)}</ul>
-            <h3>Advances</h3><ul>{data.advances.map(a => <li key={a.request_id}>{a.amount} Meat · {new Date(a.created_at).toLocaleString()}</li>)}</ul>
-            <h3>Delivery and settlement progress</h3><ul>{data.deliveries.map(d => <li key={d.reference}>{d.reference.split(':').slice(2).join(' · ')}: {d.state} · {d.meat} Meat{d.item_id ? ` · #${d.item_id} × ${d.quantity}` : ''}{['unknown', 'sending'].includes(d.state) && ' · Requires verification; do not resend.'}</li>)}</ul>
+            <div className="raffle-management-deposit"><span>Deposit prize items:</span><CopyMessage text={`SUPPLY ${data.raffle_number}`} label="prize deposit command" inline /></div>
+            <p className="raffle-management-note">Partial and repeat deposits supported.</p>
+            <p className="raffle-management-proceeds">Ticket Sales: <strong>{BigInt(data.revenue).toLocaleString('en-US')} Meat</strong> <small className="raffle-management-ticket-total">({BigInt(data.ticket_count ?? 0).toLocaleString('en-US')} tickets)</small></p>
+            <details className="raffle-management-reserves">
+                <summary><svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="m6 3 5 5-5 5"/></svg><span>Reserved Items</span><span className="raffle-management-inventory">{data.inventory.filter(i => BigInt(i.quantity) > 0n).map(i => `${i.name} × ${BigInt(i.quantity).toLocaleString('en-US')}`).join(' · ') || 'None'}</span></summary>
+                <div className="raffle-management-history"><h3>Deposit History</h3>{data.deposits.length ? <ul>{data.deposits.map(d => <li key={d.receipt_id}><time dateTime={d.received_at}>{new Date(d.received_at).toLocaleString()}</time><span>{d.items.map(i => `${data.inventory.find(item => item.item_id === i.id)?.name ?? i.name ?? `Item #${i.id}`} × ${BigInt(i.quantity).toLocaleString('en-US')}`).join(' · ')}</span><span className="raffle-management-deposit-status">Received</span></li>)}</ul> : <p>No deposits yet.</p>}</div>
+            </details>
+            {['preview', 'active'].includes(data.state) && <button type="button" className="raffle-management-cancel" disabled={busy} onClick={() => act('cancel_mystery_raffle')}>Cancel raffle and refund tickets</button>}
         </>}
     </section>;
 }

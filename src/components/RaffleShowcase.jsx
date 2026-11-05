@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import GiveawayItemImage from './GiveawayItemImage';
 import { itemImageUrl } from '../lib/itemCatalog';
+import { formatCompactMeat } from '../lib/formatMeat';
 import { raffleCountdown } from '../lib/raffles';
 import { createMarketPriceService } from '../lib/marketPrices';
 import { supabase } from '../lib/supabase';
@@ -27,6 +28,11 @@ export function RafflePrizeDisplay({ raffle, marketPrices = new Map(), winnerRes
         const left = value(a), right = value(b);
         return left === right ? a.outcome - b.outcome : left === null ? 1 : right === null ? -1 : left > right ? -1 : 1;
     });
+    const values = pool.map(value);
+    const range = values.length && values.every(v => v !== null) ? {
+        min: values.reduce((a, b) => a < b ? a : b),
+        max: values.reduce((a, b) => a > b ? a : b),
+    } : null;
     const prizeArea = useRef(null);
     const [areaSize, setAreaSize] = useState({ width: 500, height: 326 });
     useEffect(() => {
@@ -46,10 +52,11 @@ export function RafflePrizeDisplay({ raffle, marketPrices = new Map(), winnerRes
         <header className="raffle-showcase-heading">
             <div className="raffle-badges"><span className="raffle-label">Raffle</span>{raffle.raffle_number && <span>#{raffle.raffle_number}</span>}</div>
             <div className="raffle-showcase-titleline"><h2>{raffle.name}</h2>
-        <div className="raffle-facts"><strong>{quantity(raffle.ticket_price)} Meat <small>/ ticket</small></strong>{!closed && <span>{raffleCountdown(raffle.ends_at, now)}</span>}</div></div>
-            <span className={`raffle-showcase-status ${concluded ? 'is-concluded' : ''}`}>{status}</span>
+        <div className="raffle-facts"><strong>{quantity(raffle.ticket_price)} Meat <small>/ ticket</small></strong></div></div>
+            <div className="raffle-status-line">{!closed && <span className="raffle-header-countdown">{raffleCountdown(raffle.ends_at, now)}</span>}<span className={`raffle-showcase-status ${concluded ? 'is-concluded' : status === 'Active' ? 'is-active' : ''}`}>{status}</span></div>
         </header>
         <h3 className="raffle-pool-heading" style={{ '--first-prize-offset': `${(positions[0]?.x ?? 5) * areaSize.width / 100}px` }}>Possible prizes</h3>
+        <div className="raffle-prize-range-row" style={{ '--first-prize-offset': `${(positions[0]?.x ?? 5) * areaSize.width / 100}px` }}><span className="raffle-prize-value-range" title={range ? `Approximate current Mall value per prize, quantity included: ${quantity(range.min)}–${quantity(range.max)} Meat` : 'Market value unavailable for one or more prizes'}>{range ? `Ranging from ${formatCompactMeat(range.min, 2)} to ${formatCompactMeat(range.max, 2)} meat` : 'Prize range unavailable.'}</span></div>
         <div className="raffle-prize-scene" style={{ '--scene-height': `${sceneHeight}px` }}>
             <div className={`raffle-mystery-art ${boxCenter ? 'raffle-box-balanced' : ''}`} style={boxCenter ? { '--box-center-x': `${boxCenter.x}px`, '--box-center-y': `${boxCenter.y}px` } : undefined} aria-hidden="true">
                 <div className="raffle-box-illustration"><span className="raffle-question q-one">?</span><span className="raffle-question q-two">?</span><span className="raffle-question q-three">?</span><span className="raffle-question q-four">?</span><span className="raffle-question q-five">?</span><span className="raffle-question q-six">?</span><span className="raffle-question q-seven">?</span>
@@ -60,8 +67,8 @@ export function RafflePrizeDisplay({ raffle, marketPrices = new Map(), winnerRes
                     const winner = selected?.outcome === prize.outcome;
                     const { x, y } = positions[index];
                     return <li key={prize.outcome} className={`raffle-orbit-prize ${winner ? 'is-winning-prize' : ''}`} style={{ '--prize-x': `${x}%`, '--prize-y': `${y}%` }}>
-                        <div className="raffle-prize-icon">{itemImageUrl(prize.image) ? <GiveawayItemImage source={itemImageUrl(prize.image)} /> : <span aria-hidden="true">?</span>}</div>
-                        <div className="raffle-prize-description"><strong>{prize.name}</strong><span>Qty {quantity(prize.quantity)} <i aria-hidden="true">·</i> {(prize.probability_bps / 100).toFixed(2)}% chance</span>{winner && <span className="raffle-winning-label">✦ Winning prize</span>}</div>
+                        <div className="raffle-prize-icon">{itemImageUrl(prize.image) ? <GiveawayItemImage source={itemImageUrl(prize.image)} refined /> : <span aria-hidden="true">?</span>}</div>
+                        <div className="raffle-prize-description"><strong>{prize.name}</strong><span>x {quantity(prize.quantity)} <i aria-hidden="true">·</i> {(prize.probability_bps / 100).toFixed(1)}% chance</span>{winner && <span className="raffle-winning-label">✦ Winning prize</span>}</div>
                     </li>;
                 })}</ol>
             </div>
@@ -72,7 +79,7 @@ export function RafflePrizeDisplay({ raffle, marketPrices = new Map(), winnerRes
             </aside>}
         </div>
         <footer className="raffle-showcase-footer">
-            <span>{selected ? <><span className="raffle-footer-star" aria-hidden="true">✦</span> Winning prize: <strong>{quantity(selected.quantity)} × {selected.name}</strong></> : 'One winning ticket. One mystery prize.'}</span>
+            <span>{selected ? <><span className="raffle-footer-star" aria-hidden="true">✦</span> Winning prize: <strong>{quantity(selected.quantity)} × {selected.name}</strong></> : 'The raffle winner receives one of the above items based on the listed odds.'}</span>
             <time dateTime={raffle.ends_at}>{closed ? 'Closed' : 'Closes'} {new Date(raffle.ends_at).toLocaleString()}</time>
         </footer>
     </article>;

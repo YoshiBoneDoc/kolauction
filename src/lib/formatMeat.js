@@ -1,6 +1,6 @@
 // Display-only shorthand; keep saved amounts and transaction confirmations exact.
 // BigInt also preserves seller totals that exceed JavaScript's safe Number range.
-function formatMeatRatio(value, quantity = 1) {
+function formatMeatRatio(value, quantity = 1, fractionDigits = 1) {
     const count = BigInt(quantity);
     const amount = BigInt(value ?? 0);
     const negative = amount < 0n;
@@ -16,17 +16,18 @@ function formatMeatRatio(value, quantity = 1) {
         const fraction = (hundredths % 100n).toString().padStart(2, '0').replace(/0+$/, '');
         return `${negative ? '-' : ''}${(hundredths / 100n).toLocaleString('en-US')}${fraction ? `.${fraction}` : ''}`;
     }
-    let tenths = (magnitude * 10n + units[index].divisor * count / 2n) / (units[index].divisor * count);
-    if (tenths >= 10000n && index < units.length - 1) {
+    const scale = 10n ** BigInt(fractionDigits);
+    let tenths = (magnitude * scale + units[index].divisor * count / 2n) / (units[index].divisor * count);
+    if (tenths >= 1000n * scale && index < units.length - 1) {
         ++index;
-        tenths = (magnitude * 10n + units[index].divisor * count / 2n) / (units[index].divisor * count);
+        tenths = (magnitude * scale + units[index].divisor * count / 2n) / (units[index].divisor * count);
     }
-    const fraction = tenths % 10n;
-    return `${negative ? '-' : ''}${(tenths / 10n).toLocaleString('en-US')}${fraction ? `.${fraction}` : ''}${units[index].suffix}`;
+    const fraction = (tenths % scale).toString().padStart(fractionDigits, '0').replace(/0+$/, '');
+    return `${negative ? '-' : ''}${(tenths / scale).toLocaleString('en-US')}${fraction ? `.${fraction}` : ''}${units[index].suffix}`;
 }
 
-export function formatCompactMeat(value) {
-    return formatMeatRatio(value);
+export function formatCompactMeat(value, fractionDigits = 1) {
+    return formatMeatRatio(value, 1, fractionDigits);
 }
 
 export function formatPerItemMeat(value, quantity) {

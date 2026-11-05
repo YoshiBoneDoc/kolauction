@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
+import { softenCutoutEdge, sharpenCutoutInterior } from '../lib/itemCutoutRefinement';
 
 const processed = new Map();
 const emptyImage = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
-function cutout(source) {
-    if (processed.has(source)) return processed.get(source);
+function cutout(source, refined) {
+    const key = JSON.stringify([source, refined]);
+    if (processed.has(key)) return processed.get(key);
     const result = new Promise(resolve => {
         const path = source.replace('https://images.kingdomofloathing.com/', '');
         const picture = new Image();
@@ -48,30 +50,41 @@ function cutout(source) {
                     left = Math.min(left, x); right = Math.max(right, x); top = Math.min(top, y); bottom = Math.max(bottom, y);
                 }
                 if (left > right || top > bottom) return resolve(emptyImage);
+                if (refined) softenCutoutEdge(pixels);
                 ctx.putImageData(pixels, 0, 0);
                 const cropped = document.createElement('canvas'); cropped.width = right - left + 1; cropped.height = bottom - top + 1;
                 cropped.getContext('2d').drawImage(canvas, left, top, cropped.width, cropped.height, 0, 0, cropped.width, cropped.height);
-                resolve(cropped.toDataURL());
+                if (!refined) { resolve(cropped.toDataURL()); return; }
+                const enhanced = document.createElement('canvas');
+                enhanced.width = (cropped.width + 2) * 3; enhanced.height = (cropped.height + 2) * 3;
+                const enhancedContext = enhanced.getContext('2d', { willReadFrequently: true });
+                enhancedContext.imageSmoothingEnabled = true;
+                enhancedContext.imageSmoothingQuality = 'high';
+                enhancedContext.drawImage(cropped, 3, 3, cropped.width * 3, cropped.height * 3);
+                const enlarged = enhancedContext.getImageData(0, 0, enhanced.width, enhanced.height);
+                sharpenCutoutInterior(enlarged);
+                enhancedContext.putImageData(enlarged, 0, 0);
+                resolve(enhanced.toDataURL());
             } catch { next(); }
         };
         picture.onerror = next;
         next();
     });
-    processed.set(source, result);
+    processed.set(key, result);
     return result;
 }
-export function useGiveawayCutout(source) {
+export function useGiveawayCutout(source, refined = false) {
     const [image, setImage] = useState({ source: null, url: emptyImage });
     useEffect(() => {
         if (!source) return;
         let active = true;
-        cutout(source).then(url => { if (active) setImage({ source, url }); });
+        cutout(source, refined).then(url => { if (active) setImage({ source, refined, url }); });
         return () => { active = false; };
-    }, [source]);
-    return image.source === source ? image.url : emptyImage;
+    }, [source, refined]);
+    return image.source === source && image.refined === refined ? image.url : emptyImage;
 }
-export default function GiveawayItemImage({ source, className = '', style }) {
-    const image = useGiveawayCutout(source);
+export default function GiveawayItemImage({ source, className = '', style, refined = false }) {
+    const image = useGiveawayCutout(source, refined);
     return <img src={image} alt="" style={style} className={`object-contain [image-rendering:pixelated] ${className}`} />;
 }
-GiveawayItemImage.propTypes = { source: PropTypes.string.isRequired, className: PropTypes.string, style: PropTypes.object };
+GiveawayItemImage.propTypes = { source: PropTypes.string.isRequired, className: PropTypes.string, style: PropTypes.object, refined: PropTypes.bool };

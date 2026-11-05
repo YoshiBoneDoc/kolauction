@@ -5,6 +5,8 @@ import { AuctionsProvider } from "./context/AuctionsContext";
 import App from "./App";
 import "./index.css";
 import "./theme.css";
+// Raffle surfaces are styled before any lazy route can paint.
+import "./components/raffles.css";
 import { UserProvider } from "./context/UserContext";
 
 ReactDOM.createRoot(document.getElementById("root")).render(

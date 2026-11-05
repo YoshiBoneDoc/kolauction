@@ -22,8 +22,8 @@ test('raffle reveal orders known prizes by total value and places unavailable va
     assert.match(html, /Concluded/);
     assert.doesNotMatch(html, /settled/);
     assert.equal((html.match(/class="raffle-orbit-prize is-winning-prize"/g) || []).length, 1);
-    assert.match(items[0], /Qty 3/);
-    assert.match(items[0], /33.33% chance/);
+    assert.match(items[0], /x 3/);
+    assert.match(items[0], /33.3% chance/);
 });
 test('canceled and empty raffles do not claim a winning prize or successful conclusion', () => {
     for (const reason of ['cancelled', 'no_tickets']) {
@@ -58,7 +58,7 @@ test('complete entries follow a balanced outward-and-back arc within the prize a
     const html = compiled.exports.render(raffle);
     const entries = html.match(/<li\b[\s\S]*?<\/li>/g);
     const offsets = entries.map(entry => {
-        for (const text of ['raffle-prize-icon','raffle-prize-description','Qty ','% chance']) assert.ok(entry.includes(text));
+        for (const text of ['raffle-prize-icon','raffle-prize-description','x ','% chance']) assert.ok(entry.includes(text));
         return ['prize-x','prize-y'].map(key => Number(entry.match(new RegExp(`--${key}:([0-9.]+)%`))[1]));
     });
     const [top, middle, bottom] = offsets;
@@ -84,4 +84,16 @@ test('smaller prize pools stay centered and close, with no unnecessary added car
 test('long labels use natural-height entries rather than overlapping the arc', () => {
     const html = compiled.exports.render({ ...raffle, prizes: raffle.prizes.map(p => ({ ...p, name: 'An especially long item name that needs multiple lines' })) });
     assert.doesNotMatch(html, /raffle-prize-scene-many/);
+});
+
+test('prize range beneath heading shows compact minimum and maximum total prize values', () => {
+    const html = compiled.exports.render(raffle, new Map([[1, { available: true, price_meat: 100 }], [2, { available: true, price_meat: 800 }], [3, { available: true, price_meat: 1240000000 }]]));
+    assert.match(html, /Ranging from 100 to 1.24b meat/);
+    assert.match(html, /raffle-prize-value-range/);
+    assert.ok(html.indexOf('Ranging from') > html.indexOf('</h3>'));
+    assert.ok(html.indexOf('Ranging from') < html.indexOf('class="raffle-prize-scene"'));
+    assert.doesNotMatch(html.match(/<h3[\s\S]*?<\/h3>/)[0], /Ranging from/);
+    const quantityRange = compiled.exports.render(raffle, new Map([[1, { available: true, price_meat: 1000 }], [2, { available: true, price_meat: 500 }], [3, { available: true, price_meat: 100 }]]));
+    assert.match(quantityRange, /Ranging from 100 to 1.5k meat/);
+    assert.match(compiled.exports.render(raffle), /Prize range unavailable\./);
 });
