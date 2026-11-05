@@ -4,6 +4,7 @@ credentials, network, real bot, KoL account or live database is used.
 Run: python3 tests/public_listing_projection_database_test.py
 """
 import json
+import sys
 from pathlib import Path
 import subprocess
 import tempfile
@@ -18,7 +19,7 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
         return subprocess.run([str(BIN/'pg_ctl'),'-D',str(data),*args],check=True,capture_output=True)
     started=False
     try:
-        pg('-l',str(Path(folder)/'postgres.log'),'-o',f"-F -h '' -k {folder}",'-w','start');started=True
+        pg('-l',str(Path(folder)/'postgres.log'),'-o',f"-F -h '' -k {folder} -c shared_preload_libraries=pg_stat_statements",'-w','start');started=True
         serial=0
         def sql(query,uid=None,error=None):
             global serial
@@ -46,6 +47,7 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
             grant execute on function auth.uid() to anon,authenticated;
         ''')
         sql("create schema storage; create table storage.buckets(id text primary key,public boolean); insert into storage.buckets values('creator-photos',false); create table storage.objects(bucket_id text,name text);")
+        sql("create schema extensions;create extension pg_stat_statements with schema extensions;")
         migrations=sorted([*ROOT.glob('supabase/migrations/*.sql'),*ROOT.glob('supabase/migrations/queue/*.sql')],key=lambda p:p.name)
         assert len({p.name for p in migrations})==len(migrations)
         
@@ -53,8 +55,13 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
         for migration in migrations:
             if migration.name=='202611030170_public_sell_listing_projection.sql':
                 before_projection=sql(financial_probe)
+            if migration.name.startswith('202611050231_'):
+                before_read_231=sql(financial_probe)
+                definition=sql("select pg_get_functiondef('public.read_auction_card_context(uuid[])'::regprocedure)")
+                sql(definition.replace('FUNCTION public.read_auction_card_context(', 'FUNCTION khub_bot.card_before_231('))
             sql(migration.read_text())
-        assert before_projection==sql(financial_probe), 'Financial definitions changed'
+            if migration.name=='202611030170_public_sell_listing_projection.sql':assert before_projection==sql(financial_probe), 'Projection changed financial functions'
+            if migration.name.startswith('202611050231_'):assert before_read_231==sql(financial_probe), 'Read optimization changed financial functions'
 
         definitions="""select jsonb_object_agg(p.oid::regprocedure::text,pg_get_functiondef(p.oid)) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
             where n.nspname in ('public','khub_bot') and p.prokind='f' and p.proname in
@@ -102,7 +109,9 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
             pair=json.loads(sql(f"with fixture as (select jsonb_populate_record(a,{variant}) as lot from public.auctions a where id='{aid}') select jsonb_build_object('old',khub_bot.public_auction(lot,1,'Bidder 1',null),'new',khub_bot.public_listing_projection(lot,1,'Bidder 1',null)) from fixture;"))
             for key in public_fields:
                 assert pair['old'].get(key)==pair['new'].get(key),(key,pair)
-        assert sql(f"select khub_bot.public_listing_projection(a,1,null,null)=khub_bot.public_auction(a,1,null,null) from (select (jsonb_populate_record(a,jsonb_build_object('auction_kind','buy'))).* from public.auctions a where id='{aid}') a;")=='t'
+        # A Buy-shaped row without an order must retain its public cache fields.
+        pair=json.loads(sql(f"select jsonb_build_object('old',khub_bot.public_auction(a,1,null,null),'new',khub_bot.public_listing_projection(a,1,null,null)) from (select (jsonb_populate_record(a,jsonb_build_object('auction_kind','buy'))).* from public.auctions a where id='{aid}') a;"))
+        for key in public_fields: assert pair['old'].get(key)==pair['new'].get(key),(key,pair)
         for query in ["select public.read_public_home_auctions();",
                       "select public.read_public_auction_page('browse',null,'','active','ending',1,'all','all',null,null);"]:
             payload=json.loads(sql(query))
@@ -147,6 +156,57 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
             # performance threshold or production capacity inference.
             timing=json.loads(sql(f"explain (analyze,format json) select jsonb_agg(khub_bot.{function}(a,1,null,null)) from public.auctions a cross join generate_series(1,24) n where a.id='{aid}';"))
             print(function,'local 24-card execution ms:',timing[0]['Execution Time'])
+        # Real Buy order + private reservation: cards omit detail-only finances,
+        # history and contacts, retaining public quantities and viewer actions.
+        buy=sql("select public.create_buy_auction(2,10,100,24,'immediate')",owner)
+        funding=int(sql(f"select funding_required from khub_bot.buy_orders where auction_id='{buy}'"))
+        payment=dict(id='99981',sender_id=48889801,sender_name='Traffic Seller',received_at=sql('select clock_timestamp()'),command=dict(type='fund',auction_id=buy),meat=funding,items=[],raw=dict(type='normal'))
+        sql('select public.bot_ingest_mail('+lit(json.dumps(payment))+')')
+        sql(f"select public.reserve_buy_quantity('{buy}',2)",other)
+        private_keys=['seller_id','seller_username','usernames_visible','highest_bidder_id','highest_bidder_username','winner_public','winner_id','winner_username','my_reservation','trade_reported']
+        for lot in [aid,buy]:
+            for status in ['active','awaiting_trade','completed'] if lot==aid else ['active','completed']:
+                if lot==aid:
+                    sql(f"update public.auctions set status='{status}',completed_at=case when '{status}'='completed' then clock_timestamp() else completed_at end,seller_confirmed_at=case when '{status}'='completed' then clock_timestamp() else seller_confirmed_at end,buyer_confirmed_at=case when '{status}'='completed' then clock_timestamp() else buyer_confirmed_at end,winner_id=case when '{status}'='active' then null else '{other}'::uuid end,final_price=case when '{status}'='active' then null else 100 end,finalized_at=case when '{status}'='active' then null else coalesce(finalized_at,clock_timestamp()) end where id='{lot}'")
+                else: sql(f"update public.auctions set status='{status}',completed_at=case when '{status}'='completed' then clock_timestamp() else completed_at end,settled_at=case when '{status}'='completed' then clock_timestamp() else settled_at end where id='{lot}'")
+                for viewer in [owner,other,restricted,administrator]:
+                    pair=json.loads(sql(f"select jsonb_build_object('old',khub_bot.card_before_231(array['{lot}'::uuid]),'new',public.read_auction_card_context(array['{lot}'::uuid]))",viewer))
+                    oldrows=pair['old']['rows'];newrows=pair['new']['rows'];assert len(oldrows)==len(newrows)
+                    if not newrows:continue
+                    for key in private_keys:
+                        # Active Sell's old narrow projection omits winner/report keys.
+                        if lot==aid and status=='active' and key not in oldrows[0]:continue
+                        assert oldrows[0].get(key)==newrows[0].get(key),(key,viewer,status,oldrows,newrows)
+                    assert not {'balance_meat','fulfillments','settlement_contacts','reservation_audit','own_trade_report'} & newrows[0].keys()
+                    projection=json.loads(sql(f"select jsonb_build_object('old',khub_bot.public_auction(a,1,null,null),'new',khub_bot.public_listing_projection(a,1,null,null)) from public.auctions a where id='{lot}'",viewer))
+                    for key in public_fields:assert projection['old'].get(key)==projection['new'].get(key),(key,projection)
+        for rpc in ['khub_bot.card_before_231','public.read_auction_card_context']:
+            plan=json.loads(sql(f"explain (analyze,buffers,format json) select {rpc}(array['{buy}'::uuid])",owner))
+            print(rpc,'local Buy context execution ms:',plan[0]['Execution Time'])
+        for viewer in [None,owner,other,restricted,administrator]:
+            before=json.loads(sql('select public.read_home_auctions()',viewer))
+            after=json.loads(sql('select public.read_home_cards()',viewer))
+            assert before['sections']==after['sections'] and before['total']==after['total']
+            assert before['site_totals']==after['site_totals']
+            old_by_id={row['id']:row for row in before['rows']}
+            assert set(old_by_id)=={row['id'] for row in after['rows']}
+            for row in after['rows']:
+                for key in public_fields:assert row.get(key)==old_by_id[row['id']].get(key),(key,row)
+                assert not {'seller_id','seller_username','highest_bidder_id','settlement_contacts','fulfillments'} & row.keys()
+        for rpc in ['read_home_auctions','read_home_cards']:
+            plan=json.loads(sql(f'explain (analyze,buffers,format json) select public.{rpc}()',owner))
+            print(rpc,'local signed-in Home execution ms:',plan[0]['Execution Time'])
+        # Complete snapshot is valid without exposing query text or literals.
+        snapshot_sql=(ROOT/'scripts/query-stats-snapshot.sql').read_text()
+        before=json.loads(sql(snapshot_sql));sql('select public.read_auction_card_context(array['+lit(buy)+'::uuid])',owner);after=json.loads(sql(snapshot_sql))
+        assert before['snapshot_version']==1 and len(before['statements'])>50
+        assert all('query' not in row and 'statement' not in row for row in before['statements'])
+        assert any(row['category']=='application' and row['rpc']=='read_auction_card_context' for row in after['statements'])
+        for name,value in [('before',before),('after',after)]: (Path(folder)/(name+'.json')).write_text(json.dumps(value))
+        delta=subprocess.run([sys.executable,str(ROOT/'scripts/queryStatsDelta.py'),str(Path(folder)/'before.json'),str(Path(folder)/'after.json')],capture_output=True,text=True)
+        assert delta.returncode==0,delta.stderr
+        assert 'matched' in delta.stdout and 'read_auction_card_context' in delta.stdout
+        print('PASS: lightweight Buy/closed identity parity, private reservation isolation, public fields and complete statistics snapshot/delta')
         print('PASS: public Sell cache-field parity for anonymous, owner, bidder, banned viewer and administrator; no private fields.')
         assert sql(definitions)==financial_before
     finally:

@@ -27,6 +27,8 @@ JSON 404 instead of SPA HTML. The repository's Amplify files are legacy scaffold
   Sell auctions, custom deadlines and receipt-time safeguards.
 - KMail registration/recovery, verified KoL identities, profile histories, seller
   profiles, private balances/reservations and public trade totals.
+- Raffles with private ticket histories, commitment verification, durable draws,
+  prize supply and fulfillment; operational availability depends on deployed gates.
 - Feedback/withdrawal, trade queries, account bans/appeals, reviewed public ban
   gallery, admin inbox, analytics, announcements and multi-select polls.
 - Player ignores with server-side visibility filtering; site activity tracking.
@@ -49,7 +51,10 @@ can use direct reads. Actions use live authorization and authoritative post-writ
 
 Public detail static/live snapshots are combined with private context and bid history;
 details are not wholly cached. Public live TTL is two seconds; static TTL five minutes.
-Private context is reused for five seconds, with full reads on transitions and periodically.
+Active private context refreshes every 60 seconds, closed private detail every 120
+seconds and unpublished drafts every 30 seconds, with authoritative refreshes on
+transitions/actions. Live browse reuses private context per auction for up to 60
+seconds, scoped to authorization; status changes and reservation expiry invalidate it.
 Featured giveaway shares the listing object, with a 30-second TTL; banner has a separate object.
 
 Listing snapshots are fresh for 30 seconds and normally usable up to five minutes
@@ -110,13 +115,21 @@ cannot identify the live Oracle image. Run only one KoL-connected worker across 
 
 ## Performance investigation
 
-Giveaway traffic reliability remains unfinished. Cumulative exports identify private
-card/detail reads and public Home/browse as targets, but cannot isolate an incident hour.
-Capture current sessions/locks and query statistics; compare two snapshots
-without resetting statistics. Collect safe RPC identities, historical
-CPU/memory/I/O/connections and `[PUBLIC_CACHE]` failure codes for the same time window.
-Database-wide and query-statistics resets are independent. Do not run financial-write
-`EXPLAIN ANALYZE` on production. See [priorities](ROADMAP.md).
+Performance work through migration **231** is implemented locally: bounded raffle
+reads and commitment polling, consolidated background account reads, lighter pending
+trade/Home/card projections, per-auction private caching, and reduced idle bot work
+and gift-state payloads. Recovery, privacy and financial barriers remain in place.
+See the [current handoff](HANDOFF.md:1) for verification and rollout status, and
+[231 rollout notes](docs/SCOPED_READS_AND_QUERY_STATS.md:1) for the latest changes.
+SQL 231 must precede the website release; the ignored bot ships separately.
+
+Production impact and the reported peak-traffic incident still need measurement.
+Use [complete statistics snapshots](scripts/query-stats-snapshot.sql:1) and the
+[delta tool](scripts/queryStatsDelta.py:1) approximately 24 hours apart; cumulative
+exports cannot reconstruct the last day. Correlate RPC latency/calls with database
+waits/resources and Worker/bot telemetry. Do not reset counters or run financial-write
+`EXPLAIN ANALYZE` on production. The [roadmap](ROADMAP.md:1) may contain completed items;
+check code before starting another optimization.
 
 ## Secrets and documentation boundaries
 

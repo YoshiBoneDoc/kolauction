@@ -157,7 +157,7 @@ test('homepage is one bounded read independent of total history, with exact sect
     const data=await service.load({view:'home'});
     assert.equal(data.total,10000);assert.equal(data.auctions.length,1);
     assert.equal(data.homeSections.popular[0].id,row.id);
-    assert.deepEqual(calls,[['read_home_auctions',undefined]]);
+    assert.deepEqual(calls,[['read_home_cards',undefined]]);
 });
 
 test('My Auctions uses server-side seller filtering before pagination and preserves returned totals', async () => {

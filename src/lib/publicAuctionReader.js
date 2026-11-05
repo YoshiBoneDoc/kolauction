@@ -1,13 +1,21 @@
+import { createPrivateCardCache } from './privateCardCache.js';
 import { LIVE_FIELDS } from '../../workers/public-auction-cache/liveState.js';
 // Shared public snapshots and private viewer context use separate transports.
 // Never send the browser's JWT/cookies or private query parameters to Cloudflare.
 export function createPublicAuctionReader(client, { enabled = false, fetch: fetcher = globalThis.fetch } = {}) {
     const details = new Map();
     const overlays = new Map();
+    const cardCache = createPrivateCardCache(async (ids, signal) => {
+        let query = client.rpc('read_auction_card_context', { p_ids: ids });
+        if (signal && query.abortSignal) query = query.abortSignal(signal);
+        const { data, error, status } = await query;
+        if (error) throw Object.assign(new Error(error.message || 'Your auction details could not be refreshed.'), { code: error.code, status });
+        return data;
+    });
     let eligibility;
     let scope;
     let generation = 0;
-    const invalidate = () => { generation++; eligibility = null; details.clear(); overlays.clear(); };
+    const invalidate = () => { generation++; eligibility = null; details.clear(); overlays.clear(); cardCache.clear(); };
     globalThis.window?.addEventListener('khub:ignore-list-changed', invalidate);
     async function affected(session) {
         const token = session?.access_token || session?.user?.id || (session ? 'signed-in' : 'anon');
@@ -28,7 +36,7 @@ export function createPublicAuctionReader(client, { enabled = false, fetch: fetc
     }
     return {
         async accepts(request) {
-            if (request.fresh) { details.clear(); overlays.clear(); }
+            if (request.fresh) { details.clear(); overlays.clear(); cardCache.clear(); }
             if (!enabled || !client || !['home', 'browse', 'seller', 'detail'].includes(request.view)
                 || request.sellerId || request.excludeOwn || request.fresh && request.view !== 'detail' || request.summaryOnly
                 || ['seller', 'detail'].includes(request.view) && !request.id) return false;
@@ -132,23 +140,26 @@ export function createPublicAuctionReader(client, { enabled = false, fetch: fetc
                 data.rows.map(row => row.id).sort()]);
             let privateData;
             const saved = overlays.get(overlayKey);
-            // Live polling must not multiply expensive per-viewer card reads.
-            // Match the old listing read cadence; auth/ignore changes scope it.
-            if (data.public_snapshot?.live_mode && saved && Date.now() - saved.at < (request.view === 'seller' ? 30000 : 60000)) privateData = saved.data;
+            if (request.view === 'browse' && data.public_snapshot?.live_mode) privateData = await cardCache.load(auth.session?.access_token || 'anon', data.rows, { signal: request.signal });
             else {
-                let query = request.view === 'seller'
-                    ? client.rpc('read_seller_auction_context', { p_seller_id: request.id, p_ids: auth.session ? data.rows.map(row => row.id) : [] })
-                    : client.rpc('read_auction_card_context', { p_ids: data.rows.map(row => row.id) });
-                if (request.signal && query.abortSignal) query = query.abortSignal(request.signal);
-                const { data: result, error, status } = await query;
-                if (error) throw Object.assign(new Error(error.message || 'Your auction details could not be refreshed.'), { code: error.code, status });
-                request.signal?.throwIfAborted();
-                if (result?.privacy_version !== 1 || !Array.isArray(result.rows)) {
-                    throw Object.assign(new Error('Your auction details could not be verified.'), { code: 'KHUB_PRIVACY' });
+                // Live polling must not multiply expensive per-viewer card reads.
+                // Match the old listing read cadence; auth/ignore changes scope it.
+                if (data.public_snapshot?.live_mode && saved && Date.now() - saved.at < (request.view === 'seller' ? 30000 : 60000)) privateData = saved.data;
+                else {
+                    let query = request.view === 'seller'
+                        ? client.rpc('read_seller_auction_context', { p_seller_id: request.id, p_ids: auth.session ? data.rows.map(row => row.id) : [] })
+                        : client.rpc('read_auction_card_context', { p_ids: data.rows.map(row => row.id) });
+                    if (request.signal && query.abortSignal) query = query.abortSignal(request.signal);
+                    const { data: result, error, status } = await query;
+                    if (error) throw Object.assign(new Error(error.message || 'Your auction details could not be refreshed.'), { code: error.code, status });
+                    request.signal?.throwIfAborted();
+                    if (result?.privacy_version !== 1 || !Array.isArray(result.rows)) {
+                        throw Object.assign(new Error('Your auction details could not be verified.'), { code: 'KHUB_PRIVACY' });
+                    }
+                    privateData = result;
+                    overlays.set(overlayKey, { data: result, at: Date.now() });
+                    while (overlays.size > 32) overlays.delete(overlays.keys().next().value);
                 }
-                privateData = result;
-                overlays.set(overlayKey, { data: result, at: Date.now() });
-                while (overlays.size > 32) overlays.delete(overlays.keys().next().value);
             }
             const byId = new Map(privateData.rows.map(row => [row.id, row]));
             const rows = auth.session ? data.rows.filter(row => byId.has(row.id)).map(row => ({ ...row, ...byId.get(row.id),

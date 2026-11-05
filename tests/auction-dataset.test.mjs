@@ -9,7 +9,7 @@ const data = () => ({privacy_version:1,rows:[row],bids:[],total:90000,sections})
 
 test('homepage bounds are independent of total: one read, exact sections, no historic paging',async()=>{
     let calls=0;
-    const service=createAuctionService({rpc:async name=>{calls++;assert.equal(name,'read_home_auctions');return {data:data()};}});
+    const service=createAuctionService({rpc:async name=>{calls++;assert.equal(name,'read_home_cards');return {data:data()};}});
     const result=await service.load({view:'home'});
     assert.equal(calls,1);assert.equal(result.auctions.length,1);assert.equal(result.total,90000);
     assert.equal(result.homeSections.popular[0].owner,'Authorized seller');

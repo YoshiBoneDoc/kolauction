@@ -100,3 +100,27 @@ Offline validation includes full bot tests and the isolated full-schema lifecycl
 suite, including cancellation batching, reserve preservation, rollback, concurrent
 ticks, restart, wakeups, service-only access and frozen beacon commitments. Tests
 use simulated delivery evidence and cannot prove real KoL delivery behavior.
+
+
+## Scheduler/log follow-up (bot code only)
+
+Confirmed intake outcomes now drive the fast maintenance/closet path. Merely
+retaining recognized mail is not new work: cached completed account messages,
+`already_done`/`deferred` account jobs and `duplicate` receipt responses retain
+normal idle scheduling. Newly completed account work and confirmed nonduplicate
+intake still expedite maintenance. Dispatch and due-auction hints remain live;
+there is no change to receipt validation, scan barriers, cleanup or send guards.
+
+The default `[BOT_PERFORMANCE]` line is compact: cycle count/average/max, RPC
+count/failures/no-work responses, average phase durations, maintenance/closet
+reason counts, and the two largest RPC maximum latencies. Reasons include timer,
+new intake, due auction, dispatch, legacy mode and idle skip as applicable. A task
+may have multiple reasons. These counters explain decisions without mail IDs,
+commands, player data or request arguments. `no_work` counts known work-discovery
+and claim results; a successful void-returning maintenance RPC is not an empty
+claim. For full aggregates and histograms, explicitly set
+`BOT_PERFORMANCE_DETAIL=true` in the bot environment; short summaries are default.
+
+This follow-up needs only the Oracle bot rebuild after the existing migration 230
+prerequisite. It adds no SQL. The quickstart and live runtime are not changed by
+local edits; use the existing deployment procedure when ready.

@@ -152,7 +152,7 @@ export function createAuctionService(client, { publicReader = null, readDeadline
             let request;
             if (await publicReader?.accepts(sharedRequest)) request = publicReader.load(sharedRequest).then(data => ({ data }));
             else if (view === 'seller' && summaryOnly) request = requireClient().rpc('read_seller_auction_context', { p_seller_id: id, p_ids: [] });
-            else if (view === 'home') request = requireClient().rpc('read_home_auctions');
+            else if (view === 'home') request = requireClient().rpc('read_home_cards');
             else request = requireClient().rpc(view === 'browse' ? 'read_filtered_auction_page' : view === 'detail' ? 'read_auction_detail_static' : 'read_auction_page', {
                 p_view: view === 'browse' && excludeOwn ? 'others' : view === 'browse' && sellerId ? 'seller' : view,
                 p_id: view === 'browse' && sellerId ? sellerId : id,

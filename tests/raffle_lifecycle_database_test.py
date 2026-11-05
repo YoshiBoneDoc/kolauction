@@ -870,7 +870,7 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
         safety=json.loads(sql('select public.bot_worker_safety()'))
         for key in ['attention','isolatedDeliveryAttention','closetAttention','mailPolicyAttention','accountRequestsPending','siteMaintenanceOwned','closetRecoveryReviewKey']:
             assert safety[key]==full_status[key],key
-        assert safety['capabilityRevision']==230 and full_status['workerSchedulingVersion']==1
+        assert safety['capabilityRevision']==231 and full_status['workerSchedulingVersion']==1
         for signature in ['bot_worker_safety()','bot_cycle_plan()','bot_raffle_tick_due()','bot_defer_raffle_draw(uuid,bigint,boolean)']:
             for role in ['anon','authenticated']:
                 assert sql(f"select has_function_privilege('{role}','public.{signature}','execute')")=='f'
@@ -927,6 +927,28 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
         assert account_value(deferred,'draw_failures')=='1'
         assert sql(f"select commitment_hash||':'||round from khub_bot.raffle_fairness where raffle_id='{deferred}'")==committed_before
         print('PASS: fresh safety equivalence, service-only scheduling, bounded refunds, exact partial liabilities, rollback, restart, wakeups and immutable deferred draw')
+        gift_probe=json.loads(sql("""begin;
+        insert into khub_bot.incoming_gifts(mail_id,wrapper_id,envelope,payload,opened_at)
+        select (910000000+n)::text,1167,jsonb_build_object('id',(910000000+n)::text),jsonb_build_object('id',(910000000+n)::text,'fixture',repeat('x',2000)),clock_timestamp() from generate_series(1,300)n;
+        insert into khub_bot.receipts(mail_id,sender_id,received_at,payload,result)
+        select (910000000+n)::text,48889602,clock_timestamp(),'{}'::jsonb,'fixture' from generate_series(1,300)n;
+        insert into khub_bot.incoming_gifts(mail_id,wrapper_id,envelope,payload)
+        values('910001000',1167,'{"id":"910001000"}','{"id":"910001000"}'),('910001001',1167,'{"id":"910001001"}',null);
+        insert into khub_bot.gift_mail_reviews(mail_id,raw,evidence)values('910001002','{"id":"910001002"}','offline fixture');
+        with original as(select public.bot_gift_intake_state() v),scoped as(select public.bot_gift_intake_state_scoped(array['910000001']) v)
+        select jsonb_build_object('old_bytes',length(original.v::text),'new_bytes',length(scoped.v::text),
+        'observed',exists(select 1 from jsonb_array_elements(scoped.v->'mails') m where m->>'id'='910000001'),
+        'historical_omitted',not exists(select 1 from jsonb_array_elements(scoped.v->'mails') m where m->>'id'='910000002'),
+        'unposted',exists(select 1 from jsonb_array_elements(scoped.v->'mails') m where m->>'id'='910001000'),
+        'unopened',exists(select 1 from jsonb_array_elements(scoped.v->'mails') m where m->>'id'='910001001'),
+        'holds_equal',original.v->'isolated'=scoped.v->'isolated' and original.v->'attempt'=scoped.v->'attempt' and original.v->'review_mail'=scoped.v->'review_mail' and original.v->'reviews'=scoped.v->'reviews') from original,scoped;
+        rollback;"""))
+        assert all(gift_probe[key] for key in ['observed','historical_omitted','unposted','unopened','holds_equal']),gift_probe
+        assert gift_probe['new_bytes']<gift_probe['old_bytes']/2,gift_probe
+        for role in ['anon','authenticated']:
+            assert sql(f"select has_function_privilege('{role}','public.bot_gift_intake_state_scoped(text[])','execute')")=='f'
+        sql("select public.bot_gift_intake_state_scoped(array['bad-id'])",error='Invalid complete inbox IDs')
+        print('PASS: scoped gifts omit posted history, preserve observed/unposted/unresolved state and global holds; payload bytes',json.dumps(gift_probe))
         print('PASS: full-schema lifecycle and isolation: identical items, concurrent auction/raffle Meat, exact solvency, proof guards, retries, restarts, cancellation and schema permissions')
     finally:
         if started: pg('-m','immediate','-w','stop')

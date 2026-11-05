@@ -223,7 +223,7 @@ test('private routes, personalized filters, signed-in All, and forced post-actio
     const calls = [];
     const service = createAuctionService({ rpc(name) { calls.push(name); return Promise.resolve({ data: { ...source(), sections: source().sections } }); } }, { publicReader: f.reader });
     await service.load({ view: 'home', fresh: true });
-    assert.deepEqual(calls, ['read_home_auctions']);
+    assert.deepEqual(calls, ['read_home_cards']);
     assert.equal(f.requests.length, 0);
 });
 

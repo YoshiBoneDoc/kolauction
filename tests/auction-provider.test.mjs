@@ -30,13 +30,13 @@ function setup(){
  fixture={cursor:0,slots:[],effects:[],user:{id:'viewer'},location:{pathname:'/',search:''},calls:[],fail:false};
  fixture.rpc=async(name,args)=>{
   fixture.calls.push([name,args]);
-  if(fixture.fail&&['read_home_auctions','read_filtered_auction_page','read_auction_page','read_auction_detail_static'].includes(name))return {error:{code:'57014',message:'timeout'}};
+  if(fixture.fail&&['read_home_cards','read_filtered_auction_page','read_auction_page','read_auction_detail_static'].includes(name))return {error:{code:'57014',message:'timeout'}};
   if(name==='read_pending_trade_summary')return {data:{privacy_version:1,total:0}};
   if(name==='read_pending_trades')return {data:{privacy_version:1,rows:[],total:0}};
-  if(['read_home_auctions','read_filtered_auction_page','read_auction_page','read_auction_detail_static'].includes(name)){
+  if(['read_home_cards','read_filtered_auction_page','read_auction_page','read_auction_detail_static'].includes(name)){
    const rows=Array.from({length:25},(_,i)=>({id:`a-${i}`,seller_id:'seller',seller_username:fixture.user?'Authorized seller':'Seller',usernames_visible:!!fixture.user,
     item:`Item ${i}`,quantity:1,min_bid_meat:100,current_bid:100,status:'active',created_at:'2026-10-20',end_time:'2027-01-01',market_value_meat:200}));
-   return {data:{privacy_version:1,rows:rows.slice(((args?.p_page||1)-1)*24,(args?.p_page||1)*24),bids:[],total:25, ...(name==='read_home_auctions'?{sections:{popular:rows.slice(0,24).map(r=>r.id),new:[],ending:[],highRollers:[],recent:[]}}:{})}};
+   return {data:{privacy_version:1,rows:rows.slice(((args?.p_page||1)-1)*24,(args?.p_page||1)*24),bids:[],total:25, ...(name==='read_home_cards'?{sections:{popular:rows.slice(0,24).map(r=>r.id),new:[],ending:[],highRollers:[],recent:[]}}:{})}};
   }
   return {error:null};
  };
@@ -48,7 +48,7 @@ function setup(){
 test('provider reads Home once and each selected browse page once, retaining independent pending pagination and cached navigation',async()=>{
  const f=setup();try{
   f.render();await f.immediate();let value=f.render();assert.equal(value.auctions.length,24);
-  assert.deepEqual(fixture.calls.map(([n])=>n),['read_home_auctions','read_pending_trade_summary']);
+  assert.deepEqual(fixture.calls.map(([n])=>n),['read_home_cards','read_pending_trade_summary']);
   fixture.location={pathname:'/auctions',search:'?q=item&sort=price-desc&page=2&minPrice=10'};
   value=f.render();assert.equal(value.auctions.length,0);await f.immediate();value=f.render();
   assert.equal(value.auctions.length,1);assert.equal(value.total,25);assert.equal(fixture.calls.length,3);
@@ -64,7 +64,7 @@ test('writes still call the server and force fresh selected-resource reads; fail
  const f=setup();try{
   f.render();await f.immediate();let value=f.render();await value.placeBid('a-0',200);
   value=f.render();assert.equal(value.auctions.length,24);assert.ok(fixture.calls.some(([n,a])=>n==='place_bid'&&a.p_amount===200));
-  assert.equal(fixture.calls.filter(([n])=>n==='read_home_auctions').length,2);
+  assert.equal(fixture.calls.filter(([n])=>n==='read_home_cards').length,2);
   fixture.fail=true;await value.refreshAuctions();value=f.render();
   assert.equal(value.auctions.length,24);assert.equal(value.hasLoaded,true);assert.equal(value.isLoading,false);assert.match(value.error,/took too long/);
  }finally{f.restore();}
@@ -88,7 +88,7 @@ test('development StrictMode effect cleanup/setup can restart the cache and poll
   for(const effect of effects)effect.cleanup=effect.setup();
   await f.immediate();
   const value=f.render();assert.equal(value.auctions.length,24);assert.equal(value.hasLoaded,true);
-  assert.equal(fixture.calls.filter(([name])=>name==='read_home_auctions').length,1);
+  assert.equal(fixture.calls.filter(([name])=>name==='read_home_cards').length,1);
  }finally{f.restore();}
 });
 
@@ -133,10 +133,10 @@ test('a bid completing after navigation refreshes the selected page rather than 
   fixture.rpc=(name,...args)=>name==='place_bid'?new Promise(resolve=>{finish=()=>resolve({error:null});}):original(name,...args);
   const write=home.placeBid('a-0',200);
   fixture.location={pathname:'/auctions',search:'?page=2'};f.render();await f.immediate();f.render();
-  const before=fixture.calls.filter(([n])=>n==='read_home_auctions').length;
+  const before=fixture.calls.filter(([n])=>n==='read_home_cards').length;
   finish();await write;const value=f.render();
   assert.equal(value.auctions.length,1);
-  assert.equal(fixture.calls.filter(([n])=>n==='read_home_auctions').length,before);
+  assert.equal(fixture.calls.filter(([n])=>n==='read_home_cards').length,before);
   assert.equal(fixture.calls.filter(([n])=>n==='read_filtered_auction_page').length,2);
  }finally{f.restore();}
 });
@@ -146,7 +146,7 @@ test('confirmed bids finish while page refresh is pending and do not reload unre
  const f=setup();try{
   f.render();await f.immediate();const before=fixture.calls.filter(([n])=>n.startsWith('read_pending')).length;
   const original=fixture.rpc;let finish;
-  fixture.rpc=(name,...args)=>name==='read_home_auctions'?new Promise(resolve=>{finish=async()=>resolve(await original(name,...args));}):original(name,...args);
+  fixture.rpc=(name,...args)=>name==='read_home_cards'?new Promise(resolve=>{finish=async()=>resolve(await original(name,...args));}):original(name,...args);
   await f.render().placeBid('a-0',200);
   for(let n=0;n<10&&!finish;n++)await Promise.resolve();
   assert.equal(typeof finish,'function');assert.equal(f.render().isRefreshing,true);
