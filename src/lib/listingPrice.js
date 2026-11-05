@@ -11,7 +11,7 @@ export function listingPrice(value, side, quantity, canonicalSide) {
     const amount = BigInt(price);
     const units = BigInt(count);
     if (side === 'whole' && amount % units !== 0n) {
-        fields.message = `This total is not divisible by the quantity into whole Meat per item.${canonicalSide === 'item' ? ' Enter a divisible total or a whole per-item price.' : ' The whole-listing price will be used unchanged.'}`;
+        if (canonicalSide === 'item') fields.message = 'This total is not divisible by the quantity into whole Meat per item. Enter a divisible total or a whole per-item price.';
         return fields;
     }
     const derived = side === 'whole' ? amount / units : amount * units;

@@ -228,7 +228,8 @@ export function createAuctionService(client, { publicReader = null, readDeadline
                 p_item: auction.item,
                 p_quantity: auction.quantity,
                 p_min_bid_meat: auction.minBidMeat,
-                p_duration_hours: Number(auction.auctionTime),
+                // Existing custom-end RPC validates a supported preset before deriving the actual duration.
+                p_duration_hours: auction.giveawayTitle && auction.customEndAt && Number(auction.auctionTime) === 1 ? 6 : Number(auction.auctionTime),
                 p_image: auction.image || null,
                 p_instant_purchase_price: auction.instantPurchasePrice ?? null,
                 p_item_id: auction.itemId ?? null,

@@ -1,3 +1,6 @@
+import RaffleAuctionCard from '../components/RaffleAuctionCard';
+import useHomeRaffles from '../hooks/useHomeRaffles';
+import { matchesRaffleBrowse } from '../lib/raffles';
 import AuctionFilters, { AuctionFiltersButton, AUCTION_PRICE_RANGE_ENABLED } from '../components/AuctionFilters';
 import { parsePrice } from '../lib/auctionPriceRange';
 import { useContext, useEffect, useId, useState } from 'react';
@@ -23,6 +26,7 @@ export default function AllAuctions() {
     const [searchInput, setSearchInput] = useAuctionSearch(setParams);
     const now = useNow(auctions);
     const featuredGiveaway = useFeaturedGiveaway();
+    const raffles = useHomeRaffles(true);
     const [openBid, setOpenBid] = useState(null);
     const [filtersOpen, setFiltersOpen] = useState(false);
     const filtersId = useId();
@@ -50,6 +54,7 @@ export default function AllAuctions() {
     const trade = ['escrow', 'direct', 'none'].includes(params.get('trade')) ? params.get('trade') : 'all';
     const minPrice = AUCTION_PRICE_RANGE_ENABLED ? parsePrice(params.get('minPrice')) : null;
     const maxPrice = AUCTION_PRICE_RANGE_ENABLED ? parsePrice(params.get('maxPrice')) : null;
+    const visibleRaffles = raffles.filter(raffle => matchesRaffleBrowse(raffle, { query: params.get('q') || '', status, kind, trade, buyout, bundle, ownershipFiltered, minPrice, maxPrice }));
     const requestedPage = Math.min(1000000, Math.max(1, Number.parseInt(params.get('page'), 10) || 1));
     // The reader filters and sorts the complete matching set BEFORE pagination.
     const found = total;
@@ -163,12 +168,13 @@ export default function AllAuctions() {
                 </p>}
                 {isLoading ? <p role="status">Loading auctions…</p> : <>
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
-                        {hasLoaded && <p role="status">{listingOrderDelayed ? 'Results may be out of date. Count and ordering are being refreshed.' : `${found} ${found === 1 ? 'auction' : 'auctions'} found`}</p>}
+                        {hasLoaded && <p role="status">{listingOrderDelayed ? 'Results may be out of date. Count and ordering are being refreshed.' : `${found} ${found === 1 ? 'auction' : 'auctions'} found${visibleRaffles.length ? ` · ${visibleRaffles.length} raffle ${visibleRaffles.length === 1 ? 'preview' : 'previews'}` : ''}`}</p>}
                         <button onClick={clearAdvancedFilters} className="min-h-9 border-0 bg-transparent px-2 text-sm text-blue-700 underline">Reset filters</button>
                     </div>
-                    {!error && pageRows.length === 0 && <p className="rounded-lg border bg-white p-6">{trade === 'none' ? 'Select Escrow or Direct to show auctions.' : mineOnly ? 'No auctions of yours match these filters.' : 'No auctions match your search and filters. Try another item name or status.'}</p>}
+                    {!error && pageRows.length === 0 && visibleRaffles.length === 0 && <p className="rounded-lg border bg-white p-6">{trade === 'none' ? 'Select Escrow or Direct to show auctions.' : mineOnly ? 'No auctions of yours match these filters.' : 'No auctions match your search and filters. Try another item name or status.'}</p>}
                     <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         {featuredGiveaway && featuredGiveaway.endTime > now && <GiveawayCard compact auction={featuredGiveaway} now={now} />}
+                        {visibleRaffles.map(raffle => <RaffleAuctionCard key={`raffle-${raffle.id}`} raffle={raffle} />)}
                         {pageRows.filter(auction => !(featuredGiveaway?.endTime > now && auction.id === featuredGiveaway.id)).map((auction) => <div key={auction.id} className={`auction-bookmark-card relative min-w-0 ${bookmarkCounts[auction.id] > 0 && !auction.liveUnavailable ? 'has-bookmark-ribbon' : ''}`}>
                             {bookmarkCounts[auction.id] > 0 && !auction.liveUnavailable && <span className={`auction-bookmark-ribbon${mySavedAuctionIds.has(auction.id) ? ' is-saved' : ''}`}
                                 onMouseEnter={() => setShowBookmarkers(true)} onFocus={() => setShowBookmarkers(true)}

@@ -94,7 +94,10 @@ function SavedAuctionPanel({ auctionId }) {
     const saved = rows?.find(row => row.id === auctionId);
     return <section aria-label={auctionId ? 'Save auction' : 'Saved Auctions'} className={auctionId ? (error ? 'mb-3 space-y-2 pr-10' : '') : 'profile-transaction-section space-y-3'}>
         {!auctionId && <div className="profile-saved-header flex min-h-[26px] items-center gap-4 overflow-x-auto border-b pb-3 profile-divider">
+            <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
                 <h2 className="shrink-0 whitespace-nowrap text-[17px] font-semibold profile-text">My Saved Auctions</h2>
+                <p className="text-xs profile-muted">Click the red bookmark on any auction&apos;s details page to save it here.</p>
+            </div>
             <div className="profile-saved-default ml-auto flex shrink-0">
                 <div className="ml-auto flex w-max min-w-max items-center gap-2">
                     <label className="flex items-center gap-1.5 whitespace-nowrap text-xs profile-muted">

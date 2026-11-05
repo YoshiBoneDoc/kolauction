@@ -1,3 +1,6 @@
+import { canViewRaffles } from '../lib/raffleVisibility';
+import SpecialAuctionNavigation from '../components/SpecialAuctionNavigation';
+import RaffleEditor from '../components/RaffleEditor';
 import useEscrowFeePreview from '../hooks/useEscrowFeePreview';
 import ListingPriceInputs from '../components/ListingPriceInputs';
 import useListingPrice from '../hooks/useListingPrice';
@@ -81,6 +84,7 @@ export default function AuctionAnItem() {
     const [preview, setPreview] = useState(null);
     const { fee: previewFee } = useEscrowFeePreview(preview?.minBidMeat, Boolean(preview?.escrowMode && preview?.auctionKind !== 'buy'));
     const [giveaway, setGiveaway] = useState(false);
+    const [raffle, setRaffle] = useState(false);
     const [giveawayCondition, setGiveawayCondition] = useState('last_bid');
     const [giveawayTitle, setGiveawayTitle] = useState('Meat Stack Mania');
     useEffect(() => {
@@ -92,12 +96,12 @@ export default function AuctionAnItem() {
             event.preventDefault();
             if (performance.now() - lastStep < 160) return;
             lastStep = performance.now();
-            const options = ['6', '12', '24', '72', '168', '336', '720'];
+            const options = [...(giveaway ? ['1'] : []), '6', '12', '24', '72', '168', '336', '720'];
             setAuctionTime(current => options[Math.max(0, Math.min(options.length - 1, options.indexOf(current) + (event.deltaY > 0 ? 1 : -1)))]);
         }
         select.addEventListener('wheel', scrollDuration, { passive: false });
         return () => select.removeEventListener('wheel', scrollDuration);
-    }, [customDuration, preview]);
+    }, [customDuration, preview, giveaway, raffle]);
     const [error, setError] = useState('');
     const [pending, setPending] = useState(false);
     const previewHeading = useRef(null);
@@ -184,6 +188,8 @@ export default function AuctionAnItem() {
             try { customEndAt = customAuctionEnd(customEndTime); }
             catch (failure) { setError(failure.message); return; }
         }
+        // One hour uses the existing fixed-deadline overload; normal presets start on deposit.
+        if (giveaway && !customDuration && auctionTime === '1') customEndAt = new Date(auctionNow() + 3600000).toISOString();
         if (giveaway && (isBuy || isBundle)) { setError('Giveaways use a single sell item.'); return; }
         if (giveaway && giveawayCondition !== 'last_bid' && !escrowMode) { setError('This win condition requires Escrow delivery.'); return; }
         if (giveaway && !giveawayTitle.trim()) { setError('Enter a giveaway title.'); return; }
@@ -234,15 +240,35 @@ export default function AuctionAnItem() {
         </main>
     );
 
+    function selectGiveaway() {
+        const meat = catalogItems.find(item => item.name === 'dense meat stack');
+        setRaffle(false); setGiveaway(true); setPreview(null); setError('');
+        setAuctionKind('sell'); setEscrowMode(true);
+        setSelectedItem(String(meat?.id || '')); setItemSearch('dense meat stack');
+        setQuantity('1000'); setMinBidMeat('1'); setShowBuyout(false); setInstantPrice('');
+        setGiveawayTitle('Meat Stack Mania'); setGiveawayCondition('last_bid');
+        setAuctionTime('1'); setCustomDuration(false); setCustomEndTime(''); setAutoRelist(false);
+    }
+    function selectRaffle() {
+        setRaffle(true); setGiveaway(false); setPreview(null); setError('');
+    }
+    function standardAuction() {
+        setRaffle(false); setGiveaway(false); setPreview(null); setError('');
+        setAuctionKind('sell'); setEscrowMode(true); setAuctionTime('24');
+        setCustomDuration(false); setCustomEndTime(''); setShowBuyout(false); setInstantPrice('');
+        setSelectedItem(''); setItemSearch(''); setQuantity('1'); setMinBidMeat(''); setAutoRelist(false);
+    }
+    if (raffle && currentUser?.isAdmin && canViewRaffles(currentUser)) return <main className="auction-create-page site-page-background flex-1 p-4 sm:p-6"><div className="auction-create-shell"><h1 className="special-create-title mb-5 text-center text-3xl font-bold">Create Raffle</h1><div className="auction-create-content"><RaffleEditor items={sortedItems} onExit={standardAuction} onGiveaway={selectGiveaway} /></div></div></main>;
+
     const removeBuyoutControl = <button type="button" aria-label="Remove buyout price" onClick={() => { setInstantPrice(''); setShowBuyout(false); }} className="shrink-0 rounded px-1 py-0.5 text-xs font-normal text-gray-500 hover:text-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 dark:text-gray-400 dark:hover:text-gray-200"><span aria-hidden="true" className="mr-1 text-sm">×</span>Remove</button>;
 
     return (
         <main className="auction-create-page site-page-background flex-1 p-4 sm:p-6">
             <div className="auction-create-shell">
-            <h1 className="mb-6 text-center text-3xl font-bold text-blue-600 sm:text-4xl">Create Auction</h1>
-            {!preview && <p className="mx-auto mb-4 max-w-lg text-sm text-gray-700">{kolIdentity && !kolIdentity.kol_player_id && <>First <Link to="/profile" className="text-blue-700 underline">link your KoL account</Link>. </>}Choose Buy or Sell. Mode is fixed after publishing.</p>}
+            <h1 className={`mb-6 text-center text-3xl font-bold text-blue-600 sm:text-4xl ${giveaway ? 'special-create-title' : ''}`}>{giveaway ? 'Create Giveaway' : 'Create Auction'}</h1>
+            {!preview && !giveaway && <p className="mx-auto mb-4 max-w-lg text-sm text-gray-700">{kolIdentity && !kolIdentity.kol_player_id && <>First <Link to="/profile" className="text-blue-700 underline">link your KoL account</Link>. </>}Choose Buy or Sell. Mode is fixed after publishing.</p>}
             <div className="auction-create-content">
-                {!preview && <div className="mb-5">
+                {!preview && !giveaway && <div className="mb-5">
                     <div role="group" aria-label="Auction type" className="grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
                         {[['buy','Buy Items'],['sell','Sell Items']].map(([value,label]) => {
                             const selected = value === 'buy' ? isBuy : !isBuy;
@@ -339,8 +365,10 @@ export default function AuctionAnItem() {
                             <button type="button" disabled={pending} onClick={confirm} className="button-green min-h-11 rounded-lg border border-green-700 bg-green-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? 'Publishing…' : 'Publish Auction'}</button>
                         </div>
                     </dialog>
-                </section> : <form className="auction-create-form" onSubmit={showPreview}>
-                    <fieldset className="mb-3 min-w-0">
+                </section> : <form className={`auction-create-form ${giveaway ? 'giveaway-editor' : ''}`} onSubmit={showPreview}>
+                    {giveaway && <><SpecialAuctionNavigation mode="giveaway" onRaffle={selectRaffle} onGiveaway={selectGiveaway} onStandard={standardAuction} />{giveaway && <label className="mt-3 block text-sm font-bold">Title<input id="giveaway-title" value={giveawayTitle} maxLength={80} onChange={event => setGiveawayTitle(event.target.value)} className={fieldClass} /></label>}{giveaway && <fieldset className="mt-2 flex flex-wrap gap-3 text-xs"><legend className="sr-only">Win Condition</legend>{[['last_bid', 'Last Bid'], ['random_draw', 'Random Draw'], ['split', 'Split'], ['surprise', 'Surprise Me']].map(([value, label]) => <label key={value} className="flex items-center gap-1"><input type="radio" name="giveaway-condition" checked={giveawayCondition === value} onChange={() => { setGiveawayCondition(value); if (value !== 'last_bid') setEscrowMode(true); }} />{label}</label>)}</fieldset>}</>}
+
+                    {!giveaway && <fieldset className="mb-3 min-w-0">
                         <legend className="mb-2 text-sm font-bold">Trading Method</legend>
                         <div className="grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
                             {[[true, 'Escrow'], [false, 'Direct']].map(([value, label]) => <button
@@ -353,11 +381,11 @@ export default function AuctionAnItem() {
                             </button>)}
                         </div>
                         {isBuy && <p className="mt-2 text-xs text-gray-600">For now, creating a Buy auction is limited to Escrow</p>}
-                    </fieldset>
-                    <div id="escrow-protection" ref={protectionSection} className={`${escrowMode && !isBuy ? 'mb-2' : 'mb-5'} scroll-mt-4`}>
+                    </fieldset>}
+                    {!giveaway && <div id="escrow-protection" ref={protectionSection} className={`${escrowMode && !isBuy ? 'mb-2' : 'mb-5'} scroll-mt-4`}>
                         {escrowMode ? <EscrowProtection forListing buy={isBuy} minimumPrice={minimumValue} /> : <DirectTradeHelp forListing />}
                         {!escrowMode && <p className="mt-2 text-xs leading-[1.4] text-red-600">Failure to honor a valid, completed auction is a violation of kHub policy and will likely get you banned. We take these very seriously.</p>}
-                    </div>
+                    </div>}
                     {isBundle && <>
                         <label htmlFor="bundleTitle" className="mb-2 block text-sm font-bold">Bundle title <span className="font-normal text-gray-600">(optional)</span></label>
                         <input ref={bundleTitleInput} id="bundleTitle" type="text" value={bundleTitleText} maxLength={MAX_BUNDLE_TITLE_LENGTH} autoComplete="off"
@@ -454,7 +482,7 @@ export default function AuctionAnItem() {
                     <label htmlFor="minBidMeat" className="mb-2 block text-sm font-bold">{isBuy ? 'Maximum purchase price per item (Meat):' : 'Minimum Bid (Meat, whole listing):'}</label>
                     <input id="minBidMeat" type="text" inputMode="decimal" required autoComplete="off" value={minBidMeat} onChange={(event) => setMinBidMeat(event.target.value)} onBlur={() => setMinBidMeat(value => normalizeAuctionAmount(value, { meat: true }))} placeholder="e.g. 1000, 10b, 4.53m, 50k" className={fieldClass} />
                     </> : <ListingPriceInputs id="minimum-price" label={isBuy ? 'Maximum purchase price (Meat):' : 'Minimum Bid (Meat):'} pricing={minimumPricing} required />}
-                    {!isBuy && (showBuyout ? <section id="buyout-price-fields" className="mb-4 border-t border-[#ead8ce] pt-3 dark:border-[#594337]">
+                    {!isBuy && !giveaway && (showBuyout ? <section id="buyout-price-fields" className="mb-4 border-t border-[#ead8ce] pt-3 dark:border-[#594337]">
                         {isBundle ? <>
                         <div className="mb-2 flex items-center justify-between gap-2"><label htmlFor="instantPurchasePrice" className="text-sm font-bold">Buyout Price (Meat, whole listing, optional):</label>{removeBuyoutControl}</div>
                         <input ref={buyoutInput} id="instantPurchasePrice" type="text" inputMode="decimal" autoComplete="off" value={instantPrice}
@@ -480,7 +508,7 @@ export default function AuctionAnItem() {
                     <label htmlFor="auctionTime" className="mb-2 block text-sm font-bold">Duration:</label>
                     <div className="mb-4 flex min-w-0 gap-2">
                         <select ref={durationInput} title="Scroll to adjust the duration, or click to choose." id="auctionTime" value={auctionTime} disabled={customDuration} onChange={(event) => setAuctionTime(event.target.value)} className="block min-h-11 w-full min-w-0 flex-1 rounded border border-gray-400 bg-white p-3 text-base text-gray-900 disabled:bg-gray-100 disabled:text-gray-500">
-                            <option value="6">6 Hours</option><option value="12">12 Hours</option>
+                            {giveaway && <option value="1">1 Hour</option>}<option value="6">6 Hours</option><option value="12">12 Hours</option>
                             <option value="24">1 Day</option><option value="72">3 Days</option>
                             <option value="168">7 Days</option><option value="336">14 Days</option>
                             <option value="720">1 Month</option>
@@ -525,8 +553,8 @@ export default function AuctionAnItem() {
                             <p className="w-full text-xs leading-relaxed text-stone-500">{relistPricing === 'reduce' ? `Reduce the minimum bid by ${relistReduction || 1}% each time the auction is relisted.` : 'Keep the same starting price each time the auction is relisted.'}</p>
                         </div>}
                     </div>}
-                    {currentUser?.isAdmin && <div className="mb-4"><button type="button" aria-pressed={giveaway} onClick={() => { const next = !giveaway; setGiveaway(next); if (next) { const meat = catalogItems.find(item => item.name === 'dense meat stack'); setAuctionKind('sell'); setEscrowMode(true); setSelectedItem(String(meat?.id || '')); setItemSearch('dense meat stack'); setQuantity('1000'); setMinBidMeat('1'); setShowBuyout(false); setInstantPrice(''); } }} className="min-h-11 w-full rounded border border-red-700 bg-red-700 px-4 font-bold text-white">Giveaway</button>{giveaway && <fieldset className="mt-2 flex flex-wrap gap-3 text-xs"><legend className="sr-only">Win Condition</legend>{[['last_bid', 'Last Bid'], ['random_draw', 'Random Draw'], ['split', 'Split'], ['surprise', 'Surprise Me']].map(([value, label]) => <label key={value} className="flex items-center gap-1"><input type="radio" name="giveaway-condition" checked={giveawayCondition === value} onChange={() => { setGiveawayCondition(value); if (value !== 'last_bid') setEscrowMode(true); }} />{label}</label>)}</fieldset>}{giveaway && <label className="mt-3 block text-sm font-bold">Title<input value={giveawayTitle} maxLength={80} onChange={event => setGiveawayTitle(event.target.value)} className={fieldClass} /></label>}</div>}
-                    <button type="submit" className="auction-preview-button min-h-11 w-full rounded bg-blue-600 px-4 py-3 font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">Preview Auction</button>
+                    {currentUser?.isAdmin && canViewRaffles(currentUser) && !giveaway && auctionKind === 'sell' && escrowMode && <div className="mb-4"><div className="grid grid-cols-2 gap-2"><button type="button" aria-pressed={false} onClick={selectRaffle} className="raffle-mode-button raffle-mode-purple min-h-11 w-full rounded border border-violet-700 bg-violet-700 px-4 font-bold text-white transition-[background-color,box-shadow] duration-150 hover:bg-violet-600 hover:shadow-[0_0_14px_rgba(139,92,246,0.45)] motion-reduce:transition-none">Raffle</button><button type="button" aria-pressed={giveaway} onClick={selectGiveaway} className="raffle-mode-button raffle-mode-red min-h-11 w-full rounded border border-red-700 bg-red-700 px-4 font-bold text-white transition-[background-color,box-shadow] duration-150 hover:bg-red-600 hover:shadow-[0_0_14px_rgba(239,68,68,0.4)] motion-reduce:transition-none">Giveaway</button></div></div>}
+                    <button type="submit" className={`auction-preview-button ${giveaway ? 'special-preview-button giveaway-preview-button' : ''} min-h-11 w-full rounded bg-blue-600 px-4 py-3 font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50`}>{giveaway ? 'Preview Giveaway' : 'Preview Auction'}</button>
                 </form>}
             </div>
             </div>

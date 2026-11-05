@@ -1,0 +1,133 @@
+.raffle-editor,.raffle-summary{color:#342d43;background:#fffaf7;border:1px solid #dfd4e6;border-radius:12px;padding:18px;font-size:13px}.raffle-editor{display:grid;gap:14px}.raffle-editor label{display:grid;gap:6px;font-weight:600}.raffle-editor input,.raffle-editor select{min-width:0;width:100%;padding:9px;border:1px solid #aaa0b5;border-radius:6px;background:#fff;color:#342d43}.raffle-editor p,.raffle-summary p{font-size:12px;line-height:1.6;color:#756b80;margin:10px 0}.raffle-editor button{font-size:12px}.raffle-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}.raffle-badges{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:10px;color:#756b80}.raffle-label{background:#74529b;color:#fff;border-radius:4px;padding:3px 7px;font-weight:700}.raffle-summary h2{font-size:23px;font-weight:700;margin:12px 0}.raffle-facts{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px}.raffle-facts small{font-weight:400}.raffle-prizes{display:grid;gap:8px;margin:12px 0}.raffle-prizes li{display:flex;align-items:center;gap:10px;border:1px solid #e4dce9;border-radius:7px;padding:9px}.raffle-prizes img{width:32px;height:32px;object-fit:contain}.raffle-prizes small{display:block;font-size:10px;color:#756b80;margin-top:3px}.raffle-prizes input{width:100px}.raffle-prizes button{margin-left:auto}.raffle-primary{background:#74529b;color:white}.raffle-error{color:#b53535!important}.raffle-editor button:disabled{opacity:.5}.raffle-page{max-width:900px;width:100%;margin:24px auto;padding:0 16px}.raffle-page>a{display:inline-block;margin:10px 0}.raffle-list{display:grid;gap:16px}
+html[data-theme=dark] :is(.raffle-editor,.raffle-summary){background:#211e2d;color:#ece5f3;border-color:#50405f}html[data-theme=dark] .raffle-editor :is(input,select){background:#151320;color:#ece5f3;border-color:#675875}html[data-theme=dark] :is(.raffle-editor p,.raffle-summary p,.raffle-badges,.raffle-prizes small){color:#bcafc8}html[data-theme=dark] .raffle-prizes li{border-color:#50405f}@media(max-width:520px){.raffle-fields{grid-template-columns:1fr}.raffle-prizes input{width:76px}}
+
+.raffle-unit{font-size:11px;font-weight:400;color:#756b80}html[data-theme=dark] .raffle-unit{color:#bcafc8}
+
+.raffle-odds-controls{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-top:12px}.raffle-odds-controls label{display:flex;align-items:center;font-size:12px}.raffle-odds-controls input{width:auto}.raffle-chance span{font-size:10px}.raffle-chance input:disabled{opacity:.65}@media(max-width:520px){.raffle-editor .raffle-prizes li{flex-wrap:wrap}.raffle-editor .raffle-prizes li>span{flex-basis:100%}}
+
+
+
+.raffle-chance-control{display:flex!important;position:relative}.raffle-chance-control input{appearance:textfield;-moz-appearance:textfield;padding-right:24px}.raffle-chance-control input::-webkit-inner-spin-button,.raffle-chance-control input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}.raffle-chance-arrows{position:absolute;right:3px;top:2px;bottom:2px;display:flex;flex-direction:column;justify-content:center}.raffle-prizes .raffle-chance-arrows button{padding:0 4px;margin:0;line-height:16px;font-size:12px;background:transparent;border:0;color:inherit}.raffle-chance-arrows button:hover:not(:disabled){background:#a882c533}
+
+/* Compact editor rows; public prize cards keep their existing layout. */
+.raffle-editor .raffle-pool{gap:5px;margin:10px 0}
+.raffle-editor .raffle-pool li{display:grid;grid-template-columns:minmax(0,1fr) 64px 82px 20px;align-items:end;gap:8px;padding:6px 8px}
+.raffle-editor .raffle-pool-custom li{grid-template-columns:minmax(0,1fr) 64px 82px 20px 20px}
+.raffle-editor .raffle-pool .raffle-prize-name{align-self:center;overflow-wrap:anywhere;line-height:1.35}
+.raffle-editor .raffle-pool label{gap:3px;min-width:0}
+.raffle-quantity>span:first-child{font-size:10px}
+.raffle-editor .raffle-pool input{width:100%;box-sizing:border-box;padding:6px 7px}
+.raffle-editor .raffle-pool .raffle-chance-control input{padding-right:20px}
+.raffle-editor .raffle-pool :is(.raffle-odds-lock,.raffle-prize-remove){display:inline-flex;align-items:center;justify-content:center;align-self:end;width:20px;height:33px;min-width:0;padding:0;margin:0;background:transparent;border:0;border-radius:0;box-shadow:none;color:#8a7e92;transition:color .15s,filter .15s}
+.raffle-editor .raffle-pool .raffle-odds-lock[aria-pressed=true]{color:#8850ba;filter:drop-shadow(0 0 3px #a16bd580)}
+.raffle-editor .raffle-pool .raffle-prize-remove{font-size:19px;font-weight:400;line-height:1}
+.raffle-editor .raffle-pool .raffle-prize-remove:hover{color:#c84237;filter:drop-shadow(0 0 3px #c8423733)}
+.raffle-editor .raffle-pool .raffle-odds-lock:hover{color:#8850ba}
+html[data-theme=dark] .raffle-editor .raffle-pool :is(.raffle-odds-lock,.raffle-prize-remove){color:#a99ab4}
+html[data-theme=dark] .raffle-editor .raffle-pool .raffle-odds-lock[aria-pressed=true]{color:#c99af3;filter:drop-shadow(0 0 4px #b780ea80)}
+html[data-theme=dark] .raffle-editor .raffle-pool .raffle-odds-lock:hover{color:#d2aff2}
+html[data-theme=dark] .raffle-editor .raffle-pool .raffle-prize-remove:hover{color:#f29b92}
+@media(max-width:420px){.raffle-editor .raffle-pool li{grid-template-columns:minmax(0,1fr) 58px 76px 18px;gap:5px;padding-inline:6px}.raffle-editor .raffle-pool-custom li{grid-template-columns:minmax(0,1fr) 58px 76px 18px 18px}}
+@media(prefers-reduced-motion:reduce){.raffle-editor .raffle-pool :is(.raffle-odds-lock,.raffle-prize-remove){transition:none}}
+
+.auction-create-content button.raffle-mode-button{min-height:44px;width:100%;border-radius:8px;font-weight:700;color:#fff;transition:background-color .15s,box-shadow .15s}.auction-create-content button.raffle-mode-purple{background:#6d28d9;border:1px solid #6d28d9}.auction-create-content button.raffle-mode-purple:hover{background:#7c3aed;box-shadow:0 0 14px #8b5cf673}.auction-create-content button.raffle-mode-purple[aria-pressed=true]{background:#6d28d9;box-shadow:0 0 12px #8b5cf64d}.auction-create-content button.raffle-mode-purple[aria-pressed=true]:hover{background:#7c3aed}.auction-create-content button.raffle-mode-red{background:#b91c1c;border:1px solid #b91c1c}.auction-create-content button.raffle-mode-red:hover{background:#dc2626;box-shadow:0 0 14px #ef444466}.auction-create-content button.raffle-mode-red[aria-pressed=true]{background:#b91c1c;box-shadow:0 0 12px #ef44444d}.auction-create-content button.raffle-mode-red[aria-pressed=true]:hover{background:#dc2626}@media(prefers-reduced-motion:reduce){.auction-create-content button.raffle-mode-button{transition:none}}
+
+/* The inactive Giveaway option in the raffle editor fills only on hover. */
+.raffle-editor button.raffle-mode-red[aria-pressed=false]{background:transparent;color:#b91c1c;box-shadow:none}
+.raffle-editor button.raffle-mode-red[aria-pressed=false]:hover{background:#dc2626;color:#fff;box-shadow:0 0 14px #ef444466}
+html[data-theme=dark] .raffle-editor button.raffle-mode-red[aria-pressed=false]{color:#f08b8b;border-color:#dc5252}
+html[data-theme=dark] .raffle-editor button.raffle-mode-red[aria-pressed=false]:hover{color:#fff;background:#dc2626}
+
+.raffle-editor button.raffle-mode-purple:disabled{opacity:1;cursor:default;background:#6d28d9;box-shadow:0 0 12px #8b5cf64d}
+
+.raffle-details-fields{display:grid;gap:16px}.raffle-details-fields .raffle-fields{align-items:start;gap:16px}.raffle-details-fields label{gap:7px}.raffle-details-fields .raffle-fields label>span:first-child{min-height:20px;display:flex;align-items:baseline;gap:4px}.raffle-details-fields input{box-sizing:border-box;min-height:40px}.raffle-escrow-row{display:flex;align-items:center}
+
+/* Give every row a shared label baseline and control baseline. */
+.raffle-editor .raffle-pool :is(.raffle-quantity,.raffle-chance){display:grid;grid-template-rows:14px 34px;gap:3px;align-self:end;align-items:center}
+.raffle-editor .raffle-pool :is(.raffle-quantity,.raffle-chance)>span:first-child{font-size:10px;line-height:14px;white-space:nowrap}
+.raffle-editor .raffle-pool .raffle-quantity input{height:34px;margin:0}
+.raffle-editor .raffle-pool .raffle-chance-control{height:34px;align-items:center;min-width:0}
+.raffle-editor .raffle-pool .raffle-chance-control input{height:34px;margin:0;padding:4px 19px 4px 0;background:transparent;border:0;border-radius:0;box-shadow:none}
+.raffle-editor .raffle-pool .raffle-chance-value{height:34px;min-width:0;width:100%;margin:0;padding:0 19px 0 0;border:0;border-radius:0;background:transparent;box-shadow:none;color:inherit;font:inherit;text-align:left;font-variant-numeric:tabular-nums}
+.raffle-editor .raffle-pool .raffle-chance-value:disabled{opacity:1;cursor:default}
+.raffle-editor .raffle-pool :is(.raffle-odds-lock,.raffle-prize-remove){height:34px}
+.raffle-editor .raffle-pool .raffle-prize-name{align-self:end;min-height:34px;display:flex;align-items:center}
+
+/* Shared column headings and generous, separated odds actions. */
+.raffle-editor :is(.raffle-pool-head,.raffle-pool li){display:grid;grid-template-columns:58px minmax(0,1fr) 106px 28px;column-gap:12px}
+.raffle-editor :is(.raffle-pool-head.raffle-pool-custom,.raffle-pool-custom li){grid-template-columns:58px minmax(0,1fr) 106px 28px 28px}
+.raffle-pool-head{align-items:center;margin-top:14px;padding:0 8px;color:#756b80;font-size:10px;font-weight:600}
+html[data-theme=dark] .raffle-pool-head{color:#bcafc8}
+.raffle-editor .raffle-pool{margin-top:5px}
+.raffle-editor .raffle-pool :is(.raffle-quantity,.raffle-chance){display:flex;align-items:center;grid-template-rows:none;height:40px}
+.raffle-editor .raffle-pool .raffle-chance-control{height:40px;width:100%}
+.raffle-editor .raffle-pool .raffle-prize-name{min-height:40px}
+.raffle-editor .raffle-pool :is(.raffle-chance-value,.raffle-chance-control input){height:40px;font-size:15px;font-weight:500;padding-right:32px;letter-spacing:-.02em}
+.raffle-editor .raffle-pool .raffle-chance-arrows{right:0;top:0;bottom:0;width:30px}
+.raffle-editor .raffle-pool .raffle-chance-arrows button{width:30px;height:20px;line-height:20px;font-size:17px;padding:0;border-radius:4px}
+.raffle-editor .raffle-pool :is(.raffle-odds-lock,.raffle-prize-remove){width:28px;height:40px}
+@media(max-width:520px){.raffle-editor :is(.raffle-pool-head,.raffle-pool li){grid-template-columns:48px minmax(0,1fr) 94px 24px;column-gap:8px}.raffle-editor :is(.raffle-pool-head.raffle-pool-custom,.raffle-pool-custom li){grid-template-columns:48px minmax(0,1fr) 94px 24px 24px}.raffle-pool-head{padding-inline:6px;font-size:9px}.raffle-editor .raffle-pool :is(.raffle-odds-lock,.raffle-prize-remove){width:24px}}
+
+.raffle-editor .raffle-pool :is(.raffle-chance-value,.raffle-chance-control input){font-size:13px;font-weight:400;letter-spacing:normal}
+
+.raffle-editor .raffle-pool .raffle-chance-control{gap:2px}
+.raffle-editor .raffle-pool .raffle-chance-value{flex:0 0 auto;width:auto;padding-right:0}
+.raffle-editor .raffle-pool .raffle-chance-arrows{position:static;flex:0 0 30px;height:40px}
+.raffle-editor .raffle-pool .raffle-chance-control input{width:54px;flex:0 0 54px;padding-right:0}
+
+.raffle-editor .raffle-pool button.raffle-chance-value{flex:0 0 auto;width:max-content;padding:0;margin:0}
+
+/* Keep odds arrows stationary across values such as 5%, 33.33%, and 100%. */
+.raffle-editor .raffle-pool-head>span:nth-child(3){padding-left:6px}
+.raffle-editor .raffle-pool .raffle-chance{padding-left:6px}
+.raffle-editor .raffle-pool button.raffle-chance-value,
+.raffle-editor .raffle-pool .raffle-chance-control input{box-sizing:border-box;flex:0 0 54px;width:54px;padding:0;text-align:right;font-variant-numeric:tabular-nums}
+.raffle-editor .raffle-pool .raffle-chance-control{gap:2px}
+
+.raffle-odds-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px 12px;margin:10px 0}.raffle-editor .raffle-odds-footer p{margin:0}.raffle-editor .raffle-reset-odds{padding:4px 0;border:0;border-radius:0;background:transparent;color:#76549a;font-size:11px;font-weight:500}.raffle-editor .raffle-reset-odds:hover{text-decoration:underline;color:#6d28d9}html[data-theme=dark] .raffle-editor .raffle-reset-odds{color:#c4a0e6}html[data-theme=dark] .raffle-editor .raffle-reset-odds:hover{color:#dfc4f6}
+
+.raffle-pool-head .raffle-odds-heading{display:flex;align-items:center;gap:10px;white-space:nowrap}.raffle-editor .raffle-odds-heading .raffle-reset-odds{font-size:10px;padding:0;line-height:14px}.raffle-pool-head.raffle-pool-custom .raffle-odds-heading{grid-column:3 / -1}.raffle-pool-head.raffle-pool-custom .raffle-odds-heading~span{display:none}
+
+.raffle-editor .raffle-odds-heading .raffle-reset-odds{margin-left:auto;font-size:11px;padding:4px 0;line-height:normal}
+
+.auction-create-content .special-auction-navigation button.raffle-mode-red:disabled{opacity:1;cursor:default;background:#b91c1c;color:#fff;box-shadow:0 0 12px #ef44444d}.auction-create-content .special-auction-back{border:0;background:transparent;padding:4px 0;font-size:12px;color:#756b80}html[data-theme=dark] .auction-create-content .special-auction-back{color:#bcafc8}
+
+.giveaway-editor{border:1px solid #e7cdcd;border-radius:12px;padding:18px;background:#fff8f6}.auction-create-content .special-preview-button{display:block;width:100%;min-height:42px;padding:10px 16px;border:1px solid transparent;border-radius:8px;font-size:13px;font-weight:700;line-height:20px;color:#fff;transition:background-color .15s,box-shadow .15s}.auction-create-content .giveaway-editor .giveaway-preview-button{background:#991b1b;border-color:#991b1b;margin-top:10px}.auction-create-content .giveaway-editor .giveaway-preview-button:hover{background:#b91c1c;border-color:#b91c1c;box-shadow:0 0 12px #ef444433}.auction-create-content .raffle-preview-button{background:#552287;border-color:#552287}.auction-create-content .raffle-preview-button:hover:not(:disabled){background:#7540aa;border-color:#7540aa;box-shadow:0 0 12px #a16bd533}
+html[data-theme=dark] .auction-create-content .giveaway-editor{background:#2c1e25;border-color:#613942}
+/* Match the inactive Raffle-form mode button's outline and colored hover. */
+.auction-create-content .giveaway-editor button.raffle-mode-purple[aria-pressed=false]{background:transparent;color:#6d28d9;box-shadow:none}.auction-create-content .giveaway-editor button.raffle-mode-purple[aria-pressed=false]:hover{background:#7c3aed;color:#fff;box-shadow:0 0 14px #8b5cf673}html[data-theme=dark] .auction-create-content .giveaway-editor button.raffle-mode-purple[aria-pressed=false]{color:#c4a0e6;border-color:#9c6bd6}html[data-theme=dark] .auction-create-content .giveaway-editor button.raffle-mode-purple[aria-pressed=false]:hover{background:#7c3aed;color:#fff}
+@media(prefers-reduced-motion:reduce){.auction-create-content .special-preview-button{transition:none}}
+html[data-theme=dark] .auction-create-content .giveaway-editor .giveaway-preview-button{background:#991b1b;border-color:#991b1b;color:#fff}
+html[data-theme=dark] .auction-create-content .giveaway-editor .giveaway-preview-button:hover{background:#b91c1c;border-color:#b91c1c}
+
+.auction-create-content .special-auction-navigation button.raffle-mode-red:disabled:hover{background:#dc2626;border-color:#dc2626;box-shadow:0 0 16px #ef444473}
+
+/* Shared typography for dedicated Raffle and Giveaway creation. */
+.auction-create-shell .special-create-title{font-size:30px;line-height:1.2;font-weight:700;margin-bottom:20px}
+.auction-create-content :is(.raffle-editor,.giveaway-editor){font-size:13px;line-height:1.5}
+.auction-create-content :is(.raffle-editor,.giveaway-editor) label{font-size:13px;font-weight:600}
+.auction-create-content :is(.raffle-editor,.giveaway-editor) :is(input,select){font-size:14px;line-height:20px;font-weight:400}
+.auction-create-content :is(.raffle-editor,.giveaway-editor) p{font-size:12px;line-height:1.6}
+.auction-create-content :is(.raffle-editor,.giveaway-editor) button{font-size:13px}
+.auction-create-content :is(.raffle-editor,.giveaway-editor) .raffle-mode-button{font-size:13px;font-weight:700}
+.auction-create-content :is(.raffle-editor,.giveaway-editor) .special-auction-back{font-size:12px}
+.auction-create-content .giveaway-editor fieldset label{font-size:12px;font-weight:400}
+.auction-create-content .raffle-editor .raffle-pool :is(input,.raffle-chance-value,.raffle-prize-name){font-size:13px;font-weight:400}
+.auction-create-content .raffle-editor .raffle-chance-arrows button{font-size:17px}
+.auction-create-content .raffle-editor .raffle-prize-remove{font-size:19px}
+.auction-create-content .raffle-editor .raffle-reset-odds{font-size:11px}
+.auction-create-content .giveaway-editor .auction-quantity-stepper button{font-size:22px}
+
+.auction-create-content .giveaway-editor .giveaway-preview-button{margin-top:18px}
+
+/* Inactive special-auction launchers match their dedicated form tabs. */
+.auction-create-content button.raffle-mode-purple[aria-pressed=false]{background:transparent;color:#6d28d9;box-shadow:none}
+.auction-create-content button.raffle-mode-purple[aria-pressed=false]:hover{background:#7c3aed;color:#fff;box-shadow:0 0 14px #8b5cf673}
+.auction-create-content button.raffle-mode-red[aria-pressed=false]{background:transparent;color:#b91c1c;box-shadow:none}
+.auction-create-content button.raffle-mode-red[aria-pressed=false]:hover{background:#dc2626;color:#fff;box-shadow:0 0 14px #ef444466}
+html[data-theme=dark] .auction-create-content button.raffle-mode-purple[aria-pressed=false]{color:#c4a0e6;border-color:#9c6bd6}
+html[data-theme=dark] .auction-create-content button.raffle-mode-red[aria-pressed=false]{color:#f08b8b;border-color:#dc5252}
+html[data-theme=dark] .auction-create-content button.raffle-mode-purple[aria-pressed=false]:hover{background:#7c3aed;color:#fff}
+html[data-theme=dark] .auction-create-content button.raffle-mode-red[aria-pressed=false]:hover{background:#dc2626;color:#fff}
+
+.giveaway-editor #giveaway-title{margin-top:7px}

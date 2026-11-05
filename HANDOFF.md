@@ -1,7 +1,7 @@
 # kHub handoff for the next chat
 
-Repository audit: November 2, 2026. Read this before proposing work, then inspect the relevant
-code. The website is live; the Oracle bot holds real players’ Meat and items.
+Updated November 4, 2026 for the raffle handoff; older performance context is retained.
+Read this before proposing work, then inspect the relevant code. The website is live; the Oracle bot holds real players’ Meat and items.
 
 ## Working standards
 
@@ -48,9 +48,58 @@ code. The website is live; the Oracle bot holds real players’ Meat and items.
   seller profiles, trade totals, multi-select polls, player ignores, admin analytics,
   site activity, and giveaways with Last Bid/Random Draw/Split/Surprise Me conditions.
   Use [giveaway notes](README.md) for condition and funding constraints.
-- Current SQL files extend through 169. Prefixes 150, 151, 160 and 167 have multiple
-  filenames: use full filenames and prerequisites, not the number alone. The queue
-  currently has no SQL. Neither this layout nor local tests proves applied state.
+- Current local SQL extends through 202. Prefixes including 150, 151, 160, 167
+  and 199 have multiple filenames: use full filenames and prerequisites. Raffle
+  migrations 197–202 currently sit in the parent directory; the queue has no SQL.
+  File location alone does not verify the production schema or deployed runtime.
+
+## Recent focus: raffle backend (activation disabled)
+
+- Admin creation, preview/detail pages, management UI and private personal ticket
+  counts/history are implemented. Public data exposes the winner and selected
+  prize, never ticket totals, other players' holdings or revenue. Reads are bounded;
+  management refresh is explicit. See [raffle pages](src/pages/Raffles.jsx:1).
+- `RAFFLE <uuid>` buys tickets with an exact positive multiple of the ticket price.
+  Repeat purchases are supported; durable receipts prevent duplicate processing.
+  Payments processed at/after closing are refunded, even if sent before closing.
+  [Gift intake](bot/src/incoming-gifts.mjs:10) recognizes RAFFLE/SUPPLY in the outside
+  note and preserves verified acquisition proof, sender identity and deduplication.
+  Existing outbound gift fallback supports Hardcore/Ronin, with wrapping funded
+  only from spare bot Meat. Inside-note commands never execute.
+- `SUPPLY <uuid>` accepts optional, partial/repeated listed-item deposits from the
+  current admin/raffle owner. It is item-only: Meat rejects the whole request and
+  returns all attachments via ordinary refunds. No automated Mall purchasing,
+  PURCHASE command or active Meat-contribution accounting remains.
+- Closing freezes private inputs; [secure drawing](bot/src/raffle-draw.mjs:1)
+  selects one equally weighted ticket and independently one weighted prize.
+  Draw persistence, queue identities and settlement are restart-safe. Deposited
+  prizes deliver automatically; missing prizes are acquired manually and supplied.
+- `ADVANCE <uuid> <amount>` (whole Meat or shorthand such as `200m`) and the UI
+  commit advances against available ticket proceeds, including pending/unknown
+  advances. Shared financial locks prevent concurrent overcommitment. Over-limit
+  KMail replies include the actual balance (200m against 140m is rejected).
+- Raffle reserves enter shared liabilities; reserve-to-queue changes are atomic.
+  Verified prize delivery precedes unused-item returns; verified returns/advances
+  precede final net payout. Cancellation refunds tickets; canceled/empty raffles
+  return deposits. Unknown sends never automatically resend or release settlement.
+- [Latest KMail templates](supabase/migrations/202611040202_raffle_kmail_wording.sql:1)
+  identify the raffle and transaction. Tickets show purchase count/range and equal
+  chances; winners receive congratulations and a 30-minute closing-time target.
+  Missing-prize notices include items, SUPPLY, available advances and ADVANCE.
+  Genuine delay notices occur only after 30 minutes. Persisted keys prevent
+  duplicate winner/delay notices, including across restarts.
+- SQL: 197/198 preview/schema/odds; 199 backend and hard-disabled activation gate;
+  200 manual fulfillment, advances, gift-proof fence and contribution removal;
+  201 fulfillment notices; 202 wording. Matching bot copies are packaged separately.
+  The worker requires raffle capability version 2 from 200; 199-only databases
+  pause raffle processing while ordinary auction work continues.
+- Prior local verification passed focused Node/gift/message tests on Node 24,
+  website build/targeted lint, and [full-schema lifecycle/isolation tests](tests/raffle_lifecycle_database_test.py:1).
+  Coverage includes identical-item escrow/Buy/other-raffle reserves, exact balances,
+  concurrent bids/advances, verified gifts, replay, rollback, restart, uncertainty,
+  notices, cancellation and zero tickets. Giveaway/relisting regressions also passed.
+  These are historical offline results with simulated transfer evidence, not live
+  delivery proof; no tests were run for this handoff update.
 
 ## Deployment and verification
 
@@ -66,10 +115,12 @@ code. The website is live; the Oracle bot holds real players’ Meat and items.
   No deployment or production SQL was performed in this documentation audit.
 - Relevant local checks: `npm run build`, `npm run lint`,
   `node --test tests/*.test.mjs`; database suites under `tests/*database_test.py`
-  use isolated PostgreSQL. Bot tests use its own package scripts and Node 24+.
+  use isolated PostgreSQL. Bot tests use its own package scripts and Node 24+ (`.nvmrc` is 24).
+  The shell may still select Node 22; use installed Node 24 for bot tests requiring
+  `node:sqlite`.
   Run checks appropriate to code changes; historical passes are not a current run.
 
-## Current priority: traffic reliability
+## Earlier priority: traffic reliability (retain for follow-up)
 
 The owner reports giveaway traffic still causes slow/erroring loads after caching
 improvements. Supplied cumulative query exports identify expensive private reads:
@@ -81,9 +132,9 @@ or proof of CPU saturation. Account and bot polling add substantial call volume.
 Next: inspect private projections and bid-history work, obtain targeted plans,
 correlate historical resource charts/cache error logs, then optimize and measure.
 Preserve financial authorization and privacy. The cache has bounded queues,
-origin deadlines and cooldowns; do not increase limits blindly. Browser route
-splitting is also outstanding: the listing editor imports the large item catalog
-into the initial bundle. Use the [performance diagnostics](README.md#performance-investigation).
+origin deadlines and cooldowns; do not increase limits blindly. Routes are now lazy-loaded in [App](src/App.jsx:5), and the listing editor
+loads the catalog dynamically. The catalog remains large; do not repeat the old
+claim that it is statically imported into the initial bundle. Use the [performance diagnostics](README.md#performance-investigation).
 A quiet database-pressure snapshot cannot reconstruct an earlier traffic spike.
 
 ## Runtime and deployment boundaries
@@ -127,6 +178,26 @@ A quiet database-pressure snapshot cannot reconstruct an earlier traffic spike.
   [command guide](bot/QUICKSTART_README.md:1) over invented recovery commands.
 - Settlement, winner items and seller payouts are separate tracked obligations.
   Preserve frozen fees, anti-sniping, receipt-time deadlines and refund accounting.
+
+## Next Steps / Important Notes
+
+- Keep raffles disabled. The database gate has a CHECK preventing activation;
+  enabling requires a separate, explicitly reviewed migration after readiness review.
+- Verify exactly which SQL revisions the owner applied and which website/Oracle
+  runtimes are deployed. No deployment, production SQL, live-worker start or real
+  asset transfer was performed by Codex during the raffle work. Apply prerequisites
+  before dependent runtimes; separately bundle/rebuild the ignored Oracle bot.
+  Do not rerun already-applied scripts; use incremental SQL if revisions differ.
+- Migration 200 refuses legacy contribution records rather than deleting obligations;
+  any such data needs reconciliation before upgrading. The overview in
+  [raffle notes](docs/RAFFLE_BACKEND.md:1) contains older queue-location references;
+  current migration files and runtime code take precedence.
+- Manual management-UI/deployment review and actual production-version verification
+  remain outstanding. Offline tests cannot guarantee KoL behavior or delivery within
+  30 minutes. Rollover pauses shared transfers; closing/30-minute deadlines do not
+  shift. Never bypass uncertain-send verification or run another connected worker.
+- Preserve unrelated existing edits/untracked files. Continue focused work only;
+  do not rewrite the owner's quickstart or treat older traffic tasks as a new audit.
 
 ## Verification boundaries
 

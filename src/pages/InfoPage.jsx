@@ -328,7 +328,7 @@ const InfoPage = () => {
                     <h2 id="brief-history-title" className={`${sectionHeadingClass} mb-2 text-center`}>A Brief History</h2>
                     <ul className="list-disc space-y-2 pl-5">
                         <li>October 19, 2026 - Official launch of kHub.</li>
-                        <li>Friday, October 30, 2026, 01:02AM - The first &apos;<Link to="/giveaways" className="text-blue-700 underline dark:text-blue-300">Meat Stack Mania</Link>&apos; was held.</li>
+                        <li>Friday, October 30, 2026, 01:02AM - The first &apos;<Link to="/giveaways" className="text-blue-700 underline dark:text-blue-300">Meat Stack Mania</Link>&apos; was held.<p className="ml-3 mt-1 text-xs text-gray-500 dark:text-gray-400">Inaugural winner: <Link to="/seller/3c088d45-3b87-46a5-b74e-10b5c49c4564?view=stats" className="font-semibold text-blue-700 underline hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-200">neonep</Link></p></li>
                     </ul>
                 </section>
 

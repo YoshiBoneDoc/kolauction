@@ -16,7 +16,7 @@ test('fractional per-item prices never round or change the entered total', () =>
     assert.equal(sell.whole, '10');
     assert.equal(sell.item, '');
     assert.equal(sell.canonical, '10');
-    assert.match(sell.message, /not divisible/);
+    assert.equal(sell.message, '');
     assert.equal(listingPrice('10', 'whole', '3', 'item').canonical, '');
 });
 

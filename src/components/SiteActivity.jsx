@@ -76,10 +76,9 @@ export default function SiteActivity({ children }) {
                 <p>Viewing now<span className="block text-lg font-bold">{Math.max(0, activity.viewers - ownPresence)}</span></p>
                 {Array.isArray(activity.users) ? <ul aria-label="Viewing now users" className="mt-1 max-h-60 space-y-1 overflow-y-auto break-words text-xs">
                     {otherUsers.map(user => <li key={user.id}>{user.username}</li>)}
-                    <li>Other users: {activity.guests ?? 0}</li>
+                    {Number(activity.guests) > 0 && <li>Other users: {activity.guests}</li>}
                 </ul> : <p className="mt-1 text-xs">User list unavailable until the database update is applied.</p>}
             </div> : <p role="status">Activity unavailable</p>}
-            <p className="mt-2 text-xs opacity-70">Active last 2 minutes.<br />Updated every 60 sec</p>
         </aside>}
         <div className="min-w-0 flex-1">{children}</div>
     </div>;

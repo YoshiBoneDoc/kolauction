@@ -18,7 +18,7 @@ const { outputFiles } = buildSync({ stdin: { contents: `
     export { AuctionsContext } from './src/context/AuctionsContext.jsx';
 `, resolveDir: fileURLToPath(new URL('../', import.meta.url)), loader: 'jsx' },
     bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external', external: ['../lib/itemCatalog'], jsx: 'automatic',
-    define: { 'import.meta.env': '{}' }, loader: { '.gif': 'dataurl' },
+    define: { 'import.meta.env': '{}' }, loader: { '.gif': 'dataurl', '.css': 'empty' },
 });
 let active;
 function slot(initial) {
@@ -27,7 +27,7 @@ function slot(initial) {
     if (!(index in harness.slots)) harness.slots[index] = typeof initial === 'function' ? initial() : initial;
     return [harness.slots[index], value => { harness.slots[index] = typeof value === 'function' ? value(harness.slots[index]) : value; }];
 }
-const hooks = { ...React, useState: slot, useRef: value => slot({ current: value })[0],
+const hooks = { ...React, useSyncExternalStore: (_subscribe, getSnapshot) => getSnapshot(), useState: slot, useRef: value => slot({ current: value })[0],
     useContext: context => active.contexts.get(context), useEffect(fn, deps) {
         const [ran, setRan] = slot(false);
         if (deps?.length === 0 && !ran) { setRan(true); fn(); }
@@ -40,7 +40,7 @@ new Function('require', 'module', 'exports', outputFiles[0].text)(name => name =
 const { AuctionAnItem, UserContext, AuctionsContext } = compiled.exports;
 function nodes(element) {
     if (!element || typeof element !== 'object') return [];
-    if (typeof element.type === 'function' && element.type.name === 'ListingPriceInputs') return [element, ...nodes(element.type(element.props))];
+    if (typeof element.type === 'function' && ['ListingPriceInputs', 'SpecialAuctionNavigation'].includes(element.type.name)) return [element, ...nodes(element.type(element.props))];
     return [element, ...React.Children.toArray(element.props?.children).flatMap(nodes)];
 }
 function harness(addAuction) {
@@ -317,4 +317,61 @@ test('duplicate live bundle names return to the form with red validation and pre
         await page.button('Publish Auction').props.onClick();
         assert.deepEqual(page.locations,['/auction/renamed-bundle']);
     }finally{if(original)globalThis.requestAnimationFrame=original;else delete globalThis.requestAnimationFrame;}
+});
+
+
+test('raffle controls are admin-only and selecting Raffle leaves ordinary publishing', () => {
+    const page = harness(() => { throw new Error('Ordinary auction write forbidden'); }).render();
+    assert.equal(nodes(page.tree).some(n => n.type === 'button' && n.props.children === 'Raffle'), false);
+    page.contexts.set(UserContext, { currentUser: { id: 'admin', isAdmin: true } });
+    page.render();
+    assert.ok(page.button('Giveaway'));
+    page.button('Raffle').props.onClick(); page.render();
+    assert.equal(nodes(page.tree).some(n => n.props?.id === 'minimum-price-whole'), false);
+    const editor = page.find(n => n.type?.name === 'RaffleEditor');
+    assert.ok(editor.props.items.length);
+    editor.props.onGiveaway(); page.render();
+    assert.equal(page.button('Giveaway').props['aria-pressed'], true);
+    assert.equal(page.find(n => n.props?.id === 'quantity').props.value, '1000');
+});
+
+
+test('dedicated Giveaway preserves the working payload for all four conditions', async () => {
+    for (const condition of ['last_bid', 'random_draw', 'split', 'surprise']) {
+        const writes = [];
+        const page = harness(async draft => { writes.push(draft); return 'giveaway'; });
+        page.contexts.set(UserContext, { currentUser: { id: 'admin', isAdmin: true } }); page.render(); page.render();
+        page.button('Giveaway').props.onClick(); page.render();
+        assert.equal(page.find(n => n.type === 'h1').props.children, 'Create Giveaway');
+        assert.equal(page.find(n => n.props?.id === 'giveaway-title').props.value, 'Meat Stack Mania');
+        assert.equal(page.find(n => n.props?.id === 'auctionTime').props.value, '1');
+        assert.equal(nodes(page.tree).some(n => n.props?.['aria-label'] === 'Auction type'), false);
+        assert.equal(nodes(page.tree).some(n => n.props?.id === 'buyout-price-fields'), false);
+        assert.equal(nodes(page.tree).some(n => n.props?.['aria-expanded'] === false && String(n.props.children).includes('Buyout')), false);
+        const choices = nodes(page.tree).filter(n => n.props?.name === 'giveaway-condition');
+        choices[['last_bid', 'random_draw', 'split', 'surprise'].indexOf(condition)].props.onChange(); page.render();
+        const original = globalThis.requestAnimationFrame; globalThis.requestAnimationFrame = fn => fn();
+        try {
+            page.find(n => n.type === 'form').props.onSubmit({ preventDefault() {} }); page.render();
+            assert.equal(nodes(page.tree).find(n => n.props?.id === 'listing-error')?.props.children, undefined);
+            page.button('Continue to Publish').props.onClick(); page.render();
+            await page.button('Publish Auction').props.onClick();
+        } finally { if (original) globalThis.requestAnimationFrame = original; else delete globalThis.requestAnimationFrame; }
+        assert.equal(writes.length, 1); assert.equal(writes[0].giveawayWinCondition, condition);
+        assert.equal(writes[0].giveawayTitle, 'Meat Stack Mania'); assert.equal(writes[0].minBidMeat, 1);
+        assert.equal(writes[0].quantity, 1000); assert.equal(writes[0].escrowMode, true);
+        assert.equal(writes[0].instantPurchasePrice, null); assert.ok(writes[0].customEndAt);
+        assert.equal(writes[0].autoRelist, undefined);
+    }
+});
+test('Giveaway duration stays editable and switching modes clears irrelevant settings', () => {
+    const page = harness(() => {}); page.contexts.set(UserContext, { currentUser: { id: 'admin', isAdmin: true } }); page.render();
+    page.button('Giveaway').props.onClick(); page.render(); page.input('auctionTime', '12');
+    assert.equal(page.find(n => n.props?.id === 'auctionTime').props.value, '12');
+    page.button('Raffle').props.onClick(); page.render();
+    const editor = page.find(n => n.type?.name === 'RaffleEditor'); editor.props.onGiveaway(); page.render();
+    assert.equal(page.find(n => n.props?.id === 'auctionTime').props.value, '1');
+    page.find(n => n.type === 'button' && n.props.children === '← Standard Auction').props.onClick(); page.render();
+    assert.equal(page.find(n => n.type === 'h1').props.children, 'Create Auction');
+    assert.equal(page.find(n => n.props?.id === 'auctionTime').props.value, '24');
 });

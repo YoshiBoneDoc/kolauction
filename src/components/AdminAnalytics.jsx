@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
+import AdminRaffleAnalytics from './AdminRaffleAnalytics';
+import AdminUserSearch from './AdminUserSearch';
 import AdminUserAnalytics from './AdminUserAnalytics';
 import { supabase } from '../lib/supabase';
 
@@ -92,15 +94,15 @@ export default function AdminAnalytics() {
     return <section aria-label="Administrator analytics" className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <nav aria-label="Analytics sections" className="admin-analytics-tabs inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5">
-                {['overview', 'giveaways', 'users'].map(value => <button key={value} aria-current={tab === value ? 'page' : undefined}
+                {['overview', 'raffles', 'giveaways', 'users'].map(value => <button key={value} aria-current={tab === value ? 'page' : undefined}
                     onClick={() => setTab(value)}
                     className={`min-h-8 rounded-md border px-3 py-1 text-xs font-medium ${tab === value ? 'border-gray-200 bg-white text-gray-900' : 'border-transparent bg-transparent text-gray-500 hover:text-gray-900'}`}>
-                    {value === 'overview' ? 'Overview' : value === 'giveaways' ? 'Giveaways' : 'Users'}
+                    {value === 'overview' ? 'Overview' : value === 'raffles' ? 'Raffles' : value === 'giveaways' ? 'Giveaways' : 'Users'}
                 </button>)}
             </nav>
             <button onClick={() => setAttempt(value => value + 1)} className="min-h-11 text-sm text-blue-700 hover:underline">Refresh analytics</button>
         </div>
-        {tab === 'users' ? <AdminUserAnalytics key={attempt} /> : error ? <p role="alert" className="text-sm text-red-700">{error}</p> : !result ? <p role="status" className="text-sm text-gray-500">Loading analytics…</p> : <>
+        {tab === 'raffles' ? <AdminRaffleAnalytics key={attempt} /> : tab === 'users' ? <div key={attempt}><AdminUserSearch /><AdminUserAnalytics /></div> : error ? <p role="alert" className="text-sm text-red-700">{error}</p> : !result ? <p role="status" className="text-sm text-gray-500">Loading analytics…</p> : <>
             {tab === 'giveaways' ? <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <h2 className="text-sm font-medium text-gray-700">Meat stack mania:</h2>
