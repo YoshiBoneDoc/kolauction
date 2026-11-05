@@ -9,6 +9,7 @@ import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { readRaffle } from '../lib/raffleService';
 import RaffleShowcase from '../components/RaffleShowcase';
+import NotFound from './NotFound';
 
 export default function Raffles() {
     const { currentUser } = useContext(UserContext);
@@ -49,7 +50,7 @@ export default function Raffles() {
     }, [id, viewerId, raffleAccess, revision, offset]);
     // Local display clock only; no polling or auction subscriptions.
     useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
-    if (!canViewRaffles(currentUser)) return <main className="raffle-page"><p>Page unavailable.</p></main>;
+    if (!raffleAccess) return <NotFound />;
     return <main className="raffle-page">{ticketError?.id === id && ticketError?.viewerId === viewerId && <p role="alert">Ticket history unavailable. <button onClick={() => setRevision(v => v + 1)}>Retry</button></p>}<h1 className="mb-4 text-2xl font-bold">Mystery Raffles</h1>{result.key !== (id ?? 'list') ? <p role="status">Loading raffles…</p> : result.error && !result.rows ? <p role="alert">{result.error}</p> : <div className="raffle-list">{result.error && <p role="alert">{result.error}</p>}{!result.rows.length && <p>No raffles found.</p>}{result.rows.map(raffle => <div key={raffle.id}>{!id && <Link className="mb-2 inline-block" to={`/raffle/${raffle.id}`}>View raffle ↗</Link>}<RaffleShowcase raffle={raffle} now={now} />{raffle.completion_reason === 'cancelled' && <p>Raffle canceled. Ticket refunds are tracked in your purchase history.</p>}{raffle.completion_reason === 'no_tickets' && <p>Closed without valid tickets. Deposits are being returned.</p>}{!currentUser?.isAdmin && raffle.creator_id !== currentUser?.id && ['preview', 'active'].includes(raffle.state) && <section className="raffle-summary mt-4" aria-label="How to buy raffle tickets">
                     <div className="raffle-ticket-heading"><h2>Buy Raffle Tickets</h2>{currentUser?.id && <span className="raffle-user-ticket-count">Your tickets <strong>{tickets?.owner === currentUser.id && tickets?.raffleId === raffle.id ? BigInt(tickets.ticket_count).toLocaleString('en-US') : counts?.owner === currentUser.id ? BigInt(counts.data?.[raffle.id] ?? '0').toLocaleString('en-US') : '…'}</strong></span>}</div>
                     {raffle.state === 'preview' && <p>This raffle is a draft. Wait until it is active before sending payment.</p>}
