@@ -94,8 +94,8 @@ export default function RaffleFairness({ raffleId, viewerId, revision, endsAt })
     return <section className="raffle-summary raffle-fairness mt-4" aria-label="Raffle fairness">
         <div className="raffle-fairness-heading"><h2>Fairness proof</h2><button type="button" className="raffle-fairness-icon-button" title="Refresh proof" aria-label="Refresh proof" aria-busy={refreshing} disabled={refreshing} onClick={() => setAttempt(value => value + 1)}><span className={refreshing ? 'raffle-refresh-spinning' : undefined}><FairnessIcon kind="refresh" /></span></button></div>
         {summary?.error ? <p role="alert">Fairness information unavailable. Refresh to retry.</p> : !summary ? <p>No draw proof is available yet.</p> : ['cancelled', 'empty'].includes(summary.state) ? <p>No draw took place. There is no winner or prize selection to verify.</p> : !summary.required ? <p>This raffle uses the earlier draw method. No public-beacon proof exists for it.</p> : <>
-            <p>Both the winning ticket and prize are selected using a signed public randomness beacon and fixed calculations.</p>
-            {!summary.commitmentHash ? <p>The input commitment will be published after ticket intake closes, before the selected beacon round.</p> : <>
+            <p>The winning ticket and prize are determined using independent, publicly verifiable randomness. The information used to calculate the results is published before the draw.</p>
+            {summary.commitmentHash && <>
                 <p>{summary.complete ? 'The draw is ready to verify.' : 'Inputs are committed. Waiting for verified public randomness. If gateways are delayed or unavailable, the bot automatically retries the same committed round; no replacement draw is used.'}</p>
                 <div className="raffle-commitment-record">
                     <span className="text-xs font-semibold">Draw commitment</span>
