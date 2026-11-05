@@ -1,0 +1,85 @@
+.mmg-invitation-backdrop {
+    position: fixed; inset: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px; background: rgb(3 8 17 / 78%);
+}
+dialog.mmg-invitation {
+    position: relative; inset: auto; margin: auto;
+    width: 100%; max-width: 640px; max-height: calc(100dvh - 32px);
+    overflow-y: auto; box-sizing: border-box;
+    border: 1px solid rgb(201 166 107 / 28%); border-radius: 12px;
+    padding: 24px 28px; background: #111c2d; color: #aeb9c9;
+    font-size: 14px; line-height: 1.5; color-scheme: dark;
+    box-shadow: 0 20px 60px rgb(0 0 0 / 35%);
+}
+.mmg-invitation-header { text-align: center; }
+.mmg-invitation-header > svg { width: 22px; height: 22px; margin: 0 auto 6px; color: #c9a66b; }
+.mmg-invitation-header h2 { margin: 0 0 8px; color: #c9a66b; font-size: 25px; font-weight: 600; line-height: 1.2; }
+.mmg-invitation-header p { margin: 0; }
+.mmg-invitation strong { color: #e0e5ed; font-weight: 600; }
+.mmg-invitation-acknowledgment { margin: 16px 0 12px; padding-top: 12px; border-top: 1px solid rgb(201 166 107 / 18%); }
+.mmg-invitation-rules { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.mmg-invitation-rules li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 10px; }
+.mmg-invitation-rules svg { width: 18px; height: 18px; margin-top: 2px; color: #c9a66b; }
+.mmg-invitation-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.mmg-invitation-actions button { min-height: 36px; border-radius: 6px; padding: 7px 13px; font: inherit; font-weight: 600; cursor: pointer; }
+.mmg-invitation-actions .mmg-invitation-decline { background: transparent; color: #aeb9c9; border: 1px solid #344156; }
+.mmg-invitation-actions .mmg-invitation-accept { background: #c9a66b; color: #111c2d; border: 1px solid #c9a66b; }
+.mmg-invitation-actions button:hover { filter: brightness(1.1); }
+.mmg-invitation-actions button:focus-visible { outline: 2px solid #c9a66b; outline-offset: 3px; }
+.mmg-invitation-actions button:disabled { cursor: wait; opacity: .6; }
+.mmg-invitation-error { margin-top: 12px; color: #fca5a5; }
+@media (max-width: 480px) {
+    dialog.mmg-invitation { padding: 20px 18px; }
+    .mmg-invitation-header h2 { font-size: 24px; }
+    .mmg-invitation-rules { gap: 9px; }
+}
+
+/* Ivory invitation palette applies only to the site's light theme. */
+html[data-theme="light"] dialog.mmg-invitation {
+    background: #fffaf3;
+    color: #514b46;
+    border-color: #e5d5ba;
+    color-scheme: light;
+    box-shadow: 0 16px 48px rgb(73 57 47 / 16%);
+}
+html[data-theme="light"] .mmg-invitation-header {
+    position: relative;
+}
+html[data-theme="light"] .mmg-invitation-header::before,
+html[data-theme="light"] .mmg-invitation-header::after {
+    content: '';
+    position: absolute;
+    top: 11px;
+    width: 48px;
+    height: 1px;
+    background: #e5d5ba;
+    pointer-events: none;
+}
+html[data-theme="light"] .mmg-invitation-header::before { right: calc(50% + 24px); }
+html[data-theme="light"] .mmg-invitation-header::after { left: calc(50% + 24px); }
+html[data-theme="light"] .mmg-invitation-header > svg,
+html[data-theme="light"] .mmg-invitation-rules svg { color: #a67c3d; }
+html[data-theme="light"] .mmg-invitation-header h2,
+html[data-theme="light"] .mmg-invitation strong { color: #49392f; }
+html[data-theme="light"] .mmg-invitation-acknowledgment { border-color: #e5d5ba; }
+html[data-theme="light"] .mmg-invitation-rules li > div {
+    border-left: 1px solid #e5d5ba;
+    padding-left: 10px;
+}
+html[data-theme="light"] .mmg-invitation-actions {
+    border-top: 1px solid #e5d5ba;
+    padding-top: 12px;
+}
+html[data-theme="light"] .mmg-invitation-actions .mmg-invitation-accept {
+    background: #a67c3d;
+    border-color: #a67c3d;
+    color: #fff;
+}
+html[data-theme="light"] .mmg-invitation-actions .mmg-invitation-decline {
+    background: #f6eee2;
+    border-color: #cfc2b3;
+    color: #514b46;
+}
+html[data-theme="light"] .mmg-invitation-actions button:focus-visible { outline-color: #a67c3d; }
+html[data-theme="light"] .mmg-invitation-error { color: #a33528; }
