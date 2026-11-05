@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import HighRollersInvitation from './HighRollersInvitation';
 
 export default function HighRollersClub() {
+    const [preview, setPreview] = useState(false);
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState('');
     const [player, setPlayer] = useState('');
@@ -38,11 +40,15 @@ export default function HighRollersClub() {
     }
     return <details className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-xs" onToggle={event => setOpen(event.currentTarget.open)}>
         <summary className="cursor-pointer text-sm font-semibold">MMG High Rollers Club</summary>
+        {preview && <HighRollersInvitation preview onPreviewClose={() => setPreview(false)} />}
         {open && <div className="mt-3 space-y-3">
             <p>Members can view raffles and buy tickets. Hosting and administration remain restricted to administrators.</p>
             <form className="flex flex-wrap items-end gap-2" onSubmit={event => { event.preventDefault(); if (!busy && player.trim()) update('add_high_rollers_member', { p_player: player.trim() }); }}>
                 <label className="flex-1">Add by KoL username or player ID<input className="mt-1 block w-full rounded border px-2 py-2" value={player} onChange={event => setPlayer(event.target.value)} required maxLength={100} /></label>
-                <button className="rounded border px-3 py-2" disabled={busy || !player.trim()}>Send invitation</button>
+                <div className="flex flex-col items-end gap-1">
+                    <button type="button" className="text-xs text-gray-500 underline" onClick={() => setPreview(true)}>preview invite</button>
+                    <button className="rounded border px-3 py-2" disabled={busy || !player.trim()}>Send invitation</button>
+                </div>
             </form>
             <p className="text-gray-500">Use an exact username or ID belonging to a registered kHub account.</p>
             <label className="block">Search members by username or player ID<input type="search" className="mt-1 block w-full rounded border px-2 py-2" value={search} maxLength={100} onChange={event => { setSearch(event.target.value); setOffset(0); }} /></label>

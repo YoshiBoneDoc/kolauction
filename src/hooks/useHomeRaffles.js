@@ -5,23 +5,27 @@ import { supabase } from '../lib/supabase';
 import { auctionNow } from '../lib/auctionClock';
 import { useAuctionBoundaryNow } from './useAuctionBoundaryNow';
 
+const EMPTY_RAFFLES = [];
+
 export default function useHomeRaffles(includePrizeNames = false) {
     const { currentUser } = useContext(UserContext);
     const [counts, setCounts] = useState(null);
-    const [raffles, setRaffles] = useState([]);
+    const viewerId = currentUser?.id;
+    const raffleAccess = canViewRaffles(currentUser);
+    const [listing, setListing] = useState(null);
+    const raffles = listing?.owner === viewerId && listing?.includePrizeNames === includePrizeNames && raffleAccess ? listing.rows : EMPTY_RAFFLES;
     const now = useAuctionBoundaryNow(raffles.map(r => ({ endTime: Date.parse(r.ends_at) })));
     useEffect(() => {
         let active = true;
-        setRaffles([]);
-        if (!supabase || !canViewRaffles(currentUser)) return;
+        if (!supabase || !raffleAccess) return;
         // One bounded public read on Home mount. No polling, financial RPC or cache invalidation.
         supabase.from('mystery_raffles').select(`id,raffle_number,name,ticket_price,ends_at,created_at${includePrizeNames ? ',prizes:mystery_raffle_prizes(name)' : ''}`)
             .eq('is_test', false).in('state', ['preview', 'active']).gt('ends_at', new Date(auctionNow()).toISOString())
             .order('created_at', { ascending: false }).limit(20)
-            .then(({ data, error }) => { if (active && !error) setRaffles(data || []); })
+            .then(({ data, error }) => { if (active && !error) setListing({ owner: viewerId, includePrizeNames, rows: data || [] }); })
             .catch(() => {});
         return () => { active = false; };
-    }, [includePrizeNames, currentUser]);
+    }, [includePrizeNames, viewerId, raffleAccess]);
     useEffect(() => {
         let active = true;
         if (currentUser?.id && raffles.length) {

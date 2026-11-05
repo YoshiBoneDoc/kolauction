@@ -97,11 +97,15 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
         # All migrations are loaded, including the current real delivery/solvency code.
         sql(f"insert into khub_bot.administrators(user_id,note) values('{seller}','isolated raffle test');")
         call("select public.add_high_rollers_member('48889602')")
+        if call("select public.read_my_high_rollers_invitation()",uid=buyer): call("select public.respond_high_rollers_invitation(true,'1')",uid=buyer)
         mid=100000
-        def create_raffle():
+        def create_raffle(fair=False):
             rid=str(uuid4())
             call(f"select public.create_mystery_raffle('{rid}','Fixture raffle',100,now()+interval '1 day','[{{\"id\":2,\"quantity\":3,\"probability_bps\":10000}},{{\"id\":364,\"quantity\":5,\"probability_bps\":0}}]');")
             call(f"select public.activate_mystery_raffle('{rid}')")
+            assert sql(f"select fair_required from khub_bot.raffle_accounts where raffle_id='{rid}'")=='t'
+            # Preserve historical lifecycle fixtures; new-protocol tests below opt in.
+            if not fair: sql(f"update khub_bot.raffle_accounts set fair_required=false where raffle_id='{rid}'")
             return rid
         def mail(rid,kind='raffle',meat=100,items=None,actor=48889602):
             global mid
@@ -478,7 +482,7 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
         # Exactly the protected external balances remain, with no raffle revenue
         # or refunded payment available to subsidize the other transactions.
         assert physical['meat']==int(liabilities()['meat'])
-        assert sql("select (public.bot_worker_status()->>'raffleBackendVersion')::integer")=='2'
+        assert sql("select (public.bot_worker_status()->>'raffleBackendVersion')::integer")=='3'
         canceled=create_raffle()
         intake_physical(mail(canceled,meat=200))
         intake_physical(mail(canceled,'raffle_supply',0,[dict(id=2,quantity=3)],48889601))
@@ -496,7 +500,9 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
         assert ingest(rejected)=='raffle_refund'
         assert ingest(rejected)=='duplicate'
         call("select public.add_high_rollers_member('nIsEmOnO')")
+        call("select public.respond_high_rollers_invitation(true,'1')",uid=buyer)
         call("select public.add_high_rollers_member('48889602')")
+        if call("select public.read_my_high_rollers_invitation()",uid=buyer): call("select public.respond_high_rollers_invitation(true,'1')",uid=buyer)
         club=json.loads(call("select public.read_high_rollers_members('NISE',0)"))
         assert club['total']==1 and club['members'][0]['player_id']=='48889602'
         assert len(json.loads(call("select public.read_high_rollers_members('889602',0)"))['members'])==1
@@ -532,6 +538,7 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
         assert sql(f"select sum(meat) from khub_bot.deliveries where receipt_id='{removed_mail['id']}' and kind='refund'")=='200'
         assert sql(f"select sum(quantity) from khub_bot.deliveries where receipt_id='{removed_mail['id']}' and item_id=2")=='3'
         call("select public.add_high_rollers_member('48889602')")
+        if call("select public.read_my_high_rollers_invitation()",uid=buyer): call("select public.respond_high_rollers_invitation(true,'1')",uid=buyer)
         print('PASS: club membership, username/ID search, removed tester access, restricted management and exact nonmember refunds')
         assert call('select public.can_view_raffles()',uid=buyer)=='t'
         assert int(call('select count(*) from public.mystery_raffles',uid=buyer))>0
@@ -693,6 +700,97 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
         call(f"select public.read_raffle_result('{gift_raffle}')",uid=other,error='Raffle access required')
         assert sql("select has_function_privilege('anon','public.read_raffle_result(uuid)','execute')")=='f'
         assert call(f"select public.read_raffle_result('{forged}')",uid=buyer)==''
+        # New-protocol database checks. Historical round 42 is used only as a signed
+        # offline fixture; production scheduling is separately tested below.
+        fair=create_raffle(fair=True)
+        assert ingest(mail(fair,meat=500))=='raffle_tickets'
+        sql(f"update public.mystery_raffles set ends_at=clock_timestamp()-interval '31 minutes' where id='{fair}'")
+        scan=json.loads(sql('select public.bot_begin_inbox_scan()'))
+        sql(f"select public.bot_stage_inbox_scan('{scan['id']}','[]');select public.bot_finish_inbox_scan('{scan['id']}');")
+        fair_work=json.loads(sql('set role service_role;select public.bot_raffle_draw_work()'))
+        committed=next(row for row in fair_work if row['raffleId']==fair)
+        assert committed['fairness']['commitmentHash']==hashlib.sha256(committed['fairness']['manifest'].encode()).hexdigest()
+        frow=json.loads(sql(f"select to_jsonb(f) from khub_bot.raffle_fairness f where raffle_id='{fair}'"))
+        assert sql(f"select to_timestamp(1692803367+(round-1)*3)>=committed_at+interval '120 seconds' from khub_bot.raffle_fairness where raffle_id='{fair}'")=='t'
+        restart()
+        assert next(row for row in json.loads(sql('select public.bot_raffle_draw_work()')) if row['raffleId']==fair)==committed
+        sql(f"update khub_bot.raffle_fairness set round=round+1 where raffle_id='{fair}'",error='immutable')
+        for change in ["draw_input='{}'",'ticket_count=ticket_count+1','ticket_label_offset=ticket_label_offset+1','fair_required=false']:
+            sql(f"update khub_bot.raffle_accounts set {change} where raffle_id='{fair}'",error='immutable')
+        sql(f"select public.bot_commit_raffle_draw('{fair}','{{}}')",error='Invalid fairness proof')
+        summary=json.loads(call(f"select public.read_raffle_fairness_summary('{fair}')",uid=buyer))
+        assert not {'manifest','ticketCount','prizes','draw_input','ticket_label_offset'} & summary.keys()
+        assert summary['commitmentHash']==frow['commitment_hash'] and not summary['complete']
+        for rpc in ['read_raffle_fairness_summary','read_raffle_fairness_proof']:
+            call(f"select public.{rpc}('{fair}')",uid=other,error='Raffle access required')
+            assert sql(f"select has_function_privilege('anon','public.{rpc}(uuid)','execute')")=='f'
+        sql('set role authenticated;select * from khub_bot.raffle_fairness',uid=buyer,error='permission denied')
+        # Simulate a historical commitment in this disposable database only. No
+        # real wait, live raffle or production timestamp is changed by these tests.
+        sql(f"delete from khub_bot.raffle_fairness where raffle_id='{fair}'")
+        manifest=committed['fairness']['manifest'].split('\n');manifest[2]='42';manifest='\n'.join(manifest)
+        commitment=hashlib.sha256(manifest.encode()).hexdigest()
+        sql(f"insert into khub_bot.raffle_fairness(raffle_id,committed_at,round,manifest,commitment_hash) values('{fair}','2023-08-23T15:08:00Z',42,{lit(manifest)},'{commitment}')")
+        committed['fairness'].update(round=42,manifest=manifest,commitmentHash=commitment)
+        beacon={'round':42,'randomness':'8ada64bae5c6c0f5540a6a13af56e663240edfbd2c76ac6a8f27671eb7259ce3','signature':'95a9f9f5b231b7714de1553105d8ffdf3dcda24cfdb1e689319bccf79a9c8ce430a91b811fbfaf763900bc998b5d686a'}
+        node_code="import{readFileSync}from'node:fs';import{createFairRaffleDraw}from'./bot/src/raffle-beacon.mjs';import{createRaffleDraw}from'./bot/src/raffle-draw.mjs';const x=JSON.parse(readFileSync(0,'utf8'));console.log(JSON.stringify(createFairRaffleDraw(x.input,x.beacon,createRaffleDraw)));"
+        result=json.loads(subprocess.run(['node','--input-type=module','-e',node_code],input=json.dumps(dict(input=committed,beacon=beacon)),text=True,capture_output=True,cwd=ROOT,check=True).stdout)
+        bad_result={**result,'winningTicket':'99999'}
+        sql(f"select public.bot_commit_raffle_draw('{fair}',{lit(json.dumps(bad_result))})",error='does not match beacon')
+        command=f"set role service_role;select public.bot_commit_raffle_draw('{fair}',{lit(json.dumps(result))})"
+        concurrent=[subprocess.Popen([str(BIN/'psql'),'-h',folder,'-d','postgres','-X','-qAt','-v','ON_ERROR_STOP=1','-c',command],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True) for _ in range(2)]
+        for client in concurrent:
+            _,failure=client.communicate()
+            assert client.returncode==0,failure
+        assert json.loads(account_value(fair,'draw_result'))['method']=='khub-drand-quicknet-sha256-v1'
+        sql(f"select public.bot_commit_raffle_draw('{fair}','{{}}')")
+        proof=json.loads(call(f"select public.read_raffle_fairness_proof('{fair}')",uid=buyer))
+        assert set(proof)=={'method','raffleId','committedAt','round','manifest','commitmentHash','beacon','result','displayedWinningTicket','prizes'}
+        assert 'purchases' not in json.dumps(proof) and 'playerId' not in json.dumps(proof) and 'receiptId' not in json.dumps(proof)
+        verification="import{readFileSync}from'node:fs';import{verifyRaffleProof}from'./src/lib/raffleProof.js';console.log(JSON.stringify(await verifyRaffleProof(JSON.parse(readFileSync(0,'utf8')))));"
+        verified=subprocess.run(['node','--input-type=module','-e',verification],input=json.dumps(proof),text=True,capture_output=True,cwd=ROOT)
+        assert verified.returncode==0,verified.stderr
+        assert json.loads(verified.stdout)['winningTicket']==proof['displayedWinningTicket']
+        assert json.loads(call(f"select public.read_raffle_fairness_summary('{fair}')",uid=buyer))['complete']
+        sql(f"update khub_bot.raffle_fairness set result='{{}}' where raffle_id='{fair}'",error='immutable')
+        sql(f"update khub_bot.raffle_fairness set beacon='{{}}' where raffle_id='{fair}'",error='immutable')
+        assert sql(f"select count(*) from khub_bot.deliveries where dedupe_key like 'raffle:{fair}:prize:%'")=='0', 'drawing alone must not send or queue unowned prizes'
+        # Simulated delivery evidence, never a real send: uncertainty must still
+        # block settlement under the new draw method, just as under legacy draws.
+        assert ingest(mail(fair,'raffle_supply',0,[dict(id=2,quantity=3)],48889601))=='raffle_supply'
+        for _ in range(5): tick()
+        assert sql(f"select count(*) from khub_bot.deliveries where dedupe_key like 'raffle:{fair}:prize:%'")=='1'
+        sql(f"update khub_bot.deliveries set state='unknown' where dedupe_key like 'raffle:{fair}:prize:%'")
+        for _ in range(3): tick()
+        assert sql(f"select state from public.mystery_raffles where id='{fair}'")=='fulfilling'
+        assert account_value(fair,'held_meat')=='500'
+        assert sql(f"select count(*) from khub_bot.deliveries where dedupe_key like 'raffle:{fair}:proceeds:%'")=='0'
+        # Local fixture evidence only: mark this raffle's obligations verified.
+        for _ in range(12):
+            sql(f"update khub_bot.deliveries set state='sent',sent_at=clock_timestamp() where dedupe_key like 'raffle:{fair}:%'")
+            tick()
+        assert sql(f"select state from public.mystery_raffles where id='{fair}'")=='settled'
+        assert account_value(fair,'held_meat')=='0'
+        assert json.loads(call(f"select public.read_raffle_fairness_proof('{fair}')",uid=buyer))==proof
+        print('PASS: immutable pre-beacon commitment, restart, permissions, deterministic SQL/Node/browser verification of winner and prize, no private-ledger disclosure')
+        # More than five pending rounds cannot starve later raffles.
+        queued=[create_raffle(fair=True) for _ in range(6)]
+        for pending_id in queued:
+            assert ingest(mail(pending_id,meat=100))=='raffle_tickets'
+            sql(f"update public.mystery_raffles set ends_at=clock_timestamp()-interval '31 minutes' where id='{pending_id}'")
+        scan=json.loads(sql('select public.bot_begin_inbox_scan()'))
+        sql(f"select public.bot_stage_inbox_scan('{scan['id']}','[]');select public.bot_finish_inbox_scan('{scan['id']}');")
+        seen=set();commitments={}
+        for _ in range(4):
+            batch=json.loads(sql('select public.bot_raffle_draw_work()'))
+            assert len(batch)<=5
+            for entry in batch:
+                if entry['raffleId'] in queued:
+                    seen.add(entry['raffleId'])
+                    previous=commitments.setdefault(entry['raffleId'],entry['fairness'])
+                    assert previous==entry['fairness']
+        assert seen==set(queued)
+        print('PASS: pending beacon rounds rotate without starving later raffles or changing commitments')
         print('PASS: full-schema lifecycle and isolation: identical items, concurrent auction/raffle Meat, exact solvency, proof guards, retries, restarts, cancellation and schema permissions')
     finally:
         if started: pg('-m','immediate','-w','stop')

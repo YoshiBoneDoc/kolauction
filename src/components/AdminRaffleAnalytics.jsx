@@ -38,7 +38,7 @@ function Pager({ offset, setOffset, more }) {
     return (offset > 0 || more) && <div className="mt-2 flex gap-4"><button disabled={!offset} onClick={() => setOffset(offset - 50)}>Previous</button><span>Page {offset / 50 + 1}</span><button disabled={!more} onClick={() => setOffset(offset + 50)}>Next</button></div>;
 }
 Pager.propTypes = { offset: PropTypes.number.isRequired, setOffset: PropTypes.func.isRequired, more: PropTypes.bool.isRequired };
-export default function AdminRaffleAnalytics() {
+export default function AdminRaffleAnalytics({ revision = 0 }) {
     const [data, setData] = useState(null);
     const [error, setError] = useState('');
     const [offset, setOffset] = useState(0);
@@ -52,7 +52,7 @@ export default function AdminRaffleAnalytics() {
             else setData(value);
         }).catch(() => { if (active) setError('Raffle analytics unavailable. Please refresh.'); });
         return () => { active = false; };
-    }, [offset]);
+    }, [offset, revision]);
     if (error) return <p role="alert" className="text-sm text-red-700">{error}</p>;
     if (!data) return <p role="status" className="text-sm text-gray-500">Loading raffle analytics…</p>;
     return <div className="space-y-4 text-sm text-gray-700">
@@ -87,3 +87,5 @@ export default function AdminRaffleAnalytics() {
         </details>
     </div>;
 }
+
+AdminRaffleAnalytics.propTypes = { revision: PropTypes.number };

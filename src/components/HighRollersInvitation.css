@@ -83,3 +83,6 @@ html[data-theme="light"] .mmg-invitation-actions .mmg-invitation-decline {
 }
 html[data-theme="light"] .mmg-invitation-actions button:focus-visible { outline-color: #a67c3d; }
 html[data-theme="light"] .mmg-invitation-error { color: #a33528; }
+
+.mmg-invitation-rules li > div { font-size: 13px; }
+.mmg-invitation-rules strong { font-size: 14px; }

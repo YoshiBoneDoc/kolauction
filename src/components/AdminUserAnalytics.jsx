@@ -1,16 +1,17 @@
+import PropTypes from 'prop-types';
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
 const date = value => new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 const time = value => new Date(value).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
 
-export default function AdminUserAnalytics() {
+export default function AdminUserAnalytics({ revision = 0 }) {
     const [page, setPage] = useState(1);
     const [result, setResult] = useState(null);
     const [error, setError] = useState('');
     useEffect(() => {
         let cancelled = false;
-        setResult(null); setError('');
+        setError('');
         supabase.rpc('read_admin_new_users', { p_page: page }).then(({ data, error: failure }) => {
             if (cancelled) return;
             if (failure || !data) setError(failure?.code === '42501' ? 'Administrator access required.' : 'User analytics are unavailable. Please refresh analytics to retry.');
@@ -18,7 +19,7 @@ export default function AdminUserAnalytics() {
             else setResult(data);
         }).catch(() => { if (!cancelled) setError('User analytics are unavailable. Please refresh analytics to retry.'); });
         return () => { cancelled = true; };
-    }, [page]);
+    }, [page, revision]);
     if (error) return <p role="alert" className="text-sm text-red-700">{error}</p>;
     if (!result) return <p role="status" className="text-sm text-gray-500">Loading new users…</p>;
     const pages = Math.max(1, Math.ceil(Number(result.total) / 25));
@@ -47,3 +48,5 @@ export default function AdminUserAnalytics() {
         <p className="mt-3 text-xs text-gray-400">Updated {new Date(result.generated_at).toLocaleString()}</p>
     </section>;
 }
+
+AdminUserAnalytics.propTypes = { revision: PropTypes.number };

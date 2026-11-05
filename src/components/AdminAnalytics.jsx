@@ -83,7 +83,7 @@ export default function AdminAnalytics() {
     const [attempt, setAttempt] = useState(0);
     useEffect(() => {
         let cancelled = false;
-        setResult(null); setError('');
+        setError('');
         supabase.rpc('read_admin_analytics').then(({ data, error: failure }) => {
             if (cancelled) return;
             if (failure || !data) setError(failure?.code === '42501' ? 'Administrator access required.' : 'Analytics are unavailable. Please retry.');
@@ -102,7 +102,7 @@ export default function AdminAnalytics() {
             </nav>
             <button onClick={() => setAttempt(value => value + 1)} className="min-h-11 text-sm text-blue-700 hover:underline">Refresh analytics</button>
         </div>
-        {tab === 'raffles' ? <AdminRaffleAnalytics key={attempt} /> : tab === 'users' ? <div key={attempt}><AdminUserSearch /><AdminUserAnalytics /></div> : error ? <p role="alert" className="text-sm text-red-700">{error}</p> : !result ? <p role="status" className="text-sm text-gray-500">Loading analytics…</p> : <>
+        {tab === 'raffles' ? <AdminRaffleAnalytics revision={attempt} /> : tab === 'users' ? <div><AdminUserSearch /><AdminUserAnalytics revision={attempt} /></div> : error ? <p role="alert" className="text-sm text-red-700">{error}</p> : !result ? <p role="status" className="text-sm text-gray-500">Loading analytics…</p> : <>
             {tab === 'giveaways' ? <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <h2 className="text-sm font-medium text-gray-700">Meat stack mania:</h2>
