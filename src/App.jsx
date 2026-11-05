@@ -1,3 +1,4 @@
+import RenderBoundary from './components/RenderBoundary';
 import HighRollersInvitation from './components/HighRollersInvitation';
 import { lazy, Suspense, useContext } from "react";
 import { AuctionsContext } from "./context/AuctionsContext";
@@ -41,9 +42,9 @@ function RouteLoading() {
 }
 
 const App = () => {
-    const { pathname } = useLocation();
+    const { pathname, search } = useLocation();
     const { error, refreshAuctions } = useContext(AuctionsContext) || {};
-    if (pathname.replace(/\/+$/, '') === '/official-approval') return <Suspense fallback={<RouteLoading />}><OfficialApproval /></Suspense>;
+    if (pathname.replace(/\/+$/, '') === '/official-approval') return <RenderBoundary key={pathname}><Suspense fallback={<RouteLoading />}><OfficialApproval /></Suspense></RenderBoundary>;
     const isWallOfShame = pathname.replace(/\/+$/, '') === '/wall-of-shame';
     return (
         <div className={`flex min-h-screen flex-col ${isWallOfShame ? 'shame-background' : 'site-page-background bg-[#F9F9F9]'}`}>
@@ -53,7 +54,7 @@ const App = () => {
             {error && <div role="alert" className="bg-red-50 p-4 text-red-700">
                 {error}{" "}<button onClick={refreshAuctions} className="underline">Retry</button>
             </div>}
-            <SiteActivity><Suspense fallback={<RouteLoading />}><Routes>
+            <SiteActivity><RenderBoundary key={`${pathname}${search}`}><Suspense fallback={<RouteLoading />}><Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/raffles" element={<Raffles />} />
                 <Route path="/raffle/:id/commitment" element={<RaffleCommitment />} />
@@ -88,7 +89,7 @@ const App = () => {
                 <Route path="/auction/:id" element={<AuctionDetails />} />
                 <Route path="*" element={<NotFound />} />
 
-            </Routes></Suspense></SiteActivity>
+            </Routes></Suspense></RenderBoundary></SiteActivity>
         </div>
     );
 };

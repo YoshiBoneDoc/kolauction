@@ -75,7 +75,7 @@ export default function AuctionDetails() {
             {backLink}
             <div className={`relative mx-auto max-w-4xl rounded-lg border border-gray-200 bg-white p-4 shadow-lg sm:p-6 ${auction.giveawayTitle ? 'giveaway-detail-card' : ''}`}>
                 <AuctionWatching auctionId={auction.id} />
-                <SavedAuctions auctionId={auction.id} />
+                <SavedAuctions auctionId={auction.id} hostId={auction.sellerId} />
                 <section aria-label="Auction overview" className="grid min-w-0 pr-8 grid-cols-1 items-start gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:gap-6">
                     <div className="flex min-w-0 items-center justify-center sm:pt-2">
                         {auction.image ? <AuctionItemImage key={auction.id} src={auction.giveawayTitle ? giveawayImage : auction.image} item={auction.item} enhanceEnabled /> : <p className="text-gray-500">No Image Available</p>}

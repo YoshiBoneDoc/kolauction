@@ -21,7 +21,7 @@ export function attachCarouselDrag({ viewport, track, moving, reducedMotion, rot
     }
     function beginManual() {
         measure();
-        const progress = track.getAnimations()[0]?.effect?.getComputedTiming().progress;
+        const progress = track.getAnimations?.()[0]?.effect?.getComputedTiming().progress;
         position = (typeof progress === 'number' ? progress : 0) * step;
         track.style.animation = 'none';
         manual = true;

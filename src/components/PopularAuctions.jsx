@@ -28,9 +28,9 @@ function CompletedAuctionCarousel({ auctions, now, children }) {
     const latest = useRef(null);
     const [columns, setColumns] = useState(4);
     const [paused, setPaused] = useState(restored?.paused || false);
-    const [reducedMotion, setReducedMotion] = useState(false);
+    const [reducedMotion, setReducedMotion] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
     const hasAuctions = auctions.length > 0;
-    useEffect(() => {
+    useBrowserLayoutEffect(() => {
         const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
         function update() {
             const width = viewportRef.current?.clientWidth;
@@ -61,7 +61,7 @@ function CompletedAuctionCarousel({ auctions, now, children }) {
     useBrowserLayoutEffect(() => {
         function rememberPosition() {
             if (!latest.current.order.length) return; // Don't overwrite while loading.
-            const animation = trackRef.current?.getAnimations()[0];
+            const animation = trackRef.current?.getAnimations?.()[0];
             const progress = animation?.effect?.getComputedTiming().progress;
             const elapsed = typeof progress === 'number' ? (progress * CAROUSEL_STEP_MS) % CAROUSEL_STEP_MS : latest.current.elapsed;
             try { saveCarouselPosition(window.sessionStorage, { order: latest.current.order, paused: latest.current.paused, elapsed }, storageKey); }

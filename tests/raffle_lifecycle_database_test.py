@@ -813,6 +813,11 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
         call("select public.remove_high_rollers_member('48889602')")
         call('select public.read_my_raffle_history()',uid=buyer,error='Accepted club membership required')
         print('PASS: self-only bounded raffle history, exact personal ticket totals, accepted-member gating and revoked access')
+        sql("update khub_bot.catalog set name='colored-light &quot;necklace&quot;' where id=2")
+        assert sql('select name from khub_bot.catalog where id=2')=='colored-light "necklace"'
+        sql(f"update public.auctions set item='colored-light &quot;necklace&quot;' where id='{escrow}'")
+        assert sql(f"select item from public.auctions where id='{escrow}'")=='colored-light "necklace"'
+        print('PASS: quotation entities normalize to plain catalog and auction names')
         print('PASS: full-schema lifecycle and isolation: identical items, concurrent auction/raffle Meat, exact solvency, proof guards, retries, restarts, cancellation and schema permissions')
     finally:
         if started: pg('-m','immediate','-w','stop')

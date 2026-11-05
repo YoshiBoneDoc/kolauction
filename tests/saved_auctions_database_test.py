@@ -51,10 +51,10 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
         
         financial_probe="""select jsonb_object_agg(p.oid::regprocedure::text,pg_get_functiondef(p.oid)) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname in ('public','khub_bot') and p.prokind='f' and p.proname in ('bot_ingest_mail','bot_tick','bot_claim_delivery','bot_ack_delivery','finish_listing','finish_buy_order','bot_liabilities');"""
         for migration in migrations:
-            if migration.name=='202611030181_saved_auctions.sql':
-                before_projection=sql(financial_probe)
+            before_projection=sql(financial_probe)
             sql(migration.read_text())
-        assert before_projection==sql(financial_probe), 'Financial definitions changed'
+            if 'saved_' in migration.name or 'bookmark' in migration.name:
+                assert before_projection==sql(financial_probe), 'Bookmark migration changed financial definitions'
 
         definitions="""select jsonb_object_agg(p.oid::regprocedure::text,pg_get_functiondef(p.oid)) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
             where n.nspname in ('public','khub_bot') and p.prokind='f' and p.proname in
@@ -83,6 +83,19 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
             return json.loads(sql("set role authenticated;select public.read_saved_auctions();reset role;",uid))['rows']
         save(other)
         assert len(read(other))==1 and read(owner)==[]
+        buy_id=sql("set role authenticated;select public.create_buy_auction(2,1,100,24,'immediate');reset role",owner)
+        sql(f"update public.auctions set status='active' where id='{buy_id}'")
+        for listing_id in [aid,buy_id]:
+            for viewer in [owner,other]:
+                sql(f"select public.set_saved_auction('{listing_id}',true,0,'UTC')",viewer)
+            assert sql(f"set role anon;select bookmark_count from public.read_auction_bookmark_counts(array['{listing_id}'::uuid]);reset role")=='1'
+            assert next(row for row in read(owner) if row['id']==listing_id)['is_host']
+            sql(f"select public.set_saved_auction('{listing_id}',false,0,'UTC')",other)
+            assert sql(f"set role anon;select bookmark_count from public.read_auction_bookmark_counts(array['{listing_id}'::uuid]);reset role")=='0'
+            assert any(row['id']==listing_id for row in read(owner))
+            sql(f"select public.set_saved_auction('{listing_id}',false,0,'UTC')",owner)
+        save(other)
+
         preference_before=sql(f"select preference_set_at from khub_bot.saved_auctions where user_id='{other}' and auction_id='{aid}';")
         sql(f"set role authenticated;select public.set_saved_auction('{aid}',true,15,'Asia/Kolkata');reset role;",other)
         assert preference_before==sql(f"select preference_set_at from khub_bot.saved_auctions where user_id='{other}' and auction_id='{aid}';")

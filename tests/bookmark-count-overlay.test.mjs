@@ -50,3 +50,14 @@ test('ribbon saved state is immediate, user-scoped and independent of shared cou
     overlay.changed('user', 'auction', true, false, 40, 50);
     assert.equal(overlay.savedIds('user', ['auction']).has('auction'), false);
 });
+
+test('host bookmarks retain private saved state without changing public counts', () => {
+    const overlay = createBookmarkCountOverlay();
+    overlay.counts('host', snapshot(3));
+    overlay.changed('host', 'auction', false, true, 20, 30, false);
+    assert.equal(overlay.counts('host', snapshot(3)).auction, 3);
+    assert.equal(overlay.savedIds('host', []).has('auction'), true);
+    overlay.changed('host', 'auction', true, false, 40, 50, false);
+    assert.equal(overlay.counts('host', snapshot(3)).auction, 3);
+    assert.equal(overlay.savedIds('host', ['auction']).has('auction'), false);
+});

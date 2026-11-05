@@ -20,6 +20,7 @@ await save('src/data/items.meta.json', json(metadata));
 if (await stat(new URL('bot/', root)).catch(() => null)) {
     await save('bot/catalog/items.json', json(snapshot.items));
     await save('bot/catalog/items.meta.json', json(metadata));
+    await save('bot/src/item-name.mjs', await readFile(new URL('scripts/lib/item-name.mjs', root), 'utf8'));
     await save('bot/src/item-catalog-source.mjs', await readFile(new URL('scripts/lib/item-catalog.mjs', root), 'utf8'));
 }
 console.log(`Updated ${snapshot.items.length} known items; ${items.length} items available for auctions, including ${metadata.gift_only_items} gift-only collectibles. Gift packages excluded. Source: ${snapshot.source}`);

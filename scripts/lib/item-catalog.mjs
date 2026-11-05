@@ -1,3 +1,4 @@
+import { decodeItemName } from './item-name.mjs';
 import { createHash } from 'node:crypto';
 
 export const ITEM_SOURCE = 'https://raw.githubusercontent.com/kolmafia/kolmafia/main/src/main/resources/data/items.txt';
@@ -36,7 +37,7 @@ export function parseItemCatalog(text, limits) {
         if (fields.length < 7 || !/^[1-9]\d*$/.test(fields[0]) || !/^\d+$/.test(fields[2])) throw new Error('Malformed item row; keeping the previous catalog.');
         const access = fields[5] === '' ? [] : fields[5].split(',').map(flag => flag.trim());
         if (access.some(flag => !['q', 'g', 't', 'd'].includes(flag))) throw new Error('Unknown item access flag; keeping the previous catalog.');
-        items.push({ id: Number(fields[0]), name: fields[1], image: fields[3], tradeable: access.includes('t'),
+        items.push({ id: Number(fields[0]), name: decodeItemName(fields[1]), image: fields[3], tradeable: access.includes('t'),
             giftable: access.includes('g'), is_gift_package: fields[4].split(',').some(use => use.trim() === 'package') });
     }
     return validateCatalog(items, limits).sort((a, b) => a.id - b.id);

@@ -1,3 +1,5 @@
+import { decodeItemName } from '../../scripts/lib/item-name.mjs';
+const decoded = items => items?.some(item => decodeItemName(item.name) !== item.name) ? items.map(item => ({ ...item, name: decodeItemName(item.name) })) : items;
 const imagePath = /^(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+\.gif$/;
 
 export function itemImageUrl(image) {
@@ -27,7 +29,7 @@ export function isAuctionableItem(item) {
 // A failed read uses the checked-in auctionable snapshot; server validation remains
 // authoritative if an item's eligibility has changed since that snapshot.
 export function createItemCatalogService(client, fallback, now = Date.now, fetcher = globalThis.fetch) {
-    let cached = typeof fallback === 'function' ? null : fallback;
+    let cached = typeof fallback === 'function' ? null : decoded(fallback);
     let expires = 0;
     let loading;
     let version;
@@ -46,14 +48,14 @@ export function createItemCatalogService(client, fallback, now = Date.now, fetch
                     if (!response.ok) throw new Error('Catalogue unavailable');
                     const data = await response.json();
                     if (data?.ready === true && validTradeableItems(data.items)) {
-                        cached = data.items;
+                        cached = decoded(data.items);
                         version = manifest.version;
                         expires = now() + 5 * 60 * 1000;
                     } else throw new Error('Invalid catalogue items');
                 } catch {
                     expires = now() + 30000;
                     if (!cached?.length && typeof fallback === 'function') {
-                        try { cached = await fallback(); } catch { cached = []; }
+                        try { cached = decoded(await fallback()); } catch { cached = []; }
                     }
                 }
                 return cached;

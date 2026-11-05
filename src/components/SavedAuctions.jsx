@@ -16,14 +16,14 @@ import RemainingTime from './RemainingTime';
 
 const service = createSavedAuctionService(supabase);
 const changed = 'khub:saved-auctions-changed';
-export default function SavedAuctions({ auctionId }) {
+export default function SavedAuctions({ auctionId, hostId }) {
     const { currentUser } = useContext(UserContext);
     if (!currentUser || currentUser.isBanned) return null;
-    return <SavedAuctionPanel key={`${currentUser.id}:${auctionId || 'profile'}`} auctionId={auctionId} />;
+    return <SavedAuctionPanel key={`${currentUser.id}:${auctionId || 'profile'}`} auctionId={auctionId} hostId={hostId} />;
 }
-SavedAuctions.propTypes = { auctionId: PropTypes.string };
+SavedAuctions.propTypes = { auctionId: PropTypes.string, hostId: PropTypes.string };
 
-function SavedAuctionPanel({ auctionId }) {
+function SavedAuctionPanel({ auctionId, hostId }) {
     const { currentUser } = useContext(UserContext);
     const sequence = useRef(0);
     const [defaultMinutes, setDefaultMinutes] = useState(null);
@@ -57,7 +57,7 @@ function SavedAuctionPanel({ auctionId }) {
         const startedAt = Date.now();
         try {
             await service.set(id, saved, minutes);
-            bookmarkCountOverlay.changed(currentUser.id, id, wasSaved, saved, startedAt, Date.now());
+            bookmarkCountOverlay.changed(currentUser.id, id, wasSaved, saved, startedAt, Date.now(), hostId !== currentUser.id && !rows?.find(row => row.id === id)?.is_host);
             // Update locally even when a follow-up read is temporarily unavailable.
             setRows(previous => saved ? [...(previous || []).filter(row => row.id !== id),
                 { ...(previous || []).find(row => row.id === id), id, reminder_minutes: minutes ?? defaultMinutes ?? 0 }] : (previous || []).filter(row => row.id !== id));
@@ -157,4 +157,4 @@ function SavedAuctionPanel({ auctionId }) {
         </button>}
     </section>;
 }
-SavedAuctionPanel.propTypes = { auctionId: PropTypes.string };
+SavedAuctionPanel.propTypes = { auctionId: PropTypes.string, hostId: PropTypes.string };

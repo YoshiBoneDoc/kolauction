@@ -6,7 +6,7 @@ export function createBookmarkCountOverlay() {
     return {
         subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
         version: () => version,
-        changed(user, id, wasSaved, saved, start, end) {
+        changed(user, id, wasSaved, saved, start, end, contributes = true) {
             if (!user || wasSaved === saved) return;
             if (!users.has(user)) users.set(user, new Map());
             const records = users.get(user);
@@ -14,8 +14,8 @@ export function createBookmarkCountOverlay() {
             if (record.saved === saved) return;
             record.saved = saved;
             record.changes = record.changes.filter(change => end - change.end < 11 * 60 * 1000);
-            const delta = saved ? 1 : -1;
-            record.changes.push({ delta, start, end });
+            const delta = contributes ? (saved ? 1 : -1) : 0;
+            if (delta) record.changes.push({ delta, start, end });
             if (record.display !== null) record.display = Math.max(0, record.display + delta);
             records.set(id, record);
             // A profile can hold at most 200 bookmarks; keep long sessions bounded.

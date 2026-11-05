@@ -1,3 +1,4 @@
+import { decodeItemName } from '../../scripts/lib/item-name.mjs';
 import { withReadDeadline } from './readDeadline.js';
 import { parsePrice } from './auctionPriceRange.js';
 import { resolveAuctionSort } from './auctionBrowsing.js';
@@ -25,7 +26,7 @@ export function mapAuction(row, bidRows) {
         giveawayTitle: row.giveaway_title || null,
         giveawayWinCondition: row.giveaway_win_condition || 'last_bid',
         isBundle: Array.isArray(row.bundle_items) && row.bundle_items.length > 1,
-        bundleItems: Array.isArray(row.bundle_items) ? row.bundle_items.map(item => ({ ...item, id: Number(item.id), quantity: Number(item.quantity) })) : [],
+        bundleItems: Array.isArray(row.bundle_items) ? row.bundle_items.map(item => ({ ...item, name: decodeItemName(item.name), id: Number(item.id), quantity: Number(item.quantity) })) : [],
         pricePerItem: Number(row.price_per_item || row.min_bid_meat),
         purchasedQuantity: Number(row.purchased_quantity || 0),
         remainingQuantity: Number(row.remaining_quantity ?? row.quantity),
@@ -53,7 +54,7 @@ export function mapAuction(row, bidRows) {
         sellerId: row.seller_id,
         owner: row.usernames_visible === false ? (row.auction_kind === 'buy' ? 'Buyer' : 'Seller') : row.seller_username,
         usernamesVisible: row.usernames_visible !== false,
-        item: Array.isArray(row.bundle_items) && row.bundle_items.length > 1 && row.item && !row.item.startsWith('Bundle:') ? `Bundle: ${row.item}` : row.item,
+        item: Array.isArray(row.bundle_items) && row.bundle_items.length > 1 && row.item && !row.item.startsWith('Bundle:') ? `Bundle: ${decodeItemName(row.item)}` : decodeItemName(row.item),
         quantity: Number(row.quantity),
         minBidMeat: Number(row.min_bid_meat),
         itemId: row.item_id,

@@ -109,7 +109,7 @@ export default function BuyAuctionDetails({ auction, backLink }) {
                         <span aria-label="Auction status" className={`ml-auto max-w-full rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass}`}>{outcomeLabel}</span>
                     </div>
                     <AuctionWatching auctionId={auction.id} />
-                <SavedAuctions auctionId={auction.id} />
+                <SavedAuctions auctionId={auction.id} hostId={auction.sellerId} />
                     <h1 className="buy-detail-title break-words text-2xl font-bold leading-tight text-[#172554]">{auction.item}</h1>
                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#64748B]">
                         <p>Requested by <SellerLink auction={auction} /></p>
