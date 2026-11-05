@@ -25,6 +25,11 @@ const choose = (value, choices, fallback) => {
 export function publicRequest(url) {
     const parsed = new URL(url);
     const query = parsed.searchParams;
+    if (parsed.pathname === '/public-raffle-commitment') {
+        const id = query.get('id');
+        if (query.size !== 1 || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(id || '')) throw new Error('Invalid commitment ID.');
+        return { view: 'commitment', id: id.toLowerCase() };
+    }
     if (parsed.pathname === '/public-banner') {
         if (query.size) throw new Error('Banner does not accept filters.');
         return { view: 'banner' };
@@ -74,6 +79,14 @@ export function publicRequest(url) {
 }
 
 export function publicProjection(data, request) {
+    if (request.view === 'commitment') {
+        if (data !== null && (data.raffleId !== request.id || !/^[a-f0-9]{64}$/.test(data.commitmentHash)
+            || !Number.isFinite(Date.parse(data.committedAt)) || !Number.isSafeInteger(data.round) || data.round < 1
+            || typeof data.complete !== 'boolean')) throw new Error('Invalid commitment.');
+        // Explicit projection: no names, pool, ticket totals, holdings or proof.
+        return { commitment: data === null ? null : Object.fromEntries(['raffleId', 'method', 'commitmentHash', 'committedAt', 'round', 'chainHash', 'beaconAvailableAt', 'complete'].map(key => [key, data[key]])),
+            server_time: new Date().toISOString() };
+    }
     if (request.view === 'bookmarks') {
         if (!Array.isArray(data) || data.length > request.ids.length
             || new Set(data.map(row => row.auction_id)).size !== data.length
@@ -119,6 +132,7 @@ export function publicProjection(data, request) {
 }
 
 export function originRequest(request) {
+    if (request.view === 'commitment') return { rpc: 'read_public_raffle_commitment', args: { p_id: request.id } };
     if (request.view === 'bookmarks') return { rpc: 'read_auction_bookmark_counts', args: { p_ids: request.ids } };
     if (request.view === 'batch-live') return { rpc: 'read_public_auction_live_batch', args: { p_ids: request.ids } };
     if (request.view === 'featured') return { rpc: 'read_featured_giveaway', args: {} };

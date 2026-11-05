@@ -12,18 +12,19 @@ import { minimumAuctionBid } from '../lib/bidIncrements';
 
 export default function AuctionBidForm({ auction, showTerms = true, showHeading = true, compact = false, inline = false, onClose }) {
     const { currentUser } = useContext(UserContext);
-    const { placeBid, purchaseAuction } = useContext(AuctionsContext);
+    const { placeBid, purchaseAuction, isRefreshing = false } = useContext(AuctionsContext);
     const [amount, setAmount] = useState('');
     const [error, setError] = useState('');
     const [pending, setPending] = useState(false);
     const [message, setMessage] = useState('');
     const inputId = useId();
+    const reconciling = isRefreshing && Boolean(message);
     const minimum = minimumAuctionBid(auction);
     const minimumText = minimum === null ? 'Maximum bid reached' : minimum.toLocaleString('en-US');
 
     async function submit(event, buyout = false) {
         event.preventDefault();
-        if (pending) return;
+        if (pending || reconciling) return;
         setMessage('');
         const bid = buyout ? auction.instantPurchasePrice : auction.giveawayTitle ? minimum : parseMeatAmount(amount);
         const instant = auction.instantPurchasePrice && bid !== null && bid >= auction.instantPurchasePrice;
@@ -49,7 +50,7 @@ export default function AuctionBidForm({ auction, showTerms = true, showHeading 
         }
     }
 
-    if (auction.liveUnavailable) return <p role="status">Live bidding information is temporarily unavailable.</p>;
+    if (auction.liveUnavailable) return <p role="status">{message && <span>{message} </span>}Live bidding information is temporarily unavailable.</p>;
     if (!currentUser) return <Link to="/login" className="flex min-h-11 items-center justify-center rounded bg-blue-600 px-4 py-3 text-white">Log in to bid</Link>;
     if (currentUser.isBanned) return <p className="text-sm text-gray-600">Bidding is unavailable for this account.</p>;
     if (currentUser.id === auction.sellerId) return <p className="text-sm text-gray-600">This is your listing.</p>;
@@ -71,24 +72,24 @@ export default function AuctionBidForm({ auction, showTerms = true, showHeading 
 
     if (inline) return <form onSubmit={submit} aria-label={`Bid on ${auction.item}`} className="grid h-full min-h-0 w-full min-w-0 grid-cols-[minmax(0,1fr)_clamp(104px,50%,160px)] grid-rows-[18px_24px] gap-y-0.5 text-left">
         <label htmlFor={inputId} className={error || message ? 'sr-only' : 'col-start-1 row-start-1 self-end text-[10px] font-medium leading-3 text-gray-600'}>Your Bid (Meat)</label>
-        {auction.instantPurchasePrice > 0 && (!auction.giveawayTitle || auction.instantPurchasePrice === minimum) && <button type="button" disabled={pending} onClick={event => submit(event, true)} title={`Buyout: ${auction.instantPurchasePrice.toLocaleString('en-US')} Meat`}
+        {auction.instantPurchasePrice > 0 && (!auction.giveawayTitle || auction.instantPurchasePrice === minimum) && <button type="button" disabled={pending || reconciling} onClick={event => submit(event, true)} title={`Buyout: ${auction.instantPurchasePrice.toLocaleString('en-US')} Meat`}
             className="button-green col-start-2 row-start-1 inline-flex h-[18px] items-center justify-center rounded-[2px] border border-green-800 bg-green-800 p-0 text-[11px] font-semibold text-green-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-green-700 disabled:cursor-not-allowed disabled:border-gray-300 disabled:bg-gray-100 disabled:text-gray-500">Buy Now</button>}
         <input id={inputId} type="text" inputMode="decimal" autoComplete="off" autoFocus
             readOnly={Boolean(auction.giveawayTitle)} value={auction.giveawayTitle ? minimum ?? '' : amount} onChange={(event) => { setAmount(event.target.value); setError(''); setMessage(''); }}
             onBlur={() => setAmount(value => normalizeAuctionAmount(value, { meat: true }))}
-            placeholder={minimum === null ? minimumText : `Min: ${minimumText} · k/m/b`} disabled={pending || minimum === null}
+            placeholder={minimum === null ? minimumText : `Min: ${minimumText} · k/m/b`} disabled={pending || reconciling || minimum === null}
             title={minimum === null ? minimumText : `Next minimum bid: ${minimumText} Meat. Full amounts or k/m/b shorthand.`}
             aria-invalid={Boolean(error)} aria-describedby={`${inputId}-help${error ? ` ${inputId}-error` : ''}`}
             className="col-start-1 row-start-2 h-6 w-full min-w-0 rounded-none rounded-l-[2px] border border-r-0 border-gray-400 bg-white px-2 text-xs text-gray-900 placeholder:text-[11px] placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500" />
         <div className={`col-start-2 row-start-2 grid h-6 grid-cols-2 overflow-hidden ${auction.instantPurchasePrice ? 'rounded-br-[2px]' : 'rounded-r-[2px]'}`}>
-            <button type="submit" disabled={pending || minimum === null} className="h-full min-h-0 min-w-0 rounded-none border border-blue-700 bg-blue-700 p-0 text-xs font-semibold text-white hover:border-blue-700 hover:bg-blue-100 hover:text-blue-800 disabled:border-gray-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-800 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500">{pending ? '…' : 'Bid'}</button>
+            <button type="submit" disabled={pending || reconciling || minimum === null} className="h-full min-h-0 min-w-0 rounded-none border border-blue-700 bg-blue-700 p-0 text-xs font-semibold text-white hover:border-blue-700 hover:bg-blue-100 hover:text-blue-800 disabled:border-gray-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-800 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500">{pending ? '…' : 'Bid'}</button>
             <button type="button" onClick={onClose} disabled={pending} aria-label="Close Bid Form"
                 className="h-full min-h-0 min-w-0 rounded-none border border-l-0 border-gray-300 bg-white p-0 text-xs font-semibold text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500">Close</button>
         </div>
         <p id={`${inputId}-help`} className="sr-only">{minimum === null ? minimumText : `Next minimum bid: ${minimumText} Meat. Full amounts or k/m/b shorthand.`}</p>
         {(error || message) && <div className="col-start-1 row-start-1 min-h-0 overflow-y-auto bg-[#F8F6F4] text-[10px] leading-3">
             {error && <p id={`${inputId}-error`} role="alert" className="break-words text-red-700">{error}</p>}
-            {message && <p role="status" className="text-green-700">{message}</p>}
+            {message && <p role="status" className="text-green-700">{message}{reconciling ? ' Refreshing auction…' : ''}</p>}
         </div>}
     </form>;
 
@@ -99,15 +100,15 @@ export default function AuctionBidForm({ auction, showTerms = true, showHeading 
             <input id={inputId} type="text" inputMode="decimal" autoComplete="off"
                 readOnly={Boolean(auction.giveawayTitle)} value={auction.giveawayTitle ? minimum ?? '' : amount} onChange={(event) => { setAmount(event.target.value); setError(''); setMessage(''); }}
                 onBlur={() => setAmount(value => normalizeAuctionAmount(value, { meat: true }))}
-                placeholder={minimum === null ? minimumText : `${minimumText} · Full amounts or k/m/b shorthand.`} disabled={pending || minimum === null}
+                placeholder={minimum === null ? minimumText : `${minimumText} · Full amounts or k/m/b shorthand.`} disabled={pending || reconciling || minimum === null}
                 aria-invalid={Boolean(error)} aria-describedby={`${inputId}-help${error ? ` ${inputId}-error` : ''}`}
                 className={`w-full min-w-0 rounded border border-gray-400 bg-white text-gray-900 ${compact ? 'min-h-10 px-3 py-2 text-sm' : 'min-h-11 p-3 text-base'}`} />
             <p id={`${inputId}-help`} className="pb-4 text-xs text-gray-600">{minimum === null ? minimumText : `Next minimum bid: ${minimumText} Meat.`}</p>
-            <button type="submit" disabled={pending || minimum === null} className={`w-full rounded bg-blue-600 px-4 font-semibold text-white hover:bg-blue-700 disabled:opacity-50 ${compact ? 'min-h-9 py-2 text-sm' : 'min-h-11 py-3'}`}>
+            <button type="submit" disabled={pending || reconciling || minimum === null} className={`w-full rounded bg-blue-600 px-4 font-semibold text-white hover:bg-blue-700 disabled:opacity-50 ${compact ? 'min-h-9 py-2 text-sm' : 'min-h-11 py-3'}`}>
                 {pending ? 'Submitting…' : 'Place Bid'}
             </button>
             {error && <p id={`${inputId}-error`} role="alert" className="break-words text-sm text-red-700">{error}</p>}
-            {message && <p role="status" className="text-sm text-green-700">{message}</p>}
+            {message && <p role="status" className="text-sm text-green-700">{message}{reconciling ? ' Refreshing auction…' : ''}</p>}
         </form>
     );
 }

@@ -4,7 +4,7 @@ import { buildSync } from 'esbuild';
 import { createRequire } from 'node:module';
 import * as React from 'react';
 const require = createRequire(import.meta.url);
-const { outputFiles } = buildSync({ stdin: { contents: "export {default} from './src/components/RaffleFairness.jsx';", resolveDir: process.cwd() }, bundle: true, write: false, platform: 'node', format: 'cjs', supported: { 'dynamic-import': false }, packages: 'external', jsx: 'automatic', external: ['../lib/supabase', '../lib/raffleProof'] });
+const { outputFiles } = buildSync({ stdin: { contents: "export {default} from './src/components/RaffleFairness.jsx';", resolveDir: process.cwd() }, bundle: true, write: false, platform: 'node', format: 'cjs', supported: { 'dynamic-import': false }, packages: 'external', jsx: 'automatic', define: { 'import.meta.env.VITE_SHARED_AUCTION_CACHE': 'false' }, external: ['../lib/supabase', '../lib/raffleProof', '../lib/raffleService'] });
 globalThis.document = Object.assign(new EventTarget(), { hidden: false });
 globalThis.window = new EventTarget();
 let active, verificationFailure = false;
@@ -21,7 +21,7 @@ const compiled = { exports: {} };
 new Function('require', 'module', 'exports', outputFiles[0].text)(name => name === 'react' ? { ...React,
     useState: state, useRef: value => state({ current: value })[0],
     useEffect(fn, deps) { const [prior, set] = state(null); if (!prior || deps.some((v, i) => prior[i] !== v)) { set(deps); effects.push(fn); } },
-} : name === 'react-router-dom' ? { Link: () => null } : name === '../lib/supabase' ? { supabase: { async rpc(name, args) { calls.push([name, args]); return { data: name === 'read_raffle_fairness_summary' ? summary : proof }; } } } : name === '../lib/raffleProof' ? { async verifyRaffleProof(data, savedHash) { verifiedInputs.push([data, savedHash]); if (verificationFailure) throw new Error('Commitment hash mismatch'); return { winningTicket: '1234', selectedOutcome: '2' }; } } : require(name), compiled, compiled.exports);
+} : name === '../lib/raffleService' ? { readRaffle: (_key, read) => read() } : name === 'react-router-dom' ? { Link: () => null } : name === '../lib/supabase' ? { supabase: { async rpc(name, args) { calls.push([name, args]); return { data: name === 'read_raffle_fairness_summary' ? summary : proof }; } } } : name === '../lib/raffleProof' ? { async verifyRaffleProof(data, savedHash) { verifiedInputs.push([data, savedHash]); if (verificationFailure) throw new Error('Commitment hash mismatch'); return { winningTicket: '1234', selectedOutcome: '2' }; } } : require(name), compiled, compiled.exports);
 function harness() {
     const h = { slots: [], cursor: 0 };
     const cleanups = [];

@@ -56,7 +56,9 @@ export function createPublicAuctionReader(client, { enabled = false, fetch: fetc
                 const livePromise = previous?.data.rows.length && previous.data.rows[0].status !== 'pending_escrow'
                     ? this.load({ ...request, view: 'detail-live' }).then(data => ({ data }), error => ({ error })) : null;
                 let authoritativeRead = false;
-                if (!context || Date.now() - context.at >= 30000) {
+                const detailStatus = context?.data.rows[0]?.status;
+                const privateTtl = detailStatus === 'active' ? 60000 : detailStatus === 'pending_escrow' ? 30000 : 120000;
+                if (!context || Date.now() - context.at >= privateTtl) {
                     const full = !context || Date.now() - context.staticAt >= 300000 || context.data.rows[0]?.status !== 'active' || context.data.rows[0]?.auction_kind === 'buy';
                     let query = client.rpc(full ? 'read_auction_detail_static' : 'read_auction_viewer_context', { p_view: 'detail', p_id: request.id,
                         p_search: '', p_status: 'active', p_sort: 'ending', p_page: 1 });

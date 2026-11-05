@@ -3,6 +3,8 @@ import { watchRaffleCommitment } from '../lib/raffleCommitmentRefresh';
 import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { supabase } from '../lib/supabase';
+import { readPublicRaffleCommitment } from '../lib/publicRaffleCommitment';
+import { readRaffle } from '../lib/raffleService';
 
 function FairnessIcon({ kind }) {
     const paths = {
@@ -39,8 +41,12 @@ export default function RaffleFairness({ raffleId, viewerId, revision, endsAt })
             read: async () => {
                 if (active) setRefreshing(true);
                 try {
-                    const { data, error } = await supabase.rpc('read_raffle_fairness_summary', { p_id: raffleId });
+                    const { data, error } = await readRaffle(`summary:${raffleId}`, () => supabase.rpc('read_raffle_fairness_summary', { p_id: raffleId }), { maxAge: 60000 });
                     if (error) throw error;
+                    if (import.meta.env.VITE_SHARED_AUCTION_CACHE === 'true' && data?.required && !data.complete && !['cancelled', 'empty'].includes(data.state)) {
+                        const commitment = await readPublicRaffleCommitment(raffleId);
+                        return commitment ? { ...data, ...commitment } : data;
+                    }
                     return data;
                 } finally { if (active) setRefreshing(false); }
             },

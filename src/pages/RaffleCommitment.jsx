@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { readPublicRaffleCommitment } from '../lib/publicRaffleCommitment';
 import { supabase } from '../lib/supabase';
 import '../components/raffles.css';
 export default function RaffleCommitment() {
@@ -9,7 +10,7 @@ export default function RaffleCommitment() {
     useEffect(() => {
         let active = true;
         setResult(null); setMessage('');
-        supabase.rpc('read_public_raffle_commitment', { p_id: id }).then(({ data, error }) => {
+        (import.meta.env.VITE_SHARED_AUCTION_CACHE === 'true' ? readPublicRaffleCommitment(id).then(data => ({ data })) : supabase.rpc('read_public_raffle_commitment', { p_id: id })).then(({ data, error }) => {
             if (active) setResult({ id, data, error: !!error });
         }).catch(() => { if (active) setResult({ id, error: true }); });
         return () => { active = false; };

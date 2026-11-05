@@ -7,6 +7,8 @@ import { UserContext } from "./UserContext";
 import { auctionReadRequest, auctionRefreshDelay, startAuctionRefresh } from '../lib/auctionRefresh';
 import { auctionNow } from '../lib/auctionClock';
 import { createAuctionReadCache } from '../lib/auctionReadCache';
+import { trafficPressure } from '../lib/trafficPressure';
+import { submitConfirmedBid } from '../lib/confirmedBid';
 import { createPublicAuctionReader } from '../lib/publicAuctionReader';
 
 export const AuctionsContext = createContext();
@@ -22,6 +24,7 @@ export const AuctionsProvider = ({ children }) => {
     const [authRevision, setAuthRevision] = useState(0);
     const scope = JSON.stringify([viewerId ?? null, currentUser?.isBanned ?? false, currentUser?.khubUsername ?? null, authRevision]);
     const cache = useMemo(() => createAuctionReadCache((key, signal, { fresh } = {}) => {
+        if (key === 'pending-summary') return storage.pendingTradeSummary({ signal });
         if (key.startsWith('pending:')) return storage.pendingTrades(Number(key.slice(8)), { signal });
         return storage.load({ ...JSON.parse(key), signal, fresh });
     }, { scope }), [scope]);
@@ -72,8 +75,11 @@ export const AuctionsProvider = ({ children }) => {
     const [pendingSelection, setPendingSelection] = useState({ scope, page: 1 });
     const pendingPage = pendingSelection.scope === scope ? pendingSelection.page : 1;
     const setPendingPage = page => setPendingSelection({ scope, page });
+    const [pendingVisibility, setPendingVisibility] = useState({ scope, open: false });
+    const pendingExpanded = pendingVisibility.scope === scope && pendingVisibility.open;
+    const setPendingExpanded = useCallback(open => setPendingVisibility({ scope, open }), [scope]);
     const showPending = Boolean(currentUser?.id && shared);
-    const pendingKey = showPending ? `pending:${pendingPage}` : null;
+    const pendingKey = showPending ? pendingExpanded ? `pending:${pendingPage}` : 'pending-summary' : null;
     const getPending = useCallback(() => cache.snapshot(pendingKey), [cache, pendingKey]);
     const pending = useSyncExternalStore(subscribe, getPending, getPending);
     const pendingTrades = pending.data?.auctions || [];
@@ -91,7 +97,7 @@ export const AuctionsProvider = ({ children }) => {
 
     useEffect(() => {
         if (!key || networkRequest.view === 'profile' && !currentUser?.id) return;
-        const delay = () => Math.max(cache.snapshot(key).data?.publicSnapshot?.live_mode ? 5000 : auctionRefreshDelay(networkRequest, cache.snapshot(key).data?.auctions || [], auctionNow(), import.meta.env.VITE_SHARED_AUCTION_CACHE === 'true'), cache.retryAfter(key));
+        const delay = () => Math.max(cache.snapshot(key).data?.publicSnapshot?.live_mode && networkRequest.view !== 'detail' ? 5000 : auctionRefreshDelay(networkRequest, cache.snapshot(key).data?.auctions || [], auctionNow(), import.meta.env.VITE_SHARED_AUCTION_CACHE === 'true'), cache.retryAfter(key));
         const previous = cache.snapshot(key);
         const initialDelay = previous.error ? cache.retryAfter(key)
             : previous.updatedAt == null ? (networkRequest.view === 'browse' && (networkRequest.minPrice != null || networkRequest.maxPrice != null) ? 250 : 0)
@@ -108,21 +114,21 @@ export const AuctionsProvider = ({ children }) => {
         const previous = cache.snapshot(pendingKey);
         return startAuctionRefresh({
             refresh: () => cache.load(pendingKey, { maxAge: 5000 }),
-            delay: 30000, document, jitter: 0.2,
-            initialDelay: previous.updatedAt == null ? 0 : Math.max(0, 30000 - (Date.now() - previous.updatedAt)),
+            delay: () => trafficPressure.delay(pendingExpanded ? 30000 : 120000), document, jitter: 0.2,
+            initialDelay: previous.updatedAt == null ? 0 : Math.max(0, (pendingExpanded ? 30000 : 120000) - (Date.now() - previous.updatedAt)),
         });
-    }, [cache, pendingKey]);
+    }, [cache, pendingKey, pendingExpanded]);
 
     // Only explicit refreshes and completed/failed write attempts invalidate the
     // cache. A post-write refresh queues after any older read, so it cannot be
     // satisfied by a response whose request preceded the write.
-    const refreshReads = useCallback(async (fresh = false) => {
+    const refreshReads = useCallback(async (fresh = false, includePending = true) => {
         // A write may finish after navigation. Refresh the currently selected
         // resource rather than refetching the page where the write began.
         const { cache, key, pendingKey } = activeRead.current;
         cache.invalidate();
         await cache.load(key, { force: true, fresh });
-        if (pendingKey) await cache.load(pendingKey, { force: true });
+        if (includePending && pendingKey) await cache.load(pendingKey, { force: true });
     }, []);
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -144,13 +150,7 @@ export const AuctionsProvider = ({ children }) => {
     };
 
     const placeBid = async (auctionId, amount) => {
-        try {
-            await storage.bid(auctionId, amount);
-        } catch (failure) {
-            await refreshAfterAction();
-            throw failure;
-        }
-        await refreshAfterAction();
+        return submitConfirmedBid(() => storage.bid(auctionId, amount), () => refreshReads(true, false));
     };
 
     const confirmTrade = async (auctionId) => {
@@ -205,7 +205,7 @@ export const AuctionsProvider = ({ children }) => {
     };
 
     return (
-        <AuctionsContext.Provider value={{ auctions, total, homeSections, siteTotals, priceBounds, seller, isLoading, isRefreshing, hasLoaded, publicDataDelayed, listingOrderDelayed, error, pendingTrades, pendingTotal, pendingPage, setPendingPage, pendingError, pendingHasLoaded, addAuction, placeBid, purchaseAuction, confirmTrade, rateTrade, reserveBuyQuantity, cancelBuyReservation, cancelAuction, refreshAuctions }}>
+        <AuctionsContext.Provider value={{ auctions, total, homeSections, siteTotals, priceBounds, seller, isLoading, isRefreshing, hasLoaded, publicDataDelayed, listingOrderDelayed, error, pendingTrades, pendingTotal, pendingExpanded, setPendingExpanded, pendingPage, setPendingPage, pendingError, pendingHasLoaded, addAuction, placeBid, purchaseAuction, confirmTrade, rateTrade, reserveBuyQuantity, cancelBuyReservation, cancelAuction, refreshAuctions }}>
             {children}
         </AuctionsContext.Provider>
     );

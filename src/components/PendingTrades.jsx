@@ -1,5 +1,5 @@
 import { auctionQuantityLabel } from '../lib/bundles';
-import { useContext, useId, useState } from 'react';
+import { useContext, useEffect, useId, useState } from 'react';
 import ConfirmTradeButton from './ConfirmTradeButton';
 import TradeFeedback from './TradeFeedback';
 import { Link } from 'react-router-dom';
@@ -37,11 +37,19 @@ export default function PendingTrades() {
     const { currentUser } = useContext(UserContext);
     const [expanded, setExpanded] = useState(false);
     const listId = useId();
-    const { pendingTrades = [], pendingTotal = 0, pendingPage = 1, setPendingPage, pendingError, pendingHasLoaded = !pendingError || pendingTrades.length > 0, refreshAuctions } = useContext(AuctionsContext);
+    const { pendingExpanded = true, setPendingExpanded, pendingTrades = [], pendingTotal = 0, pendingPage = 1, setPendingPage, pendingError, pendingHasLoaded = !pendingError || pendingTrades.length > 0, refreshAuctions } = useContext(AuctionsContext);
+    useEffect(() => () => setPendingExpanded?.(false), [setPendingExpanded]);
+    useEffect(() => {
+        if (pendingExpanded && pendingHasLoaded && !pendingTotal && !pendingError) setPendingExpanded?.(false);
+    }, [pendingExpanded, pendingHasLoaded, pendingTotal, pendingError, setPendingExpanded]);
     if (!currentUser || currentUser.isBanned) return null;
     if (pendingError && !pendingHasLoaded) return <section aria-label="Your pending trades" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3">
         <p role="alert" className="text-red-700">Pending trades could not be loaded. <button onClick={refreshAuctions} className="min-h-11 underline">Retry</button></p>
     </section>;
+    if (!pendingExpanded) return pendingTotal > 0 ? <section aria-label="Your pending trades" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3">
+        <button type="button" aria-expanded={false} onClick={() => setPendingExpanded(true)} className="font-semibold underline">{pendingTotal} pending {pendingTotal === 1 ? 'trade' : 'trades'} — view details</button>
+        {pendingError && <p role="status">Trade count refresh delayed.</p>}
+    </section> : null;
     const visibleTrades = pendingTrades.filter(auction => !auction.escrowMode
         && ['awaiting_trade', 'completed'].includes(auction.status)
         && (auction.sellerId === currentUser.id || auction.winnerId === currentUser.id)
@@ -50,6 +58,7 @@ export default function PendingTrades() {
     if (!visibleTotal && !pendingError) return null;
     const displayedTrades = expanded ? visibleTrades : visibleTrades.slice(0, 3);
     return <section aria-label="Your pending trades" className="mb-4 space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3">
+        {setPendingExpanded && <button type="button" aria-expanded={true} onClick={() => setPendingExpanded(false)} className="text-xs underline">Hide trade details</button>}
         <h2 className="text-base font-bold">{visibleTotal === 1 ? 'Trade' : 'Trades'} awaiting your response</h2>
         <p className="text-xs leading-5 text-gray-600">{visibleTotal} pending {visibleTotal === 1 ? 'trade' : 'trades'} awaiting a trade response or optional experience rating.</p>
         {pendingError && <p role="alert" className="text-red-700">Refresh delayed. Showing previously loaded trades. <button onClick={refreshAuctions} className="min-h-11 underline">Retry</button></p>}

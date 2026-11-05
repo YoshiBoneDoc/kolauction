@@ -105,3 +105,13 @@ test('raffle membership is loaded from its own server permission and fails close
         assert.equal(user.isAdmin, false);
     }
 });
+
+test('consolidated account access loads self-only permissions and invitation in one RPC', async () => {
+    const calls = [];
+    const user = await build({ async rpc(name) {
+        calls.push(name); return { data: { id: 'member', is_banned: false, server_now: new Date().toISOString(),
+            access_version: 1, is_admin: false, can_view_raffles: true, invitation_version: '1' } };
+    } }).loadProfile({ id: 'member' });
+    assert.deepEqual(calls, ['read_my_account_access']);
+    assert.equal(user.canViewRaffles, true); assert.equal(user.isAdmin, false); assert.equal(user.invitationVersion, '1');
+});

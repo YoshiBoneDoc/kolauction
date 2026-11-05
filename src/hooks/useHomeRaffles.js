@@ -2,6 +2,7 @@ import { canViewRaffles } from '../lib/raffleVisibility';
 import { UserContext } from '../context/UserContext';
 import { useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { readRaffle } from '../lib/raffleService';
 import { auctionNow } from '../lib/auctionClock';
 import { useAuctionBoundaryNow } from './useAuctionBoundaryNow';
 
@@ -19,9 +20,9 @@ export default function useHomeRaffles(includePrizeNames = false) {
         let active = true;
         if (!supabase || !raffleAccess) return;
         // One bounded public read on Home mount. No polling, financial RPC or cache invalidation.
-        supabase.from('mystery_raffles').select(`id,raffle_number,name,ticket_price,ends_at,created_at${includePrizeNames ? ',prizes:mystery_raffle_prizes(name)' : ''}`)
+        readRaffle(`home-raffles:${includePrizeNames}`, () => supabase.from('mystery_raffles').select(`id,raffle_number,name,ticket_price,ends_at,created_at${includePrizeNames ? ',prizes:mystery_raffle_prizes(name)' : ''}`)
             .eq('is_test', false).in('state', ['preview', 'active']).gt('ends_at', new Date(auctionNow()).toISOString())
-            .order('created_at', { ascending: false }).limit(20)
+            .order('created_at', { ascending: false }).limit(20))
             .then(({ data, error }) => { if (active && !error) setListing({ owner: viewerId, includePrizeNames, rows: data || [] }); })
             .catch(() => {});
         return () => { active = false; };
@@ -29,7 +30,7 @@ export default function useHomeRaffles(includePrizeNames = false) {
     useEffect(() => {
         let active = true;
         if (currentUser?.id && raffles.length) {
-            supabase.rpc('read_my_raffle_counts', { p_ids: raffles.map(r => r.id) }).then(({ data, error }) => {
+            readRaffle(`counts:${raffles.map(r => r.id).sort().join(',')}`, () => supabase.rpc('read_my_raffle_counts', { p_ids: raffles.map(r => r.id) })).then(({ data, error }) => {
                 if (active && !error) setCounts({ owner: currentUser.id, data });
             }).catch(() => {});
         }

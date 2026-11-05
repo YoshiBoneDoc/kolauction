@@ -135,6 +135,15 @@ export function createAuctionService(client, { publicReader = null, readDeadline
         load(options = {}) {
             return withReadDeadline(signal => this.loadWithinDeadline({ ...options, signal }), { ...options, milliseconds: readDeadlineMs });
         },
+        pendingTradeSummary({ signal } = {}) {
+            return withReadDeadline(async abort => {
+                const query = requireClient().rpc('read_pending_trade_summary');
+                const { data, error } = await (query.abortSignal ? query.abortSignal(abort) : query);
+                if (error) throw databaseError(error);
+                if (data?.privacy_version !== 1 || !Number.isSafeInteger(data.total) || data.total < 0) throw new Error('Invalid pending trade summary.');
+                return { auctions: [], total: data.total };
+            }, { signal, milliseconds: readDeadlineMs });
+        },
         async loadWithinDeadline({ view = 'browse', id = null, sellerId = null, excludeOwn = false, kind = 'all', buyout = 'any', bundle = 'any', summaryOnly = false, search = '', status = 'active', sort = resolveAuctionSort(status), trade = 'all', page = 1, minPrice = null, maxPrice = null, signal, fresh = false } = {}) {
             // Browsing is read-only. The existing bot tick expires all auction
             // types; write RPCs independently validate deadlines under their locks.

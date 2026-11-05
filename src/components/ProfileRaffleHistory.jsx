@@ -2,6 +2,7 @@ import { raffleHistoryStatus } from '../lib/raffleHistory';
 import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
+import { readRaffle } from '../lib/raffleService';
 import { supabase } from '../lib/supabase';
 import { useNow } from '../hooks/useNow';
 import ProfileTimeLeft from './ProfileTimeLeft';
@@ -14,7 +15,7 @@ export default function ProfileRaffleHistory({ userId }) {
     useEffect(() => {
         let active = true;
         setResult(null);
-        supabase.rpc('read_my_raffle_history', { p_offset: offset }).then(({ data, error }) => {
+        readRaffle(`profile-history:${offset}`, () => supabase.rpc('read_my_raffle_history', { p_offset: offset })).then(({ data, error }) => {
             if (active) setResult(error ? { error: true } : { rows: data || [] });
         }).catch(() => { if (active) setResult({ error: true }); });
         return () => { active = false; };

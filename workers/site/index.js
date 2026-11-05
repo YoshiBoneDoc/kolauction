@@ -1,4 +1,5 @@
 import { onRequest as bookmarkCounts } from '../../functions/api/public-bookmark-counts.js';
+import { onRequest as publicCommitment } from '../../functions/api/public-raffle-commitment.js';
 import { itemCatalog } from './itemCatalog.js';
 import { runMaintenance } from './maintenance.js';
 import { onRequest as publicAuctions } from '../../functions/api/public-auctions.js';
@@ -12,6 +13,7 @@ const routes = new Map([
     ['/api/public-bookmark-counts', bookmarkCounts],
     ['/api/public-auctions', publicAuctions],
     ['/api/public-banner', publicBanner],
+    ['/api/public-raffle-commitment', publicCommitment],
     ['/api/giveaway-image', giveawayImage],
     ['/api/public-auctions/invalidate', invalidateAuctions],
 ]);

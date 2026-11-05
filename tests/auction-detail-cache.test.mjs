@@ -51,7 +51,7 @@ test('featured cache shares reads, expires at 30 seconds, and refreshes at the d
         deadline = now + 100000;
         await get(); assert.equal(reads, 3);
         cache.readOrigin = async () => { reads++; throw new Error('unavailable'); };
-        now += 31000;
+        now += 61000;
         assert.equal((await get()).status, 503);
         assert.equal((await get()).status, 503);
         assert.equal(reads, 4);
@@ -81,16 +81,16 @@ test('recurring detail reads use narrow context, preserve static data and refres
         }) });
         const request = { view: 'detail', id };
         await reader.load(request);
-        now += 31000;
+        now += 61000;
         const result = await reader.load(request);
         assert.equal(result.rows[0].item, 'Static item');
         assert.equal(result.rows[0].current_bid, 100);
         assert.equal(result.rows[0].viewer_is_highest_bidder, true);
         assert.deepEqual(calls, ['read_auction_detail_static', 'read_auction_viewer_context']);
-        now += 31000; ended = true;
+        now += 61000; ended = true;
         await reader.load(request);
         assert.deepEqual(calls.slice(-2), ['read_auction_viewer_context', 'read_auction_detail_static']);
-        now += 31000; blocked = true;
+        now += 121000; blocked = true;
         assert.deepEqual((await reader.load(request)).rows, [], 'private denial cannot resurrect cached public details');
         assert.equal(await reader.accepts({ ...request, fresh: true }), true);
     } finally { Date.now = realNow; }

@@ -1,6 +1,9 @@
 import { useContext, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { UserContext } from '../context/UserContext';
+import { startPrivateRefresh } from '../lib/privateRefresh';
+import { trafficPressure } from '../lib/trafficPressure';
+import { withReadDeadline } from '../lib/readDeadline';
 import useAdministrator from '../hooks/useAdministrator';
 import { supabase } from '../lib/supabase';
 
@@ -32,7 +35,8 @@ export default function SiteActivity({ children }) {
         let pending = false;
         const id = visitorId();
         async function refresh() {
-            if (document.visibilityState !== 'visible' || pending) return;
+            if (document.visibilityState !== 'visible' || pending) return true;
+            if (trafficPressure.busy()) { if (!cancelled) setActivity(null); return true; }
             pending = true;
             try {
                 const heartbeat = async () => {
@@ -40,8 +44,8 @@ export default function SiteActivity({ children }) {
                     let last = 0;
                     const identity = signedInUserId || 'guest';
                     try { if (localStorage.getItem(key + '-identity') === identity) last = Number(localStorage.getItem(key)) || 0; } catch { /* Storage unavailable. */ }
-                    if (Date.now() - last < 60000) return;
-                    const result = await supabase.rpc('khub_record_site_activity', { p_visitor_id: id });
+                    if (Date.now() - last < 90000) return;
+                    const result = await withReadDeadline(signal => supabase.rpc('khub_record_site_activity', { p_visitor_id: id }).abortSignal(signal));
                     if (result.error) throw result.error;
                     try { localStorage.setItem(key, String(Date.now())); localStorage.setItem(key + '-identity', identity); } catch { /* Storage unavailable. */ }
                 };
@@ -49,23 +53,22 @@ export default function SiteActivity({ children }) {
                 if (navigator.locks) await navigator.locks.request('khub-site-activity', heartbeat);
                 else await heartbeat();
                 if (administrator) {
-                    const { data, error } = await supabase.rpc('khub_site_activity_counts');
+                    const { data, error } = await withReadDeadline(signal => supabase.rpc('khub_site_activity_counts').abortSignal(signal));
                     if (error) throw error;
                     if (!cancelled) setActivity(data);
                 }
+                return true;
             } catch {
                 if (!cancelled) setActivity(null);
+                return false;
             } finally {
                 pending = false;
             }
         }
-        refresh();
-        const timer = setInterval(refresh, 60_000);
-        document.addEventListener('visibilitychange', refresh);
+        const stop = startPrivateRefresh({ refresh, interval: 90000, document, window });
         return () => {
             cancelled = true;
-            clearInterval(timer);
-            document.removeEventListener('visibilitychange', refresh);
+            stop();
         };
     }, [administrator, signedInUserId]);
 

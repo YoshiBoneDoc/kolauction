@@ -1,5 +1,7 @@
+import { trafficPressure } from './trafficPressure.js';
 // Bound display reads only. Never race a financial write against this deadline.
 export async function withReadDeadline(read, { signal, milliseconds = 12000 } = {}) {
+    const started = Date.now();
     const controller = new AbortController();
     const forwardAbort = () => controller.abort(signal.reason);
     if (signal?.aborted) forwardAbort();
@@ -17,7 +19,12 @@ export async function withReadDeadline(read, { signal, milliseconds = 12000 } = 
     });
     try {
         if (controller.signal.aborted) return await aborted;
-        return await Promise.race([read(controller.signal), aborted]);
+        const result = await Promise.race([read(controller.signal), aborted]);
+        trafficPressure.observe({ milliseconds: Date.now() - started, failed: Boolean(result?.error) });
+        return result;
+    } catch (error) {
+        if (!signal?.aborted) trafficPressure.observe({ milliseconds: Date.now() - started, failed: true });
+        throw error;
     } finally {
         clearTimeout(timer);
         signal?.removeEventListener('abort', forwardAbort);

@@ -120,10 +120,12 @@ export class PublicAuctionCache {
             });
             text = await response.text();
         } catch (error) {
+            console.warn(`[PUBLIC_CACHE_ORIGIN] view=${request.view} rpc=${rpc} duration_ms=${Date.now() - startedAt} state=failed`);
             throw unavailable(['TimeoutError', 'AbortError'].includes(error?.name) ? 'CACHE_ORIGIN_TIMEOUT' : 'CACHE_ORIGIN_ERROR');
         }
         if (new TextEncoder().encode(text).byteLength > MAX_BYTES) throw unavailable('CACHE_RESPONSE_TOO_LARGE');
         if (!response.ok) {
+            console.warn(`[PUBLIC_CACHE_ORIGIN] view=${request.view} rpc=${rpc} duration_ms=${Date.now() - startedAt} status=${response.status}`);
             let databaseCode;
             try { databaseCode = JSON.parse(text)?.code; } catch { /* No raw body is exposed. */ }
             throw unavailable(originFailureCode(response.status, databaseCode));
@@ -135,6 +137,7 @@ export class PublicAuctionCache {
         try { result = publicProjection(JSON.parse(text), request); }
         catch { throw unavailable('CACHE_INVALID_RESPONSE'); }
         if (request.view === 'bookmarks') result.read_started_at = new Date(startedAt).toISOString();
+        console.info(`[PUBLIC_CACHE_ORIGIN] view=${request.view} rpc=${rpc} duration_ms=${Date.now() - startedAt} pending=${this.inflight.size}`);
         result.server_time = new Date(Date.parse(result.server_time) + (Date.now() - startedAt) / 2).toISOString();
         return result;
     }
@@ -152,6 +155,7 @@ export class PublicAuctionCache {
     }
 
     changed(request, revision = '0') {
+        if (request.view === 'commitment') return false;
         if (BigInt(this.legacyRevision) > BigInt(revision)) return true;
         const ids = request.view === 'batch-live' ? request.ids
             : request.view.startsWith('detail-') ? [request.id] : null;
@@ -175,7 +179,9 @@ export class PublicAuctionCache {
         const samePriorityCount = livePriority ? this.pendingLive : this.inflight.size-this.pendingLive;
         // Reserve admission for both families, as well as fair execution order.
         if (this.inflight.size >= MAX_PENDING || this.env.LIVE_AUCTION_STATE === 'true' && samePriorityCount >= MAX_PENDING-1) return Promise.reject(unavailable('CACHE_QUEUE_FULL'));
+        const queuedAt = Date.now();
         const task = this.schedule(async () => {
+            console.info(`[PUBLIC_CACHE_QUEUE] view=${request.view} wait_ms=${Date.now() - queuedAt} pending=${this.inflight.size}`);
             const blocked = this.blocked(request);
             if (blocked) throw unavailable(blocked);
             try {
@@ -331,14 +337,14 @@ export class PublicAuctionCache {
         const key = JSON.stringify(query);
         let entry = this.entries.get(key);
         const age = entry ? Date.now() - entry.storedAt : Infinity;
-        const detail = query.view.startsWith('detail-') || ['featured', 'bookmarks'].includes(query.view);
-        const ttl = query.view === 'bookmarks' ? BOOKMARK_TTL_MS : query.view === 'detail-live' ? 2000 : query.view === 'featured' ? 30000 : 300000;
+        const detail = query.view.startsWith('detail-') || ['featured', 'bookmarks', 'commitment'].includes(query.view);
+        const ttl = query.view === 'commitment' ? 5000 : query.view === 'bookmarks' ? BOOKMARK_TTL_MS : query.view === 'detail-live' ? 2000 : query.view === 'featured' ? 30000 : 300000;
         const dirty = query.view !== 'bookmarks' && entry && this.changed(query, entry.revision || '0');
         let state = 'HIT';
         const expiredFeature = query.view === 'featured' && entry?.data.rows.some(row => Date.parse(row.bid_deadline || row.end_time) <= Date.parse(entry.data.server_time) + age);
         // Versioned rollout: deploy SQL and the unavailable-state frontend
         // before enabling this flag. Legacy behavior remains available otherwise.
-        if (this.env.LIVE_AUCTION_STATE === 'true' && request.headers.get('X-Khub-Live-State') === '1' && !['banner', 'bookmarks'].includes(query.view)) {
+        if (this.env.LIVE_AUCTION_STATE === 'true' && request.headers.get('X-Khub-Live-State') === '1' && !['banner', 'bookmarks', 'commitment'].includes(query.view)) {
             return this.readWithLiveState(key, query, entry, age, dirty);
         }
         if (expiredFeature || (!detail && dirty) || age > (detail ? ttl : query.view === 'banner' ? FRESH_MS : MAX_AGE_MS)) {

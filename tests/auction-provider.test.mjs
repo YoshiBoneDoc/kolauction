@@ -31,6 +31,7 @@ function setup(){
  fixture.rpc=async(name,args)=>{
   fixture.calls.push([name,args]);
   if(fixture.fail&&['read_home_auctions','read_filtered_auction_page','read_auction_page','read_auction_detail_static'].includes(name))return {error:{code:'57014',message:'timeout'}};
+  if(name==='read_pending_trade_summary')return {data:{privacy_version:1,total:0}};
   if(name==='read_pending_trades')return {data:{privacy_version:1,rows:[],total:0}};
   if(['read_home_auctions','read_filtered_auction_page','read_auction_page','read_auction_detail_static'].includes(name)){
    const rows=Array.from({length:25},(_,i)=>({id:`a-${i}`,seller_id:'seller',seller_username:fixture.user?'Authorized seller':'Seller',usernames_visible:!!fixture.user,
@@ -47,13 +48,13 @@ function setup(){
 test('provider reads Home once and each selected browse page once, retaining independent pending pagination and cached navigation',async()=>{
  const f=setup();try{
   f.render();await f.immediate();let value=f.render();assert.equal(value.auctions.length,24);
-  assert.deepEqual(fixture.calls.map(([n])=>n),['read_home_auctions','read_pending_trades']);
+  assert.deepEqual(fixture.calls.map(([n])=>n),['read_home_auctions','read_pending_trade_summary']);
   fixture.location={pathname:'/auctions',search:'?q=item&sort=price-desc&page=2&minPrice=10'};
   value=f.render();assert.equal(value.auctions.length,0);await f.immediate();value=f.render();
   assert.equal(value.auctions.length,1);assert.equal(value.total,25);assert.equal(fixture.calls.length,3);
   assert.equal(fixture.calls.at(-1)[0],'read_filtered_auction_page');
   assert.equal(fixture.calls.at(-1)[1].p_page,2);assert.equal(fixture.calls.at(-1)[1].p_search,'item');
-  value.setPendingPage(2);f.render();await f.immediate();
+  value.setPendingExpanded(true);value.setPendingPage(2);f.render();await f.immediate();
   assert.equal(fixture.calls.at(-1)[0],'read_pending_trades');assert.equal(fixture.calls.length,4);
   fixture.location={pathname:'/',search:''};value=f.render();await f.immediate();assert.equal(value.auctions.length,24);assert.equal(fixture.calls.length,4);
  }finally{f.restore();}
@@ -65,7 +66,7 @@ test('writes still call the server and force fresh selected-resource reads; fail
   value=f.render();assert.equal(value.auctions.length,24);assert.ok(fixture.calls.some(([n,a])=>n==='place_bid'&&a.p_amount===200));
   assert.equal(fixture.calls.filter(([n])=>n==='read_home_auctions').length,2);
   fixture.fail=true;await value.refreshAuctions();value=f.render();
-  assert.equal(value.auctions.length,24);assert.equal(value.hasLoaded,true);assert.equal(value.isLoading,false);assert.equal(value.error,'timeout');
+  assert.equal(value.auctions.length,24);assert.equal(value.hasLoaded,true);assert.equal(value.isLoading,false);assert.match(value.error,/took too long/);
  }finally{f.restore();}
 });
 
@@ -137,5 +138,20 @@ test('a bid completing after navigation refreshes the selected page rather than 
   assert.equal(value.auctions.length,1);
   assert.equal(fixture.calls.filter(([n])=>n==='read_home_auctions').length,before);
   assert.equal(fixture.calls.filter(([n])=>n==='read_filtered_auction_page').length,2);
+ }finally{f.restore();}
+});
+
+
+test('confirmed bids finish while page refresh is pending and do not reload unrelated pending-trade data',async()=>{
+ const f=setup();try{
+  f.render();await f.immediate();const before=fixture.calls.filter(([n])=>n.startsWith('read_pending')).length;
+  const original=fixture.rpc;let finish;
+  fixture.rpc=(name,...args)=>name==='read_home_auctions'?new Promise(resolve=>{finish=async()=>resolve(await original(name,...args));}):original(name,...args);
+  await f.render().placeBid('a-0',200);
+  for(let n=0;n<10&&!finish;n++)await Promise.resolve();
+  assert.equal(typeof finish,'function');assert.equal(f.render().isRefreshing,true);
+  assert.equal(fixture.calls.filter(([n])=>n.startsWith('read_pending')).length,before);
+  await finish();for(let n=0;n<20;n++)await Promise.resolve();
+  assert.equal(f.render().isRefreshing,false);
  }finally{f.restore();}
 });

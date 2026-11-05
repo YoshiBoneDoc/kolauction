@@ -71,20 +71,26 @@ export function createAuthService(client, { origin } = {}) {
             if (error) throw error;
         },
 
-        async loadProfile(user) {
-            const { data, error } = await requireClient().rpc('read_my_account_access');
+        async loadProfile(user, { signal } = {}) {
+            const read = name => {
+                const query = requireClient().rpc(name);
+                return signal && query.abortSignal ? query.abortSignal(signal) : query;
+            };
+            const { data, error } = await read('read_my_account_access');
             if (error || !data || data.id !== user.id || typeof data.is_banned !== 'boolean'
                 || !Number.isFinite(Date.parse(data.server_now))
                 || (data.ban_expires_at != null && !Number.isFinite(Date.parse(data.ban_expires_at)))) {
                 throw new Error("Your profile could not be loaded. Please sign out and sign in again. If this continues, contact support.");
             }
-            const [admin, raffleAccess] = await Promise.all([
-                requireClient().rpc('khub_is_administrator'),
-                requireClient().rpc('can_view_raffles'),
+            const combined = data.access_version === 1;
+            const [admin, raffleAccess] = combined ? [{ data: data.is_admin }, { data: data.can_view_raffles }] : await Promise.all([
+                read('khub_is_administrator'),
+                read('can_view_raffles'),
             ]);
             return { id: data.id, khubUsername: data.khub_username, email: data.account_method === 'kmail' ? null : user.email,
                 kolPlayerId: data.kol_player_id ?? null, kolPlayerName: data.kol_player_name ?? null,
                 isHighRollersMember: data.is_high_rollers_member === true,
+                accessVersion: data.access_version, invitationVersion: data.invitation_version ?? null,
                 canViewRaffles: !raffleAccess.error && raffleAccess.data === true,
                 accountMethod: data.account_method, isAdmin: admin.data === true, isBanned: data.is_banned, banExpiresAt: data.ban_expires_at || null,
                 serverOffset: Date.parse(data.server_now) - Date.now() };

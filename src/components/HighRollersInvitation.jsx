@@ -3,6 +3,7 @@ import { UserContext } from '../context/UserContext';
 import { supabase } from '../lib/supabase';
 import './HighRollersInvitation.css';
 import PropTypes from 'prop-types';
+import { startPrivateRefresh } from '../lib/privateRefresh';
 
 function InvitationIcon({ kind }) {
     const paths = {
@@ -52,17 +53,22 @@ export default function HighRollersInvitation({ preview = false, onPreviewClose 
     const [error, setError] = useState('');
     useEffect(() => {
         if (!id || preview) return;
+        if (currentUser.accessVersion === 1) {
+            setInvitation(currentUser.invitationVersion ? { id, version: currentUser.invitationVersion } : null);
+            return;
+        }
         let active = true;
         async function check() {
             try {
                 const { data, error: failure } = await supabase.rpc('read_my_high_rollers_invitation');
-                if (active && !failure) setInvitation(data ? { id, version: data } : null);
-            } catch { /* Retry on focus. */ }
+                if (failure) return false;
+                if (active) setInvitation(data ? { id, version: data } : null);
+                return true;
+            } catch { return false; }
         }
-        void check();
-        window.addEventListener('focus', check);
-        return () => { active = false; window.removeEventListener('focus', check); };
-    }, [id, preview]);
+        const stop = startPrivateRefresh({ refresh: check, document, window });
+        return () => { active = false; stop(); };
+    }, [id, preview, currentUser?.accessVersion, currentUser?.invitationVersion]);
     if (preview ? !currentUser?.isAdmin : !id || invitation?.id !== id) return null;
     async function respond(accept) {
         if (preview) { onPreviewClose?.(); return; }

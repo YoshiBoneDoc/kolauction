@@ -5,6 +5,9 @@ import { createAuthService } from "../lib/auth";
 import { recoveryUserForEvent } from "../lib/authLinks";
 import BannedAccount from "../components/BannedAccount";
 import { Link, useNavigate, useLocation } from "react-router-dom";
+import { withReadDeadline } from '../lib/readDeadline';
+import { coordinatedRefresh, refreshScope } from '../lib/coordinatedRefresh';
+import { trafficPressure } from '../lib/trafficPressure';
 import { startPrivateRefresh } from '../lib/privateRefresh';
 
 export const UserContext = createContext();
@@ -69,10 +72,25 @@ export const UserProvider = ({ children }) => {
             return;
         }
         setCurrentUser((previous) => previous?.id === session.user.id ? previous : null);
-        async function refresh() {
+        let verifiedAt = 0, fingerprint;
+        const coordination = refreshScope(session.user.id).then(hash => `khub-account-refresh:${hash}`).catch(() => null);
+        const changed = event => { void coordination.then(key => { if (!cancelled && key && event.key === `${key}:changed`) window.dispatchEvent(new Event('khub:refresh-account')); }); };
+        window.addEventListener('storage', changed);
+        async function readProfile() {
+            if (cancelled) return false;
             try {
-                const user = await auth.loadProfile(session.user);
-                if (!cancelled) { setCurrentUser(user); setAuthError(""); }
+                const user = await withReadDeadline(signal => auth.loadProfile(session.user, { signal }));
+                if (!cancelled) {
+                    verifiedAt = Date.now();
+                    const next = JSON.stringify({ ...user, serverOffset: 0 });
+                    if (fingerprint && fingerprint !== next) {
+                        const key = await coordination;
+                        if (cancelled) return false;
+                        try { if (key) localStorage.setItem(`${key}:changed`, String(Date.now())); } catch { /* Storage unavailable. */ }
+                    }
+                    fingerprint = next;
+                    setCurrentUser(user); setAuthError("");
+                }
                 return true;
             } catch (error) {
                 if (!cancelled) {
@@ -84,8 +102,14 @@ export const UserProvider = ({ children }) => {
                 if (!cancelled) { setLoadedUserId(session.user.id); setHasLoaded(true); }
             }
         }
+        async function refresh(reason) {
+            const key = await coordination;
+            if (cancelled) return false;
+            const force = reason !== 'timer' || Date.now() - verifiedAt >= 300000;
+            return key ? coordinatedRefresh(key, readProfile, { force, maxAge: trafficPressure.delay(60000, 180000) }) : readProfile();
+        }
         const stop = startPrivateRefresh({ refresh, document, window, refreshEvent: 'khub:refresh-account' });
-        return () => { cancelled = true; stop(); };
+        return () => { cancelled = true; stop(); window.removeEventListener('storage', changed); };
     }, [session]);
 
     const clearRecovery = () => {

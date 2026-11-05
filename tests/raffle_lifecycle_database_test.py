@@ -59,7 +59,13 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
                 upgrade_transfer=str(uuid4());upgrade_attempt=str(uuid4())
                 sql("insert into khub_bot.closet_transfers(id,dedupe_key,source,meat,state,attempt,before_state) values('"+upgrade_transfer+"','soft-upgrade-fixture','sale_fee',700,'unknown','"+upgrade_attempt+"','{\"inventory\":\"9000\",\"closet\":\"1000\"}');")
                 sql("insert into khub_bot.closet_recovery_attempts(attempt,transfer_id,legacy,before_state,state,deadline,reason) values('"+upgrade_attempt+"','"+upgrade_transfer+"',true,'{\"inventory\":\"9000\",\"closet\":\"1000\"}','review',clock_timestamp()-interval '1 hour','Historical attempt has no durable submission fence; elapsed time cannot authorize replay.');")
+            if migration.name.startswith('202611050229_'):
+                financial_query="select jsonb_object_agg(p.oid::regprocedure::text,pg_get_functiondef(p.oid)) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname in ('public','khub_bot') and p.prokind='f' and p.proname in ('place_bid','bot_ingest_mail','bot_tick','bot_claim_delivery','bot_ack_delivery','finish_listing','finish_buy_order','bot_liabilities');"
+                before_background_reads=sql(financial_query)
             sql(migration.read_text())
+            if migration.name.startswith('202611050229_'):
+                assert sql(financial_query)==before_background_reads, 'Background-read migration changed financial functions'
+
             if migration.name=='202611040199_raffle_backend.sql':assert sql("select public.bot_worker_status()->>'raffleBackendVersion'")=='1'
             if migration.name.startswith('202610290144_'):
                 assert sql("select state='watching' and soft_retry_window_started_at is not null and deadline>clock_timestamp() from khub_bot.closet_recovery_attempts where attempt='"+upgrade_attempt+"';")=='t'
@@ -188,6 +194,15 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
         for text in ['Fixture raffle','10 ticket(s)',f'{offset+1} through {offset+10}','equal chance of winning']:assert text in confirmation
         history=json.loads(call(f"select public.read_my_raffle_tickets('{rid}')",uid=buyer))
         assert history['ticket_count']=='10'
+        page=json.loads(call(f"select public.read_my_raffle_ticket_page('{rid}',0)",uid=buyer))
+        assert page['ticket_count']=='10' and page['purchase_count']==1 and len(page['purchases'])==len(history['purchases'])
+        for new,old in zip(page['purchases'],history['purchases']):
+            assert {k:str(v) for k,v in new.items()}=={k:str(v) for k,v in old.items()}, (new,old)
+        empty_page=json.loads(call(f"select public.read_my_raffle_ticket_page('{rid}',50)",uid=buyer))
+        assert empty_page['purchases']==[] and empty_page['ticket_count']=='10'
+        call(f"select public.read_my_raffle_ticket_page('{rid}',0)",uid=other,error='Raffle access required')
+        assert sql("select has_function_privilege('anon','public.read_my_raffle_ticket_page(uuid,integer)','execute')")=='f'
+
         admin_history=json.loads(call(f"select public.read_admin_raffle_ticket_history('{rid}')"))
         assert len(admin_history)==1
         assert admin_history[0]['receipt_id']==payment['id']
@@ -746,9 +761,10 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
         sql(f"select public.bot_commit_raffle_draw('{fair}','{{}}')")
         proof=json.loads(call(f"select public.read_raffle_fairness_proof('{fair}')",uid=buyer))
         public_record=json.loads(sql(f"set role anon;select public.read_public_raffle_commitment('{fair}')"))
-        assert set(public_record)=={'raffleId','method','commitmentHash','committedAt','round','chainHash','beaconAvailableAt'}
+        assert set(public_record)=={'raffleId','method','commitmentHash','committedAt','round','chainHash','beaconAvailableAt','complete'}
         assert public_record['commitmentHash']==commitment
         assert public_record['round']==42
+        assert public_record['complete'] is True
 
         assert set(proof)=={'method','raffleId','committedAt','round','manifest','commitmentHash','beacon','result','displayedWinningTicket','prizes'}
         assert 'purchases' not in json.dumps(proof) and 'playerId' not in json.dumps(proof) and 'receiptId' not in json.dumps(proof)
@@ -799,7 +815,11 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
                     assert previous==entry['fairness']
         assert seen==set(queued)
         print('PASS: pending beacon rounds rotate without starving later raffles or changing commitments')
-        assert json.loads(call('select public.read_my_account_access()',uid=buyer))['is_high_rollers_member']
+        access=json.loads(call('select public.read_my_account_access()',uid=buyer))
+        assert access['is_high_rollers_member'] and access['access_version']==1
+        assert access['can_view_raffles'] and not access['is_admin'] and access['invitation_version'] is None
+        admin_access=json.loads(call('select public.read_my_account_access()',uid=seller))
+        assert admin_access['is_admin'] and admin_access['can_view_raffles']
         assert not json.loads(call('select public.read_my_account_access()',uid=seller))['is_high_rollers_member']
         history=json.loads(call('select public.read_my_raffle_history()',uid=buyer))
         assert len(history)<=50 and history
@@ -818,6 +838,95 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
         sql(f"update public.auctions set item='colored-light &quot;necklace&quot;' where id='{escrow}'")
         assert sql(f"select item from public.auctions where id='{escrow}'")=='colored-light "necklace"'
         print('PASS: quotation entities normalize to plain catalog and auction names')
+        # A real Direct lifecycle, using only the disposable database. The summary
+        # must match the full reader across parties, unrelated viewers and feedback.
+        direct=create(escrow=False)
+        call(f"select public.place_bid('{direct}',100);",uid=buyer)
+        sql(f"update public.auctions set created_at=clock_timestamp()-interval '1 day',end_time=clock_timestamp()-interval '1 minute' where id='{direct}';select public.finalize_auction('{direct}');")
+        for viewer in [seller,buyer,other]:
+            full=json.loads(call('select public.read_pending_trades()',uid=viewer))
+            summary=json.loads(call('select public.read_pending_trade_summary()',uid=viewer))
+            assert set(summary)=={'privacy_version','total'} and summary['privacy_version']==1
+            assert summary['total']==full['total'], (summary,full)
+            if viewer in [seller,buyer]: assert summary['total']>0
+            else: assert summary['total']==0
+        assert sql("select has_function_privilege('anon','public.read_pending_trade_summary()','execute')")=='f'
+        call(f"select public.confirm_auction_trade('{direct}')",uid=buyer)
+        assert json.loads(call('select public.read_pending_trade_summary()',uid=buyer))['total']==json.loads(call('select public.read_pending_trades()',uid=buyer))['total']
+        # Compare warm plans on the same role/data; print measured local execution
+        # times without a flaky timing assertion or a production capacity claim.
+        import statistics
+        timings={}
+        for rpc in ['read_pending_trades','read_pending_trade_summary']:
+            durations=[]
+            for _ in range(5):
+                plan=json.loads(call(f'explain (analyze,buffers,format json) select public.{rpc}()',uid=seller))
+                durations.append(plan[0]['Execution Time'])
+            timings[rpc]=statistics.median(durations)
+        print('LOCAL pending-trade plan median execution milliseconds:',json.dumps(timings))
+        print('PASS: pending summary matches full eligibility, reveals no cards, preserves feedback and financial definitions')
+        # New worker scheduling: safety fields remain fresh and service-only.
+        full_status=json.loads(sql('select public.bot_worker_status()'))
+        safety=json.loads(sql('select public.bot_worker_safety()'))
+        for key in ['attention','isolatedDeliveryAttention','closetAttention','mailPolicyAttention','accountRequestsPending','siteMaintenanceOwned','closetRecoveryReviewKey']:
+            assert safety[key]==full_status[key],key
+        assert safety['capabilityRevision']==230 and full_status['workerSchedulingVersion']==1
+        for signature in ['bot_worker_safety()','bot_cycle_plan()','bot_raffle_tick_due()','bot_defer_raffle_draw(uuid,bigint,boolean)']:
+            for role in ['anon','authenticated']:
+                assert sql(f"select has_function_privilege('{role}','public.{signature}','execute')")=='f'
+        # Make 110 separate purchases in one offline transaction. No game calls.
+        call("select public.add_high_rollers_member('48889602')")
+        if call("select public.read_my_high_rollers_invitation()",uid=buyer):call("select public.respond_high_rollers_invitation(true,'1')",uid=buyer)
+        large=create_raffle()
+        payments=[mail(large,meat=100) for _ in range(110)]
+        results=sql('set role service_role;select public.bot_ingest_mail(value) from jsonb_array_elements('+lit(json.dumps(payments))+');').splitlines()
+        assert results==['raffle_tickets']*110
+        call(f"select public.cancel_mystery_raffle('{large}')")
+        def queued_refunds():return int(sql(f"select count(*) from khub_bot.deliveries where dedupe_key like 'raffle:{large}:refund:%'"))
+        before=liabilities()
+        sql('select public.bot_raffle_tick_due()')
+        assert queued_refunds()==50 and account_value(large,'held_meat')=='6000'
+        assert liabilities()==before, 'partial refunds changed total liabilities'
+        sql('begin;select public.bot_raffle_tick_due();rollback;')
+        assert queued_refunds()==50 and account_value(large,'held_meat')=='6000'
+        restart()
+        sql('select public.bot_raffle_tick_due()')
+        assert queued_refunds()==100 and account_value(large,'held_meat')=='1000'
+        parallel=[subprocess.Popen([str(BIN/'psql'),'-h',folder,'-d','postgres','-X','-qAt','-v','ON_ERROR_STOP=1','-c','set role service_role;select public.bot_raffle_tick_due();'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True) for _ in range(2)]
+        for client in parallel:
+            _,failure=client.communicate()
+            assert client.returncode==0,failure
+        assert queued_refunds()==110 and account_value(large,'held_meat')=='0'
+        assert liabilities()==before and account_value(large,'settlement_queued')=='t'
+        sql('select public.bot_raffle_tick_due()')
+        assert queued_refunds()==110
+        assert sql(f"select state from public.mystery_raffles where id='{large}'")=='returning'
+        # An idle waiting raffle does not rewrite its work timestamp repeatedly.
+        sql(f"delete from khub_bot.raffle_work_wakeups where raffle_id='{large}';update khub_bot.raffle_accounts set next_work_at=clock_timestamp()+interval '1 minute' where raffle_id='{large}';")
+        stamp=account_value(large,'last_work_at')
+        sql('select public.bot_raffle_tick_due()')
+        assert account_value(large,'last_work_at')==stamp
+        # Verified delivery state changes wake finalization immediately.
+        sql(f"update khub_bot.deliveries set state='sent',sent_at=clock_timestamp() where dedupe_key like 'raffle:{large}:%';")
+        assert sql(f"select exists(select 1 from khub_bot.raffle_work_wakeups where raffle_id='{large}')")=='t'
+        sql('select public.bot_raffle_tick_due()')
+        assert sql(f"select state from public.mystery_raffles where id='{large}'")=='settled'
+        assert queued_refunds()==110
+        # Beacon retry schedule persists, never changes the committed round/hash.
+        deferred=queued[0]
+        committed_before=sql(f"select commitment_hash||':'||round from khub_bot.raffle_fairness where raffle_id='{deferred}'")
+        round_number=sql(f"select round from khub_bot.raffle_fairness where raffle_id='{deferred}'")
+        sql(f"select public.bot_defer_raffle_draw('{deferred}',{round_number},true)")
+        assert account_value(deferred,'draw_failures')=='1'
+        sql(f"select public.bot_defer_raffle_draw('{deferred}',{int(round_number)+1},true)")
+        assert account_value(deferred,'draw_failures')=='1'
+        assert sql(f"select next_work_at>clock_timestamp() from khub_bot.raffle_accounts where raffle_id='{deferred}'")=='t'
+        due_inputs=json.loads(sql('select public.bot_raffle_draw_work_due()'))
+        assert all(entry['raffleId']!=deferred for entry in due_inputs)
+        restart()
+        assert account_value(deferred,'draw_failures')=='1'
+        assert sql(f"select commitment_hash||':'||round from khub_bot.raffle_fairness where raffle_id='{deferred}'")==committed_before
+        print('PASS: fresh safety equivalence, service-only scheduling, bounded refunds, exact partial liabilities, rollback, restart, wakeups and immutable deferred draw')
         print('PASS: full-schema lifecycle and isolation: identical items, concurrent auction/raffle Meat, exact solvency, proof guards, retries, restarts, cancellation and schema permissions')
     finally:
         if started: pg('-m','immediate','-w','stop')

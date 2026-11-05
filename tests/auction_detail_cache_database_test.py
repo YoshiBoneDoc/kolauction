@@ -54,9 +54,10 @@ with tempfile.TemporaryDirectory(prefix='khub-detail-cache-',dir='/tmp') as fold
             ('bot_ingest_mail','bot_tick','bot_claim_delivery','bot_ack_delivery','finish_listing','finish_buy_order','bot_liabilities');"""
         financial_before=None
         for migration in migrations:
-            if migration.name.startswith('202611030176_'): financial_before=sql(definitions)
+            financial_before=sql(definitions)
             sql(migration.read_text())
-        assert financial_before is not None and sql(definitions)==financial_before, 'Financial function definitions changed by performance migrations'
+            if migration.name.startswith(('202611030176_', '202611030177_', '202611050227_')):
+                assert sql(definitions)==financial_before, 'Performance migration changed financial definitions'
         catalog=json.loads((ROOT/'src/data/items.json').read_text())
         catalog += [{'id':1900000+i,'name':f'Untradeable fixture {i}','image':'test.gif','tradeable':False}
             for i in range(max(0,10000-len(catalog)))]
@@ -91,6 +92,7 @@ with tempfile.TemporaryDirectory(prefix='khub-detail-cache-',dir='/tmp') as fold
             identity=json.loads(sql(f"select public.read_auction_viewer_context(p_id=>'{aid}');",viewer))
             recent=json.loads(sql(f"select public.read_auction_bid_history('{aid}');",viewer))
             assert static['bids']==[] and identity['bids']==[]
+            assert [r.get('latest_bid_at') for r in static['rows']]==[r.get('latest_bid_at') for r in full['rows']]
             assert recent['bids']==full['bids'],(viewer,recent,full)
             assert not recent['has_more']
             unchanged=json.loads(sql(f"select public.read_auction_bid_history('{aid}',p_known_revision=>{recent['revision']});",viewer))
