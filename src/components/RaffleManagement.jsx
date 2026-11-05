@@ -47,7 +47,7 @@ export default function RaffleManagement({ raffleId, ownerId, onChange }) {
     const missing = data?.prize ? BigInt(data.prize.quantity) - BigInt(data.inventory.find(i => i.item_id === data.prize.item_id)?.quantity ?? '0') : 0n;
     const prizeDeliveries = data?.deliveries.filter(d => d.reference.includes(':prize:')) ?? [];
     return <section className="raffle-summary mt-4" aria-label="Raffle management">
-        <h2>Manage raffle</h2>
+        <h2>Manage raffle{data?.raffle_number && ` #${data.raffle_number}`}</h2>
         {error && <p role="alert">{error}</p>}
         <button disabled={busy} onClick={() => { setRevision(v => v + 1); onChange(); }}>Refresh status</button>
         {data && <>
@@ -56,7 +56,7 @@ export default function RaffleManagement({ raffleId, ownerId, onChange }) {
             {['preview', 'active'].includes(data.state) && <button disabled={busy} onClick={() => act('cancel_mystery_raffle')}>Cancel raffle and refund tickets</button>}
             {data.prize && <p>Selected prize: {data.prize.quantity} × {data.prize.name} (#{data.prize.item_id}). Winner: #{data.winner_player_id}.</p>}
             {prizeDeliveries.length ? <p>Prize delivery: {prizeDeliveries.every(d => d.state === 'sent') ? 'Verified' : 'Awaiting verification'}. Never resend an uncertain transfer.</p> : data.state === 'fulfilling' && <p>Action needed: acquire and deposit {missing > 0n ? missing.toString() : '0'} missing prize items.</p>}
-            {['active', 'fulfilling'].includes(data.state) && !prizeDeliveries.length && <p>KMail kHub (#3888760): <code>SUPPLY {raffleId}</code> with listed prize items attached. Partial and repeat deposits are supported. Attach prize items only, without Meat.</p>}
+            {['active', 'fulfilling'].includes(data.state) && !prizeDeliveries.length && <p>KMail kHub (#3888760): <code>SUPPLY {data.raffle_number}</code> with listed prize items attached. Partial and repeat deposits are supported. Attach prize items only, without Meat.</p>}
             <p>Ticket proceeds: {data.revenue} Meat · Advances committed: {data.advanced_meat} Meat · Still reserved: {data.held_meat} Meat.</p>
             {(BigInt(data.available_advance) > 0n || request) && <div><label>Advance from available proceeds ({data.available_advance} Meat)<input inputMode="numeric" value={request?.amount ?? amount} disabled={busy || !!request} onChange={e => setAmount(e.target.value)} /></label><button disabled={busy} onClick={() => act('request_raffle_advance')}>{request ? 'Retry same advance' : 'Request Meat advance'}</button></div>}
             <h3>Reserved items</h3><ul>{data.inventory.map(i => <li key={i.item_id}>{i.name}: {i.quantity}</li>)}</ul>

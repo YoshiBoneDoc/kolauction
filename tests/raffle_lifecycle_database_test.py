@@ -105,13 +105,16 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
         def mail(rid,kind='raffle',meat=100,items=None,actor=48889602):
             global mid
             mid+=1
-            return dict(id=str(mid),sender_id=actor,sender_name='Fixture',received_at=sql('select clock_timestamp()'),command=dict(type=kind,raffle_id=rid),meat=meat,items=items or [])
+            received=sql("select date_trunc('second',clock_timestamp())")
+            return dict(id=str(mid),sender_id=actor,sender_name='Fixture',received_at=received,command=dict(type=kind,raffle_id=rid),meat=meat,items=items or [],raw=dict(type='normal',azunixtime=str(int(datetime.fromisoformat(received).timestamp()))))
         def ingest(m):return sql('set role service_role;select public.bot_ingest_mail('+lit(json.dumps(m))+');')
         def tick():sql('set role service_role;select public.bot_raffle_tick();')
         def restart():
             pg('-m','fast','-w','stop');pg('-l',str(Path(folder)/'postgres.log'),'-o',f"-F -h '' -k {folder}",'-w','start')
         def draw(rid,minutes=31):
             sql(f"update public.mystery_raffles set ends_at=clock_timestamp()-interval '{minutes} minutes' where id='{rid}';")
+            scan=json.loads(sql('select public.bot_begin_inbox_scan()'))
+            sql(f"select public.bot_stage_inbox_scan('{scan['id']}','[]');select public.bot_finish_inbox_scan('{scan['id']}');")
             work=json.loads(sql('set role service_role;select public.bot_raffle_draw_work();'))
             restart()
             assert json.loads(sql('select public.bot_raffle_draw_work()'))==work
@@ -152,10 +155,20 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
         payment=mail(rid,meat=1000)
         assert ingest(payment)=='raffle_tickets'
         confirmation=sql(f"select message from khub_bot.deliveries where receipt_id='{payment['id']}'")
-        for text in ['Fixture raffle','10 ticket(s)','1 through 10','equal chance of winning']:assert text in confirmation
+        offset=int(account_value(rid,'ticket_label_offset'))
+        assert 999<=offset<=9998
+        for text in ['Fixture raffle','10 ticket(s)',f'{offset+1} through {offset+10}','equal chance of winning']:assert text in confirmation
+        history=json.loads(call(f"select public.read_my_raffle_tickets('{rid}')",uid=buyer))
+        assert history['ticket_count']=='10'
+        assert history['purchases'][0]['first_ticket']==str(offset+1)
+        assert history['purchases'][0]['last_ticket']==str(offset+10)
+        assert sql(f"select first_ticket=1 and last_ticket=10 from khub_bot.raffle_purchases where receipt_id='{payment['id']}'")=='t'
+        sql(f"update khub_bot.raffle_accounts set ticket_label_offset=0 where raffle_id='{rid}'",error='immutable')
         for text in ['cryptographic','rejection sampling','RNG']:assert text not in confirmation
 
         restart();assert ingest(payment)=='duplicate'
+        assert int(account_value(rid,'ticket_label_offset'))==offset
+        assert json.loads(call(f"select public.read_my_raffle_tickets('{rid}')",uid=buyer))==history
         changed=dict(payment,meat=900)
         sql('select public.bot_ingest_mail('+lit(json.dumps(changed))+');',error='Receipt payload conflict')
         assert ingest(mail(rid,meat=101))=='raffle_refund'
@@ -252,16 +265,18 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
             if cancel:assert sql(f"select sum(meat) from khub_bot.deliveries where dedupe_key like 'raffle:{rid}:refund:%'")=='200'
         # Real opened-gift adapter -> durable verified proof -> raffle intake.
         gift_raffle=create_raffle()
-        def verified_raffle_gift(kind,meat,items,actor,expected=None):
+        def verified_raffle_gift(kind,meat,items,actor,expected=None,inside=False,outside_note='Please process this'):
             raw=mail(gift_raffle,kind,meat,items,actor)
-            source=dict(id=raw['id'],type='giftshop',fromid=str(actor),fromname='Fixture',azunixtime=str(int(datetime.now(timezone.utc).timestamp())),message=('RAFFLE' if kind=='raffle' else 'SUPPLY')+' '+gift_raffle)
+            source=dict(id=raw['id'],type='giftshop',fromid=str(actor),fromname='Fixture',azunixtime=str(int(datetime.now(timezone.utc).timestamp())),message=('RAFFLE' if kind=='raffle' else 'SUPPLY')+' '+sql(f"select raffle_number from public.mystery_raffles where id='{gift_raffle}'"))
+            inside_note=source['message'] if inside else 'Enjoy!'
+            if inside: source['message']=outside_note
             script="""import {readFileSync} from 'node:fs';import {giftEnvelope,openedGiftPayload} from './bot/src/incoming-gifts.mjs';
-            const {source,meat,items}=JSON.parse(readFileSync(0,'utf8'));
+            const {source,meat,items,inside_note}=JSON.parse(readFileSync(0,'utf8'));
             const item=(id,n)=>`<table class="item" rel="id=${id}&n=${n}"><tr><td><img title="fixture"></td></tr></table>`;
             source.message+=item(1167,1);const envelope=giftEnvelope(source);
-            const opened={...source,message:source.message+'<p>Inside Note:<p>Enjoy!'+(meat?`<center>You gain ${meat} Meat</center>`:'')+items.map(i=>item(i.id,i.quantity)).join('')};
+            const opened={...source,message:source.message+'<p>Inside Note:<p>'+inside_note+(meat?`<center>You gain ${meat} Meat</center>`:'')+items.map(i=>item(i.id,i.quantity)).join('')};
             console.log(JSON.stringify({envelope,payload:openedGiftPayload(envelope,opened)}));"""
-            result=subprocess.run(['node','--input-type=module','-e',script],cwd=ROOT,input=json.dumps(dict(source=source,meat=meat,items=items)),capture_output=True,text=True,check=True)
+            result=subprocess.run(['node','--input-type=module','-e',script],cwd=ROOT,input=json.dumps(dict(source=source,meat=meat,items=items,inside_note=inside_note)),capture_output=True,text=True,check=True)
             parsed=json.loads(result.stdout);payload=parsed['payload']
             sql('select public.bot_register_gift_mail('+lit(json.dumps([parsed['envelope']]))+');')
             held=json.loads(sql('select public.bot_liabilities()'))
@@ -272,12 +287,21 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
             finish=f"select public.bot_finish_gift_open('{attempt}',{lit(json.dumps(payload))},{lit(json.dumps(after))});"
             sql(finish);sql(finish)
             protected=json.loads(sql('select public.bot_liabilities()'))
+            isolation=json.loads(sql('select public.bot_isolate_raffle_intake('+lit(json.dumps(payload))+');'))
+            assert isolation['state']=='isolated'
+            assert json.loads(sql('select public.bot_liabilities()'))==protected, 'verified gifts must not reserve twice'
             assert ingest(payload)==(expected or ('raffle_tickets' if kind=='raffle' else 'raffle_supply'))
             assert json.loads(sql('select public.bot_liabilities()'))==protected
             restart();assert ingest(payload)=='duplicate'
             assert json.loads(sql('select public.bot_liabilities()'))==protected
             return payload
-        verified_raffle_gift('raffle',100000000,[],48889602)
+        for kind,intent,contents in [('raffle','raffle',[]),('raffle_supply','raffle_supply',[dict(id=2,quantity=1)])]:
+            rejected=verified_raffle_gift(kind,100,contents,48889602,expected='Gift command is inside: '+intent,inside=True)
+            assert sql(f"select count(*) from khub_bot.raffle_purchases where receipt_id='{rejected['id']}'")=='0'
+            assert sql(f"select count(*) from khub_bot.raffle_deposits where receipt_id='{rejected['id']}'")=='0'
+            assert int(sql(f"select sum(meat) from khub_bot.deliveries where receipt_id='{rejected['id']}' and kind='refund'"))==100
+            assert 'outside message' in sql(f"select khub_bot.friendly_reason('Gift command is inside: {intent}')")
+        verified_raffle_gift('raffle',100000000,[],48889602,inside=True,outside_note='')
         verified_raffle_gift('raffle',40000000,[],48889602)
         assert account_value(gift_raffle,'revenue')=='140000000'
         verified_raffle_gift('raffle_supply',0,[dict(id=364,quantity=2)],48889601)
@@ -286,7 +310,11 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
         assert account_value(gift_raffle,'held_meat')=='140000000'
         draw(gift_raffle,minutes=1)
         notice=sql(f"select message from khub_bot.deliveries where dedupe_key='raffle:{gift_raffle}:admin:notice'")
-        for text in ['seal tooth','3','SUPPLY '+gift_raffle,'140,000,000','ADVANCE '+gift_raffle]:assert text in notice
+        for text in ['seal tooth','3','SUPPLY '+sql(f"select raffle_number from public.mystery_raffles where id='{gift_raffle}'"),'140,000,000','ADVANCE '+sql(f"select raffle_number from public.mystery_raffles where id='{gift_raffle}'")]:assert text in notice
+        assert '\n\nSupply missing items: SUPPLY ' in notice
+        assert '\n\nAvailable advance: 140,000,000 Meat\nRequest advance: ADVANCE ' in notice
+        assert '3 × seal tooth' in notice
+        assert 'Delivery target:' not in notice and '(item #' not in notice
         winner=sql(f"select message from khub_bot.deliveries where dedupe_key='raffle:{gift_raffle}:winner:notice'")
         assert 'seal tooth' in winner and '3' in winner
         for text in ['Congratulations!', 'Fixture raffle', 'being prepared', 'within 30 minutes', 'sooner']:assert text in winner
@@ -431,6 +459,54 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
             assert sql(f"select has_function_privilege('anon','{signature}','execute')")=='f'
             assert sql(f"select has_function_privilege('service_role','{signature}','execute')")=='t'
 
+        # Numeric references resolve without changing original receipt/proof payloads.
+        numbered=create_raffle()
+        number=sql(f"select raffle_number from public.mystery_raffles where id='{numbered}'")
+        assert int(number)>=1001
+        assert sql(f"select khub_bot.resolve_raffle_id('{number}')")==numbered
+        assert sql(f"select khub_bot.resolve_raffle_id('{numbered}')")==numbered
+        sql(f"update public.mystery_raffles set raffle_number=999999 where id='{numbered}'",error='immutable')
+        numeric_mail=mail(numbered,meat=200)
+        numeric_mail['command']['raffle_id']=number
+        assert sql('select public.bot_ingest_mail('+lit(json.dumps(numeric_mail))+');')=='raffle_tickets'
+        assert sql('select public.bot_ingest_mail('+lit(json.dumps(numeric_mail))+');')=='duplicate'
+        for ref in ['9999999999999999999','nonsense','0']:
+            invalid=mail(numbered,meat=100)
+            invalid['command']['raffle_id']=ref
+            assert sql('select public.bot_ingest_mail('+lit(json.dumps(invalid))+');')=='raffle_refund'
+        assert sql('select count(*)=count(distinct raffle_number) from public.mystery_raffles')=='t'
+        from concurrent.futures import ThreadPoolExecutor
+        def concurrent_number(_):
+            query=f"insert into public.mystery_raffles(creator_id,name,ticket_price,ends_at,raffle_number) select creator_id,'Concurrent number fixture',100,now()+interval '1 day',1001 from public.mystery_raffles where id='{numbered}' returning raffle_number;"
+            result=subprocess.run([str(BIN/'psql'),'-h',folder,'-d','postgres','-X','-qAt','-v','ON_ERROR_STOP=1','-c',query],capture_output=True,text=True,check=True)
+            return int(result.stdout.strip())
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            assigned=list(pool.map(concurrent_number,range(8)))
+        assert len(set(assigned))==8 and min(assigned)>int(number)
+        # Parser upgrade: old rejected ordinary KMail must not become a purchase.
+        import copy
+        replay=mail(numbered,meat=1234)
+        replay['raw']={'type':'normal','message':'RAFFLE '+number}
+        replay['command']={'type':'unknown'}
+        ingest(replay)
+        reparsed=copy.deepcopy(replay)
+        reparsed['command']={'type':'raffle','raffle_id':number}
+        original=sql(f"select payload from khub_bot.receipts where mail_id='{replay['id']}'")
+        before_replay=liabilities()
+        for state in ['pending','unknown','sent']:
+            sql(f"update khub_bot.deliveries set state='{state}' where receipt_id='{replay['id']}'")
+            assert ingest(reparsed)=='duplicate'
+            handled=json.loads(sql('select public.bot_handled_mail('+lit(json.dumps([reparsed]))+');'))
+            assert replay['id'] in handled
+            assert sql(f"select payload from khub_bot.receipts where mail_id='{replay['id']}'")==original
+            assert sql(f"select count(*) from khub_bot.raffle_purchases where receipt_id='{replay['id']}'")=='0'
+        assert sql(f"select count(*) from khub_bot.deliveries where receipt_id='{replay['id']}'")=='1'
+        for key,value in [('meat',999),('sender_id',48889603),('raw',{'type':'normal','message':'altered'})]:
+            changed=copy.deepcopy(reparsed);changed[key]=value
+            sql('select public.bot_ingest_mail('+lit(json.dumps(changed))+');',error='Receipt payload conflict')
+        gift_replay=copy.deepcopy(reparsed);gift_replay['raw']['gift_original']={}
+        sql('select public.bot_ingest_mail('+lit(json.dumps(gift_replay))+');',error='Gift contents have not been verified')
+        print('PASS: parser-upgrade rejected replays preserve receipts and refunds; changed assets, sender, raw mail and unverified gifts remain blocked')
         # Analytics must stay private and count purchases once, independently of settlement.
         call("select public.read_admin_raffle_analytics()",uid=buyer,error='Administrator required')
         call(f"select public.read_admin_raffle_participants('{canceled}')",uid=buyer,error='Administrator required')
@@ -450,6 +526,66 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
         assert sql(f"select price_meat from khub_bot.raffle_market_prices where raffle_id='{valued}'")=='123'
         assert json.loads(call('select public.read_admin_raffle_analytics()'))['unavailable']>=0
         print('PASS: admin-only raffle analytics, exact purchase totals and immutable selected-prize snapshot')
+        # Ordinary failed intake reserves exact assets, survives restart, and
+        # atomically hands protection to normal receipt/raffle obligations.
+        isolated_raffle=create_raffle()
+        stuck=mail(isolated_raffle,meat=300)
+        stuck['raw']['message']='RAFFLE '+isolated_raffle
+        before_hold=liabilities()
+        assert json.loads(sql('select public.bot_isolate_raffle_intake('+lit(json.dumps(stuck))+');'))['state']=='isolated'
+        assert int(liabilities()['meat'])==int(before_hold['meat'])+300
+        assert json.loads(sql('select public.bot_isolate_raffle_intake('+lit(json.dumps(stuck))+');'))['state']=='isolated'
+        assert int(liabilities()['meat'])==int(before_hold['meat'])+300
+        assert json.loads(sql('select public.bot_raffle_draw_work()'))==[]
+        restart()
+        assert any(row['id']==stuck['id'] for row in json.loads(sql('select public.bot_pending_raffle_intake()')))
+        changed=copy.deepcopy(stuck);changed['meat']=400
+        sql('select public.bot_ingest_mail('+lit(json.dumps(changed))+');',error='Isolated payload conflict')
+        protected=liabilities()
+        assert ingest(stuck)=='raffle_tickets'
+        assert liabilities()==protected
+        assert json.loads(sql('select public.bot_isolate_raffle_intake('+lit(json.dumps(stuck))+');'))['state']=='committed'
+        assert not any(row['id']==stuck['id'] for row in json.loads(sql('select public.bot_pending_raffle_intake()')))
+        unverified=mail(isolated_raffle,meat=100)
+        unverified['raw']={'type':'normal','gift_original':{}}
+        sql('select public.bot_isolate_raffle_intake('+lit(json.dumps(unverified))+');',error='Gift contents have not been verified')
+        print('PASS: isolated intake holds survive restart, block raffle generation, release atomically on commit and never double-count verified gifts')
+        # Deadline eligibility follows KoL receipt time, not processing time.
+        boundary=create_raffle()
+        end=sql("select date_trunc('second',clock_timestamp())-interval '120 seconds'")
+        sql(f"update public.mystery_raffles set ends_at='{end}' where id='{boundary}'")
+        ontime=mail(boundary,meat=200);late=mail(boundary,meat=100)
+        def stamp(payload,when):
+            payload['received_at']=when
+            payload['raw']['azunixtime']=str(int(datetime.fromisoformat(when).timestamp()))
+        stamp(ontime,sql(f"select '{end}'::timestamptz-interval '1 second'"))
+        stamp(late,end)
+        assert json.loads(sql('select public.bot_raffle_draw_work()'))==[], 'old scans cannot authorize a new closing'
+        scan=json.loads(sql('select public.bot_begin_inbox_scan()'))
+        sql(f"select public.bot_stage_inbox_scan('{scan['id']}',{lit(json.dumps([ontime,late]))});")
+        assert json.loads(sql('select public.bot_raffle_draw_work()'))==[]
+        assert ingest(ontime)=='raffle_tickets'
+        assert ingest(late)=='raffle_refund'
+        assert account_value(boundary,'ticket_count')=='2'
+        assert json.loads(sql('select public.bot_raffle_draw_work()'))==[], 'staged but unfinished scan must not authorize drawing'
+        sql(f"select public.bot_finish_inbox_scan('{scan['id']}');")
+        work=json.loads(sql('select public.bot_raffle_draw_work()'))
+        assert any(row['raffleId']==boundary for row in work)
+        selected=next(row for row in work if row['raffleId']==boundary)
+        assert [p['receiptId'] for p in selected['purchases']]==[ontime['id']]
+        assert ingest(ontime)=='duplicate'
+        forged=create_raffle();bad=mail(forged,meat=100);bad['raw']['azunixtime']='1'
+        sql('select public.bot_ingest_mail('+lit(json.dumps(bad))+');',error='Invalid KoL raffle timestamp')
+        print('PASS: before-deadline mail accepted after closing; exact-deadline refund; draw waits for full scan and durable intake; forged timestamps rejected')
+        # The public result projection exposes only winner identity and the
+        # displayed winning label, while preserving the temporary tester gate.
+        public_result=json.loads(call(f"select public.read_raffle_result('{gift_raffle}')",uid=buyer))
+        assert set(public_result)=={'winner_name','profile_id','winning_ticket'}
+        assert public_result['winner_name']
+        assert public_result['winning_ticket']==sql(f"select ((draw_result->>'winningTicket')::numeric+ticket_label_offset)::text from khub_bot.raffle_accounts where raffle_id='{gift_raffle}'")
+        call(f"select public.read_raffle_result('{gift_raffle}')",uid=other,error='Raffle access required')
+        assert sql("select has_function_privilege('anon','public.read_raffle_result(uuid)','execute')")=='f'
+        assert call(f"select public.read_raffle_result('{forged}')",uid=buyer)==''
         print('PASS: full-schema lifecycle and isolation: identical items, concurrent auction/raffle Meat, exact solvency, proof guards, retries, restarts, cancellation and schema permissions')
     finally:
         if started: pg('-m','immediate','-w','stop')

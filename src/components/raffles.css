@@ -131,3 +131,141 @@ html[data-theme=dark] .auction-create-content button.raffle-mode-purple[aria-pre
 html[data-theme=dark] .auction-create-content button.raffle-mode-red[aria-pressed=false]:hover{background:#dc2626;color:#fff}
 
 .giveaway-editor #giveaway-title{margin-top:7px}
+
+.auction-create-content .raffle-editor .raffle-publish-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;padding-top:16px;border-top:1px solid #d1d5db}
+.auction-create-content .raffle-editor .raffle-publish-actions button{min-height:44px;padding:10px 12px;border-radius:8px;font-size:13px;font-weight:600;line-height:1.3}
+.auction-create-content .raffle-editor .raffle-back-edit{background:transparent;border:1px solid #9ca3af;color:#374151}
+.auction-create-content .raffle-editor .raffle-publish-live{background:#15803d;border:1px solid #15803d;color:white}
+.auction-create-content .raffle-editor .raffle-publish-live{transition:background-color .15s,border-color .15s,box-shadow .15s}
+.auction-create-content .raffle-editor .raffle-publish-live:is(:hover,:focus-visible):not(:disabled){background:#16a34a;border-color:#22c55e;box-shadow:0 0 18px #22c55e80,0 0 7px #22c55e55}
+.auction-create-content .raffle-editor .raffle-publish-actions button:disabled{opacity:.5}
+html[data-theme=dark] .auction-create-content .raffle-editor .raffle-publish-actions{border-color:#475569}
+html[data-theme=dark] .auction-create-content .raffle-editor .raffle-back-edit{background:transparent;border-color:#475569;color:#cbd5e1}
+
+.auction-create-content .raffle-editor .raffle-back-edit{transition:background-color .15s,border-color .15s,color .15s,box-shadow .15s}
+.auction-create-content .raffle-editor .raffle-back-edit:is(:hover,:focus-visible):not(:disabled){background:#ede9fe;border-color:#8b5cf6;color:#5b21b6;box-shadow:0 0 12px #8b5cf640}
+html[data-theme=dark] .auction-create-content .raffle-editor .raffle-back-edit:is(:hover,:focus-visible):not(:disabled){background:#413052;border-color:#b794db;color:#f3e8ff;box-shadow:0 0 12px #a78bfa55}
+@media(prefers-reduced-motion:reduce){.auction-create-content .raffle-editor :is(.raffle-back-edit,.raffle-publish-live){transition:none}}
+
+.raffle-summary p.raffle-ticket-chances{margin-bottom:0}
+.raffle-summary p.raffle-ticket-processing{margin-top:4px;font-size:12px;color:#6b7280}
+html[data-theme=dark] .raffle-summary p.raffle-ticket-processing{color:#b8bec9}
+html:not([data-theme=dark]) .raffle-summary[aria-label="How to buy raffle tickets"] p:not(.raffle-ticket-processing){color:#392f45}
+html:not([data-theme=dark]) .raffle-summary p.raffle-ticket-processing{color:#85808d}
+
+.raffle-ticket-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px 16px;margin:12px 0}
+.raffle-summary .raffle-ticket-heading h2{margin:0}
+.raffle-user-ticket-count{display:inline-flex;align-items:baseline;gap:10px;font-size:12px;color:#756b80;white-space:nowrap}
+.raffle-user-ticket-count strong{font-size:32px;line-height:1.1;font-weight:600;color:#342d43;font-variant-numeric:tabular-nums}
+html[data-theme=dark] .raffle-user-ticket-count{color:#bcafc8}
+html[data-theme=dark] .raffle-user-ticket-count strong{color:#f5f0fa}
+
+.raffle-ticket-history{list-style:none;margin:0;padding:0}
+.raffle-ticket-history li{padding:10px 0;border-top:1px solid #e4dce9;font-size:13px;font-variant-numeric:tabular-nums}
+.raffle-ticket-history li:first-child{border-top:0}
+.raffle-summary .raffle-ticket-history p{margin:4px 0 0}
+html[data-theme=dark] .raffle-ticket-history li{border-color:#50405f}
+
+/* Floating prize reveal: crisp ink artwork, no item cards or orbit rings. */
+.raffle-summary.raffle-showcase{padding:24px 26px 20px;overflow:hidden;background:#fffcf8;border-color:#d3c6dc}
+.raffle-showcase-heading{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:14px}
+.raffle-showcase-heading>.raffle-showcase-status{grid-column:2;grid-row:1}
+.raffle-showcase .raffle-badges{gap:8px;font-size:12px}
+.raffle-showcase .raffle-label{border-radius:999px;padding:3px 8px;font-size:11px;line-height:1.2;background:#ebe7ee;color:#51465d;font-weight:500}
+html[data-theme=dark] .raffle-showcase .raffle-label{background:#37323f;color:#eee9f2}
+.raffle-showcase-titleline{grid-column:1/-1;grid-row:2;display:flex;flex-direction:column;align-items:flex-start;gap:12px;min-width:0}
+.raffle-pool-heading{margin:30px 0 0;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:600;color:#887194}
+.raffle-showcase-status{padding:5px 11px;border:1px solid #d7c9e2;border-radius:7px;background:#eee5f4;font-size:11px;font-weight:600;color:#674a7d}
+.raffle-showcase-status.is-concluded{color:#166534;border-color:#a7d8b8;background:#e4f4e9}
+.raffle-summary.raffle-showcase h2{margin:0;font-size:28px;line-height:1.2;overflow-wrap:anywhere;letter-spacing:-.4px}
+.raffle-showcase .raffle-facts{gap:10px;font-size:12px;color:#756b80}
+.raffle-showcase .raffle-facts strong{font-size:13px;font-weight:400;color:#51465d}
+.raffle-showcase .raffle-facts small{font-size:inherit}
+.raffle-custom-box{display:block;position:relative;width:100%;max-width:280px;height:auto;transform:rotate(-7deg);filter:drop-shadow(3px 8px 2px #32223d14)}
+.raffle-question{position:absolute;z-index:2;font-family:'Chalkboard SE','Comic Sans MS',cursive;font-weight:700;line-height:1;color:#9271a7;text-shadow:1px 2px 0 #c6afd629;pointer-events:none}
+.raffle-question.q-one{top:-25%;left:4%;right:auto;font-size:44px;transform:rotate(-21deg)}
+.raffle-question.q-two{top:-48%;left:35%;right:auto;font-size:24px;transform:rotate(17deg)}
+.raffle-question.q-three{top:-37%;left:77%;right:auto;font-size:54px;transform:rotate(22deg)}
+.raffle-question.q-four{top:-5%;left:108%;right:auto;font-size:29px;transform:rotate(-12deg)}
+.raffle-box-caption{position:absolute;bottom:-2%;font-size:11px;font-style:italic;color:#756b80;text-align:center}
+.raffle-prize-icon{display:grid;place-items:center;flex-shrink:0;width:57px;height:57px;position:relative}
+.raffle-prize-icon img{width:48px;height:48px;object-fit:contain;image-rendering:pixelated;background:transparent;border-radius:4px}
+.raffle-prize-description{display:flex;flex-direction:column;gap:5px;min-width:0}
+.raffle-prize-description strong{font-size:13px;font-weight:600;line-height:1.35;overflow-wrap:anywhere}
+.raffle-prize-description>span{font-size:11px;line-height:1.35;color:#756b80}
+.raffle-prize-description i{font-style:normal;padding:0 3px}
+.raffle-has-selection .raffle-orbit-prize:not(.is-winning-prize){opacity:.55}
+.is-winning-prize .raffle-prize-icon{filter:drop-shadow(0 0 4px #d4a33860)}
+.is-winning-prize .raffle-prize-icon:after{content:'';position:absolute;inset:-5px;border:1px solid #c99731;border-radius:12px;transform:rotate(-8deg);box-shadow:0 0 10px #d4a33835}
+.is-winning-prize .raffle-prize-description strong{color:#94680e}
+.raffle-prize-description .raffle-winning-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#8a620c}
+.raffle-winner-eyebrow{font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:#887194}
+.raffle-winner-details a{font-size:16px;font-weight:600;text-decoration:none;color:#76518b}
+.raffle-winner-details a:hover{text-decoration:underline}
+.raffle-winner-details .raffle-winning-ticket{font-size:30px;font-weight:600;color:#94680e;font-variant-numeric:tabular-nums;line-height:1.1;margin-bottom:4px}
+.raffle-summary p.raffle-prize-order-note{font-size:10px;line-height:1.4;margin:0 0 16px;color:#887b92}
+.raffle-showcase-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:9px 18px;padding:16px 18px;border:1px solid #d7c8df;border-radius:10px;background:#f2ebf5;font-size:14px;line-height:1.5}
+.raffle-showcase-footer time{font-size:12px;color:#756b80}
+.raffle-footer-star{color:#ac7a16;margin-right:7px;font-size:19px}
+/* Large pools keep every outcome readable rather than compressing the arc. */
+html[data-theme=dark] .raffle-summary.raffle-showcase{background:#211e2d;border-color:#50405f}
+html[data-theme=dark] .raffle-showcase .raffle-facts strong{color:#ece5f3}
+html[data-theme=dark] .raffle-showcase .raffle-facts,html[data-theme=dark] .raffle-prize-description>span{color:#b9aec5}
+html[data-theme=dark] .raffle-showcase-status{background:#37273f;border-color:#594269;color:#d7c3e4}
+html[data-theme=dark] .raffle-showcase-status.is-concluded{background:#183e30;border-color:#347758;color:#a7efc4}
+html[data-theme=dark] .raffle-question{color:#c7afd7}
+html[data-theme=dark] .is-winning-prize .raffle-prize-description strong,html[data-theme=dark] .raffle-prize-description .raffle-winning-label,html[data-theme=dark] .raffle-winning-ticket{color:#f1cb70}
+html[data-theme=dark] .raffle-winner-details a{color:#d7b8eb}
+html[data-theme=dark] .raffle-showcase-footer{background:#2a2235;border-color:#675174}
+html[data-theme=dark] .raffle-showcase-footer time,html[data-theme=dark] .raffle-box-caption{color:#b4a6bf}
+
+/* The prize coordinates belong to this dedicated area, never to the card. */
+.raffle-prize-scene{position:relative;height:var(--scene-height);margin:16px 0 12px}
+.raffle-mystery-art{position:absolute;left:0;top:29%;width:26%;height:70%;display:flex;align-items:center;justify-content:center}
+/* Balance the combined silhouette: marks extend above the illustration,
+   so the box sits lower and slightly left of the prize-arc center. */
+.raffle-mystery-art.raffle-box-balanced{left:clamp(11%,calc(21% + var(--box-center-x) - 28px),30%);top:clamp(35%,calc(var(--box-center-y) + 44px),80%);transform:translate(-50%,-50%)}
+.raffle-custom-box{max-width:165px;transform:rotate(-5deg)}
+.raffle-box-caption{bottom:0}
+.raffle-question.q-one{top:-25%;left:4%;right:auto;font-size:44px;transform:rotate(-24deg)}
+.raffle-question.q-two{top:-48%;left:35%;right:auto;font-size:24px;transform:rotate(12deg)}
+.raffle-question.q-three{top:-37%;left:77%;right:auto;font-size:54px;transform:rotate(20deg)}
+.raffle-question.q-four{top:-5%;left:108%;right:auto;font-size:29px;transform:rotate(-12deg)}
+.raffle-question.q-five{top:24%;left:-16%;right:auto;font-size:22px;transform:rotate(-16deg)}
+.raffle-question.q-six{top:-18%;left:43%;right:auto;font-size:35px;transform:rotate(8deg)}
+.raffle-question.q-seven{top:34%;left:106%;right:auto;font-size:26px;transform:rotate(24deg)}
+.raffle-orbit-pool{position:absolute;left:21%;width:61%;top:0;bottom:14px}
+.raffle-orbit-prizes{position:relative;list-style:none;margin:0;padding:0;width:100%;height:100%}
+.raffle-orbit-prize{position:absolute;left:var(--prize-x);top:var(--prize-y);transform:translate(-28px,-50%);width:calc(100% - var(--prize-x) + 28px);max-width:260px;display:flex;align-items:center;gap:10px;min-width:0}
+.raffle-prize-icon{width:56px;height:56px}
+.raffle-winner-details{position:absolute;right:0;top:8px;width:27%;padding:8px 0 8px 12px;border-left:1px solid #c9ae694d;display:flex;flex-direction:column;gap:7px;overflow-wrap:anywhere}
+.raffle-winner-details a{font-size:20px}
+@media(max-width:760px){
+ .raffle-summary.raffle-showcase{padding:18px}
+ .raffle-showcase-heading{grid-template-columns:minmax(0,1fr) auto;gap:14px}
+ .raffle-showcase-titleline{grid-column:1/-1;grid-row:2}
+ .raffle-showcase-status{grid-column:2;grid-row:1}
+ .raffle-summary.raffle-showcase h2{font-size:24px}
+ .raffle-prize-scene,.raffle-prize-scene-many{height:auto;min-height:0;display:flex;flex-direction:column;gap:26px;padding:0;margin:14px 0 20px}
+ .raffle-prize-scene .raffle-mystery-art{position:relative;left:auto;top:auto;width:200px;height:200px;align-self:center;transform:none}
+ .raffle-question.q-one{font-size:44px}.raffle-question.q-two{font-size:24px}.raffle-question.q-three{font-size:54px}.raffle-question.q-four{font-size:29px}.raffle-question.q-five{font-size:22px}.raffle-question.q-six{font-size:35px}.raffle-question.q-seven{font-size:26px}
+ .raffle-prize-scene .raffle-orbit-pool{position:relative;left:auto;top:auto;bottom:auto;width:100%;padding:0}
+ .raffle-prize-scene .raffle-orbit-prizes{height:auto;display:flex;flex-direction:column;gap:16px}
+ .raffle-prize-scene .raffle-orbit-prize{position:static;left:auto;top:auto;transform:none;width:100%;max-width:none;gap:14px}
+ .raffle-prize-scene .raffle-winner-details{position:static;width:100%;margin:0;padding:14px 0 0;border-left:0;border-top:1px solid #c9ae694d;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:baseline;gap:9px 14px}
+ .raffle-winner-details a,.raffle-winning-ticket{text-align:right}
+ .raffle-showcase-footer{padding:12px;font-size:13px}.raffle-showcase-footer time{font-size:11px}
+}
+
+
+@media(max-width:760px){.raffle-prize-scene .raffle-box-illustration{width:72%}}
+
+.raffle-box-illustration{position:relative;width:100%;max-width:165px}
+
+.raffle-pool-heading{margin-left:calc(21% + var(--first-prize-offset, 0px) - 28px)}
+html:not([data-theme=dark]) .raffle-has-selection .raffle-orbit-prize:not(.is-winning-prize){opacity:.8}
+html:not([data-theme=dark]) .raffle-orbit-prize:not(.is-winning-prize) .raffle-prize-description>span{color:#675d72}
+@media(max-width:760px){.raffle-pool-heading{margin-left:0}}
+/* These sprites are already trimmed cutouts; do not restore the global
+   dark-mode backing intended for ordinary, unprocessed KoL images. */
+html[data-theme=dark] .raffle-showcase .raffle-prize-icon img{background:transparent;padding:0;border-radius:0}
