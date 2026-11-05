@@ -48,7 +48,7 @@ test('missing username and unavailable lookup never attempt a login', async () =
 });
 
 function profileClient(profile) {
-    return { async rpc(name) { if (name === 'khub_is_administrator') return { data: false }; assert.equal(name, 'read_my_account_access'); return { data: profile && {
+    return { async rpc(name) { if (name === 'can_view_raffles') return { data: false }; if (name === 'khub_is_administrator') return { data: false }; assert.equal(name, 'read_my_account_access'); return { data: profile && {
         server_now: new Date().toISOString(), ban_expires_at: null, ...profile,
     } }; } };
 }
@@ -93,4 +93,15 @@ test('appeal sign-in uses the separate resolver without changing normal login',a
     await auth.login('KH_Player','same password',{appeal:true});
     await auth.login('KH_Player','same password');
     assert.deepEqual(names,['khub_appeal_login_address','khub_login_address']);
+});
+
+test('raffle membership is loaded from its own server permission and fails closed', async () => {
+    for (const permission of [{ data: true }, { data: false }, { data: true, error: new Error('unavailable') }]) {
+        const client = profileClient({ id: 'member', is_banned: false });
+        const original = client.rpc;
+        client.rpc = name => name === 'can_view_raffles' ? Promise.resolve(permission) : original(name);
+        const user = await build(client).loadProfile({ id: 'member' });
+        assert.equal(user.canViewRaffles, permission.data === true && !permission.error);
+        assert.equal(user.isAdmin, false);
+    }
 });

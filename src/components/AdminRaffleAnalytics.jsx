@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import HighRollersClub from './HighRollersClub';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
+import { formatCompactMeat } from '../lib/formatMeat';
 import { supabase } from '../lib/supabase';
 
 const number = value => BigInt(value ?? 0).toLocaleString('en-US');
@@ -11,23 +13,27 @@ function Player({ row }) {
     return row.profile_id ? <Link className={link} to={`/seller/${row.profile_id}`}>{row.username}</Link> : <a className={link} href={`https://www.kingdomofloathing.com/showplayer.php?who=${row.player_id}`}>{row.username}</a>;
 }
 Player.propTypes = { row: PropTypes.object.isRequired };
-function Participants({ raffleId }) {
-    const [rows, setRows] = useState([]);
+function Participants({ raffleId, initialRows }) {
+    const [rows, setRows] = useState(initialRows ?? []);
     const [offset, setOffset] = useState(0);
     const [error, setError] = useState('');
-    const [more, setMore] = useState(false);
+    const [more, setMore] = useState(initialRows?.length === 50);
     useEffect(() => {
         let active = true;
+        if (offset === 0 && initialRows) {
+            setRows(initialRows); setMore(initialRows.length === 50); setError('');
+            return;
+        }
         supabase.rpc('read_admin_raffle_participants', { p_id: raffleId, p_offset: offset }).then(({ data, error: failure }) => {
             if (!active) return;
             if (failure) setError('Participant data unavailable.');
             else { setRows(data); setMore(data.length === 50); setError(''); }
         }).catch(() => { if (active) setError('Participant data unavailable.'); });
         return () => { active = false; };
-    }, [raffleId, offset]);
+    }, [raffleId, offset, initialRows]);
     return <>{error ? <p role="alert">{error}</p> : <ul className="mt-2 space-y-1">{rows.map(row => <li key={row.player_id}><Player row={row} /> · {number(row.tickets)} tickets</li>)}</ul>}<Pager offset={offset} setOffset={setOffset} more={more} /></>;
 }
-Participants.propTypes = { raffleId: PropTypes.string.isRequired };
+Participants.propTypes = { raffleId: PropTypes.string.isRequired, initialRows: PropTypes.array };
 function Pager({ offset, setOffset, more }) {
     return (offset > 0 || more) && <div className="mt-2 flex gap-4"><button disabled={!offset} onClick={() => setOffset(offset - 50)}>Previous</button><span>Page {offset / 50 + 1}</span><button disabled={!more} onClick={() => setOffset(offset + 50)}>Next</button></div>;
 }
@@ -50,6 +56,7 @@ export default function AdminRaffleAnalytics() {
     if (error) return <p role="alert" className="text-sm text-red-700">{error}</p>;
     if (!data) return <p role="status" className="text-sm text-gray-500">Loading raffle analytics…</p>;
     return <div className="space-y-4 text-sm text-gray-700">
+        <HighRollersClub />
         <section aria-label="Current raffle" className={panel}>
             <h2 className="mb-2 text-sm font-semibold text-gray-900">Current Raffle</h2>
             {!data.current.length && <p>No current raffles.</p>}
@@ -57,7 +64,7 @@ export default function AdminRaffleAnalytics() {
                 <div className="flex flex-wrap justify-between gap-2"><Link className={link} to={`/raffle/${r.id}`}>{r.name}{r.raffle_number && ` #${r.raffle_number}`}</Link><span className="capitalize">{r.status}</span></div>
                 <p className="my-1 tabular-nums">{number(r.tickets)} tickets · {meat(r.revenue)}</p>
                 <p className="text-xs">{r.prize_name ? `Winning prize: ${number(r.prize_quantity)} × ${r.prize_name}` : new Date(r.ends_at) <= new Date() && r.state !== 'preview' ? 'Closed · winning prize pending drawing' : `Prize pool: ${r.pool.map(p => `${number(p.quantity)} × ${p.name}`).join(' · ')}`}</p>
-                <details className="mt-2 text-xs" open={!!open[r.id]} onToggle={e => { const value = e.currentTarget.open; setOpen(previous => previous[r.id] === value ? previous : { ...previous, [r.id]: value }); }}><summary className="cursor-pointer">Participants</summary>{open[r.id] && <Participants raffleId={r.id} />}</details>
+                <details className="mt-2 text-xs" open={!!open[r.id]} onToggle={e => { const value = e.currentTarget.open; setOpen(previous => previous[r.id] === value ? previous : { ...previous, [r.id]: value }); }}><summary className="cursor-pointer">Participants</summary><Participants raffleId={r.id} initialRows={r.participants_page} /></details>
             </div>)}
             {data.current.length === 50 && <p className="text-xs">Showing the latest 50 current raffles.</p>}
         </section>
@@ -68,7 +75,7 @@ export default function AdminRaffleAnalytics() {
                 ['Total Prize Value', meat(data.prize_value)], ['Estimated Profit', meat(data.profit)],
             ].map(([label, value]) => <div className={panel} key={label}><h3 className="text-xs font-medium text-gray-600">{label}</h3><p className="mt-1 text-lg font-semibold tabular-nums text-gray-900">{value}</p></div>)}
                 <details className={panel}><summary className="cursor-pointer text-xs font-medium text-gray-600">Unique Participants <span className="mt-1 block text-lg font-semibold text-gray-900">{number(data.participants)}</span></summary>
-                    <div className="mt-3 overflow-x-auto"><table className="w-full text-left text-xs"><thead><tr><th>Username</th><th>Raffles</th><th>Tickets</th></tr></thead><tbody>{data.people.map(row => <tr key={row.player_id}><td className="py-2"><Player row={row} /></td><td>{number(row.raffles)}</td><td>{number(row.tickets)}</td></tr>)}</tbody></table></div>
+                    <div className="mt-3 overflow-x-auto"><table className="w-full text-left text-xs"><thead><tr><th>Username</th><th>Raffles</th><th>Tickets</th><th>Total Meat</th></tr></thead><tbody>{data.people.map(row => <tr key={row.player_id}><td className="py-2"><Player row={row} /></td><td>{number(row.raffles)}</td><td>{number(row.tickets)}</td><td title={row.revenue == null ? undefined : meat(row.revenue)}>{row.revenue == null ? 'Unavailable' : formatCompactMeat(row.revenue, BigInt(row.revenue) >= 1000000000n ? 2 : 1)}</td></tr>)}</tbody></table></div>
                     <Pager offset={offset} setOffset={setOffset} more={data.people.length === 50} />
                 </details>
             </div>

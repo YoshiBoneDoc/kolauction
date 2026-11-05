@@ -1,3 +1,4 @@
+import HighRollersInvitation from './components/HighRollersInvitation';
 import { lazy, Suspense, useContext } from "react";
 import { AuctionsContext } from "./context/AuctionsContext";
 import { Routes, Route, useLocation } from "react-router-dom";
@@ -47,6 +48,7 @@ const App = () => {
         <div className={`flex min-h-screen flex-col ${isWallOfShame ? 'shame-background' : 'site-page-background bg-[#F9F9F9]'}`}>
             <div className="px-4 sm:px-6"><AuctionNavigation /></div>
             <SiteBanner />
+            <HighRollersInvitation />
             {error && <div role="alert" className="bg-red-50 p-4 text-red-700">
                 {error}{" "}<button onClick={refreshAuctions} className="underline">Retry</button>
             </div>}

@@ -87,13 +87,19 @@ test('long labels use natural-height entries rather than overlapping the arc', (
 });
 
 test('prize range beneath heading shows compact minimum and maximum total prize values', () => {
-    const html = compiled.exports.render(raffle, new Map([[1, { available: true, price_meat: 100 }], [2, { available: true, price_meat: 800 }], [3, { available: true, price_meat: 1240000000 }]]));
+    const html = compiled.exports.render({ ...raffle, state: 'active', selected_outcome: null, completion_reason: null }, new Map([[1, { available: true, price_meat: 100 }], [2, { available: true, price_meat: 800 }], [3, { available: true, price_meat: 1240000000 }]]));
     assert.match(html, /Ranging from 100 to 1.24b meat/);
     assert.match(html, /raffle-prize-value-range/);
     assert.ok(html.indexOf('Ranging from') > html.indexOf('</h3>'));
     assert.ok(html.indexOf('Ranging from') < html.indexOf('class="raffle-prize-scene"'));
     assert.doesNotMatch(html.match(/<h3[\s\S]*?<\/h3>/)[0], /Ranging from/);
-    const quantityRange = compiled.exports.render(raffle, new Map([[1, { available: true, price_meat: 1000 }], [2, { available: true, price_meat: 500 }], [3, { available: true, price_meat: 100 }]]));
+    const quantityRange = compiled.exports.render({ ...raffle, state: 'active', selected_outcome: null, completion_reason: null }, new Map([[1, { available: true, price_meat: 1000 }], [2, { available: true, price_meat: 500 }], [3, { available: true, price_meat: 100 }]]));
     assert.match(quantityRange, /Ranging from 100 to 1.5k meat/);
     assert.match(compiled.exports.render(raffle), /Prize range unavailable\./);
+});
+
+test('concluded range uses its snapshot and never falls back to live market values', () => {
+    const prices = new Map(raffle.prizes.map(p => [p.item_id, { available: true, price_meat: 999999 }]));
+    assert.match(compiled.exports.render({ ...raffle, prize_range_min: '100', prize_range_max: '200', prize_range_frozen_at: '2026-11-05' }, prices), /Ranging from 100 to 200 meat/);
+    assert.match(compiled.exports.render(raffle, prices), /Prize range unavailable/);
 });

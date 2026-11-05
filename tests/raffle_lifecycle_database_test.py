@@ -96,6 +96,7 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
             return call('select public.create_bundle_auction('+lit(json.dumps(parts if items is None else items))+f",100,24,{buyout},{str(escrow).lower()});")
         # All migrations are loaded, including the current real delivery/solvency code.
         sql(f"insert into khub_bot.administrators(user_id,note) values('{seller}','isolated raffle test');")
+        call("select public.add_high_rollers_member('48889602')")
         mid=100000
         def create_raffle():
             rid=str(uuid4())
@@ -487,8 +488,51 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
         assert physical['items']['2']==13
         assert physical['meat']==int(liabilities()['meat'])
         assert sql('select enabled from khub_bot.raffle_gate')=='t'
+        call("select public.remove_high_rollers_member('48889602')")
         assert call('select public.can_view_raffles()',uid=buyer)=='f'
         sql(f"update public.profiles set kol_player_name='nISemonO' where id='{buyer}'")
+        assert call('select public.can_view_raffles()',uid=buyer)=='f'
+        rejected=mail(create_raffle(),meat=100)
+        assert ingest(rejected)=='raffle_refund'
+        assert ingest(rejected)=='duplicate'
+        call("select public.add_high_rollers_member('nIsEmOnO')")
+        call("select public.add_high_rollers_member('48889602')")
+        club=json.loads(call("select public.read_high_rollers_members('NISE',0)"))
+        assert club['total']==1 and club['members'][0]['player_id']=='48889602'
+        assert len(json.loads(call("select public.read_high_rollers_members('889602',0)"))['members'])==1
+        assert json.loads(call("select public.read_high_rollers_members('missing',0)"))['members']==[]
+        call("select public.add_high_rollers_member('not registered')",error='registered kHub')
+        for query in ["select public.add_high_rollers_member('48889603')", "select public.remove_high_rollers_member('48889602')", "select public.read_high_rollers_members('',0)"]:
+            call(query,uid=buyer,error='Administrator required')
+        assert call('select public.khub_is_administrator()',uid=buyer)=='f'
+        call("select public.create_mystery_raffle(null,null,null,null,null)",uid=buyer,error='Administrator required')
+        assert call('select public.can_view_raffles()',uid=seller)=='t'
+        assert sql("set role anon;select public.can_view_raffles()")=='f'
+        sql('set role authenticated;select * from khub_bot.high_rollers_members',uid=buyer,error='permission denied')
+        assert sql(f"select count(*) from khub_bot.raffle_purchases where receipt_id='{rejected['id']}'")=='0'
+        assert sql(f"select sum(meat) from khub_bot.deliveries where receipt_id='{rejected['id']}' and kind='refund'")=='100'
+        # Membership follows numeric identity when the verified display name changes.
+        sql(f"update public.profiles set kol_player_name='Club renamed player' where id='{buyer}'")
+        assert call('select public.can_view_raffles()',uid=buyer)=='t'
+        assert json.loads(call("select public.read_high_rollers_members('RENAMED',0)"))['members'][0]['player_id']=='48889602'
+        assert json.loads(call("select public.read_high_rollers_members('nisemono',0)"))['members']==[]
+        for query in ["select public.activate_mystery_raffle(null)", "select public.cancel_mystery_raffle(null)", "select public.read_raffle_management(null)"]:
+            call(query,uid=buyer,error='Administrator required')
+        assert call('select count(*) from public.mystery_raffle_prizes',uid=other)=='0'
+        for signature in ['public.read_high_rollers_members(text,integer)','public.add_high_rollers_member(text)','public.remove_high_rollers_member(text)']:
+            assert sql(f"select has_function_privilege('anon','{signature}','execute')")=='f'
+        # Removing a member blocks both tables and refunds every attachment exactly.
+        check_raffle=create_raffle()
+        call("select public.remove_high_rollers_member('48889602')")
+        assert call('select count(*) from public.mystery_raffles',uid=buyer)=='0'
+        assert call('select count(*) from public.mystery_raffle_prizes',uid=buyer)=='0'
+        removed_mail=mail(check_raffle,meat=200,items=[dict(id=2,quantity=3)])
+        assert ingest(removed_mail)=='raffle_refund'
+        assert ingest(removed_mail)=='duplicate'
+        assert sql(f"select sum(meat) from khub_bot.deliveries where receipt_id='{removed_mail['id']}' and kind='refund'")=='200'
+        assert sql(f"select sum(quantity) from khub_bot.deliveries where receipt_id='{removed_mail['id']}' and item_id=2")=='3'
+        call("select public.add_high_rollers_member('48889602')")
+        print('PASS: club membership, username/ID search, removed tester access, restricted management and exact nonmember refunds')
         assert call('select public.can_view_raffles()',uid=buyer)=='t'
         assert int(call('select count(*) from public.mystery_raffles',uid=buyer))>0
         assert call('select count(*) from public.mystery_raffles',uid=other)=='0'
@@ -553,6 +597,14 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
         assert analytics['revenue']==sql('select coalesce(sum(meat),0)::text from khub_bot.raffle_purchases')
         assert analytics['tickets']==sql('select coalesce(sum(last_ticket-first_ticket+1),0)::text from khub_bot.raffle_purchases')
         assert analytics['participants']==int(sql('select count(distinct player_id) from khub_bot.raffle_purchases'))
+        for person in analytics['people']:
+            assert person['revenue']==sql(f"select sum(meat)::text from khub_bot.raffle_purchases where player_id={person['player_id']}")
+        for current in analytics['current']:
+            expected=json.loads(call(f"select public.read_admin_raffle_participants('{current['id']}')"))
+            actual=[{k:v for k,v in row.items() if k!='sort_tickets'} for row in current['participants_page']]
+            assert actual==expected
+            assert len(actual)<=50
+
         assert len(json.loads(call(f"select public.read_admin_raffle_participants('{canceled}')")))==1
         # Snapshot only the selected outcome, freeze quantity and price, never reprice it.
         valued=create_raffle()
@@ -564,6 +616,23 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
         assert sql(f"select price_meat from khub_bot.raffle_market_prices where raffle_id='{valued}'")=='123'
         assert json.loads(call('select public.read_admin_raffle_analytics()'))['unavailable']>=0
         print('PASS: admin-only raffle analytics, exact purchase totals and immutable selected-prize snapshot')
+        # A reversible classification excludes tests from every analytics aggregate.
+        before_test=json.loads(call('select public.read_admin_raffle_analytics()'))
+        financial_before=sql("select jsonb_build_object('receipts',(select count(*) from khub_bot.receipts),'purchases',(select jsonb_agg(to_jsonb(p) order by receipt_id) from khub_bot.raffle_purchases p),'accounts',(select jsonb_agg(to_jsonb(a) order by raffle_id) from khub_bot.raffle_accounts a),'deliveries',(select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d))")
+        sql("update public.mystery_raffles set is_test=true")
+        hidden=json.loads(call('select public.read_admin_raffle_analytics()'))
+        for key in ['revenue','tickets','refundable_revenue']: assert hidden[key]=='0'
+        assert hidden['participants']==0 and hidden['unavailable']==0
+        for key in ['people','current','past']: assert hidden[key]==[]
+        for key in ['profit','prize_value']: assert hidden[key] is None
+        assert json.loads(call(f"select public.read_admin_raffle_participants('{canceled}')"))
+        financial_after=sql("select jsonb_build_object('receipts',(select count(*) from khub_bot.receipts),'purchases',(select jsonb_agg(to_jsonb(p) order by receipt_id) from khub_bot.raffle_purchases p),'accounts',(select jsonb_agg(to_jsonb(a) order by raffle_id) from khub_bot.raffle_accounts a),'deliveries',(select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d))")
+        assert financial_after==financial_before
+        sql("update public.mystery_raffles set is_test=false")
+        assert json.loads(call('select public.read_admin_raffle_analytics()'))==before_test
+        assert sql("select has_column_privilege('authenticated','public.mystery_raffles','is_test','UPDATE')")=='f'
+        print('PASS: test flag excludes all analytics, preserves financial records, and reverses cleanly')
+
         # Ordinary failed intake reserves exact assets, survives restart, and
         # atomically hands protection to normal receipt/raffle obligations.
         isolated_raffle=create_raffle()

@@ -12,7 +12,7 @@ test('invalid prices, dates, pools and quantities fail closed', () => {
     for (const patch of [{ name: ' ' }, { ticketPrice: 'Infinity' }, { endsAt: 'invalid' }, { endsAt: new Date(now).toISOString() }, { prizes: [] }, { prizes: [{ id: 1, quantity: 1 }, { id: 1, quantity: 2 }] }, { prizes: [{ id: 1, quantity: '2.5' }] }]) assert.throws(() => validateRaffle({ ...valid(), ...patch }, now));
 });
 test('countdown never implies tickets are active', () => {
-    assert.equal(raffleCountdown(valid().endsAt, now), '7d 0h 0m remaining');
+    assert.equal(raffleCountdown(valid().endsAt, now), '7d 0h 0m 0s remaining');
     assert.match(raffleCountdown(new Date(now - 1).toISOString(), now), /participation unavailable/);
 });
 
@@ -105,4 +105,12 @@ test('pinned raffle respects explicit browse search and filters independently of
     assert.equal(matchesRaffleBrowse(raffle, { query: 'unmatched' }), false);
     for (const filter of [{ status: 'completed' }, { status: 'ended' }, { kind: 'buy' }, { trade: 'direct' }, { trade: 'none' }, { buyout: 'with' }, { bundle: 'with' }, { ownershipFiltered: true }, { minPrice: 1000001 }, { maxPrice: 999999 }]) assert.equal(matchesRaffleBrowse(raffle, filter), false);
     assert.equal(matchesRaffleBrowse(raffle, { status: 'all', kind: 'sell', trade: 'escrow', bundle: 'without', buyout: 'without', minPrice: 1000000, maxPrice: 1000000 }), true);
+});
+
+test('countdown visibly advances each second across minute boundaries', () => {
+    const end = new Date(now + 61000).toISOString();
+    assert.equal(raffleCountdown(end, now), '0h 1m 1s remaining');
+    assert.equal(raffleCountdown(end, now + 1000), '0h 1m 0s remaining');
+    assert.equal(raffleCountdown(end, now + 2000), '59s remaining');
+    assert.equal(raffleCountdown(end, now + 61000), 'Closed · participation unavailable');
 });

@@ -108,7 +108,6 @@ export default function AdminAnalytics() {
                     <h2 className="text-sm font-medium text-gray-700">Meat stack mania:</h2>
                     <p className="text-2xl font-semibold tabular-nums tracking-tight text-gray-900">{result.giveaways ? `${format(result.giveaways.meat_stack_mania)} Meat` : 'Unavailable'}</p>
                 </div>
-                <p className="mt-2 text-xs text-gray-500">All completed dense-meat-stack-only auctions hosted by teres minor · 1,000 Meat per stack.</p>
             </div> : <>
             <p className="mb-3 text-xs text-gray-500">Last month is the rolling month ending now. Meat totals count escrow fees and donations recorded in the income ledger.</p>
             <div className="grid gap-3 sm:grid-cols-3">

@@ -26,8 +26,8 @@ export default function Raffles() {
         if (id && viewerId) supabase.rpc('read_my_raffle_tickets', { p_id: id }).then(({ data, error }) => { if (active && !error) setTickets({ ...data, owner: viewerId, raffleId: id }); }).catch(() => {});
         async function load() {
             try {
-                let query = supabase.from('mystery_raffles').select('id,creator_id,raffle_number,name,ticket_price,ends_at,state,completion_reason,created_at,winner_player_id,selected_outcome,prizes:mystery_raffle_prizes(outcome,item_id,name,image,quantity,probability_bps)');
-                query = id ? query.eq('id', id) : query.order('created_at', { ascending: false }).limit(20);
+                let query = supabase.from('mystery_raffles').select('id,creator_id,prize_range_min,prize_range_max,prize_range_frozen_at,raffle_number,name,ticket_price,ends_at,state,completion_reason,created_at,winner_player_id,selected_outcome,prizes:mystery_raffle_prizes(outcome,item_id,name,image,quantity,probability_bps)');
+                query = id ? query.eq('id', id) : query.eq('is_test', false).order('created_at', { ascending: false }).limit(20);
                 const { data, error } = await query;
                 if (error) throw error;
                 if (active) setResult({ key: id ?? 'list', rows: data.map(r => ({ ...r, prizes: r.prizes.sort((a, b) => a.outcome - b.outcome) })) });
@@ -41,7 +41,7 @@ export default function Raffles() {
         return () => { active = false; };
     }, [id, currentUser, viewerId, raffleAccess, revision]);
     // Local display clock only; no polling or auction subscriptions.
-    useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(timer); }, []);
+    useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
     if (!canViewRaffles(currentUser)) return <main className="raffle-page"><p>Page unavailable.</p></main>;
     return <main className="raffle-page"><h1 className="mb-4 text-2xl font-bold">Mystery Raffles</h1>{result.key !== (id ?? 'list') ? <p role="status">Loading raffles…</p> : result.error && !result.rows ? <p role="alert">{result.error}</p> : <div className="raffle-list">{result.error && <p role="alert">{result.error}</p>}{!result.rows.length && <p>No raffles found.</p>}{result.rows.map(raffle => <div key={raffle.id}>{!id && <Link className="mb-2 inline-block" to={`/raffle/${raffle.id}`}>View raffle ↗</Link>}<RaffleShowcase raffle={raffle} now={now} />{raffle.completion_reason === 'cancelled' && <p>Raffle canceled. Ticket refunds are tracked in your purchase history.</p>}{raffle.completion_reason === 'no_tickets' && <p>Closed without valid tickets. Deposits are being returned.</p>}{!currentUser?.isAdmin && raffle.creator_id !== currentUser?.id && ['preview', 'active'].includes(raffle.state) && <section className="raffle-summary mt-4" aria-label="How to buy raffle tickets">
                     <div className="raffle-ticket-heading"><h2>Buy Raffle Tickets</h2>{currentUser?.id && <span className="raffle-user-ticket-count">Your tickets <strong>{tickets?.owner === currentUser.id && tickets?.raffleId === raffle.id ? BigInt(tickets.ticket_count).toLocaleString('en-US') : counts?.owner === currentUser.id ? BigInt(counts.data?.[raffle.id] ?? '0').toLocaleString('en-US') : '…'}</strong></span>}</div>

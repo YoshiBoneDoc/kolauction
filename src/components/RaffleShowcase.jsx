@@ -29,10 +29,14 @@ export function RafflePrizeDisplay({ raffle, marketPrices = new Map(), winnerRes
         return left === right ? a.outcome - b.outcome : left === null ? 1 : right === null ? -1 : left > right ? -1 : 1;
     });
     const values = pool.map(value);
-    const range = values.length && values.every(v => v !== null) ? {
+    const liveRange = values.length && values.every(v => v !== null) ? {
         min: values.reduce((a, b) => a < b ? a : b),
         max: values.reduce((a, b) => a > b ? a : b),
     } : null;
+    const frozen = raffle.prize_range_frozen_at || selected || concluded || canceled || empty;
+    const range = frozen ? (raffle.prize_range_min != null && raffle.prize_range_max != null ? {
+        min: BigInt(raffle.prize_range_min), max: BigInt(raffle.prize_range_max),
+    } : null) : liveRange;
     const prizeArea = useRef(null);
     const [areaSize, setAreaSize] = useState({ width: 500, height: 326 });
     useEffect(() => {

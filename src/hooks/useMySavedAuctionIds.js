@@ -40,5 +40,5 @@ export default function useMySavedAuctionIds() {
         void refresh();
         return () => { active = false; };
     }, [userId]);
-    return bookmarkCountOverlay.savedIds(userId, state?.userId === userId ? state.ids : []);
+    return bookmarkCountOverlay.savedIds(userId, userId && state?.userId === userId ? state.ids : []);
 }

@@ -75,7 +75,7 @@ export function raffleCountdown(endsAt, now) {
     if (!seconds) return 'Closed · participation unavailable';
     if (seconds < 60) return `${seconds}s remaining`;
     const days = Math.floor(seconds / 86400);
-    return `${days ? `${days}d ` : ''}${Math.floor(seconds / 3600) % 24}h ${Math.floor(seconds / 60) % 60}m remaining`;
+    return `${days ? `${days}d ` : ''}${Math.floor(seconds / 3600) % 24}h ${Math.floor(seconds / 60) % 60}m ${seconds % 60}s remaining`;
 }
 
 // Raffles have no ordinary auction status, buyout, bundle or ownership projection.

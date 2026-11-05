@@ -16,7 +16,7 @@ export default function useHomeRaffles(includePrizeNames = false) {
         if (!supabase || !canViewRaffles(currentUser)) return;
         // One bounded public read on Home mount. No polling, financial RPC or cache invalidation.
         supabase.from('mystery_raffles').select(`id,raffle_number,name,ticket_price,ends_at,created_at${includePrizeNames ? ',prizes:mystery_raffle_prizes(name)' : ''}`)
-            .in('state', ['preview', 'active']).gt('ends_at', new Date(auctionNow()).toISOString())
+            .eq('is_test', false).in('state', ['preview', 'active']).gt('ends_at', new Date(auctionNow()).toISOString())
             .order('created_at', { ascending: false }).limit(20)
             .then(({ data, error }) => { if (active && !error) setRaffles(data || []); })
             .catch(() => {});

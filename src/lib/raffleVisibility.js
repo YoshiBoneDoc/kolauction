@@ -1,5 +1,4 @@
-// Temporary controlled-test visibility. Remove with the matching SQL policies.
+// Access is loaded from the server; names and player IDs never grant access locally.
 export function canViewRaffles(user) {
-    return !!user && (String(user.kolPlayerId) === '3552305'
-        || ['anrath1', 'nisemono'].includes((user.kolPlayerName || '').toLowerCase()));
+    return !!user && !user.isBanned && user.canViewRaffles === true;
 }
