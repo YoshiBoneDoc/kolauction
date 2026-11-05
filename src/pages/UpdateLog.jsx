@@ -9,6 +9,8 @@ export default function UpdateLog() {
         <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-4 py-8 sm:px-6">
             <h1 className="text-3xl font-bold text-blue-700">Update Log</h1>
             <ul className="list-disc space-y-4 pl-5 text-gray-700">
+                <li>Hosts can still bookmark their own auctions, but their bookmarks no longer count toward the publicly displayed total.</li>
+                <li>Quotation marks in item names should now display correctly.</li>
                 <li>Added automatic relisting for unsold escrow auctions, with customizable relist limits and optional starting price reductions for each attempt.</li>
                 <li>Free escrow trades and <Link to="/info#escrow-fees-title" aria-label="Read about reduced escrow commissions for November" className="text-blue-700 underline">reduced commissions</Link> for November.</li>
                 <li>Added the ability to <Link to="/profile#profile-tab-saved" className="text-blue-700 underline">bookmark auctions</Link> and optionally receive KMail reminders before they end (can be done on your account profile page).</li>
