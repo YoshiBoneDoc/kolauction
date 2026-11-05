@@ -3,6 +3,7 @@ import { lazy, Suspense, useContext } from "react";
 import { AuctionsContext } from "./context/AuctionsContext";
 import { Routes, Route, useLocation } from "react-router-dom";
 import AuctionNavigation from "./components/AuctionNavigation";
+const RaffleCommitment = lazy(() => import('./pages/RaffleCommitment'));
 const Raffles = lazy(() => import("./pages/Raffles"));
 const Leaderboards = lazy(() => import("./pages/Leaderboards"));
 const Home = lazy(() => import("./pages/Home"));
@@ -55,6 +56,7 @@ const App = () => {
             <SiteActivity><Suspense fallback={<RouteLoading />}><Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/raffles" element={<Raffles />} />
+                <Route path="/raffle/:id/commitment" element={<RaffleCommitment />} />
                 <Route path="/raffle/:id" element={<Raffles />} />
                 <Route path="/leaderboards" element={<Leaderboards />} />
                 <Route path="/submit-appeal" element={<SubmitAppeal />} />

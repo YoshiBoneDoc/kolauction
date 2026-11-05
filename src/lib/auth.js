@@ -84,6 +84,7 @@ export function createAuthService(client, { origin } = {}) {
             ]);
             return { id: data.id, khubUsername: data.khub_username, email: data.account_method === 'kmail' ? null : user.email,
                 kolPlayerId: data.kol_player_id ?? null, kolPlayerName: data.kol_player_name ?? null,
+                isHighRollersMember: data.is_high_rollers_member === true,
                 canViewRaffles: !raffleAccess.error && raffleAccess.data === true,
                 accountMethod: data.account_method, isAdmin: admin.data === true, isBanned: data.is_banned, banExpiresAt: data.ban_expires_at || null,
                 serverOffset: Date.parse(data.server_now) - Date.now() };

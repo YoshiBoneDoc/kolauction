@@ -1,4 +1,4 @@
-// Independent verifier: no kHub API, session, private receipt data, or relay trust required.
+// Independent verifier.
 import { fetchBeacon } from 'drand-client';
 export const METHOD = 'khub-drand-quicknet-sha256-v1';
 export const CHAIN = Object.freeze({

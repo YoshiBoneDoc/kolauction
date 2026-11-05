@@ -745,6 +745,11 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
         assert json.loads(account_value(fair,'draw_result'))['method']=='khub-drand-quicknet-sha256-v1'
         sql(f"select public.bot_commit_raffle_draw('{fair}','{{}}')")
         proof=json.loads(call(f"select public.read_raffle_fairness_proof('{fair}')",uid=buyer))
+        public_record=json.loads(sql(f"set role anon;select public.read_public_raffle_commitment('{fair}')"))
+        assert set(public_record)=={'raffleId','method','commitmentHash','committedAt','round','chainHash','beaconAvailableAt'}
+        assert public_record['commitmentHash']==commitment
+        assert public_record['round']==42
+
         assert set(proof)=={'method','raffleId','committedAt','round','manifest','commitmentHash','beacon','result','displayedWinningTicket','prizes'}
         assert 'purchases' not in json.dumps(proof) and 'playerId' not in json.dumps(proof) and 'receiptId' not in json.dumps(proof)
         verification="import{readFileSync}from'node:fs';import{verifyRaffleProof}from'./src/lib/raffleProof.js';console.log(JSON.stringify(await verifyRaffleProof(JSON.parse(readFileSync(0,'utf8')))));"
@@ -772,6 +777,9 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
         assert sql(f"select state from public.mystery_raffles where id='{fair}'")=='settled'
         assert account_value(fair,'held_meat')=='0'
         assert json.loads(call(f"select public.read_raffle_fairness_proof('{fair}')",uid=buyer))==proof
+        assert json.loads(sql(f"set role anon;select public.read_public_raffle_commitment('{fair}')"))==public_record
+        assert sql(f"set role anon;select public.read_public_raffle_commitment('{forged}')")==''
+
         print('PASS: immutable pre-beacon commitment, restart, permissions, deterministic SQL/Node/browser verification of winner and prize, no private-ledger disclosure')
         # More than five pending rounds cannot starve later raffles.
         queued=[create_raffle(fair=True) for _ in range(6)]
@@ -791,6 +799,20 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
                     assert previous==entry['fairness']
         assert seen==set(queued)
         print('PASS: pending beacon rounds rotate without starving later raffles or changing commitments')
+        assert json.loads(call('select public.read_my_account_access()',uid=buyer))['is_high_rollers_member']
+        assert not json.loads(call('select public.read_my_account_access()',uid=seller))['is_high_rollers_member']
+        history=json.loads(call('select public.read_my_raffle_history()',uid=buyer))
+        assert len(history)<=50 and history
+        for row in history:
+            assert row['tickets']==sql(f"select sum(last_ticket-first_ticket+1)::text from khub_bot.raffle_purchases where raffle_id='{row['id']}' and player_id=48889602")
+            assert row['ticket_price']==sql(f"select ticket_price from public.mystery_raffles where id='{row['id']}'")
+            assert not {'player_id','receipt_id','revenue','ticket_count'} & row.keys()
+        for viewer in [other,seller]:
+            call('select public.read_my_raffle_history()',uid=viewer,error='Accepted club membership required')
+        assert sql("select has_function_privilege('anon','public.read_my_raffle_history(integer)','execute')")=='f'
+        call("select public.remove_high_rollers_member('48889602')")
+        call('select public.read_my_raffle_history()',uid=buyer,error='Accepted club membership required')
+        print('PASS: self-only bounded raffle history, exact personal ticket totals, accepted-member gating and revoked access')
         print('PASS: full-schema lifecycle and isolation: identical items, concurrent auction/raffle Meat, exact solvency, proof guards, retries, restarts, cancellation and schema permissions')
     finally:
         if started: pg('-m','immediate','-w','stop')

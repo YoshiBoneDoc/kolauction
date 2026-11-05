@@ -91,6 +91,20 @@ npm install --save-exact drand-client@1.4.2
 node raffle-fairness-verifier.mjs proof.json [previously-saved-commitment-hash]
 ```
 
+Migration 224 adds an anonymous, UUID-addressed commitment metadata read and a
+permanent `/raffle/:id/commitment` page. Its record includes only the raffle UUID,
+method, commitment hash, database timestamp, chain hash, round and scheduled beacon
+time. It contains no manifest, ticket total, player data or result. It reads the
+same immutable stored record before and after settlement; it does not reconstruct
+or independently timestamp a record after the fact.
+
+The raffle details page automatically refreshes its count-free summary while the
+draw is pending (five seconds after closing; up to one minute before closing).
+Hidden pages pause and completed draws stop refreshing. The commitment hash and
+recorded timestamp remain visible after the draw, with copy and public-record links.
+The round remains the originally scheduled round at least two minutes after the
+recorded commitment. No new infrastructure or replacement rounds are introduced.
+
 The summary offers a copyable commitment before drawing. Observing/saving it before
 the specified beacon is released is important: an after-the-fact proof alone cannot
 prove the operator published that commitment beforehand. The database timestamp
