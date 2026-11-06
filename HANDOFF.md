@@ -1,6 +1,6 @@
 # kHub handoff
 
-Updated November 5, 2026, through implemented migration 231. Read this first, then
+Updated November 6, 2026, through implemented migration 235. Read this first, then
 inspect relevant code: documentation and the roadmap can lag implementation.
 Repository state does not establish what is deployed. The live bot handles real
 players' Meat and items.
@@ -64,6 +64,46 @@ players' Meat and items.
   “last 24 hours” interpretation. Capture two complete exports about 24 hours apart;
   resets, eviction and missing baselines are flagged rather than guessed.
   See [231 rollout, measurement and profiling](docs/SCOPED_READS_AND_QUERY_STATS.md:1).
+
+## November 6 follow-up
+
+- Recomputed the four giveaway exports: clean 69-minute interval, no resets,
+  eviction or missing baselines. Aggregate RPC time is not an internal plan.
+- Cache Home now uses existing 231 card projection; bookmark indicators use new
+  private ID-only SQL 232 with authorization-scoped memory reuse. Route-shell error
+  subscription is isolated. No bot runtime or financial behavior changed.
+- Apply queued 232 once before website rollout; cache Worker requires 231 and
+  can deploy independently. Matching SQL copy is in ignored bot migrations; no
+  bot restart required. No deployment/production SQL was performed.
+- Four disposable PostgreSQL suites passed; 101 focused Node tests passed;
+  changed-source lint/build passed (existing warning). Full suite was not rerun.
+- **233:** installed-definition exports confirmed repeated browse seller checks.
+  Queued SQL now reuses restriction results per distinct candidate seller within
+  one authorized statement. Public/private payload parity and financial fingerprints
+  passed locally; 1,000 shared-seller listing fixture: 163–177 ms before, 63–65 ms
+  after. Apply once after verified 232; matching ignored bot SQL is identical.
+  This SQL alone requires no runtime deployment or bot restart. Actual production
+  distributions and remaining internal costs still need measurement.
+- **234:** one queued follow-up for statement-local history permission flags,
+  set-based scoped gift selection and no-envelope gift-claim return. Actual claims
+  keep fresh liability checks and all financial locks. Website coalesces explicit
+  refreshes during pending reads, avoids immediate focus duplicates after slow
+  reads, and lazily loads invitation UI. Owner reports 233 applied; don't rerun it.
+  Apply 234 once, then website. No new cache or bot runtime deployment for 234.
+- Latest validation on Node 24: 451 bot tests passed; website 528 passed/21 failed,
+  exactly the same failing names as HEAD baseline (524/21). Four relevant disposable
+  PostgreSQL suites, changed-source lint, Cloudflare build and secret scan passed.
+  Existing lint/build warnings remain. Fixture savings are not production claims.
+- **Full chat review / 235:** found 233's correlated seller-pool rescan cost on
+  diverse-seller fixtures; queued 235 replaces it with a join. With analyzed fixture
+  stats, scans fell 1,000 to 1 (162 to 125 ms), with full response parity. Apply
+  after 234 once; no runtime deployment/restart. No applied SQL was edited.
+  Extended tests confirm no-envelope claims still take the financial lock/reject
+  existing opening attempts and scoped reads retain isolated/reviewed evidence.
+  All six relevant disposable database suites and 451 bot tests passed; no local
+  financial regression found. Website failures retain the same HEAD-baseline names.
+- See [evidence, unresolved profiling and exact rollout](docs/NOVEMBER_6_PERFORMANCE.md:1).
+  Legacy detail provenance and internal detail/browse/intake costs remain unresolved.
 
 ## Latest verification and next steps
 

@@ -1,6 +1,6 @@
 -- Controlled read-only session. Supply actual representative viewer_id and
 -- auction_id with psql -v; do not use these plans to infer a past incident.
--- Requires migration 231. No financial mutation or gift-opening RPC is called.
+-- Requires migration 232. No financial mutation or gift-opening RPC is called.
 \set ON_ERROR_STOP on
 begin read only;
 set local statement_timeout='5s';
@@ -11,6 +11,11 @@ explain (analyze, buffers, format json) select public.read_home_auctions();
 explain (analyze, buffers, format json) select public.read_home_cards();
 explain (analyze, buffers, format json) select public.read_auction_card_context(array[:'auction_id'::uuid]);
 explain (analyze, buffers, format json) select public.read_auction_viewer_context(p_id=>:'auction_id'::uuid);
+explain (analyze, buffers, format json) select public.read_auction_detail_context(p_id=>:'auction_id'::uuid);
+explain (analyze, buffers, format json) select public.read_auction_detail_static(p_id=>:'auction_id'::uuid);
+explain (analyze, buffers, format json) select public.read_auction_bid_history(:'auction_id'::uuid);
+explain (analyze, buffers, format json) select public.read_saved_auctions();
+explain (analyze, buffers, format json) select public.read_saved_auction_ids();
 rollback;
 -- These are RPC-envelope timings. Inner SQL/row-loop costs require extracting
 -- the installed read body or controlled nested auto_explain with appropriate

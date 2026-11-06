@@ -138,7 +138,7 @@ export function originRequest(request) {
     if (request.view === 'featured') return { rpc: 'read_featured_giveaway', args: {} };
     if (request.view.startsWith('detail-')) return { rpc: 'read_public_auction_detail_state', args: { p_id: request.id } };
     if (request.view === 'banner') return { rpc: 'read_site_banner', args: {} };
-    return request.view === 'home' ? { rpc: 'read_public_home_auctions', args: {} } : {
+    return request.view === 'home' ? { rpc: 'read_home_cards', args: {} } : {
         rpc: 'read_public_auction_page', args: { p_view: request.view, p_id: request.id || null,
             p_search: request.search, p_status: request.status, p_sort: request.sort, p_page: request.page,
             ...(request.buyout && request.buyout !== 'any' || request.bundle && request.bundle !== 'any' ? { p_buyout: request.buyout || 'any' } : {}),

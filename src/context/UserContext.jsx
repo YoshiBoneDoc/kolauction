@@ -158,6 +158,7 @@ export const UserProvider = ({ children }) => {
         <UserContext.Provider value={{
             currentUser: currentUser?.id === session?.user?.id && !currentUser?.isBanned ? currentUser : null,
             restrictedAccount,
+            authorizationScope: session?.access_token || null,
             signedInUserId: session?.user?.id || null,
             registerUser: auth.register,
             loginUser,

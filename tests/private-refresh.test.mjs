@@ -63,3 +63,27 @@ test('explicit account refresh events share focus dedupe, visibility gating and 
     clock=60000;document.hidden=false;window.dispatchEvent(new Event('account-change'));await tick();assert.equal(calls,2);
     stop();window.dispatchEvent(new Event('account-change'));assert.equal(jobs.size,0);
 });
+
+test('focus after a slow successful read observes the cooldown from completion', async () => {
+    let finish;
+    const f = fixture({ refresh: () => new Promise(resolve => { finish = resolve; }) });
+    const reading = f.tick(); f.advance(30000); finish(true); await reading;
+    f.window.dispatchEvent(new Event('focus'));
+    assert.equal([...f.jobs.values()][0].at, 35000);
+    assert.equal(f.calls(), 1); f.stop();
+});
+
+test('explicit actions during an account read coalesce into one follow-up read', async () => {
+    let clock=0,finish,calls=0;
+    const jobs=new Map(),document=new EventTarget(),window=new EventTarget(); document.hidden=false;
+    const timers={setTimeout(fn,ms){jobs.set(1,{fn,at:clock+ms});return 1;},clearTimeout(){jobs.clear();}};
+    const reasons=[];
+    const stop=startPrivateRefresh({refresh:reason=>{reasons.push(reason);calls++;return calls===1?new Promise(resolve=>{finish=resolve;}):true;},document,window,timers,now:()=>clock,random:()=>0,refreshEvent:'account-change'});
+    const first=jobs.get(1).fn();
+    for(let i=0;i<10;i++)window.dispatchEvent(new Event('account-change'));
+    clock=30000;finish(true);await first;
+    assert.equal(jobs.get(1).at,35000);
+    const next=jobs.get(1);clock=next.at;await next.fn();
+    assert.deepEqual(reasons,['initial','event']); assert.equal(calls,2);
+    assert.equal(jobs.get(1).at,95000); stop();
+});

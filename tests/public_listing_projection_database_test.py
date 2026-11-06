@@ -59,7 +59,19 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
                 before_read_231=sql(financial_probe)
                 definition=sql("select pg_get_functiondef('public.read_auction_card_context(uuid[])'::regprocedure)")
                 sql(definition.replace('FUNCTION public.read_auction_card_context(', 'FUNCTION khub_bot.card_before_231('))
+            if migration.name.startswith('202611060233_'):
+                before_233=sql(financial_probe)
+                for schema,name in [('public','read_filtered_auction_page'),('khub_bot','public_listing_page')]:
+                    definition=sql(f"select pg_get_functiondef('{schema}.{name}(text,uuid,text,text,text,integer,text,text,numeric,numeric,text,text)'::regprocedure)")
+                    sql(definition.replace(f'FUNCTION {schema}.{name}(',f'FUNCTION khub_bot.before_233_{name}('))
+            if migration.name.startswith('202611060235_'):
+                before_235=sql(financial_probe)
+                definition=sql("select pg_get_functiondef('khub_bot.public_listing_page(text,uuid,text,text,text,integer,text,text,numeric,numeric,text,text)'::regprocedure)")
+                sql(definition.replace('FUNCTION khub_bot.public_listing_page(', 'FUNCTION khub_bot.before_235_public_listing_page('))
             sql(migration.read_text())
+            if migration.name.startswith('202611060235_'):assert before_235==sql(financial_probe)
+
+            if migration.name.startswith('202611060233_'):assert before_233==sql(financial_probe), 'Browse optimization changed financial functions'
             if migration.name=='202611030170_public_sell_listing_projection.sql':assert before_projection==sql(financial_probe), 'Projection changed financial functions'
             if migration.name.startswith('202611050231_'):assert before_read_231==sql(financial_probe), 'Read optimization changed financial functions'
 
@@ -196,6 +208,63 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
         for rpc in ['read_home_auctions','read_home_cards']:
             plan=json.loads(sql(f'explain (analyze,buffers,format json) select public.{rpc}()',owner))
             print(rpc,'local signed-in Home execution ms:',plan[0]['Execution Time'])
+        # Compare complete authorized payloads across status/filter/order branches.
+        for viewer in [None,owner,other,restricted,administrator]:
+            for status in ['active','all','ended','on_hold','cancelled','expired','completed']:
+                for sort in ['ending','recommended','activity']:
+                    for old,new in [('khub_bot.before_233_public_listing_page','khub_bot.public_listing_page'),('khub_bot.before_233_read_filtered_auction_page','public.read_filtered_auction_page')]:
+                        args=f"'browse',null,'','{status}','{sort}',1,'all','all',null,null,'any','any'"
+                        result=json.loads(sql(f"select jsonb_build_object('old',{old}({args})-'server_time','new',{new}({args})-'server_time')",viewer))
+                        assert result['old']==result['new'],(viewer,status,sort,old,result)
+        # Many listings per seller expose repeated restriction-evaluation cost.
+        sql(f"insert into public.auctions(seller_id,seller_username,item,quantity,min_bid_meat,current_bid,duration_hours,end_time,status) select '{owner}','Fixture','Browse pressure',1,100,100,24,now()+interval '1 hour','active' from generate_series(1,1000)")
+        for rpc in ['khub_bot.before_233_public_listing_page','khub_bot.public_listing_page']:
+            times=[]
+            for _ in range(5):
+                plan=json.loads(sql(f"explain(analyze,buffers,format json) select {rpc}('browse',null,'Browse pressure','active','ending',1,'all','all',null,null,'any','any')",owner))
+                times.append(plan[0]['Execution Time'])
+            print(rpc,'1000-listing shared-seller fixture ms:',times)
+        # Active candidates with a banned seller, direct-trade ignores, private
+        # authorization and selective filters must preserve complete payloads.
+        sql(f"insert into public.player_ignores(user_id,kol_player_id) values('{other}',48889801)")
+        for ban in [False,True]:
+            if ban:sql("insert into khub_bot.account_bans(kol_player_id,username,reason) values(48889801,'Traffic Seller','Local browse fixture')")
+            for viewer in [None,owner,other,restricted,administrator]:
+                for view,ident in [('browse','null'),('seller',f"'{owner}'"),('others','null')]:
+                    for status,search,trade,price,page in [('active','Browse pressure','all','null',1),('all','','direct','100',2),('ended','no matches','escrow','200',1)]:
+                        args=f"'{view}',{ident},'{search}','{status}','ending',{page},'{trade}','all',{price},null,'any','any'"
+                        for old,new in [('khub_bot.before_233_public_listing_page','khub_bot.public_listing_page'),('khub_bot.before_233_read_filtered_auction_page','public.read_filtered_auction_page')]:
+                            result=json.loads(sql(f"select jsonb_build_object('old',{old}({args})-'server_time','new',{new}({args})-'server_time')",viewer))
+                            assert result['old']==result['new'],(ban,viewer,args,old,result)
+        # Diverse sellers expose correlated scans hidden by a one-seller fixture.
+        sql("""create temporary table diverse_fixture as select n,public.bot_prepare_account_mail(
+        jsonb_build_object('id',(940000000+n)::text,'sender_id',540000000+n,'sender_name','diverse-'||n,
+        'received_at',now(),'command',jsonb_build_object('type','register'),'meat',0,'items','[]'::jsonb,
+        'raw',jsonb_build_object('id',(940000000+n)::text,'fromid',(540000000+n)::text,'fromname','diverse-'||n,'type','normal','message','REGISTER')),'Kh9!FixturePassword') job
+        from generate_series(1,1000)n;
+        insert into auth.users(id,email,encrypted_password,raw_app_meta_data)
+        select (job->>'user_id')::uuid,job->>'login_email','fixture-hash',jsonb_build_object('khub_account_job',(940000000+n)::text) from diverse_fixture;
+        select public.bot_finish_account_job((940000000+n)::text) from diverse_fixture;
+        insert into public.auctions(seller_id,seller_username,item,quantity,min_bid_meat,current_bid,duration_hours,end_time,status)
+        select (job->>'user_id')::uuid,'Fixture','Diverse pressure',1,100,100,24,now()+interval '1 hour','active' from diverse_fixture;""")
+        args="'browse',null,'Diverse pressure','active','ending',1,'all','all',null,null,'any','any'"
+        pair=json.loads(sql(f"select jsonb_build_object('old',khub_bot.before_235_public_listing_page({args})-'server_time','new',khub_bot.public_listing_page({args})-'server_time')"))
+        assert pair['old']==pair['new'],pair
+        sql("analyze public.auctions;analyze public.profiles;analyze auth.users;")
+        import re
+        loops=[]
+        for rpc in ['khub_bot.before_235_public_listing_page','khub_bot.public_listing_page']:
+            definition=sql(f"select prosrc from pg_proc where oid='{rpc}(text,uuid,text,text,text,integer,text,text,numeric,numeric,text,text)'::regprocedure")
+            params=dict(p_view="'browse'",p_id='null::uuid',p_search="'Diverse pressure'",p_status="'active'",p_sort="'ending'",p_page='1',p_trade="'all'",p_kind="'all'",p_min_price='null::numeric',p_max_price='null::numeric',p_buyout="'any'",p_bundle="'any'")
+            query=re.sub(r'\b('+'|'.join(params)+r')\b',lambda m:params[m[0]],definition)
+            plan=json.loads(sql('explain(analyze,buffers,format json) '+query))[0]
+            scans=[]
+            def visit(node):
+                if node.get('CTE Name')=='seller_restrictions':scans.append(node['Actual Loops'])
+                for child in node.get('Plans',[]):visit(child)
+            visit(plan['Plan']);loops.append(max(scans))
+            print(rpc,'1000 diverse-seller inner plan ms:',plan['Execution Time'],'seller-pool scan loops:',scans)
+        assert loops[0]>=1000 and loops[1]==1,loops
         # Complete snapshot is valid without exposing query text or literals.
         snapshot_sql=(ROOT/'scripts/query-stats-snapshot.sql').read_text()
         before=json.loads(sql(snapshot_sql));sql('select public.read_auction_card_context(array['+lit(buy)+'::uuid])',owner);after=json.loads(sql(snapshot_sql))

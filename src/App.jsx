@@ -1,5 +1,6 @@
 import RenderBoundary from './components/RenderBoundary';
-import HighRollersInvitation from './components/HighRollersInvitation';
+import { UserContext } from './context/UserContext';
+const HighRollersInvitation = lazy(() => import('./components/HighRollersInvitation'));
 import { lazy, Suspense, useContext } from "react";
 import { AuctionsContext } from "./context/AuctionsContext";
 import { Routes, Route, useLocation } from "react-router-dom";
@@ -41,19 +42,29 @@ function RouteLoading() {
     return <div role="status" className="p-6 text-center">Loading page…</div>;
 }
 
+function InvitationGate() {
+    const { currentUser } = useContext(UserContext) || {};
+    if (!currentUser || currentUser.accessVersion === 1 && !currentUser.invitationVersion) return null;
+    return <Suspense fallback={null}><HighRollersInvitation /></Suspense>;
+}
+
+function AuctionReadError() {
+    const { error, refreshAuctions } = useContext(AuctionsContext) || {};
+    return error ? <div role="alert" className="bg-red-50 p-4 text-red-700">
+        {error}{" "}<button onClick={refreshAuctions} className="underline">Retry</button>
+    </div> : null;
+}
+
 const App = () => {
     const { pathname, search } = useLocation();
-    const { error, refreshAuctions } = useContext(AuctionsContext) || {};
     if (pathname.replace(/\/+$/, '') === '/official-approval') return <RenderBoundary key={pathname}><Suspense fallback={<RouteLoading />}><OfficialApproval /></Suspense></RenderBoundary>;
     const isWallOfShame = pathname.replace(/\/+$/, '') === '/wall-of-shame';
     return (
         <div className={`flex min-h-screen flex-col ${isWallOfShame ? 'shame-background' : 'site-page-background bg-[#F9F9F9]'}`}>
             <div className="px-4 sm:px-6"><AuctionNavigation /></div>
             <SiteBanner />
-            <HighRollersInvitation />
-            {error && <div role="alert" className="bg-red-50 p-4 text-red-700">
-                {error}{" "}<button onClick={refreshAuctions} className="underline">Retry</button>
-            </div>}
+            <InvitationGate />
+            <AuctionReadError />
             <SiteActivity><RenderBoundary key={`${pathname}${search}`}><Suspense fallback={<RouteLoading />}><Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/raffles" element={<Raffles />} />

@@ -55,6 +55,9 @@ with tempfile.TemporaryDirectory(prefix='khub-detail-cache-',dir='/tmp') as fold
         financial_before=None
         for migration in migrations:
             financial_before=sql(definitions)
+            if migration.name.startswith('202611060234_'):
+                definition=sql("select pg_get_functiondef('public.read_auction_bid_history(uuid,bigint,uuid,bigint)'::regprocedure)")
+                sql(definition.replace('FUNCTION public.read_auction_bid_history(', 'FUNCTION khub_bot.history_before_234('))
             sql(migration.read_text())
             if migration.name.startswith(('202611030176_', '202611030177_', '202611050227_')):
                 assert sql(definitions)==financial_before, 'Performance migration changed financial definitions'
@@ -170,6 +173,22 @@ with tempfile.TemporaryDirectory(prefix='khub-detail-cache-',dir='/tmp') as fold
             cursor=page['next_cursor']
         assert len(seen)==expected and pages==3,(len(seen),expected,pages)
         assert json.loads(sql(f"select public.read_auction_bid_history('{uuid4()}');"))['bids']==[]
+        for viewer in [None,owner,other,restricted,administrator]:
+            for known in ['null','0']:
+                pair=json.loads(sql(f"select jsonb_build_object('old',khub_bot.history_before_234('{aid}',null,null,{known}),'new',public.read_auction_bid_history('{aid}',null,null,{known}))",viewer))
+                assert pair['old']==pair['new'],(viewer,known,pair)
+        for status in ['settling','awaiting_trade','completed']:
+            sql(f"update public.auctions set status='{status}',winner_id='{other}',seller_confirmed_at=now(),buyer_confirmed_at=now() where id='{aid}'")
+            for viewer in [None,owner,other,restricted,administrator]:
+                pair=json.loads(sql(f"select jsonb_build_object('old',khub_bot.history_before_234('{aid}'),'new',public.read_auction_bid_history('{aid}'))",viewer))
+                assert pair['old']==pair['new'],(viewer,status,pair)
+        sql(f"update public.auctions set status='active' where id='{aid}'")
+        for rpc in ['khub_bot.history_before_234','public.read_auction_bid_history']:
+            times=[]
+            for _ in range(5):
+                plan=json.loads(sql(f"explain(analyze,buffers,format json) select {rpc}('{aid}')",other))
+                times.append(plan[0]['Execution Time'])
+            print(rpc,'50-row history fixture ms:',times)
         # Ignore-list filtering must still authorize history before any rows or
         # revision metadata are returned, even to a previously cached viewer.
         sql(f"insert into public.player_ignores(user_id,kol_player_id) values('{other}',48889801);")

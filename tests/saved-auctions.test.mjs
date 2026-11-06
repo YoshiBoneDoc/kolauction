@@ -18,3 +18,18 @@ test('unavailable reads are not displayed as empty successful saved lists; error
     const service = createSavedAuctionService({ rpc: () => ({ abortSignal: async () => ({ error: { message: 'private error' } }) }) });
     await assert.rejects(service.read(), { message: 'Saved auctions unavailable.' });
 });
+
+test('ID-only consumers use the narrow private RPC and reject malformed responses', async () => {
+    const calls = [];
+    let data = ['auction'];
+    const service = createSavedAuctionService({ rpc(name) {
+        calls.push(name);
+        return { abortSignal: async () => ({ data }) };
+    } });
+    assert.deepEqual(await service.readIds(), ['auction']);
+    assert.deepEqual(calls, ['read_saved_auction_ids']);
+    for (const invalid of [null, {}, [null], Array(201).fill('id')]) {
+        data = invalid;
+        await assert.rejects(service.readIds(), { message: 'Saved auctions unavailable.' });
+    }
+});

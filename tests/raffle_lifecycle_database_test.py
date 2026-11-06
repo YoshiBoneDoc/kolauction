@@ -62,6 +62,10 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
             if migration.name.startswith('202611050229_'):
                 financial_query="select jsonb_object_agg(p.oid::regprocedure::text,pg_get_functiondef(p.oid)) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname in ('public','khub_bot') and p.prokind='f' and p.proname in ('place_bid','bot_ingest_mail','bot_tick','bot_claim_delivery','bot_ack_delivery','finish_listing','finish_buy_order','bot_liabilities');"
                 before_background_reads=sql(financial_query)
+            if migration.name.startswith('202611060234_'):
+                for name,sig in [('bot_gift_intake_state_scoped','text[]'),('bot_claim_gift_open','jsonb')]:
+                    definition=sql(f"select pg_get_functiondef('public.{name}({sig})'::regprocedure)")
+                    sql(definition.replace(f'FUNCTION public.{name}(',f'FUNCTION khub_bot.before_234_{name}('))
             sql(migration.read_text())
             if migration.name.startswith('202611050229_'):
                 assert sql(financial_query)==before_background_reads, 'Background-read migration changed financial functions'
@@ -949,6 +953,34 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
             assert sql(f"select has_function_privilege('{role}','public.bot_gift_intake_state_scoped(text[])','execute')")=='f'
         sql("select public.bot_gift_intake_state_scoped(array['bad-id'])",error='Invalid complete inbox IDs')
         print('PASS: scoped gifts omit posted history, preserve observed/unposted/unresolved state and global holds; payload bytes',json.dumps(gift_probe))
+        # Larger posted history tests selection work, not only returned bytes.
+        sql("""insert into khub_bot.incoming_gifts(mail_id,wrapper_id,envelope,payload,opened_at)
+        select (920000000+n)::text,1167,jsonb_build_object('id',(920000000+n)::text),jsonb_build_object('id',(920000000+n)::text,'fixture',repeat('x',2000)),clock_timestamp() from generate_series(1,5000)n;
+        insert into khub_bot.receipts(mail_id,sender_id,received_at,payload,result)
+        select (920000000+n)::text,48889602,clock_timestamp(),'{}'::jsonb,'fixture' from generate_series(1,5000)n;""")
+        for ids in ["array[]::text[]","array['920000001','920000002']"]:
+            pair=json.loads(sql(f"select jsonb_build_object('old',khub_bot.before_234_bot_gift_intake_state_scoped({ids}),'new',public.bot_gift_intake_state_scoped({ids}))"))
+            assert pair['old']==pair['new'],pair
+        for rpc in ['khub_bot.before_234_bot_gift_intake_state_scoped','public.bot_gift_intake_state_scoped']:
+            measurements=[]
+            for _ in range(5):
+                plan=json.loads(sql(f"explain(analyze,buffers,format json) select {rpc}(array['920000001'])"))[0]
+                measurements.append([plan['Execution Time'],plan['Plan'].get('Shared Hit Blocks')])
+            print(rpc,'5000 posted-gift fixture [ms,shared hits]:',measurements)
+        # Posted gifts outside the observed inbox still belong in scoped state
+        # when referenced by either side of an isolated attempt or open review.
+        pair=json.loads(sql("""begin;
+        insert into khub_bot.gift_open_attempts(wrapper_id,state,mail_id,before_state)
+        values(1167,'isolated','920000001','{"requested_mail_id":"920000002"}');
+        insert into khub_bot.gift_mail_reviews(mail_id,raw,evidence)
+        values('920000003','{}','Offline review coverage fixture');
+        update khub_bot.incoming_gifts set legacy_donation=true where mail_id='920000003';
+        select jsonb_build_object('old',khub_bot.before_234_bot_gift_intake_state_scoped(array[]::text[]),
+          'new',public.bot_gift_intake_state_scoped(array[]::text[]));
+        rollback;"""))
+        assert pair['old']==pair['new'],pair
+        assert {'920000001','920000002','920000003'} <= {m['id'] for m in pair['new']['mails']}
+        print('PASS: scoped state retains both isolated-attempt IDs and reviewed legacy evidence outside the observed inbox')
         print('PASS: full-schema lifecycle and isolation: identical items, concurrent auction/raffle Meat, exact solvency, proof guards, retries, restarts, cancellation and schema permissions')
     finally:
         if started: pg('-m','immediate','-w','stop')

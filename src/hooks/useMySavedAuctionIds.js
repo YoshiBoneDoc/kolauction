@@ -7,23 +7,24 @@ import { createSavedAuctionService } from '../lib/savedAuctions';
 const service = createSavedAuctionService(supabase);
 const cache = new Map();
 const pending = new Map();
-async function read(userId) {
-    const existing = cache.get(userId);
+async function read(scope) {
+    const existing = cache.get(scope);
     if (existing && Date.now() - existing.at < 5 * 60 * 1000) return existing.ids;
-    if (pending.has(userId)) return pending.get(userId);
-    const task = service.read().then(rows => {
-        const ids = new Set(rows.map(row => row.id));
-        cache.set(userId, { ids, at: Date.now() });
+    if (pending.has(scope)) return pending.get(scope);
+    const task = service.readIds().then(rows => {
+        const ids = new Set(rows);
+        cache.set(scope, { ids, at: Date.now() });
         while (cache.size > 4) cache.delete(cache.keys().next().value);
         return ids;
     });
-    pending.set(userId, task);
-    try { return await task; } finally { pending.delete(userId); }
+    pending.set(scope, task);
+    try { return await task; } finally { pending.delete(scope); }
 }
 // One private, cached list for the viewer, independent of public count snapshots.
 export default function useMySavedAuctionIds() {
-    const { currentUser } = useContext(UserContext);
+    const { currentUser, authorizationScope } = useContext(UserContext);
     const userId = currentUser?.id;
+    const scope = authorizationScope || userId;
     useSyncExternalStore(bookmarkCountOverlay.subscribe, bookmarkCountOverlay.version, bookmarkCountOverlay.version);
     const [state, setState] = useState(null);
     useEffect(() => {
@@ -33,12 +34,12 @@ export default function useMySavedAuctionIds() {
         const refresh = async () => {
             const version = ++revision;
             try {
-                const ids = await read(userId);
-                if (active && version === revision) setState({ userId, ids });
+                const ids = await read(scope);
+                if (active && version === revision) setState({ userId, scope, ids });
             } catch { /* Counts still render if private preferences are unavailable. */ }
         };
         void refresh();
         return () => { active = false; };
-    }, [userId]);
-    return bookmarkCountOverlay.savedIds(userId, userId && state?.userId === userId ? state.ids : []);
+    }, [userId, scope]);
+    return bookmarkCountOverlay.savedIds(userId, userId && state?.userId === userId && (state.scope || state.userId) === scope ? state.ids : []);
 }

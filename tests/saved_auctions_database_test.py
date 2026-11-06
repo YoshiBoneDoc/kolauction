@@ -195,6 +195,18 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
         assert retained=={'attempt':bulk_claim['id'],'started':True,'outcome':'unknown'}
         assert sql('select public.bot_claim_saved_reminder();')==''
         assert sql(financial_probe)==before_projection
+        for viewer in [owner,other,restricted]:
+            full=json.loads(sql('select public.read_saved_auctions();',viewer))['rows']
+            ids=json.loads(sql('set role authenticated;select public.read_saved_auction_ids();reset role;',viewer))
+            assert ids==[row['id'] for row in full], (viewer,ids,full)
+        sql('set role anon;select public.read_saved_auction_ids();reset role;',error='permission denied')
+        sql('select public.read_saved_auction_ids();',error='Sign in')
+        for rpc in ['read_saved_auctions','read_saved_auction_ids']:
+            times=[]
+            for _ in range(5):
+                plan=json.loads(sql(f'explain (analyze,buffers,format json) select public.{rpc}()',other))
+                times.append(plan[0]['Execution Time'])
+            print(rpc,'five local fixture execution ms:',times)
         print('PASS: saved-auction ownership, reminders, 72-hour final-outcome expiry, ongoing exclusions, detail bookmarks, archive-independent limit and unchanged financial functions.')
     finally:
         if started:pg('-m','immediate','-w','stop')

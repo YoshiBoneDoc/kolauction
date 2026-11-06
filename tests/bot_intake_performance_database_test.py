@@ -56,9 +56,32 @@ with tempfile.TemporaryDirectory(prefix='khub-intake-performance-',dir='/tmp') a
               'bot_claim_delivery','finish_listing','finish_buy_order','reserve_buy_quantity','expire_buy_reservations','bot_mail_cleanup');"""
         for migration in migrations:
             if migration.name.startswith('202610270117'):before_financial=sql(financial_definitions)
+            if migration.name.startswith('202611060234_'):
+                before_234_financial=sql(financial_definitions)
+                definition=sql("select pg_get_functiondef('public.bot_claim_gift_open(jsonb)'::regprocedure)")
+                sql(definition.replace('FUNCTION public.bot_claim_gift_open(', 'FUNCTION khub_bot.claim_before_234('))
             sql(migration.read_text())
+            if migration.name.startswith('202611060234_'):assert before_234_financial==sql(financial_definitions)
+
             if migration.name.startswith('202610270117'):assert before_financial==sql(financial_definitions)
         print('PASS: financial intake, validation, locking, dispatch, settlement and cleanup function definitions unchanged')
+        assert sql("select count(*) from khub_bot.incoming_gifts where payload is null")=='0'
+        for rpc in ['khub_bot.claim_before_234','public.bot_claim_gift_open']:
+            assert sql(f"select {rpc}('{{}}')")=='', 'No envelope must produce no claim'
+            times=[]
+            for _ in range(5):
+                plan=json.loads(sql(f"explain(analyze,buffers,format json) select {rpc}('{{}}')"))[0]
+                times.append(plan['Execution Time'])
+            print(rpc,'empty gift claim fixture ms:',times)
+        assert sql('select count(*) from khub_bot.gift_open_attempts')=='0'
+        # The no-envelope shortcut must not bypass an active opening barrier.
+        attempt=sql("insert into khub_bot.gift_open_attempts(wrapper_id,before_state) values(1167,'{}') returning id")
+        for rpc in ['khub_bot.claim_before_234','public.bot_claim_gift_open']:
+            sql(f"select {rpc}('{{}}')",error='An opening claim is active')
+        sql(f"delete from khub_bot.gift_open_attempts where id='{attempt}'")
+        print('PASS: no-envelope claim still rejects an existing opening attempt')
+
+
         catalog_path=ROOT/'src/data/items.json'
         if not catalog_path.exists(): catalog_path=ROOT/'catalog/items.json'
         catalog=json.loads(catalog_path.read_text())
@@ -270,6 +293,7 @@ with tempfile.TemporaryDirectory(prefix='khub-intake-performance-',dir='/tmp') a
         else:raise AssertionError('Lock holder not acquired')
         assert set(json.loads(sql("begin read only;set local statement_timeout='500ms';set local role service_role;select public.bot_handled_mail("+lit(json.dumps([fund,fill]))+');commit;')))=={fund['id'],fill['id']}
         sql("set statement_timeout='200ms';select public.bot_ingest_mail("+lit(json.dumps(fund))+');',error='statement timeout')
+        sql("set statement_timeout='200ms';set role service_role;select public.bot_claim_gift_open('{}');",error='statement timeout')
         holder.communicate(timeout=10);assert holder.returncode==0
         print('PASS: batch read does not acquire the financial advisory lock; financial operations still do')
 

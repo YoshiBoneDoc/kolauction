@@ -9,11 +9,11 @@ const { outputFiles } = buildSync({
     bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external',
     external: ['../context/UserContext', '../lib/supabase'],
 });
-let user = null, savedState = null;
+let user = null, savedState = null, authorizationScope;
 const compiled = { exports: {} };
 new Function('require', 'module', 'exports', outputFiles[0].text)(name => {
     if (name === 'react') return {
-        useContext: () => ({ currentUser: user }),
+        useContext: () => ({ currentUser: user, authorizationScope }),
         useState: () => [savedState, () => {}],
         useEffect: () => {},
         useSyncExternalStore: () => {},
@@ -36,4 +36,14 @@ test('saved IDs remain scoped to the current viewer, including logout', () => {
     assert.deepEqual([...read()], []);
     user = null;
     assert.deepEqual([...read()], []);
+});
+
+test('token scope changes hide saved IDs until the new authorization read completes', () => {
+    user = { id: 'owner' };
+    authorizationScope = 'new-token';
+    savedState = { userId: 'owner', scope: 'old-token', ids: new Set(['private']) };
+    assert.deepEqual([...read()], []);
+    savedState.scope = 'new-token';
+    assert.deepEqual([...read()], ['private']);
+    authorizationScope = undefined;
 });

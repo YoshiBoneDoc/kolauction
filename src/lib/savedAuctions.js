@@ -14,6 +14,12 @@ export function createSavedAuctionService(client, getTimeZone = () => Intl.DateT
     }
     return {
         readState,
+        async readIds(signal) {
+            if (!client) throw new Error('Saved auctions unavailable.');
+            const { data, error } = await client.rpc('read_saved_auction_ids').abortSignal(signal);
+            if (error || !Array.isArray(data) || data.length > 200 || data.some(id => typeof id !== 'string')) throw new Error('Saved auctions unavailable.');
+            return data;
+        },
         async read(id = null, signal) { return (await readState(id, signal)).rows; },
         async set(id, saved, minutes = null) {
             if (!client || minutes !== null && !valid(minutes)) throw new Error('Invalid saved auction preference.');

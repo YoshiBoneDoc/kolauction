@@ -115,6 +115,12 @@ cannot identify the live Oracle image. Run only one KoL-connected worker across 
 
 ## Performance investigation
 
+[November 6 follow-up](docs/NOVEMBER_6_PERFORMANCE.md:1) records the verified capture,
+Home origin reuse, private saved-ID reader (232), render isolation, local checks,
+combined history/gift/refresh release (234), unresolved internal profiling and exact
+SQL/cache/website rollout order.
+
+
 Performance work through migration **231** is implemented locally: bounded raffle
 reads and commitment polling, consolidated background account reads, lighter pending
 trade/Home/card projections, per-auction private caching, and reduced idle bot work
