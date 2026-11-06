@@ -1,136 +1,102 @@
 # kHub handoff
 
-Updated November 6, 2026, through implemented migration 235. Read this first, then
-inspect relevant code: documentation and the roadmap can lag implementation.
-Repository state does not establish what is deployed. The live bot handles real
-players' Meat and items.
+Updated November 6, 2026. Local implementation includes migrations through **235**.
+Read this, then inspect the relevant code; the roadmap and older rollout notes may
+lag implementation. Source placement does not prove production installation.
 
-## Project essentials
+## Start here
 
-- React/Vite website on Cloudflare; Supabase Auth/PostgreSQL holds authoritative
-  state. A separate Oracle Ubuntu/Docker KMail bot operates **kHub (#3888760)**.
-- Sell, Buy and Bundle listings support Direct and Escrow settlement, funded bids,
-  refunds, deliveries and payouts. Giveaways support Last Bid, Random Draw, Split
-  and Surprise Me. Raffles have separate ticket, supply, commitment/draw and
-  fulfillment paths; do not confuse raffle purchases with website auction bids.
-- Registration/recovery, verified identities, private balances/reservations,
-  histories, feedback, moderation, bans/appeals, ignores, polls and trade totals
-  already exist. Inspect existing implementations before proposing replacements.
-- Start at [routes](src/App.jsx:1), [account context](src/context/UserContext.jsx:1),
+React/Vite website on Cloudflare, Supabase Auth/PostgreSQL for authoritative state,
+and a separate Oracle Ubuntu/Docker KMail bot operating **kHub (#3888760)**.
+Website, public-cache Worker, database SQL and bot are independent releases.
+
+- [General reference](README.md:1), [database guide](supabase/README.md:1),
+  [bot operations](bot/README.md:1), [roadmap](ROADMAP.md:1).
+- [Routes](src/App.jsx:1), [account context](src/context/UserContext.jsx:1),
   [auction provider](src/context/AuctionsContext.jsx:1),
-  [read service](src/lib/auctions.js:1) and [bot worker](bot/src/worker.mjs:1).
-  See [README](README.md:1), [database guide](supabase/README.md:1),
-  [bot operations](bot/README.md:1) and [roadmap](ROADMAP.md:1).
+  [read service](src/lib/auctions.js:1), [worker](bot/src/worker.mjs:1).
+- Auctions, Buy orders, bundles, giveaways, raffles, saved auctions/reminders,
+  registration/recovery, balances, histories, feedback, ignores, moderation,
+  bans/appeals, polls and trade totals already exist. Inspect before rebuilding.
+  Raffle purchases have separate intake/draw/fulfillment paths from auction bids.
 
-## Safety and architecture
+## Invariants to preserve
 
-- Supabase RPCs authorize writes and enforce visibility/accounting. The bot uses
-  durable receipts, financial serialization, fresh solvency checks and recovery
-  barriers. Keep one KoL-connected worker; never automatically retry an uncertain
-  asset send, remove financial locks or use cached safety as transfer authority.
-- Website and public-cache Workers deploy separately. Shared snapshots use bounded
-  Durable Objects with origin serialization, queue limits and failure cooldowns.
-  They contain allowlisted public data and never browser JWTs/cookies or holdings.
-  Private reads go directly to Supabase with authorization-scoped memory caches.
-- Listing pages are database-paginated. Public live prices/deadlines remain distinct
-  from private context; actions reconcile against authoritative state. Preserve
-  overload protection rather than increasing concurrency to mask slow origins.
-- Raffle receipts/draw inputs and settlement are durable and restart-safe. Preserve
-  ticket privacy, committed randomness, intake/grace barriers and exact reserves.
-  Verify current feature gates in code and production; older activation notes are
-  not evidence of today's runtime state.
+- SQL RPCs authorize writes and enforce visibility/accounting. Display caches,
+  maintenance snapshots and browser permissions never authorize financial actions.
+- Keep one KoL-connected worker across hosts. Preserve financial locks, durable
+  receipt/payload deduplication, fresh solvency checks, full inbox scans, gift proof,
+  recovery barriers and unknown-send protections. Never automatically retry an
+  uncertain asset send or financial write. Reconcile actions against authoritative
+  state; do not increase Worker/transfer concurrency to mask slow reads.
+- Preserve raffle ticket privacy, committed randomness, persisted outcomes, exact
+  reserves and receipt/intake grace barriers. Verify deployed feature gates.
+- Shared Durable Objects contain allowlisted public data only, with serialized
+  origin reads, bounded queues and failure cooldowns. Do not send browser JWTs,
+  cookies or private holdings to them or bypass overload protection with visitor
+  fallback reads. Private data stays in authorization-scoped browser memory.
+- Database pagination, public live prices and private identity/context are separate.
+  Authorization changes and explicit actions require fresh private reconciliation.
 
-## Recent performance work — implemented
+## Completed locally
 
-- **227–229:** narrower history/activity reads; backed-off/coalesced raffle and
-  commitment reads; public commitment caching; consolidated account flags;
-  paginated personal ticket history; lightweight collapsed pending-trade counts;
-  slower private polling, cross-tab coordination and browser pressure backoff.
-  Confirmed bids return before display reconciliation without automatic write retry.
-  See [website rollout](docs/TRAFFIC_READ_PRESSURE_ROLLOUT.md:1).
-- **230:** fresh per-cycle bot safety with versioned capability reuse, post-intake
-  work plans, due/idle maintenance scheduling, private raffle wakeups, persistent
-  beacon backoff and bounded refund batches. Safe `[BOT_PERFORMANCE]` aggregates
-  expose RPC/phase/cycle latency, empty work and backlog signals.
-  See [bot rollout](docs/BOT_WORK_SCHEDULING_ROLLOUT.md:1).
-- **231:** lightweight Home and Buy/closed card projections; distinct-seller
-  restriction checks; per-auction private live-browse caching (60 seconds, 256
-  entries, 24-ID batches). Scoped bot gift state omits unrelated posted history
-  while retaining observed/unposted/unopened records and all unresolved holds.
-  Empty isolated intake uses two state reads instead of three. Invalid state stops
-  processing; opening/recovery/final reconciliation safeguards remain intact.
-- Complete [statistics snapshots](scripts/query-stats-snapshot.sql:1) and an
-  [interval comparator](scripts/queryStatsDelta.py:1) replace misleading cumulative
-  “last 24 hours” interpretation. Capture two complete exports about 24 hours apart;
-  resets, eviction and missing baselines are flagged rather than guessed.
-  See [231 rollout, measurement and profiling](docs/SCOPED_READS_AND_QUERY_STATS.md:1).
+- Bounded history/raffle reads, consolidated account flags, coordinated private
+  refreshes, pending-trade summaries, lightweight Home/cards, scoped gift state and
+  scheduled bot work already exist. Fresh safety is separate from reusable versioned
+  capabilities. Invalid safety/state responses stop processing.
+- Latest follow-up: public Home cache origin reuses card projections; bookmark
+  indicators use private ID-only SQL **232**; **233/235** reuse seller checks and
+  avoid correlated seller-pool rescans; **234** reuses history permission flags,
+  selects scoped gifts as a set and skips liabilities only when no unopened gift
+  exists. Actual gift claims still acquire the financial lock, reject an active
+  opening attempt and compute fresh liabilities before granting a claim.
+- Website changes isolate the route-shell error subscription, lazy-load invitation
+  UI, scope saved-ID memory reuse to authorization and coalesce explicit refreshes
+  received during pending reads. Live-price polling is unchanged.
+- [November 6 evidence, review and measurement plan](docs/NOVEMBER_6_PERFORMANCE.md:1)
+  contains details. [Earlier website rollout](docs/TRAFFIC_READ_PRESSURE_ROLLOUT.md:1),
+  [bot scheduling](docs/BOT_WORK_SCHEDULING_ROLLOUT.md:1) and
+  [scoped reads](docs/SCOPED_READS_AND_QUERY_STATS.md:1) explain prerequisites.
 
-## November 6 follow-up
+## Rollout state and next steps
 
-- Recomputed the four giveaway exports: clean 69-minute interval, no resets,
-  eviction or missing baselines. Aggregate RPC time is not an internal plan.
-- Cache Home now uses existing 231 card projection; bookmark indicators use new
-  private ID-only SQL 232 with authorization-scoped memory reuse. Route-shell error
-  subscription is isolated. No bot runtime or financial behavior changed.
-- Apply queued 232 once before website rollout; cache Worker requires 231 and
-  can deploy independently. Matching SQL copy is in ignored bot migrations; no
-  bot restart required. No deployment/production SQL was performed.
-- Four disposable PostgreSQL suites passed; 101 focused Node tests passed;
-  changed-source lint/build passed (existing warning). Full suite was not rerun.
-- **233:** installed-definition exports confirmed repeated browse seller checks.
-  Queued SQL now reuses restriction results per distinct candidate seller within
-  one authorized statement. Public/private payload parity and financial fingerprints
-  passed locally; 1,000 shared-seller listing fixture: 163–177 ms before, 63–65 ms
-  after. Apply once after verified 232; matching ignored bot SQL is identical.
-  This SQL alone requires no runtime deployment or bot restart. Actual production
-  distributions and remaining internal costs still need measurement.
-- **234:** one queued follow-up for statement-local history permission flags,
-  set-based scoped gift selection and no-envelope gift-claim return. Actual claims
-  keep fresh liability checks and all financial locks. Website coalesces explicit
-  refreshes during pending reads, avoids immediate focus duplicates after slow
-  reads, and lazily loads invitation UI. Owner reports 233 applied; don't rerun it.
-  Apply 234 once, then website. No new cache or bot runtime deployment for 234.
-- Latest validation on Node 24: 451 bot tests passed; website 528 passed/21 failed,
-  exactly the same failing names as HEAD baseline (524/21). Four relevant disposable
-  PostgreSQL suites, changed-source lint, Cloudflare build and secret scan passed.
-  Existing lint/build warnings remain. Fixture savings are not production claims.
-- **Full chat review / 235:** found 233's correlated seller-pool rescan cost on
-  diverse-seller fixtures; queued 235 replaces it with a join. With analyzed fixture
-  stats, scans fell 1,000 to 1 (162 to 125 ms), with full response parity. Apply
-  after 234 once; no runtime deployment/restart. No applied SQL was edited.
-  Extended tests confirm no-envelope claims still take the financial lock/reject
-  existing opening attempts and scoped reads retain isolated/reviewed evidence.
-  All six relevant disposable database suites and 451 bot tests passed; no local
-  financial regression found. Website failures retain the same HEAD-baseline names.
-- See [evidence, unresolved profiling and exact rollout](docs/NOVEMBER_6_PERFORMANCE.md:1).
-  Legacy detail provenance and internal detail/browse/intake costs remain unresolved.
+- Owner explicitly confirmed **233 applied**. Files **232–235** are now in the
+  parent migration directory and the queue contains no SQL. Application of **234
+  and 235 has not been explicitly confirmed**; verify installed definitions before
+  running anything. Do not infer installation from moved files or rerun confirmed SQL.
+- If outstanding, apply **234 then 235**, once per database. Website and ignored bot
+  migration copies are identical alternatives, not two scripts to apply. Earlier
+  website changes require 232; public Home cache routing requires 231.
+- Website/cache deployment versions and the live bot image remain unverified.
+  Deploy the website with `npm run build:cloudflare` if these changes are unshipped;
+  the Home origin change needs its separate cache Worker deployment. SQL 232–235
+  needs no bot binary update/restart. Older bot scheduling/scoped-state runtime
+  changes still need their own release if not already installed.
+- No production SQL, deployment, connected worker or asset send was performed by
+  this agent. Owner actions and local verification are separate evidence.
 
-## Latest verification and next steps
+## Verification and unresolved issues
 
-- Latest checks: **451 bot tests passed** on Node 24; disposable PostgreSQL lifecycle
-  and projection suites passed, including privacy, accounting and recovery checks.
-  Website build and changed-source lint passed. Full website suite: 521 passed,
-  21 failed; all failing names also occur in a HEAD baseline comparison. Do not
-  describe the full suite as green. Four statistics-delta tests and five cache
-  tests passed. Local fixture timings are not production capacity measurements.
-- SQL 227–230 is in the parent migrations directory; **231 is queued**. Matching
-  bot SQL lives under `bot/supabase/migrations/`; apply each migration once per
-  database, not once per copy. Verify installed definitions and prerequisites.
-- For the latest release: SQL 231 first, then website and bot independently. The
-  new website Home RPC requires that SQL. Build with `npm run build:cloudflare`.
-  A website push does not deploy the ignored bot. This work did not apply production
-  SQL, deploy, restart the bot or send real assets.
-- Next priority: verify deployed website/cache/bot versions, then measure ordinary
-  and peak traffic. Correlate RPC volume/latency, Worker queue failures, database
-  waits/resources and bot phase timings. No outage root cause or production savings
-  has been established. Profile remaining expensive reads before adding indexes
-  or changing scheduler/concurrency limits. Some roadmap items are already done.
+Latest Node 24 checks: **451 bot tests passed**; six relevant disposable PostgreSQL
+suites passed, including privacy, accounting, solvency, gift isolation and recovery.
+No local financial regression was found. Website: **528 passed, 21 failed**; exactly
+the same failing names occur in the clean HEAD baseline. Do not call the full suite
+green. Build, changed-source lint and secret scan passed; existing Fast Refresh and
+large catalogue chunk warnings remain. These checks do not verify live balances.
 
-## Working rules
+The November 6 capture is a clean 69-minute interval. Aggregate RPC time does not
+identify internal plans, client builds or outage causes. Legacy detail callers,
+remaining static/detail internals, replay/inbox-completion costs and actual browser
+latency remain unresolved. Fixtures demonstrate avoided work, not production
+capacity. Measure deployed versions and equivalent traffic with complete snapshot
+pairs, Worker queues/errors, database waits/resources and bot phase telemetry.
+Do not add speculative indexes or increase compute/concurrency without evidence.
 
-Preserve existing edits and keep secrets out of source, logs and public payloads.
-`bot/` is intentionally gitignored: include changes in its separate release and
-backup process; never force-add it. New website SQL belongs in
-`supabase/migrations/queue/`, with matching bot SQL; do not relocate existing files.
-Keep the owner's personal `bot/QUICKSTART_README.md` unchanged unless explicitly
-asked to edit that guide. Use project-relative code links with relevant lines.
+## Workspace rules
+
+Preserve existing edits and diagnostic exports. New website SQL belongs in
+`supabase/migrations/queue/`; matching standalone copies belong in
+`bot/supabase/migrations/`. Never relocate existing migrations or force-add ignored
+`bot/`; include it in the owner's separate release/backup process. Keep secrets out
+of source/logs/public payloads. Use project-relative code links with relevant lines.
+**Do not modify `bot/QUICKSTART_README.md` unless the owner explicitly requests it.**

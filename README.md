@@ -1,94 +1,86 @@
 # kHub — KoL Auction Hub
 
 React/Vite auction website with Supabase Auth/PostgreSQL and a separate Oracle
-KMail worker for **kHub (#3888760)**. Start new sessions with [the handoff](HANDOFF.md).
-See [unfinished work](ROADMAP.md), [database reference](supabase/README.md) and
-[bot operations](bot/README.md). Repository state does not prove production rollout.
+KMail bot operating **kHub (#3888760)**. Start new sessions with the
+[current handoff](HANDOFF.md:1). See the [database guide](supabase/README.md:1),
+[bot operations](bot/README.md:1) and [roadmap](ROADMAP.md:1); inspect current code
+before treating older documentation as unfinished work or deployed behavior.
 
 ## Architecture
 
 | Component | Entry point | Runtime |
 | --- | --- | --- |
-| Website | [React routes](src/App.jsx:1) | Cloudflare Worker + Vite static assets |
-| Website API | [site adapter](workers/site/index.js:1) | Root `wrangler.jsonc` |
-| Shared snapshots | [cache Worker](workers/public-auction-cache/index.js:1) | Separate Worker / SQLite Durable Objects |
-| Auth and authoritative state | [RPC client](src/lib/auctions.js:1), `supabase/migrations/` | Supabase |
-| Asset handling | [bot worker](bot/src/worker.mjs:1) | Oracle Ubuntu / Docker |
+| Website | [Routes](src/App.jsx:1), [auction provider](src/context/AuctionsContext.jsx:1) | Cloudflare Worker + Vite assets |
+| Website API | [Site adapter](workers/site/index.js:1) | Root Wrangler configuration |
+| Shared public snapshots | [Cache Worker](workers/public-auction-cache/index.js:1) | Separate Worker / SQLite Durable Objects |
+| Authorization and accounting | [RPC client](src/lib/auctions.js:1), [account context](src/context/UserContext.jsx:1) | Supabase Auth/PostgreSQL |
+| Asset handling | [Bot worker](bot/src/worker.mjs:1) | Oracle Ubuntu / Docker |
 
-The website Worker serves `/api/public-auctions`, `/api/public-banner`,
-`/api/public-auctions/invalidate` and `/api/giveaway-image`; unknown API routes return
-JSON 404 instead of SPA HTML. The repository's Amplify files are legacy scaffolding.
+The website adapter serves public auction/banner reads, invalidation and giveaway
+images; unknown API routes return JSON 404, not SPA HTML. Amplify files are legacy
+scaffolding. SQL, website, cache Worker and bot have separate release lifecycles.
 
-## Implemented functionality
+## Existing functionality
 
-- Sell, Buy and Bundle auctions; Direct settlement and automated Escrow deposits,
-  funded bids, refunds, winner deliveries and seller payouts.
-- Server-authoritative minimum increments, buyouts, late-bid extension for ordinary
-  Sell auctions, custom deadlines and receipt-time safeguards.
-- KMail registration/recovery, verified KoL identities, profile histories, seller
-  profiles, private balances/reservations and public trade totals.
-- Raffles with private ticket histories, commitment verification, durable draws,
-  prize supply and fulfillment; operational availability depends on deployed gates.
-- Feedback/withdrawal, trade queries, account bans/appeals, reviewed public ban
-  gallery, admin inbox, analytics, announcements and multi-select polls.
-- Player ignores with server-side visibility filtering; site activity tracking.
-- Admin giveaway preset; Last Bid, Random Draw, Split and Surprise Me conditions.
-  Non-Last-Bid conditions require Escrow. Giveaways require the exact next minimum,
-  reject self-outbids and do not extend their deadline. Draws/allocations are persisted
-  before delivery. Actual prize recipients are marked in bid history.
+- Sell, Buy and Bundle listings; Direct and Escrow settlement, funded bids, Buy
+  reservations/fulfillments, deposits, refunds, winner deliveries and seller payouts.
+- Server-authoritative increments, buyouts, custom deadlines, receipt-time checks
+  and late-bid extensions for ordinary Sell auctions.
+- KMail registration/recovery, verified KoL identities, private balances, saved
+  auctions and at-most-once reminders, profile/seller histories and trade totals.
+- Giveaways: Last Bid, Random Draw, Split and Surprise Me. Non-Last-Bid conditions
+  require Escrow. Giveaways require the exact next minimum, reject self-outbids and
+  do not extend deadlines. Outcomes persist before delivery; history marks recipients.
+- Raffles: private tickets, prize supply, commitments, verified randomness, durable
+  draws and fulfillment. These use separate intake/accounting from auction bids;
+  availability depends on deployed feature gates.
+- Feedback/withdrawal, trade queries, ignores and visibility filtering, moderation,
+  bans/appeals, reviewed ban gallery, admin inbox/analytics, announcements and polls.
 
-### Read and cache boundaries
+## Financial and privacy boundaries
 
-[The provider](src/context/AuctionsContext.jsx:1) loads bounded database pages, not
-an entire market dataset. Its memory cache is scoped to viewer authorization;
-private auction datasets are not persisted in browser storage. Preferences are separate.
+SQL RPCs enforce authorization, visibility, accounting and deadlines. Browser state
+and cached permissions are advisory. Writes reconcile against authoritative reads;
+uncertain financial writes and asset sends must never be automatically retried.
 
-[The public transport](src/lib/publicAuctionReader.js:1) shares allowlisted public
-rows without browser cookies/JWTs. Home needs no card-context read; signed-in viewers
-may need a cached ignore-eligibility check. Eligible browse/seller pages add private
-context separately. Own/others, affected ignore pools and signed-in All-status views
-can use direct reads. Actions use live authorization and authoritative post-write refreshes.
+The bot uses financial serialization, durable receipts and exact payload checks,
+fresh solvency checks, full inbox scans, gift proof and recovery barriers. Preserve
+unknown-send protections, protected assets, exact raffle reserves and persisted
+outcomes. Run only **one KoL-connected worker across all hosts**; never remove locks
+or increase transfer concurrency as a performance shortcut.
 
-Public detail static/live snapshots are combined with private context and bid history;
-details are not wholly cached. Public live TTL is two seconds; static TTL five minutes.
-Active private context refreshes every 60 seconds, closed private detail every 120
-seconds and unpublished drafts every 30 seconds, with authoritative refreshes on
-transitions/actions. Live browse reuses private context per auction for up to 60
-seconds, scoped to authorization; status changes and reservation expiry invalidate it.
-Featured giveaway shares the listing object, with a 30-second TTL; banner has a separate object.
+Listings are database-paginated. Public static/live facts are separate from private
+identity, reservations and history. Shared cache requests contain no browser JWTs
+or cookies, and responses contain only allowlisted public fields. Private read
+caches are authorization-scoped memory, not shared or persistent browser storage.
+Explicit actions, authorization changes and status transitions retain fresh checks.
 
-Listing snapshots are fresh for 30 seconds and normally usable up to five minutes
-while refreshing; known bid-invalidated snapshots must revalidate. Each object
-serializes origin reads, spaces starts by one second, allows four distinct pending
-keys, uses an eight-second fetch deadline and a 30-second origin-failure cooldown.
-These overload protections can produce temporary 503s. Never bypass privacy or flood
-Supabase with per-visitor fallback reads. HTTP responses are `no-store`; Durable
-Objects, not a blanket CDN rule, own shared storage. See [deployment](docs/CLOUDFLARE_SITE_DEPLOYMENT.md).
+Public live state has a two-second TTL; listing selection normally refreshes every
+30 seconds. Durable Objects serialize origin work and retain bounded queues,
+timeouts and failure cooldowns. HTTP responses are `no-store`; objects own storage.
+Temporary overload failures must not trigger per-visitor origin floods or expose
+unverified prices as live. See [shared-state rules](docs/SHARED_LIVE_STATE_ROLLOUT.md:1)
+and [deployment/cache settings](docs/CLOUDFLARE_SITE_DEPLOYMENT.md:1).
 
-### Totals and reference data
-
-Public lifetime trade value includes completed Sell prices and paid Buy fulfillments;
-items sum actual component quantities; trades count completed Sells and paid Buy
-fulfillments. Deposits, refunds, donations and commission are not added as trade value.
-Record bids and giveaway totals are separate measures. Aggregate snapshots are
-advisory display data, never financial authorization.
-
-The bot refreshes KoLmafia item data weekly. Tradeable or giftable items are eligible,
-excluding package wrappers. The website has a five-minute catalog cache and bundled
-fallback; database validation remains authoritative. `npm run update:items` refreshes
-checked-in reference data, not the live deployment.
+Trade totals count completed Sell value and paid Buy fulfillments, with actual
+component quantities; deposits, refunds, donations and commission do not inflate
+trade value. Totals are display snapshots, never financial authority. The bot
+refreshes KoLmafia item data weekly; tradeable or giftable items are eligible except
+package wrappers. The website caches catalog data with a bundled fallback, while
+SQL remains authoritative for item validation. `npm run update:items` updates the
+checked-in reference data, not production.
 
 ## Development and verification
 
-Use Node 24 (also used by CI and required by the bot). From the website root:
+Use **Node 24**, also required by the bot. From the website root:
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Use `.env.example` for public Supabase settings. Plain Vite does not emulate the
-Durable Object API; use direct reads locally or a configured Worker preview.
+Configure public Supabase settings from `.env.example`. Plain Vite does not emulate
+Durable Object APIs; use direct reads or a configured Worker preview locally.
 
 ```sh
 npm run build
@@ -98,53 +90,61 @@ npm run security:check
 ```
 
 Python database suites under `tests/` use disposable PostgreSQL clusters; inspect
-individual prerequisites. Do not run a live bot or financial writes as tests.
+individual prerequisites. Never use a live bot or real financial transfers as tests.
+Current validation and known baseline failures are recorded in the handoff; the
+full website suite is not green. Local fixtures are not production capacity tests.
 
-## Deployment
+## Deployment and current release
 
-[Deployment reference](docs/CLOUDFLARE_SITE_DEPLOYMENT.md) contains exact settings,
-bindings and verification. Website: Cloudflare Git integration uses
-`npm run build:cloudflare` and root Wrangler configuration. This build defaults shared
-caching to true and emits `/khub-build.json`; plain `npm run build` does not enable it.
-GitHub Actions validates/dry-runs the website and deploys **only the cache Worker**.
-SQL application and Oracle bot rebuild/restart are manual, separate steps.
+[Deployment instructions](docs/CLOUDFLARE_SITE_DEPLOYMENT.md:1) define bindings and
+settings. Cloudflare Git integration builds the website with
+`npm run build:cloudflare`, enabling shared caching by default and emitting
+`/khub-build.json`. Plain Vite build does not enable shared caching. GitHub Actions
+validates/dry-runs the website and deploys **only the separate cache Worker**.
+Database application and Oracle bot rebuild/restart remain manual, separate steps.
 
-`bot/` is deliberately gitignored and absent from fresh website clones. Never force-add
-it. Keep private bot releases and credentials backed up separately. A website commit
-cannot identify the live Oracle image. Run only one KoL-connected worker across hosts.
+New website migrations belong in `supabase/migrations/queue/`. The owner moves them
+after application; do not move existing scripts or infer installed state from file
+placement. Matching ignored bot SQL copies apply to the same database: run each
+migration once, not once per copy. Verify prerequisites and installed definitions.
 
-## Performance investigation
+Local performance work is implemented through **235**: lightweight public Home,
+private bookmark IDs, per-seller browse checks, bounded history with statement-local
+permissions, scoped gift reads and lower idle work, plus refresh/render/load changes.
+The owner confirmed 233 applied; later SQL installation and application deployment
+versions need confirmation. If outstanding, apply **234 then 235**; deploy unshipped
+website changes afterward. The earlier Home routing change also needs a cache
+Worker deployment. SQL 232–235 needs no bot restart. See the
+[handoff](HANDOFF.md:1) for current status and
+[performance evidence/review](docs/NOVEMBER_6_PERFORMANCE.md:1) for rollout details.
 
-[November 6 follow-up](docs/NOVEMBER_6_PERFORMANCE.md:1) records the verified capture,
-Home origin reuse, private saved-ID reader (232), render isolation, local checks,
-combined history/gift/refresh release (234), unresolved internal profiling and exact
-SQL/cache/website rollout order.
+`bot/` is deliberately gitignored and absent from fresh website clones. Never
+force-add it; preserve its separate release/backup process. A website commit does
+not ship the bot or identify the live Oracle image. Earlier bot capability/runtime
+changes require their own rollout if not already deployed.
 
+## Diagnostics and known limits
 
-Performance work through migration **231** is implemented locally: bounded raffle
-reads and commitment polling, consolidated background account reads, lighter pending
-trade/Home/card projections, per-auction private caching, and reduced idle bot work
-and gift-state payloads. Recovery, privacy and financial barriers remain in place.
-See the [current handoff](HANDOFF.md:1) for verification and rollout status, and
-[231 rollout notes](docs/SCOPED_READS_AND_QUERY_STATS.md:1) for the latest changes.
-SQL 231 must precede the website release; the ignored bot ships separately.
-
-Production impact and the reported peak-traffic incident still need measurement.
 Use [complete statistics snapshots](scripts/query-stats-snapshot.sql:1) and the
-[delta tool](scripts/queryStatsDelta.py:1) approximately 24 hours apart; cumulative
-exports cannot reconstruct the last day. Correlate RPC latency/calls with database
-waits/resources and Worker/bot telemetry. Do not reset counters or run financial-write
-`EXPLAIN ANALYZE` on production. The [roadmap](ROADMAP.md:1) may contain completed items;
-check code before starting another optimization.
+[interval comparator](scripts/queryStatsDelta.py:1) on baseline/after exports;
+cumulative counters cannot reconstruct an arbitrary historical window. Check resets,
+eviction and missing baselines; nested execution times can overlap. Correlate RPC
+costs with Worker queues/errors, database waits/resources and bot phase telemetry.
 
-## Secrets and documentation boundaries
+[Read-query plans](scripts/read-query-plans.psql:1) is a **terminal `psql` script**,
+not paste-ready Supabase SQL Editor input. It uses read-only transactions and
+executes display reads for profiling. Prefer controlled representative fixtures;
+never run financial-write `EXPLAIN ANALYZE` on production or reset shared counters.
+Production savings, legacy-client provenance and some detail/intake/browser costs
+remain unresolved. No past outage root cause has been established.
 
-Publishable Supabase keys belong in public build settings; service-role keys, KoL
-passwords, SSH keys and invalidation signing secrets do not. Build/package scans
-reject private material. `npm run security:install` installs the local staged-file
-check; ignored paths do not remove already-committed secrets from Git history.
+## Secrets and documentation
 
-Primary documentation is this README, the bot/database READMEs, handoff and roadmap.
-Keep the personal QUICKSTART_README unchanged unless explicitly authorized; the
-current consolidation leaves it untouched. Obsolete phase documents have been
-removed from the bot packaging list after consolidation.
+Publishable Supabase keys belong in public build settings. Service-role keys, KoL
+passwords, SSH keys and invalidation secrets do not. Build/package scans reject
+private material; `npm run security:install` installs the staged-file check.
+Ignoring a path does not remove previously committed secrets from Git history.
+
+Keep this README general and the handoff focused on current state. Detailed evidence
+and procedures belong in linked technical documents. The owner's personal
+`bot/QUICKSTART_README.md` must remain unchanged unless explicitly requested.
