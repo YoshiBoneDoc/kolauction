@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
-import { useEffect } from 'react';
+import { useContext, useEffect } from 'react';
+import { UserContext } from '../context/UserContext';
 import { BID_INCREMENT_TIERS } from '../lib/bidIncrements';
 import { ESCROW_FEE_TIERS, escrowFee } from '../lib/escrowFees';
 
@@ -35,6 +36,8 @@ const auctionTypeComparison = [
 ];
 
 const InfoPage = () => {
+    const { currentUser } = useContext(UserContext);
+    const showClubHistory = Boolean(currentUser?.id) && (currentUser.isHighRollersMember === true || currentUser.isAdmin === true);
     const { hash } = useLocation();
     useEffect(() => {
         if (['#escrow-fees-title', '#buy-gift-delivery', '#buy-auctions-title', '#gift-packages', '#anti-sniping', '#bid-increases-title'].includes(hash)) document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
@@ -323,12 +326,44 @@ const InfoPage = () => {
                     </section>
                 </div>
 
-                <hr className="info-contact-divider mx-auto mb-5 w-2/3 max-w-lg" />
+                <hr className="info-contact-divider mx-auto mb-5 w-[95%] opacity-60" />
                 <section aria-labelledby="brief-history-title" className="mb-6">
                     <h2 id="brief-history-title" className={`${sectionHeadingClass} mb-2 text-center`}>A Brief History</h2>
-                    <ul className="list-disc space-y-2 pl-5">
-                        <li>October 19, 2026 - Official launch of kHub.</li>
-                        <li>Friday, October 30, 2026, 01:02AM - The first &apos;<Link to="/giveaways" className="text-blue-700 underline dark:text-blue-300">Meat Stack Mania</Link>&apos; was held.<p className="ml-3 mt-1 text-xs text-gray-500 dark:text-gray-400">Inaugural winner: <Link to="/seller/3c088d45-3b87-46a5-b74e-10b5c49c4564?view=stats" className="font-semibold text-blue-700 underline hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-200">neonep</Link></p></li>
+                    <ul className="text-sm leading-5">
+                        <li className="group grid grid-cols-[110px_minmax(0,1fr)] gap-x-2 sm:grid-cols-[124px_minmax(0,1fr)] sm:gap-x-3">
+                            <time dateTime="2026-10-19" className="pt-0.5 text-xs text-gray-500 dark:text-gray-400">Oct 19, 2026</time>
+                            <div className="relative min-w-0 pb-4 pl-4 text-gray-700 group-last:pb-0 dark:text-gray-200">
+                                <span aria-hidden="true" className="absolute -bottom-[9px] left-0 top-[9px] w-px -translate-x-1/2 bg-gray-300 group-last:hidden dark:bg-gray-600" />
+                                <span aria-hidden="true" className="absolute left-0 top-1.5 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-gray-400 dark:bg-gray-500" />
+                                <p>Official launch of kHub</p>
+                            </div>
+                        </li>
+                        <li className="group grid grid-cols-[110px_minmax(0,1fr)] gap-x-2 sm:grid-cols-[124px_minmax(0,1fr)] sm:gap-x-3">
+                            <time dateTime="2026-10-30" className="pt-0.5 text-xs text-gray-500 dark:text-gray-400">Oct 30, 2026</time>
+                            <div className="relative min-w-0 pb-4 pl-4 text-gray-700 group-last:pb-0 dark:text-gray-200">
+                                <span aria-hidden="true" className="absolute -bottom-[9px] left-0 top-[9px] w-px -translate-x-1/2 bg-gray-300 group-last:hidden dark:bg-gray-600" />
+                                <span aria-hidden="true" className="absolute left-0 top-1.5 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-gray-400 dark:bg-gray-500" />
+                                <p>First <Link to="/giveaways" className="text-blue-700 underline dark:text-blue-300">Meat Stack Mania</Link> giveaway</p><p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Inaugural winner: <Link to="/seller/3c088d45-3b87-46a5-b74e-10b5c49c4564?view=stats" className="font-semibold text-blue-700 underline hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-200">neonep</Link></p>
+                            </div>
+                        </li>
+                        {showClubHistory && <>
+                        <li className="group grid grid-cols-[110px_minmax(0,1fr)] gap-x-2 sm:grid-cols-[124px_minmax(0,1fr)] sm:gap-x-3">
+                            <time dateTime="2026-11-05" className="pt-0.5 text-xs text-gray-500 dark:text-gray-400">Nov 5, 2026</time>
+                            <div className="relative min-w-0 pb-4 pl-4 text-gray-700 group-last:pb-0 dark:text-gray-200">
+                                <span aria-hidden="true" className="absolute -bottom-[9px] left-0 top-[9px] w-px -translate-x-1/2 bg-gray-300 group-last:hidden dark:bg-gray-600" />
+                                <span aria-hidden="true" className="absolute left-0 top-1.5 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-gray-400 dark:bg-gray-500" />
+                                <p>MMG High Rollers Club founded</p>
+                            </div>
+                        </li>
+                        <li className="group grid grid-cols-[110px_minmax(0,1fr)] gap-x-2 sm:grid-cols-[124px_minmax(0,1fr)] sm:gap-x-3">
+                            <time dateTime="2026-11-12" className="pt-0.5 text-xs text-gray-500 dark:text-gray-400">Nov 12, 2026</time>
+                            <div className="relative min-w-0 pb-4 pl-4 text-gray-700 group-last:pb-0 dark:text-gray-200">
+                                <span aria-hidden="true" className="absolute -bottom-[9px] left-0 top-[9px] w-px -translate-x-1/2 bg-gray-300 group-last:hidden dark:bg-gray-600" />
+                                <span aria-hidden="true" className="absolute left-0 top-1.5 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-gray-400 dark:bg-gray-500" />
+                                <p>First invite-only club raffle</p><p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Inaugural winner: — · Prize: —</p>
+                            </div>
+                        </li>
+                        </>}
                     </ul>
                 </section>
 
