@@ -212,8 +212,8 @@ test('escrow cards expose an exact copyable BID command and a compact Close acti
 test('logged-out bid clicks reveal a non-modal register/login warning and an independent Close button', () => {
     user = null;
     try {
-        for (const escrowMode of [false, true]) {
-            const auction = { ...base, escrowMode };
+        for (const escrowMode of [false, true]) for (const sellerId of [base.sellerId, undefined]) {
+            const auction = { ...base, escrowMode, sellerId };
             let expanded = false;
             const props = () => ({ auction, now: Date.now(), expanded, onToggleBid: () => { expanded = !expanded; } });
             const h = harness(CompactAuctionCard, props());

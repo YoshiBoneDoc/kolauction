@@ -30,7 +30,7 @@ export default function BuyAuctionCard({ auction, now, inlineReserve = false, ex
     const status = getAuctionDisplayStatus(auction, result);
     const ended = ['completed', 'awaiting_trade', 'settling', 'ended_no_bids', 'expired', 'cancelled', 'voided'].includes(result.status);
     const active = result.status === 'active' && !auction.buyClosingReason;
-    const owns = currentUser?.id === auction.sellerId;
+    const owns = Boolean(currentUser?.id) && currentUser.id === auction.sellerId;
     const available = auction.availableQuantity ?? auction.remainingQuantity ?? 0;
     const purchased = auction.purchasedQuantity || 0;
     const reserved = auction.reservedQuantity || 0;

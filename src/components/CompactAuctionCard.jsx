@@ -23,7 +23,7 @@ export default function CompactAuctionCard({ auction, now, expanded = false, onT
     if (auction.liveUnavailable) return <AuctionLiveUnavailable auction={auction} />;
     const result = getAuctionResult(auction, now);
     const active = result.status === 'active';
-    const ownsAuction = currentUser?.id === auction.sellerId;
+    const ownsAuction = Boolean(currentUser?.id) && currentUser.id === auction.sellerId;
     const status = getAuctionDisplayStatus(auction, result);
     const ended = ['completed', 'awaiting_trade', 'settling', 'ended_no_bids', 'expired', 'cancelled', 'voided'].includes(result.status);
     const price = result.finalPrice ?? (auction.currentBid || auction.minBidMeat);

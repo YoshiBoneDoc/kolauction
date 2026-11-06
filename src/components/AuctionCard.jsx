@@ -26,6 +26,7 @@ export default function AuctionCard({ auction, now }) {
     if (auction.liveUnavailable) return <AuctionLiveUnavailable auction={auction} />;
     const result = getAuctionResult(auction, now);
     const active = result.status === 'active';
+    const ownsAuction = Boolean(currentUser?.id) && currentUser.id === auction.sellerId;
     const displayStatus = getAuctionDisplayStatus(auction, result);
     if (auction.auctionKind === 'buy') return <BuyAuctionCard auction={auction} now={now} />;
     return (
@@ -54,8 +55,8 @@ export default function AuctionCard({ auction, now }) {
             )}
             <div className="mt-auto pt-3">
                 {active && <div className="relative z-10"><InstantPurchaseAction auction={auction} compact /></div>}
-                {active && currentUser?.id === auction.sellerId && <p className="text-center text-sm text-gray-600">This is your listing.</p>}
-                {active && currentUser?.id !== auction.sellerId && (showBid ? (
+                {active && ownsAuction && <p className="text-center text-sm text-gray-600">This is your listing.</p>}
+                {active && !ownsAuction && (showBid ? (
                     <div className="relative z-10">
                         <AuctionBidForm auction={auction} />
                         <button onClick={() => setShowBid(false)} className="mt-2 min-h-11 w-full border border-gray-400 bg-white text-gray-700">Close bid form</button>
