@@ -9,6 +9,9 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+# Complete SQL Editor snapshots are exported as one large JSON CSV cell.
+csv.field_size_limit(sys.maxsize)
+
 COUNTERS = ('calls', 'total_exec_ms', 'total_plan_ms', 'shared_blks_read', 'shared_blks_hit', 'temp_blks_written')
 
 
