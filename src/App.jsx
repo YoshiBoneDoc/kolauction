@@ -1,10 +1,10 @@
 import RenderBoundary from './components/RenderBoundary';
 import { UserContext } from './context/UserContext';
-const HighRollersInvitation = lazy(() => import('./components/HighRollersInvitation'));
 import { lazy, Suspense, useContext } from "react";
 import { AuctionsContext } from "./context/AuctionsContext";
 import { Routes, Route, useLocation } from "react-router-dom";
 import AuctionNavigation from "./components/AuctionNavigation";
+const HighRollersInvitation = lazy(() => import('./components/HighRollersInvitation'));
 const RaffleCommitment = lazy(() => import('./pages/RaffleCommitment'));
 const Raffles = lazy(() => import("./pages/Raffles"));
 const Leaderboards = lazy(() => import("./pages/Leaderboards"));

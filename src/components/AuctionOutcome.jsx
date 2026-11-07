@@ -1,3 +1,4 @@
+import { paymentLabel } from '../lib/mrAPayment';
 import { feeLabel } from '../lib/feeDisplay';
 import ConfirmTradeButton from './ConfirmTradeButton';
 import TradeFeedback from './TradeFeedback';
@@ -90,8 +91,9 @@ export default function AuctionOutcome({ auction, now }) {
             {result.status === 'settling' && <p>{result.hasWinner
                 ? 'Bidding has closed. The bot is sending the items to the winner and payment to the seller via KMail. Settlement finishes once all required deliveries are confirmed.'
                 : 'This auction did not result in a sale. The bot is returning the deposited items to the seller via KMail. The return finishes once all required deliveries are confirmed.'}</p>}
-            {result.hasWinner && <p>Winner: <strong><WinnerLink auction={auction} /></strong> · Final price: <strong>{result.finalPrice.toLocaleString('en-US')} Meat</strong></p>}
+            {result.hasWinner && <p>Winner: <strong><WinnerLink auction={auction} /></strong> · Final price: <strong>{paymentLabel(auction.paymentMeat ?? result.finalPrice, auction.paymentMrA, result.finalPrice)}</strong></p>}
             {isSeller && result.hasWinner && <p>{feeLabel(auction.feeMeat, result.finalPrice, auction.feePolicy !== 'flat')}: {(auction.feeMeat || 0).toLocaleString('en-US')} Meat.</p>}
+            {isSeller && auction.mrARate && result.hasWinner && <p>Seller proceeds: {paymentLabel(Math.max(0, auction.paymentMeat - auction.feeMeat), auction.paymentMrA)}. Commission permanently waived: {(auction.waivedFeeMeat || 0).toLocaleString('en-US')} Meat.</p>}
             {auction.instantPurchasedAt && <p>The buyout price ended bidding early.</p>}
             {result.status === 'completed' && <p>The items and payment have been delivered via KMail.</p>}
             {result.status === 'ended_no_bids' && <p>No bids were accepted. The bot has returned the items to the seller.</p>}
@@ -120,7 +122,7 @@ export default function AuctionOutcome({ auction, now }) {
                         <div className="space-y-6">
                             <div className="space-y-5">
                             <p><span className="text-sm">Your trading partner:</span> <strong>{partner?.kol_name || partner?.username || (isSeller ? result.winner : auction.owner)}{partner?.kol_player_id && ` (#${partner.kol_player_id})`}</strong></p>
-                            <p>Arrange an {partner?.kol_player_id ? <a href={`https://www.kingdomofloathing.com/sendmessage.php?towho=${partner.kol_player_id}`} target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">in-game trade</a> : 'in-game trade'}: send <strong>{isSeller ? `${auction.quantity.toLocaleString('en-US')} × ${auction.item}` : `${result.finalPrice.toLocaleString('en-US')} Meat`}</strong> in exchange for <strong>{isSeller ? `${result.finalPrice.toLocaleString('en-US')} Meat` : `${auction.quantity.toLocaleString('en-US')} × ${auction.item}`}</strong>. Check the item, quantity, price and player name/number before accepting.</p>
+                            <p>Arrange an {partner?.kol_player_id ? <a href={`https://www.kingdomofloathing.com/sendmessage.php?towho=${partner.kol_player_id}`} target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">in-game trade</a> : 'in-game trade'}: send <strong>{isSeller ? `${auction.quantity.toLocaleString('en-US')} × ${auction.item}` : paymentLabel(auction.paymentMeat ?? result.finalPrice, auction.paymentMrA, result.finalPrice)}</strong> in exchange for <strong>{isSeller ? paymentLabel(auction.paymentMeat ?? result.finalPrice, auction.paymentMrA, result.finalPrice) : `${auction.quantity.toLocaleString('en-US')} × ${auction.item}`}</strong>. Check the item, quantity, price and player name/number before accepting.</p>
                             <div className="space-y-[10px] pt-3 text-sm leading-[1.4] text-[#5B6472]">
                                 <p>Both parties are responsible for completing this <strong>direct trade</strong> and <strong>confirming its completion on kHub</strong>. While we can assist with issues, we cannot guarantee delivery or cover any losses.</p>
                                 <p><strong>Failure to honor a trade is grounds for a temporary or permanent ban.</strong> We strictly enforce this policy to deter fraudulent listings, bids made in bad faith, and last-minute withdrawals.</p>

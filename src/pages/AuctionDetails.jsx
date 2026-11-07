@@ -1,3 +1,4 @@
+import { paymentLabel } from '../lib/mrAPayment';
 import AuctionWatching from '../components/AuctionWatching';
 import SavedAuctions from '../components/SavedAuctions';
 import RemainingTime from '../components/RemainingTime';
@@ -90,6 +91,7 @@ export default function AuctionDetails() {
                                 <span aria-hidden="true">·</span>
                                 <TradeTypeBadge escrow={auction.escrowMode} />
                             </div>
+                            {auction.mrARate && <p className="text-sm text-gray-600">Accepts Mr. A&apos;s · Fixed rate: {auction.mrARate.toLocaleString()} Meat each.</p>}
                             {auction.isBundle ? <BundleContents items={auction.bundleItems} /> : <ItemResources item={auction.item} itemId={auction.itemId} />}
                         </div>
                         <div className="space-y-3">
@@ -100,6 +102,7 @@ export default function AuctionDetails() {
                                 </div>
                                 {closedSale && auction.instantPurchasedAt && <p className="text-sm leading-6 text-green-700">Buyout accepted for {result.finalPrice.toLocaleString('en-US')} Meat on <span className="inline-block whitespace-nowrap">{new Date(auction.instantPurchasedAt).toLocaleString()}.</span></p>}
                             </div>
+                            {auction.mrARate && price > 0 && <p className="text-sm">Payment: {paymentLabel(auction.paymentMeat, auction.paymentMrA, price)}</p>}
                             {(active || result.status === 'completed') && (auction.isBundle
                                 ? <BundleMarketPrice items={auction.bundleItems} completed={result.status === 'completed'} />
                                 : <MarketPrice itemId={auction.itemId} auctionId={auction.id} quantity={auction.quantity} completed={result.status === 'completed'} />)}

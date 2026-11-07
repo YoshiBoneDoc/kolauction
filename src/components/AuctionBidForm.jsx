@@ -1,4 +1,5 @@
 import { bundleConfirmation } from '../lib/bundles';
+import MixedBidForm from './MixedBidForm';
 import { useContext, useId, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
@@ -60,6 +61,7 @@ export default function AuctionBidForm({ auction, showTerms = true, showHeading 
         <button type="button" onClick={onClose} aria-label="Close Bid Form"
             className="col-start-2 row-start-2 inline-flex h-6 w-20 items-center justify-center rounded-none rounded-r-[2px] border border-gray-300 bg-white p-0 text-xs font-semibold text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-500">Close</button>
     </div>;
+    if (inline && auction.escrowMode && auction.mrARate) return <Link to={`/auction/${auction.id}`} className="text-sm text-blue-700 underline">KMail Meat or Mr. A&apos;s →</Link>;
     if (inline && auction.escrowMode) return <div className="grid h-full min-w-0 grid-cols-[minmax(0,1fr)_80px] grid-rows-[20px_24px] items-end">
         <label htmlFor={inputId} title={`${minimum === null ? 'The maximum supported bid has been reached.' : `Attach ${auction.giveawayTitle ? 'exactly' : 'at least'} ${minimumText} Meat, with no items.`}${auction.instantPurchasePrice ? ` Attach ${auction.instantPurchasePrice.toLocaleString('en-US')} Meat to accept the buyout.` : ''} Bids must be processed before the auction deadline.`}
             className="col-span-2 row-start-1 self-end text-xs font-medium leading-4 text-gray-600">KMail with attached bid meat.</label>
@@ -69,6 +71,10 @@ export default function AuctionBidForm({ auction, showTerms = true, showHeading 
     </div>;
     if (auction.escrowMode) return <KmailInstructions auction={auction} showHeading={showHeading} />;
     if (currentUser.id === auction.highestBidderId) return <p className="text-sm font-semibold text-blue-700">You are the highest bidder.</p>;
+
+    if (auction.mrARate) return inline
+        ? <Link to={`/auction/${auction.id}`} className="text-sm text-blue-700 underline">Bid with Meat or Mr. A&apos;s →</Link>
+        : <MixedBidForm auction={auction} />;
 
     if (inline) return <form onSubmit={submit} aria-label={`Bid on ${auction.item}`} className="grid h-full min-h-0 w-full min-w-0 grid-cols-[minmax(0,1fr)_clamp(104px,50%,160px)] grid-rows-[18px_24px] gap-y-0.5 text-left">
         <label htmlFor={inputId} className={error || message ? 'sr-only' : 'col-start-1 row-start-1 self-end text-[10px] font-medium leading-3 text-gray-600'}>Your Bid (Meat)</label>

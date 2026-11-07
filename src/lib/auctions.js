@@ -12,6 +12,8 @@ export function mapAuction(row, bidRows) {
             bidderId: bid.bidder_id,
             bidder: bid.bidder_username,
             amount: Number(bid.amount),
+            paymentMeat: Number(bid.payment_meat ?? bid.amount),
+            paymentMrA: Number(bid.payment_mr_a || 0),
             timestamp: new Date(bid.created_at).getTime(),
             giveawayWinner: bid.giveaway_winner === true,
             // The database omits this field unless the viewer is an administrator.
@@ -62,11 +64,16 @@ export function mapAuction(row, bidRows) {
         dealMarketValueMeat: Number(row.deal_market_value_meat || 0),
         dealCheckedAt: row.deal_checked_at || null,
         escrowMode: row.escrow_mode === true,
+        mrARate: row.mr_a_rate == null ? null : Number(row.mr_a_rate),
+        paymentMeat: latestBid?.paymentMeat ?? Number(row.payment_meat ?? row.current_bid),
+        paymentMrA: latestBid?.paymentMrA ?? Number(row.payment_mr_a || 0),
         startOnDeposit: row.start_on_deposit !== false,
         customEndAt: row.custom_end_at || null,
         itemEscrowedAt: row.item_escrowed_at,
         settledAt: row.settled_at,
         feeMeat: Number(row.fee_meat || 0),
+        calculatedFeeMeat: row.calculated_fee_meat == null ? null : Number(row.calculated_fee_meat),
+        waivedFeeMeat: Number(row.waived_fee_meat || 0),
         feeBps: Number(row.fee_bps || 0),
         feePolicy: row.fee_policy || 'flat',
         instantPurchasePrice: row.instant_purchase_price == null ? null : Number(row.instant_purchase_price),
@@ -207,6 +214,11 @@ export function createAuctionService(client, { publicReader = null, readDeadline
             return { auctions: data.rows.map((row) => mapAuction(row, [])), total: Number(data.total) };
         },
         async create(auction) {
+            if (auction.mrARate != null) {
+                const { data, error } = await requireClient().rpc('create_mr_a_auction', { p_listing: auction, p_rate: auction.mrARate });
+                if (error) throw databaseError(error);
+                return data;
+            }
             if (auction.autoRelist) {
                 const { data, error } = await requireClient().rpc('create_relisting_auction', {
                     p_listing: auction, p_relist_count: auction.relistCount,
@@ -277,11 +289,13 @@ export function createAuctionService(client, { publicReader = null, readDeadline
             const { error } = await requireClient().rpc('purchase_auction', { p_auction_id: auctionId });
             if (error) throw databaseError(error);
         },
-        async bid(auctionId, amount) {
+        async bid(auctionId, amount, payment = null) {
             if (!Number.isSafeInteger(amount) || amount < 1) {
                 throw new Error('Bid must be a positive whole Meat amount that can be represented exactly.');
             }
-            const { error } = await requireClient().rpc('place_bid', { p_auction_id: auctionId, p_amount: amount });
+            const { error } = await requireClient().rpc(payment ? 'place_mixed_bid' : 'place_bid', payment
+                ? { p_auction_id: auctionId, p_meat: payment.meat, p_mr_a: payment.mrAQuantity }
+                : { p_auction_id: auctionId, p_amount: amount });
             if (error) throw databaseError(error);
         },
     };

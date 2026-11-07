@@ -1,3 +1,4 @@
+import MrAPaymentOptions from '../components/MrAPaymentOptions';
 import { canViewRaffles } from '../lib/raffleVisibility';
 import SpecialAuctionNavigation from '../components/SpecialAuctionNavigation';
 import RaffleEditor from '../components/RaffleEditor';
@@ -11,7 +12,7 @@ import { prepareBundle, bundleCover, bundleTitle, normalizeBundleTitle, MAX_BUND
 import { effectiveFeePercent, feeLabel } from '../lib/feeDisplay';
 import { buyFunding } from '../lib/buyOrders';
 import TradeTypeBadge from '../components/TradeTypeBadge';
-import { useState, useContext, useDeferredValue, useEffect, useMemo, useRef } from 'react';
+import { useState, useContext, useDeferredValue, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AuctionsContext } from '../context/AuctionsContext';
 import { UserContext } from '../context/UserContext';
@@ -61,6 +62,9 @@ export default function AuctionAnItem() {
     const [customEndTime, setCustomEndTime] = useState('');
     const endingTimeInput = useRef(null);
     const [escrowMode, setEscrowMode] = useState(true);
+    const [mrAEnabled, setMrAEnabled] = useState(false);
+    const [mrARate, setMrARate] = useState(null);
+    const changeMrAPayment = useCallback((enabled, rate) => { setMrAEnabled(enabled); setMrARate(rate); }, []);
     const [auctionKind, setAuctionKind] = useState('sell');
     const [deliveryMode, setDeliveryMode] = useState('immediate');
     const isBuy = auctionKind === 'buy';
@@ -136,6 +140,7 @@ export default function AuctionAnItem() {
         setQuantity(draft.quantity); setMinBidMeat(draft.minimum);
         setInstantPrice(draft.buyout); setShowBuyout(Boolean(draft.buyout));
         setEscrowMode(draft.escrow); setDeliveryMode(draft.delivery);
+        setMrAEnabled(draft.acceptMrA === true); setMrARate(null);
         const preset = [6, 12, 24, 72, 168, 336, 720].includes(draft.hours);
         setAuctionTime(String(preset ? draft.hours : 24));
         setCustomDuration(!preset);
@@ -164,6 +169,9 @@ export default function AuctionAnItem() {
 
     function showPreview(event) {
         event.preventDefault();
+        if (mrAEnabled && !isBuy && !giveaway && (!Number.isSafeInteger(mrARate) || mrARate <= 0)) {
+            setError('Choose a valid Mr. A valuation from a fresh market quote.'); return;
+        }
         if (!isBundle && ((minimumPricing.message && !minBidMeat) || (buyoutPricing.message && !instantPrice && !isBuy))) { setError(minimumPricing.message || buyoutPricing.message); return; }
         const item = catalogItems.find(entry => String(entry.id) === selectedItem && isAuctionableItem(entry));
         const count = parseAuctionAmount(quantity, 5000000000);
@@ -197,7 +205,7 @@ export default function AuctionAnItem() {
         if (relisting && relistPricing === 'reduce' && !/^(?:[1-9]|[1-9][0-9])$/.test(relistReduction)) {
             setError('Enter a reduction from 1 to 99 percent.'); return;
         }
-        setPreview({ ...(relisting ? { autoRelist: true, relistCount: Number(relistCount), relistReduction: relistPricing === 'reduce' ? Number(relistReduction) : 0 } : {}), ...(giveaway ? { giveawayTitle: giveawayTitle.trim(), giveawayWinCondition: giveawayCondition } : {}), item: contents ? bundleTitle(contents, customTitle) : item.name, itemId: contents ? contents[0].id : item.id, quantity: contents ? 1 : count, ...(contents ? { bundleItems: contents, bundleTitle: customTitle || null, bundleImageItemId: contents.some(entry => entry.id === bundleImageItemId) ? bundleImageItemId : null } : {}), minBidMeat: minimum, instantPurchasePrice: purchasePrice, auctionTime, escrowMode, ...(customEndAt ? { customEndAt } : {}),
+        setPreview({ ...(mrAEnabled && !isBuy && !giveaway ? { mrARate } : {}), ...(relisting ? { autoRelist: true, relistCount: Number(relistCount), relistReduction: relistPricing === 'reduce' ? Number(relistReduction) : 0 } : {}), ...(giveaway ? { giveawayTitle: giveawayTitle.trim(), giveawayWinCondition: giveawayCondition } : {}), item: contents ? bundleTitle(contents, customTitle) : item.name, itemId: contents ? contents[0].id : item.id, quantity: contents ? 1 : count, ...(contents ? { bundleItems: contents, bundleTitle: customTitle || null, bundleImageItemId: contents.some(entry => entry.id === bundleImageItemId) ? bundleImageItemId : null } : {}), minBidMeat: minimum, instantPurchasePrice: purchasePrice, auctionTime, escrowMode, ...(customEndAt ? { customEndAt } : {}),
             image: contents ? bundleCover(contents, bundleImageItemId, bundlePrices).image : itemImageUrl(item.image), ...(isBuy ? { auctionKind, deliveryMode } : {}) });
         setError('');
         setBundleTitleConflict(false);
@@ -314,6 +322,7 @@ export default function AuctionAnItem() {
                         </div>
                     </div>}
                     {preview.giveawayTitle && <p className="mb-3 font-bold text-red-700">Giveaway: {preview.giveawayTitle}</p>}
+                    {preview.mrARate && <p className="my-3 text-sm">Accept Mr. A&apos;s at {preview.mrARate.toLocaleString()} Meat each, fixed for this auction.</p>}
                     <dl className="divide-y divide-gray-100 text-sm">
                         {!preview.bundleItems && <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] items-baseline gap-3 py-2.5">
                             <dt className="text-gray-500">Quantity</dt>
@@ -337,6 +346,7 @@ export default function AuctionAnItem() {
                         </div>
                         {preview.autoRelist && <div className="flex justify-between gap-3 py-2.5"><dt className="text-gray-500">Relist if unsold</dt><dd className="text-right">Up to {preview.relistCount} times · {preview.relistReduction ? `Reduce minimum bid ${preview.relistReduction}% each time` : 'Keep the same price'}</dd></div>}
                         {preview.auctionKind === 'buy' && <>{[['Purchase funds',buyFunding(preview.minBidMeat, preview.quantity).purchase],[`Commission reserve (${effectiveFeePercent(buyFunding(preview.minBidMeat, preview.quantity).feeReserve, BigInt(preview.minBidMeat) * BigInt(preview.quantity))})`,buyFunding(preview.minBidMeat, preview.quantity).feeReserve],['Required deposit, including fee reserve',buyFunding(preview.minBidMeat, preview.quantity).total]].map(([label,value]) => <div key={label} className="flex justify-between gap-3 py-3"><dt>{label}</dt><dd className="text-right font-semibold">{value.toLocaleString('en-US')} Meat</dd></div>)}</>}
+                    {preview.mrARate && preview.escrowMode && <p className="py-2 text-xs text-gray-600">Commission uses the full winning value, is collected only from Meat, and any shortfall is permanently waived. Every Mr. A goes to the seller.</p>}
                     {preview.auctionKind !== 'buy' && preview.escrowMode && previewFee !== null && <div className={`${preview.bundleItems ? 'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3' : 'flex justify-between gap-3'} py-3`}><dt>{preview.bundleItems ? <>Estimated fee <span className="block text-xs font-normal text-gray-500">At minimum bid · {effectiveFeePercent(previewFee, preview.minBidMeat)}</span></> : `Estimated ${feeLabel(previewFee, preview.minBidMeat)} at minimum bid`}</dt><dd className="shrink-0 text-right font-semibold tabular-nums">{previewFee.toLocaleString('en-US')} Meat</dd></div>}
                     </dl>
                     {preview.auctionKind === 'buy' && <p className="text-xs text-gray-500">The original-rate reserve is retained as a rollback buffer and rounds up to whole Meat. Actual fees are rounded down per fulfillment; unused reserve is refunded.</p>}
@@ -478,6 +488,7 @@ export default function AuctionAnItem() {
                         </ul> : <p className="bundle-empty-state mt-3 rounded-lg border border-dashed border-[#EADBD3] px-3 py-3 text-center text-xs text-gray-700">Your bundle is empty. Search for an item above and add it here.</p>}
                     </section>}
                     <hr className="mb-3 border-0 border-t border-[#ead8ce] dark:border-[#594337]" />
+                    {!isBuy && !giveaway && <MrAPaymentOptions enabled={mrAEnabled} rate={mrARate} onChange={changeMrAPayment} />}
                     {isBundle ? <>
                     <label htmlFor="minBidMeat" className="mb-2 block text-sm font-bold">{isBuy ? 'Maximum purchase price per item (Meat):' : 'Minimum Bid (Meat, whole listing):'}</label>
                     <input id="minBidMeat" type="text" inputMode="decimal" required autoComplete="off" value={minBidMeat} onChange={(event) => setMinBidMeat(event.target.value)} onBlur={() => setMinBidMeat(value => normalizeAuctionAmount(value, { meat: true }))} placeholder="e.g. 1000, 10b, 4.53m, 50k" className={fieldClass} />

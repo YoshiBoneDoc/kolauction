@@ -60,7 +60,7 @@ export default function InstantPurchaseAction({ auction, compact = false, showTe
             {!compact && <div className="mt-2 space-y-2 text-xs text-gray-600">
                 <p>Buy the entire listing immediately at this price.</p>
                 {showTerms && !auction.escrowMode && <SettlementTerms escrowMode={false} />}
-                {auction.escrowMode && <p>Use the same BID command. Any excess Meat is returned.</p>}
+                {auction.escrowMode && <p>{auction.mrARate ? 'Use BID or BUY with Meat, Mr. A’s, or both at the fixed rate. Extra Meat is returned; a Mr. A portion above buyout is rejected in full.' : 'Use the same BID command. Any excess Meat is returned.'}</p>}
                 {currentUser?.id === auction.sellerId && <p>Your optional buyout offer.</p>}
             </div>}
             {error && <p role="alert" className="mt-3 break-words text-sm text-red-700">{error}</p>}

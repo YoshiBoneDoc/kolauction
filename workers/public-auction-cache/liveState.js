@@ -2,8 +2,8 @@
 // deadlines, availability or outcomes as though they were a current observation.
 export const STATIC_FIELDS = ['id', 'auction_number', 'auction_kind', 'item', 'item_id', 'quantity', 'image',
     'duration_hours', 'created_at', 'escrow_mode', 'start_on_deposit',
-    'bundle_items', 'giveaway_title', 'giveaway_win_condition'];
-export const LIVE_FIELDS = ['id', 'min_bid_meat', 'custom_end_at', 'current_bid', 'bid_count', 'end_time', 'bid_deadline', 'status',
+    'bundle_items', 'giveaway_title', 'giveaway_win_condition', 'mr_a_rate'];
+export const LIVE_FIELDS = ['id', 'mr_a_rate', 'payment_meat', 'payment_mr_a', 'min_bid_meat', 'custom_end_at', 'current_bid', 'bid_count', 'end_time', 'bid_deadline', 'status',
     'instant_purchase_price', 'instant_purchased_at', 'has_winner', 'final_price', 'finalized_at',
     'completed_at', 'cancelled_at', 'expired_at', 'closure_reason', 'price_per_item',
     'purchased_quantity', 'remaining_quantity', 'available_quantity', 'reserved_quantity',

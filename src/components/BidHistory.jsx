@@ -1,3 +1,4 @@
+import { paymentLabel } from '../lib/mrAPayment';
 import PropTypes from 'prop-types';
 import useBidHistory from '../hooks/useBidHistory';
 
@@ -18,7 +19,7 @@ export default function BidHistory({ auction, currentUser, result }) {
                                 </ul>}
                             </div>
                             <div className="sm:text-right">
-                                <p className="font-bold text-gray-900">{bid.amount.toLocaleString('en-US')} Meat</p>
+                                <p className="font-bold text-gray-900">{paymentLabel(bid.paymentMeat ?? bid.amount, bid.paymentMrA, bid.amount)}</p>
                                 {auction.instantPurchasedAt && bid.amount === auction.instantPurchasePrice && <p className="text-xs font-semibold text-green-700">Buyout</p>}
                                 {auction.giveawayTitle ? bid.giveawayWinner && result.hasWinner && <p className="giveaway-winner-label text-xs font-semibold text-green-700">Giveaway Winner</p>
                                     : !auction.instantPurchasedAt && result.hasWinner && bid.amount === result.finalPrice && <p className="text-xs font-semibold text-green-700">Winning bid</p>}

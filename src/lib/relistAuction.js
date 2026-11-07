@@ -17,6 +17,7 @@ export function relistDraft(auction) {
         buyout: auction.instantPurchasePrice > 0 ? String(auction.instantPurchasePrice) : '',
         escrow: auction.escrowMode, hours,
         delivery: auction.deliveryMode || 'immediate',
+        ...(auction.mrARate ? { acceptMrA: true } : {}),
         entries: (auction.bundleItems || []).map(({ id, quantity }) => ({ id, quantity: String(quantity) })),
         title: auction.bundleItems?.length > 1 ? (auction.item === bundleTitle(auction.bundleItems) ? '' : auction.item.replace(/^Bundle:\s*/, '')) : '',
         cover: auction.bundleItems?.find(item => item.image === auction.image)?.id ?? null,
@@ -26,5 +27,5 @@ export function relistDraft(auction) {
 export function relistSnapshot(auction) {
     return Object.fromEntries(['id', 'sellerId', 'status', 'item', 'itemId', 'quantity', 'minBidMeat',
         'instantPurchasePrice', 'auctionTime', 'escrowMode', 'auctionKind', 'pricePerItem', 'deliveryMode',
-        'createdAt', 'customEndAt', 'endTime', 'image', 'bundleItems'].map(key => [key, auction[key]]));
+        'createdAt', 'customEndAt', 'endTime', 'image', 'bundleItems', 'mrARate'].map(key => [key, auction[key]]));
 }

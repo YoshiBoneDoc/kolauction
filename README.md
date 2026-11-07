@@ -6,6 +6,16 @@ KMail bot operating **kHub (#3888760)**. Start new sessions with the
 [bot operations](bot/README.md:1) and [roadmap](ROADMAP.md:1); inspect current code
 before treating older documentation as unfinished work or deployed behavior.
 
+## Development principle
+
+**Consider performance, database load and scalability in every feature, change and
+optimization across the website, Workers, SQL and bot.** Build on existing shared
+caching, request coalescing, efficient queries, pagination and bounded concurrency
+where practical. Preserve established optimizations; avoid redundant reads,
+unnecessary polling, expensive unbounded operations and competing infrastructure.
+Design for growing traffic and auction activity without compromising correctness,
+data freshness, privacy or financial safety.
+
 ## Architecture
 
 | Component | Entry point | Runtime |
@@ -148,3 +158,16 @@ Ignoring a path does not remove previously committed secrets from Git history.
 Keep this README general and the handoff focused on current state. Detailed evidence
 and procedures belong in linked technical documents. The owner's personal
 `bot/QUICKSTART_README.md` must remain unchanged unless explicitly requested.
+
+The [November 7 Home timeout follow-up](docs/HOME_READ_TIMEOUT.md:1) adds queued
+SQL 236 to remove a redundant abandoned-draft check on completed Home results.
+Local parity/profiling passed; production resolution remains unverified.
+
+Optional Mr. A payments are [implemented locally](docs/MR_A_PAYMENTS.md:1) for
+Direct/Escrow Sell and Bundle auctions, using locked market-validated rates,
+physical-asset accounting and Meat-capped commissions. Queued SQL 237–239 and
+compatible website/cache/bot releases are required. New mixed Escrow creation
+remains disabled until explicit owner-controlled activation; nothing was deployed.
+
+The [Mr. A audit](docs/MR_A_AUDIT.md:1) records confirmed fixes and remaining
+rollout requirements; apply audit migration 239 before any mixed escrow activation.

@@ -157,8 +157,8 @@ export const AuctionsProvider = ({ children }) => {
         return id;
     };
 
-    const placeBid = async (auctionId, amount) => {
-        return submitConfirmedBid(() => storage.bid(auctionId, amount), () => refreshReads(true, false));
+    const placeBid = async (auctionId, amount, payment = null) => {
+        return submitConfirmedBid(() => storage.bid(auctionId, amount, payment), () => refreshReads(true, false));
     };
 
     const confirmTrade = async (auctionId) => {

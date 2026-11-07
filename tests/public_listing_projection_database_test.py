@@ -68,7 +68,13 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
                 before_235=sql(financial_probe)
                 definition=sql("select pg_get_functiondef('khub_bot.public_listing_page(text,uuid,text,text,text,integer,text,text,numeric,numeric,text,text)'::regprocedure)")
                 sql(definition.replace('FUNCTION khub_bot.public_listing_page(', 'FUNCTION khub_bot.before_235_public_listing_page('))
+            if migration.name.startswith('202611070236_'):
+                before_236=sql(financial_probe)
+                definition=sql("select pg_get_functiondef('khub_bot.home_cards_core()'::regprocedure)")
+                sql(definition.replace('FUNCTION khub_bot.home_cards_core()', 'FUNCTION khub_bot.home_before_236()'))
             sql(migration.read_text())
+            if migration.name.startswith('202611070236_'):assert before_236==sql(financial_probe)
+
             if migration.name.startswith('202611060235_'):assert before_235==sql(financial_probe)
 
             if migration.name.startswith('202611060233_'):assert before_233==sql(financial_probe), 'Browse optimization changed financial functions'
@@ -265,6 +271,18 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
             visit(plan['Plan']);loops.append(max(scans))
             print(rpc,'1000 diverse-seller inner plan ms:',plan['Execution Time'],'seller-pool scan loops:',scans)
         assert loops[0]>=1000 and loops[1]==1,loops
+        # Completed history exercises the formerly redundant draft helper.
+        sql(f"insert into public.auctions(seller_id,seller_username,item,quantity,min_bid_meat,current_bid,duration_hours,end_time,created_at,status,winner_id,final_price,completed_at,seller_confirmed_at,buyer_confirmed_at) select '{other}','Fixture','Completed pressure',1,100,100,24,now()-interval '1 day',now()-interval '2 days','completed','{owner}',100,now()-n*interval '1 second',now(),now() from generate_series(1,1000)n")
+        sql('analyze public.auctions;')
+        for viewer in [None,owner,other,restricted,administrator]:
+            pair=json.loads(sql("select jsonb_build_object('old',khub_bot.home_before_236()-'server_time','new',khub_bot.home_cards_core()-'server_time')",viewer))
+            assert pair['old']==pair['new'],viewer
+        for predicate in ["and not khub_bot.is_abandoned_escrow_draft(a)",""]:
+            timings=[]
+            for _ in range(5):
+                plan=json.loads(sql(f"explain(analyze,buffers,format json) select a.id from khub_bot.visible_auctions() a where a.status='completed' {predicate} order by a.completed_at desc nulls last,a.id limit 24"))[0]
+                timings.append([plan['Execution Time'],plan['Plan'].get('Shared Hit Blocks')])
+            print('Home recent',predicate or 'without redundant helper','[ms,shared hits]:',timings)
         # Complete snapshot is valid without exposing query text or literals.
         snapshot_sql=(ROOT/'scripts/query-stats-snapshot.sql').read_text()
         before=json.loads(sql(snapshot_sql));sql('select public.read_auction_card_context(array['+lit(buy)+'::uuid])',owner);after=json.loads(sql(snapshot_sql))
