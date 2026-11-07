@@ -72,7 +72,20 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
                 before_236=sql(financial_probe)
                 definition=sql("select pg_get_functiondef('khub_bot.home_cards_core()'::regprocedure)")
                 sql(definition.replace('FUNCTION khub_bot.home_cards_core()', 'FUNCTION khub_bot.home_before_236()'))
+            if migration.name.startswith('202611070242_'):
+                before_242=sql(financial_probe)
+                definition=sql("select pg_get_functiondef('khub_bot.home_cards_core()'::regprocedure)")
+                sql(definition.replace('FUNCTION khub_bot.home_cards_core()', 'FUNCTION khub_bot.home_before_242()'))
+            if migration.name.startswith('202611070243_'):
+                before_243=sql(financial_probe)
+                definition=sql("select pg_get_functiondef('khub_bot.buy_history(uuid)'::regprocedure)")
+                sql(definition.replace('FUNCTION khub_bot.buy_history(', 'FUNCTION khub_bot.buy_history_before_243('))
             sql(migration.read_text())
+            if migration.name.startswith('202611070243_'):
+                assert sql(financial_probe)==before_243, 'History optimization changed financial definitions'
+
+            if migration.name.startswith('202611070242_'):
+                assert sql(financial_probe)==before_242, 'Home join changed financial definitions'
             if migration.name.startswith('202611070236_'):assert before_236==sql(financial_probe)
 
             if migration.name.startswith('202611060235_'):assert before_235==sql(financial_probe)
@@ -110,6 +123,9 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
         import re
         protocol=(ROOT/'workers/public-auction-cache/protocol.js').read_text()
         public_fields=re.findall(r"'([^']+)'",protocol.split('export const PUBLIC_FIELDS = [',1)[1].split('];',1)[0])+['bundle_items']
+        # Physical payment composition is fetched by live/detail readers; the
+        # lightweight card whitelist carries acceptance, not payment balances.
+        public_fields=[key for key in public_fields if key not in ('payment_meat','payment_mr_a')]
         for viewer in [None,owner,other,restricted,administrator]:
             pair=json.loads(sql(f"select jsonb_build_object('old',khub_bot.public_auction(a,1,'Bidder 1',null),'new',khub_bot.public_listing_projection(a,1,'Bidder 1',null)) from public.auctions a where id='{aid}';",viewer))
             for key in public_fields:
@@ -271,6 +287,21 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
             visit(plan['Plan']);loops.append(max(scans))
             print(rpc,'1000 diverse-seller inner plan ms:',plan['Execution Time'],'seller-pool scan loops:',scans)
         assert loops[0]>=1000 and loops[1]==1,loops
+        # Home must scan its seller pool once, with identical selection/privacy.
+        for viewer in [None,owner,other,restricted,administrator]:
+            pair=json.loads(sql("select jsonb_build_object('old',khub_bot.home_before_242()-'server_time','new',khub_bot.home_cards_core()-'server_time')",viewer))
+            assert pair['old']==pair['new'],viewer
+        home_loops=[]
+        for rpc in ['khub_bot.home_before_242','khub_bot.home_cards_core']:
+            query=sql(f"select prosrc from pg_proc where oid='{rpc}()'::regprocedure")
+            plan=json.loads(sql('explain(analyze,buffers,format json) '+query))[0]
+            scans=[]
+            def visit_home(node):
+                if node.get('CTE Name')=='seller_restrictions': scans.append(node['Actual Loops'])
+                for child in node.get('Plans',[]): visit_home(child)
+            visit_home(plan['Plan']); home_loops.append(max(scans))
+            print(rpc,'Home diverse-seller plan ms:',plan['Execution Time'],'seller-pool loops:',scans)
+        assert home_loops[0]>=1000 and home_loops[1]==1,home_loops
         # Completed history exercises the formerly redundant draft helper.
         sql(f"insert into public.auctions(seller_id,seller_username,item,quantity,min_bid_meat,current_bid,duration_hours,end_time,created_at,status,winner_id,final_price,completed_at,seller_confirmed_at,buyer_confirmed_at) select '{other}','Fixture','Completed pressure',1,100,100,24,now()-interval '1 day',now()-interval '2 days','completed','{owner}',100,now()-n*interval '1 second',now(),now() from generate_series(1,1000)n")
         sql('analyze public.auctions;')
@@ -284,6 +315,9 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
                 timings.append([plan['Execution Time'],plan['Plan'].get('Shared Hit Blocks')])
             print('Home recent',predicate or 'without redundant helper','[ms,shared hits]:',timings)
         # Complete snapshot is valid without exposing query text or literals.
+        pressure=json.loads(sql((ROOT/'scripts/traffic-pressure-snapshot.sql').read_text()))
+        assert set(pressure)=={'captured_at','settings','database','activity_groups','blocked','financial_lock'}
+        assert isinstance(pressure['blocked'],list) and isinstance(pressure['financial_lock'],list)
         snapshot_sql=(ROOT/'scripts/query-stats-snapshot.sql').read_text()
         before=json.loads(sql(snapshot_sql));sql('select public.read_auction_card_context(array['+lit(buy)+'::uuid])',owner);after=json.loads(sql(snapshot_sql))
         assert before['snapshot_version']==1 and len(before['statements'])>50
@@ -295,6 +329,23 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
         assert 'matched' in delta.stdout and 'read_auction_card_context' in delta.stdout
         print('PASS: lightweight Buy/closed identity parity, private reservation isolation, public fields and complete statistics snapshot/delta')
         print('PASS: public Sell cache-field parity for anonymous, owner, bidder, banned viewer and administrator; no private fields.')
+        # Exercise full bounded Buy history: names, fees, admin evidence and cap.
+        sql(f"insert into khub_bot.receipts(mail_id,sender_id,received_at,payload,result) select 'history-perf-'||n,48889802,now(),'{{}}'::jsonb,'fixture' from generate_series(1,120)n")
+        sql(f"insert into khub_bot.buy_fulfillments(receipt_id,auction_id,seller_id,seller_kol_id,quantity,price_per_item,payment_meat,commission_meat,created_at) select 'history-perf-'||n,'{buy}','{other}',48889802,1,100,100,4,now()-n*interval '1 second' from generate_series(1,120)n")
+        for viewer in [None,owner,other,restricted,administrator]:
+            pair=json.loads(sql(f"select jsonb_build_object('old',khub_bot.buy_history_before_243('{buy}'),'new',khub_bot.buy_history('{buy}'))",viewer))
+            assert pair['old']==pair['new'],viewer
+            assert len(pair['new'])==100
+        for rpc in ['khub_bot.buy_history_before_243','khub_bot.buy_history']:
+            timings=[]
+            for _ in range(3):
+                plan=json.loads(sql(f"explain(analyze,buffers,format json) select {rpc}('{buy}')",owner))[0]
+                timings.append(plan['Execution Time'])
+            print(rpc,'100-row Buy history execution ms:',timings)
+        history_body=sql("select prosrc from pg_proc where oid='khub_bot.buy_history(uuid)'::regprocedure")
+        assert history_body.count('khub_bot.can_view_usernames()')==1
+        assert history_body.count('khub_bot.is_administrator(auth.uid())')==1
+        print('PASS: 120-fulfillment Buy history parity, 100-row cap and permission reuse')
         assert sql(definitions)==financial_before
     finally:
         if started:pg('-m','immediate','-w','stop')

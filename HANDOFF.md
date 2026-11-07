@@ -173,3 +173,25 @@ financial functions, extra queries or polling changed. Matching ignored bot SQL
 copy included. Mr. A Direct disposable database regressions pass with mixed and
 Meat-only projection/privacy assertions. Not applied to production; cached cards
 must expire or be invalidated after installation.
+
+November 7 traffic follow-up: see `docs/NOVEMBER_7_TRAFFIC_PRESSURE.md`. Owner
+noticed slowdown during Mr. A Sell creation; creation's financial-lock contention
+is a hypothesis, not established by cumulative counters. Queued additive **242**
+replaces Home's correlated seller-pool rescan with a join; local 1,000-seller plan
+scans fall 1,000 → 1 but total time improves only ~4%. Privacy/parity/financial
+regressions pass. New read-only `scripts/traffic-pressure-snapshot.sql` captures
+waits/blockers and financial-lock holders without raw SQL; stats snapshot adds
+optional JIT counters. Need a during-incident capture and a short snapshot pair;
+no new retries/TTLs/polling, deployment, production SQL or live bot action occurred.
+
+Additional incident evidence: November 7 exports (9)/(11) span 56.106 seconds:
+read_auction_page 2 calls/7.262s, public browse 1/2.128s, bot ingest 391/3.609s.
+Pressure export (10) was idle, no blockers/financial lock, JIT off. Timeout logs
+pinpoint Buy history in full read_auction_page and public_listing_page separately.
+Queued **243** reuses permissions within Buy history; 120-fulfillment JSON parity
+and 100-row/privacy checks pass for five roles. No inference of Sell-only history,
+old browser builds, duplicate bot payments or current CPU exhaustion is warranted.
+Current Profile/Seller requests can still call the six-argument reader. Both SQL
+optimizations remain local; verify rollout and measure public browse separately.
+Measured Buy history 243: local 100-row host reads ~27ms → ~3.2ms (~88% less time),
+exact output/privacy parity retained. Live incident resolution remains unverified.

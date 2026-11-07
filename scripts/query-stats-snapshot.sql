@@ -25,6 +25,11 @@ select jsonb_build_object('snapshot_version',1,'captured_at',m.captured_at,
   'calls',s.calls,'total_exec_ms',s.total_exec_time,'total_plan_ms',s.total_plan_time,
   'shared_blks_read',s.shared_blks_read,'shared_blks_hit',s.shared_blks_hit,
   'temp_blks_written',s.temp_blks_written,
+  'jit_functions',to_jsonb(s)->'jit_functions',
+  'jit_generation_ms',to_jsonb(s)->'jit_generation_time',
+  'jit_inlining_ms',to_jsonb(s)->'jit_inlining_time',
+  'jit_optimization_ms',to_jsonb(s)->'jit_optimization_time',
+  'jit_emission_ms',to_jsonb(s)->'jit_emission_time',
   'entry_stats_since',to_jsonb(s)->>'stats_since'
  ) order by s.queryid,s.userid,s.toplevel) from statements s),'[]'::jsonb)) as snapshot
 from metadata m;
