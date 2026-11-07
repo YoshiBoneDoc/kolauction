@@ -1,3 +1,4 @@
+import { withReadDeadline } from './readDeadline.js';
 import { createPrivateCardCache } from './privateCardCache.js';
 import { LIVE_FIELDS } from '../../workers/public-auction-cache/liveState.js';
 // Shared public snapshots and private viewer context use separate transports.
@@ -17,20 +18,22 @@ export function createPublicAuctionReader(client, { enabled = false, fetch: fetc
     let generation = 0;
     const invalidate = () => { generation++; eligibility = null; details.clear(); overlays.clear(); cardCache.clear(); };
     globalThis.window?.addEventListener('khub:ignore-list-changed', invalidate);
-    async function affected(session) {
+    async function affected(session, signal) {
         const token = session?.access_token || session?.user?.id || (session ? 'signed-in' : 'anon');
         if (scope !== token) { scope = token; invalidate(); }
         if (!session) return false;
         if (!eligibility || Date.now() - eligibility.at >= 60000) {
             const revision = generation;
-            const promise = client.rpc('read_ignore_relationships').then(({ data, error }) => {
+            const promise = withReadDeadline(async abort => {
+                const query = client.rpc('read_ignore_relationships');
+                const { data, error } = await (query.abortSignal ? query.abortSignal(abort) : query);
                 if (error) throw error;
                 if (typeof data !== 'boolean') throw new Error('Invalid private visibility context.');
                 return data;
-            });
+            }, { signal });
             eligibility = { at: Date.now(), promise };
-            try { const result = await promise; if (revision !== generation) return affected(session); return result; }
-            catch (error) { eligibility = null; throw error; }
+            try { const result = await promise; if (revision !== generation) return affected(session, signal); return result; }
+            catch (error) { if (eligibility?.promise === promise) eligibility = null; throw error; }
         }
         return eligibility.promise;
     }
@@ -45,7 +48,7 @@ export function createPublicAuctionReader(client, { enabled = false, fetch: fetc
             if (error) throw error;
             const needsEligibility = ['home', 'browse', 'seller'].includes(request.view)
                 && request.trade !== 'escrow' && request.kind !== 'buy';
-            const restricted = needsEligibility && await affected(data.session);
+            const restricted = needsEligibility && await affected(data.session, request.signal);
             if (data.session && ['browse', 'seller'].includes(request.view) && request.status === 'all') return false;
             if (restricted && ['home', 'browse', 'seller'].includes(request.view)
                 && request.trade !== 'escrow' && request.kind !== 'buy') return false;

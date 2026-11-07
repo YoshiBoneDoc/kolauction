@@ -138,7 +138,15 @@ export const AuctionsProvider = ({ children }) => {
     }, [refreshReads]);
 
     // Retry buttons still use the shared cache. Only action refreshes bypass it.
-    const refreshAuctions = useCallback(() => refreshReads(), [refreshReads]);
+    const pendingRetry = useRef(null);
+    const refreshAuctions = useCallback(() => {
+        if (pendingRetry.current) return pendingRetry.current;
+        const task = refreshReads().finally(() => {
+            if (pendingRetry.current === task) pendingRetry.current = null;
+        });
+        pendingRetry.current = task;
+        return task;
+    }, [refreshReads]);
     const refreshAfterAction = () => refreshReads(true);
 
     const addAuction = async (auction) => {

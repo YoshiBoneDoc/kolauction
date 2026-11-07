@@ -49,9 +49,9 @@ function InvitationGate() {
 }
 
 function AuctionReadError() {
-    const { error, refreshAuctions } = useContext(AuctionsContext) || {};
+    const { error, refreshAuctions, isRefreshing } = useContext(AuctionsContext) || {};
     return error ? <div role="alert" className="bg-red-50 p-4 text-red-700">
-        {error}{" "}<button onClick={refreshAuctions} className="underline">Retry</button>
+        {error}{" "}<button onClick={refreshAuctions} disabled={isRefreshing} className="underline disabled:opacity-60">{isRefreshing ? 'Retrying…' : 'Retry'}</button>
     </div> : null;
 }
 

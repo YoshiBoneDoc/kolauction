@@ -870,3 +870,19 @@ test('a relist overlays its reduced minimum and new custom deadline with one sha
     assert.equal(f.calls.filter(q => q.view === 'browse').length, 1);
     assert.equal(f.calls.filter(q => q.view === 'batch-live').length, 2);
 });
+
+test('an aborted eligibility check is not reused by Retry after a stalled private read', async () => {
+    let calls = 0;
+    const client = {
+        auth: { getSession: async () => ({ data: { session: { access_token: 'fixture-token' } } }) },
+        rpc() { calls++; return calls === 1 ? new Promise(() => {}) : Promise.resolve({ data: false }); },
+    };
+    const reader = createPublicAuctionReader(client, { enabled: true });
+    const controller = new AbortController();
+    const first = reader.accepts({ view: 'home', signal: controller.signal });
+    await new Promise(resolve => setImmediate(resolve));
+    controller.abort(new Error('Page read expired'));
+    await assert.rejects(first, /Page read expired/);
+    assert.equal(await reader.accepts({ view: 'home' }), true);
+    assert.equal(calls, 2);
+});

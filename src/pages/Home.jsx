@@ -16,7 +16,7 @@ import HomePoll from '../components/HomePoll';
 import SiteTradeTotals from '../components/SiteTradeTotals';
 
 export default function Home() {
-    const { auctions, homeSections, siteTotals, listingOrderDelayed = false, isLoading, error, hasLoaded = !isLoading && !error, refreshAuctions } = useContext(AuctionsContext);
+    const { auctions, homeSections, siteTotals, listingOrderDelayed = false, isLoading, isRefreshing, error, hasLoaded = !isLoading && !error, refreshAuctions } = useContext(AuctionsContext);
     const now = useNow(auctions);
     const featuredGiveaway = useFeaturedGiveaway();
     const featuredPollTarget = useRef(null);
@@ -38,7 +38,7 @@ export default function Home() {
                 <div ref={featuredPollTarget} />
                 {error && <p role="alert" className="mb-4 text-red-700">
                     {hasLoaded ? 'Refresh delayed. Showing previously loaded auctions.' : 'Auctions could not be loaded. Please try again.'}{' '}
-                    <button onClick={refreshAuctions} className="underline">Retry</button>
+                    <button onClick={refreshAuctions} disabled={isRefreshing} className="underline disabled:opacity-60">{isRefreshing ? 'Retrying…' : 'Retry'}</button>
                 </p>}
                 {listingOrderDelayed && <p role="status" className="mb-4">Auction selection and ordering are being refreshed. Available prices are verified separately.</p>}
                 {auctions.some(auction => auction.liveUnavailable) && <div className="mb-4 grid gap-3 sm:grid-cols-2">
