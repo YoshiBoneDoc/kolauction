@@ -34,6 +34,7 @@ export default function useBidHistory(auction, client = supabase) {
                 if (!older && data.unchanged === true) { publish({ ...current, loading: false, error: false }); return; }
                 if (!older) { revision = data.revision || null; revisionAt = Date.now(); }
                 const mapped = data.bids.map(bid => ({ id: bid.id, bidder: bid.bidder_username, amount: Number(bid.amount),
+                    paymentMeat: Number(bid.payment_meat ?? bid.amount), paymentMrA: Number(bid.payment_mr_a || 0),
                     timestamp: Date.parse(bid.created_at), giveawayWinner: bid.giveaway_winner === true,
                     adminDeliveryReferences: bid.admin_delivery_references || [] }));
                 const overlap = mapped.some(bid => current.bids.some(old => old.id === bid.id));

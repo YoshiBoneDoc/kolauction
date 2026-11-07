@@ -7,6 +7,7 @@ import FittedPrice from './FittedPrice';
 import SellPrice from './SellPrice';
 import BuyAuctionCard from './BuyAuctionCard';
 import TradeTypeBadge from './TradeTypeBadge';
+import MrAAcceptedIcon from './MrAAcceptedIcon';
 import { useContext, useId } from 'react';
 import PropTypes from 'prop-types';
 import { Link, useLocation } from 'react-router-dom';
@@ -50,6 +51,7 @@ export default function CompactAuctionCard({ auction, now, expanded = false, onT
                     <time dateTime={new Date(auction.endTime).toISOString()} title={`Ends ${new Date(auction.endTime).toLocaleString()}`}><RemainingTime endTime={auction.endTime} /></time> left
                 </p> : <p title={status.label} className={`max-w-full truncate leading-3 text-xs font-semibold ${status.color}`}>{status.label}</p>}
                 <TradeTypeBadge escrow={auction.escrowMode} compact short />
+                {auction.mrARate > 0 && <MrAAcceptedIcon tiny />}
             </div>
         </header>
         <Link to={`/auction/${auction.id}`} state={linkState} aria-label={`View ${itemLabel}`} className="col-start-1 row-start-2 row-span-2 flex h-[60px] w-[60px] self-center items-center justify-center rounded-md bg-white/70">

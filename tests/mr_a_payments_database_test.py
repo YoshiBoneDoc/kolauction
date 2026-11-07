@@ -172,6 +172,11 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
         same=create(item='Mr. Accessory',itemId=194)
         bid(same,0,1)
         assert state(same)['payment_mr_a']==1
+        # Home's lightweight whitelist must carry the acceptance indicator too.
+        for aid, expected in [(same,70000000),(plain,None)]:
+            card=json.loads(sql(f"select khub_bot.public_listing_projection(a,0,null,null) from public.auctions a where id='{aid}'"))
+            assert card['mr_a_rate']==expected,card
+            assert 'seller_id' not in card and 'fee_meat' not in card
         print('Mr. A Direct database regressions passed')
     finally:
         if started: pg('-m','immediate','-w','stop')

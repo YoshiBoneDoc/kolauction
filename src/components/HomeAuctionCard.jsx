@@ -8,6 +8,7 @@ import { formatCompactMeat } from '../lib/formatMeat';
 import FittedPrice from './FittedPrice';
 import SellPrice from './SellPrice';
 import TradeTypeBadge from './TradeTypeBadge';
+import MrAAcceptedIcon from './MrAAcceptedIcon';
 import { getAuctionStatus } from '../lib/auctionLifecycle';
 
 export default function HomeAuctionCard({ auction, now }) {
@@ -36,6 +37,7 @@ export default function HomeAuctionCard({ auction, now }) {
             <div className={`col-span-2 col-start-1 ${buy ? 'row-start-4' : 'row-start-3'} flex min-w-0 items-center gap-1`}>
                 {completed ? <p className="min-w-0 flex-1 truncate text-[11px] leading-4 text-green-700">{auction.completedAt ? <>Completed · <time dateTime={new Date(auction.completedAt).toISOString()}>{new Date(auction.completedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</time></> : 'Trade completed'}</p>
                     : <p className={`min-w-0 flex-1 truncate text-[11px] leading-4 ${auctionEndingSoon(auction, now) ? 'text-red-700' : 'text-gray-600'}`}>Ends in <time dateTime={new Date(auction.endTime).toISOString()}><RemainingTime endTime={auction.endTime} /></time></p>}
+                {!buy && auction.mrARate > 0 && <MrAAcceptedIcon tiny />}
                 {!buy && <span className="shrink-0"><TradeTypeBadge escrow={auction.escrowMode} tiny short /></span>}
             </div>
         </Link>

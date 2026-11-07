@@ -398,3 +398,27 @@ test('attention rows are full-width, grouped once per nonempty category, and abs
     assert.doesNotMatch(depositsOnly,/>Awaiting settlement<\/h2>/);
     assert.doesNotMatch(render({page:'profile',userId:'seller',auctions:[]}),/aria-label="Auctions needing attention"/);
 });
+
+test('completed escrow layout separates payment value and keeps commission details host-only', () => {
+    const completed = { ...auction, status: 'completed', escrowMode: true, mrARate: 78_000_000,
+        finalPrice: 80_000_000, paymentMeat: 2_000_000, paymentMrA: 1,
+        feeMeat: 1_000_000, waivedFeeMeat: 500_000, instantPurchasedAt: '2026-11-07' };
+    const seller = render({ auction: completed, userId: 'seller' });
+    assert.match(seller, /Escrow trade · Completed via kHub bot/);
+    assert.match(seller, /1 x <img[^>]+alt="Mr. A"/);
+    assert.match(seller, /\+ 2,000,000 Meat/);
+    assert.match(seller, /80,000,000 Meat equivalent/);
+    assert.match(seller, /Commission \(1.25%\)/);
+    assert.match(seller, /\+ 1,000,000 Meat/);
+    assert.match(seller, /Commission permanently waived/);
+    assert.match(seller, /Payment and items delivered via KMail/);
+    assert.match(seller, /Auction ended early through buyout/);
+    for (const userId of ['buyer', 'outsider', null]) {
+        const html = render({ auction: completed, userId });
+        assert.match(html, /80,000,000 Meat equivalent/);
+        assert.doesNotMatch(html, /Commission|Seller proceeds|500,000/);
+    }
+    const legacy = render({ auction: { ...auction, status: 'completed', escrowMode: true, feeMeat: 4 }, userId: 'seller' });
+    assert.match(legacy, /96 Meat/);
+    assert.doesNotMatch(legacy, /Meat equivalent|Commission permanently waived/);
+});

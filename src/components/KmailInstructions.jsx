@@ -14,8 +14,9 @@ export default function KmailInstructions({ auction, mode = 'bid', showHeading =
     const minimum = mode === 'list' ? null : minimumAuctionBid(auction);
     return (
         <section aria-label={`${mode} KMail instructions`} className={`w-full space-y-2 rounded border border-gray-200 bg-white text-left text-sm leading-5 text-gray-800 ${mode === 'bid' ? 'bid-kmail-instructions p-4' : 'p-3'}`}>
-            {auction.isBundle && mode !== 'list' && <BundleContents items={auction.bundleItems} />}
+            {auction.isBundle && mode === 'buy' && <BundleContents items={auction.bundleItems} />}
             {mode === 'bid' && showHeading && <h2 className="text-base font-semibold text-gray-900">Place a Bid</h2>}
+            {auction.isBundle && mode === 'bid' && <p className="text-xs text-gray-600">One bid buys the entire bundle; items cannot be purchased separately.</p>}
             <p>Send a KMail to <strong>kHub (#3888760)</strong> with this exact message:</p>
             <CopyMessage text={command} label={`${command.split(' ')[0]} command`} className="text-base" compact={mode === 'bid'} />
             {mode === 'list' ? <>

@@ -7,6 +7,7 @@ import FittedPrice from './FittedPrice';
 import SellPrice from './SellPrice';
 import BuyAuctionCard from './BuyAuctionCard';
 import TradeTypeBadge from './TradeTypeBadge';
+import MrAAcceptedIcon from './MrAAcceptedIcon';
 import WinnerLink from './WinnerLink';
 import { useContext, useState } from 'react';
 import PropTypes from 'prop-types';
@@ -39,6 +40,7 @@ export default function AuctionCard({ auction, now }) {
             {auction.auctionNumber && <p className="mt-2 text-center text-xs text-gray-600">Auction #{auction.auctionNumber}</p>}
             <p className="relative z-10 mx-auto mt-2 w-fit break-words text-center text-sm">Sold by <SellerLink auction={auction} /></p>
             <p className="mt-1 text-center"><TradeTypeBadge escrow={auction.escrowMode} /></p>
+            {auction.mrARate > 0 && <div className="mt-1 flex justify-center"><MrAAcceptedIcon /></div>}
             <p className="mt-3 text-center text-sm text-gray-600">Minimum bid: {formatCompactMeat(auction.minBidMeat)} Meat</p>
             <div className="my-3 text-center">
                 <p className="text-sm text-gray-600">{active ? 'Current bid' : result.hasWinner ? 'Final price' : 'Last bid'}</p>

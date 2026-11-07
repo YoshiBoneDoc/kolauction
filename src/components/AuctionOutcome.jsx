@@ -1,5 +1,6 @@
 import { paymentLabel } from '../lib/mrAPayment';
-import { feeLabel } from '../lib/feeDisplay';
+import PaymentAssets from './PaymentAssets';
+import { effectiveFeePercent, feeLabel } from '../lib/feeDisplay';
 import ConfirmTradeButton from './ConfirmTradeButton';
 import TradeFeedback from './TradeFeedback';
 import WithdrawTradeRating from './WithdrawTradeRating';
@@ -81,6 +82,35 @@ export default function AuctionOutcome({ auction, now }) {
             ? auction.escrowTimingReview ? 'This auction is on hold for administrator review.' : 'Bidding and automatic closing are paused while an administrator reviews an account restriction. No winner has been declared. Existing bids are preserved.'
             : 'An administrator cancelled this held auction. No winner or completed trade was recorded. Existing bids remain in its history.'}</p>
     </section>;
+
+    if (auction.escrowMode && result.status === 'completed') return (
+        <section aria-label="Auction escrow" className="mx-auto mt-6 max-w-4xl space-y-5 break-words rounded-2xl border border-gray-200 bg-white p-4 shadow sm:p-6">
+            <header>
+                <h2 className="flex items-center gap-2 text-2xl font-bold">
+                    <svg aria-hidden="true" className="h-5 w-5 shrink-0 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" /></svg>
+                    {result.label}
+                </h2>
+                <p className="mt-2 text-xs text-gray-500">Escrow trade · Completed via kHub bot</p>
+            </header>
+            {result.hasWinner && <dl className="space-y-4 border-t border-gray-200 pt-5 text-sm">
+                <div className="flex justify-between gap-4"><dt className="text-gray-500">Winner</dt><dd className="text-right"><WinnerLink auction={auction} /></dd></div>
+                <div className="flex justify-between gap-4"><dt className="text-gray-500">Final price</dt><dd className="text-right">
+                    <strong><PaymentAssets meat={auction.paymentMeat ?? result.finalPrice} mrA={auction.paymentMrA} /></strong>
+                    {auction.mrARate && <p className="mt-3 text-xs text-gray-500">{result.finalPrice.toLocaleString('en-US')} Meat equivalent</p>}
+                </dd></div>
+            </dl>}
+            {isSeller && result.hasWinner && <dl className="space-y-4 border-t border-gray-200 pt-5 text-sm">
+                <div className="flex justify-between gap-4"><dt className="text-gray-500">Commission ({effectiveFeePercent(auction.feeMeat, result.finalPrice)})</dt><dd className="text-right font-semibold">{(auction.feeMeat || 0).toLocaleString('en-US')} Meat</dd></div>
+                <div className="flex justify-between gap-4"><dt className="text-gray-500">Seller proceeds</dt><dd className="text-right font-semibold"><PaymentAssets meat={Math.max(0, (auction.paymentMeat ?? result.finalPrice) - (auction.feeMeat || 0))} mrA={auction.paymentMrA} /></dd></div>
+                {auction.waivedFeeMeat > 0 && <div className="flex justify-between gap-4"><dt className="text-gray-500">Commission permanently waived</dt><dd className="text-right">{auction.waivedFeeMeat.toLocaleString('en-US')} Meat</dd></div>}
+            </dl>}
+            <div className="rounded-lg bg-gray-50 p-3 text-sm">
+                <p className="flex items-center gap-2"><svg aria-hidden="true" className="h-4 w-4 shrink-0 text-green-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m12 3 9 5v8l-9 5-9-5V8zM3 8l9 5 9-5M12 13v8M7.5 5.5l9 5" /></svg>Payment and items delivered via KMail</p>
+                {auction.instantPurchasedAt && <p className="mt-2 text-xs text-gray-500">Auction ended early through buyout.</p>}
+            </div>
+            {escrowContact && <div className="text-right">{escrowContact}</div>}
+        </section>
+    );
 
     if (auction.escrowMode) return (
         <section aria-label="Auction escrow" className="mx-auto mt-6 max-w-4xl space-y-4 break-words rounded-lg border border-gray-200 bg-white p-4 shadow sm:p-6">

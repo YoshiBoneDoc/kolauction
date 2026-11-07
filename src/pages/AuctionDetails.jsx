@@ -16,6 +16,7 @@ import BundleMarketPrice from '../components/BundleMarketPrice';
 import SellPrice from '../components/SellPrice';
 import BuyAuctionDetails from '../components/BuyAuctionDetails';
 import TradeTypeBadge from '../components/TradeTypeBadge';
+import MrAAcceptedIcon from '../components/MrAAcceptedIcon';
 import { useContext } from 'react';
 import { useParams, useLocation, Link } from 'react-router-dom';
 import { AuctionsContext } from '../context/AuctionsContext';
@@ -90,6 +91,7 @@ export default function AuctionDetails() {
                                 <p className="leading-6 text-gray-800">{auction.auctionNumber && <>Auction #{auction.auctionNumber} · </>}Min Bid: <span title={`${auction.minBidMeat.toLocaleString('en-US')} Meat`}>{formatCompactMeat(auction.minBidMeat)}{auction.minBidMeat < 1000 ? ' Meat' : ''}{auction.quantity > 1 && <span className="text-xs text-gray-700"> · {formatPerItemMeat(auction.minBidMeat, auction.quantity)} each</span>}</span></p>
                                 <span aria-hidden="true">·</span>
                                 <TradeTypeBadge escrow={auction.escrowMode} />
+                                {auction.mrARate > 0 && <MrAAcceptedIcon />}
                             </div>
                             {auction.mrARate && <p className="text-sm text-gray-600">Accepts Mr. A&apos;s · Fixed rate: {auction.mrARate.toLocaleString()} Meat each.</p>}
                             {auction.isBundle ? <BundleContents items={auction.bundleItems} /> : <ItemResources item={auction.item} itemId={auction.itemId} />}

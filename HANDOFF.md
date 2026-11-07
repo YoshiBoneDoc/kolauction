@@ -165,3 +165,11 @@ records and frozen/sent messages remain unchanged. Identical ignored bot copy
 exists. Disposable `buy_funding_message_database_test.py` passed exact 4M/170k
 (4.25%) output and row-preservation checks. Not applied to production; no bot
 binary update is needed after the owner applies SQL. Personal quickstart untouched.
+
+Home Mr. A indicator: additive queued migration **241** adds `mr_a_rate` to
+`public_listing_projection`'s existing whitelist. Home cards already render the
+icon but previously received no acceptance metadata. Apply once after 240; no
+financial functions, extra queries or polling changed. Matching ignored bot SQL
+copy included. Mr. A Direct disposable database regressions pass with mixed and
+Meat-only projection/privacy assertions. Not applied to production; cached cards
+must expire or be invalidated after installation.
