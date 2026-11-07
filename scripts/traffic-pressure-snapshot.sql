@@ -18,6 +18,16 @@ select jsonb_build_object(
  'captured_at',clock_timestamp(),
  'settings',(select jsonb_object_agg(name,setting) from pg_settings where name in
    ('max_connections','shared_buffers','work_mem','jit','jit_above_cost','statement_timeout','lock_timeout','track_io_timing')),
+ 'role_settings',coalesce((select jsonb_agg(to_jsonb(config)) from (
+   select coalesce(r.rolname,'all_roles') as role_name,
+     case when s.setdatabase=0 then 'all_databases' else 'current_database' end as scope,
+     split_part(setting,'=',1) as name,substring(setting from strpos(setting,'=')+1) as value
+   from pg_db_role_setting s left join pg_roles r on r.oid=s.setrole
+   cross join lateral unnest(s.setconfig) setting
+   where (s.setdatabase=0 or s.setdatabase=(select oid from pg_database where datname=current_database()))
+     and (s.setrole=0 or r.rolname in ('anon','authenticated','authenticator','service_role'))
+     and split_part(setting,'=',1) in ('statement_timeout','lock_timeout','jit','work_mem','plan_cache_mode')
+ ) config),'[]'::jsonb),
  'database',(select to_jsonb(d)-'datid'-'datname' from pg_stat_database d where datname=current_database()),
  'activity_groups',coalesce((select jsonb_agg(to_jsonb(g)) from (
    select backend_type,state,wait_event_type,wait_event,count(*) as sessions,
@@ -27,6 +37,10 @@ select jsonb_build_object(
  'blocked',coalesce((select jsonb_agg(to_jsonb(b)) from (
    select pid,rpc,state,wait_event_type,wait_event,query_age_seconds,transaction_age_seconds,blockers
    from activity where cardinality(blockers)>0 order by query_age_seconds desc limit 40) b),'[]'::jsonb),
+ 'active_operations',coalesce((select jsonb_agg(to_jsonb(a)) from (
+   select pid,rpc,backend_type,wait_event_type,wait_event,query_age_seconds,transaction_age_seconds,blockers
+   from activity where state='active' order by query_age_seconds desc limit 40
+ ) a),'[]'::jsonb),
  'financial_lock',coalesce((select jsonb_agg(to_jsonb(l)) from (
    select f.*,a.rpc,a.state,a.query_age_seconds,a.transaction_age_seconds
    from financial_lock f left join activity a using(pid)) l),'[]'::jsonb)

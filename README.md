@@ -171,3 +171,9 @@ remains disabled until explicit owner-controlled activation; nothing was deploye
 
 The [Mr. A audit](docs/MR_A_AUDIT.md:1) records confirmed fixes and remaining
 rollout requirements; apply audit migration 239 before any mixed escrow activation.
+
+Additional local traffic optimizations: queued live reads can reuse freshly verified
+auction state without renewing its two-second TTL; additive SQL **244** constructs
+public card JSON directly. See [evidence and rollout](docs/NOVEMBER_7_TRAFFIC_PRESSURE.md)
+for regression results and the remaining incident-diagnosis limits. These changes
+require their separate SQL/cache Worker rollout; no production resolution is claimed.

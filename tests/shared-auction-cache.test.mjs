@@ -886,3 +886,53 @@ test('an aborted eligibility check is not reused by Retry after a stalled privat
     assert.equal(await reader.accepts({ view: 'home' }), true);
     assert.equal(calls, 2);
 });
+
+test('queued overlapping live requests reuse verified state without renewing freshness', async () => {
+    const f = await liveFixture();
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    const original = f.cache.readOrigin.bind(f.cache);
+    f.cache.readOrigin = async request => { await gate; return original(request); };
+    const batch = { view: 'batch-live', ids: [id, secondId] };
+    const detail = { view: 'detail-live', id };
+    const first = f.cache.refresh(JSON.stringify(batch), batch);
+    const second = f.cache.refresh(JSON.stringify(detail), detail);
+    release();
+    const [a,b] = await Promise.all([first,second]);
+    assert.equal(f.calls.length, 1, 'one origin read serves both queued requests');
+    assert.equal(b.storedAt,a.storedAt, 'reuse cannot extend the two-second TTL');
+    assert.equal(b.data.rows.length,1);
+    assert.equal(b.data.rows[0].id,id);
+    assert.equal(b.data.rows[0].current_bid,200);
+    await f.cache.fetch(scopedNotification('1',id));
+    await f.cache.refresh(JSON.stringify(detail),detail);
+    assert.equal(f.calls.length,2,'an invalidated auction must be verified again');
+});
+
+test('expired or incomplete live coverage never suppresses an origin read', async () => {
+    const f = await liveFixture();
+    const single = { view: 'detail-live', id };
+    await f.cache.refresh(JSON.stringify(single),single);
+    const value=f.cache.liveStates.get(id);
+    value.at=Date.now()-2001;
+    await f.cache.refresh(JSON.stringify(single),single);
+    assert.equal(f.calls.length,2);
+    const batch={view:'batch-live',ids:[id,secondId]};
+    await f.cache.refresh(JSON.stringify(batch),batch);
+    assert.equal(f.calls.length,3,'partial coverage still reads every requested ID');
+});
+
+test('live queue reuse retains conservative timestamps and is disabled for legacy mode', async () => {
+    const f=await liveFixture();
+    const at=Date.now();
+    f.cache.liveStates.set(id,{row:{...source().rows[0],current_bid:300},at:at-1000,revision:'0',server_time:new Date(at-1000).toISOString()});
+    f.cache.liveStates.set(secondId,{row:{...source().rows[0],id:secondId,current_bid:400},at:at-500,revision:'0',server_time:new Date(at-500).toISOString()});
+    const query={view:'batch-live',ids:[id,secondId]};
+    const entry=f.cache.cachedLiveEntry(query);
+    assert.equal(entry.storedAt,at-1000);
+    assert.equal(Date.parse(entry.data.server_time),at-1000);
+    assert.deepEqual(entry.data.rows.map(row=>row.current_bid),[300,400]);
+    assert.equal(f.cache.cachedLiveEntry({view:'browse'}),null);
+    f.cache.env.LIVE_AUCTION_STATE='false';
+    assert.equal(f.cache.cachedLiveEntry(query),null);
+});

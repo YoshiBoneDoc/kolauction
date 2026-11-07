@@ -171,6 +171,22 @@ export class PublicAuctionCache {
         return failure?.until > Date.now() ? failure.code : null;
     }
 
+    cachedLiveEntry(request) {
+        if (this.env.LIVE_AUCTION_STATE !== 'true') return null;
+        const ids = request.view === 'batch-live' ? request.ids : request.view === 'detail-live' ? [request.id] : [];
+        if (!ids.length) return null;
+        const now = Date.now();
+        const values = ids.map(id => this.liveStates.get(id));
+        if (values.some((value, index) => !value || now < value.at || now - value.at > 2000
+            || this.changed({ view: 'batch-live', ids: [ids[index]] }, value.revision))) return null;
+        // Preserve the oldest verification time; reuse must never renew a TTL.
+        const storedAt = Math.min(...values.map(value => value.at));
+        const serverTime = Math.min(...values.map(value => Date.parse(value.server_time) + storedAt - value.at));
+        return { data: { privacy_version: 1, shared_cache_version: CACHE_VERSION, bids: [], total: ids.length,
+            rows: values.map(value => value.row), server_time: new Date(serverTime).toISOString() },
+            storedAt, revision: this.revision, ephemeral: true };
+    }
+
     refresh(key, request) {
         if (this.inflight.has(key)) return this.inflight.get(key);
         const blocked = this.blocked(request);
@@ -187,9 +203,15 @@ export class PublicAuctionCache {
             try {
                 let entry;
                 for (let attempt = 0; attempt < 2; attempt++) {
+                    // Different page keys may have queued the same auctions.
+                    // Recheck after earlier work finishes, before spending an origin slot.
+                    entry = this.cachedLiveEntry(request);
+                    if (entry) break;
                     // Rate limit retries as well as distinct query keys.
                     const delay = Math.max(0, this.lastOriginAt + 1000 - Date.now());
                     if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+                    entry = this.cachedLiveEntry(request);
+                    if (entry) break;
                     this.lastOriginAt = Date.now();
                     const revision = this.revision;
                     const data = await this.readOrigin(this.env.LIVE_AUCTION_STATE === 'true' && request.view === 'detail-live'
@@ -204,6 +226,12 @@ export class PublicAuctionCache {
                     break;
                 }
                 if (!entry) throw changedDuringRead();
+                if (livePriority) {
+                    for (const row of entry.data.rows) this.liveStates.set(row.id, {
+                        row, at: entry.storedAt, revision: entry.revision, server_time: entry.data.server_time,
+                    });
+                    while (this.liveStates.size > 256 || jsonBytes([...this.liveStates]) > MAX_BYTES / 4) this.liveStates.delete(this.liveStates.keys().next().value);
+                }
                 this.entries.delete(key);
                 this.entries.set(key, entry);
                 while (this.entries.size > MAX_ENTRIES || jsonBytes([...this.entries]) > MAX_BYTES) {

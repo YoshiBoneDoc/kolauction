@@ -195,3 +195,22 @@ Current Profile/Seller requests can still call the six-argument reader. Both SQL
 optimizations remain local; verify rollout and measure public browse separately.
 Measured Buy history 243: local 100-row host reads ~27ms → ~3.2ms (~88% less time),
 exact output/privacy parity retained. Live incident resolution remains unverified.
+
+Earlier logs show a 23:14–23:15 UTC cluster across Home, full/static detail,
+viewer deal_quote and narrow public detail startup. They predate the idle 23:27
+capture; varying cancellation frames do not identify a single root cause or prove
+Mr. A creation contention. Pressure diagnostic now includes bounded active RPCs
+and allowlisted role timeout/planning overrides; locally validated (including a
+synthetic role timeout). Need current rollout status/resource graphs/during-stall
+capture before declaring resolution. No additional speculative migration added.
+
+Further local pressure reductions: queued cache live reads recheck fully covered,
+<=2s verified states after earlier work completes; original timestamps and scoped
+invalidation remain authoritative. Two overlapping queued keys now need one origin
+read; 61 cache/detail tests pass. Deploy separate cache Worker, no TTL/polling or
+concurrency increase. Queued **244**, after 243, builds existing public-card JSON
+whitelist directly instead of serializing all private auction columns then filtering.
+Local 120-card cost ~15.8→11.8ms (~25% less); whole JSON/privacy parity across all
+fixture auctions/five roles and financial-definition suite pass. Matching ignored
+bot SQL copy included. No deployment/production SQL/live transfers; current outage
+root cause and production capacity remain unverified. See November 7 pressure doc.

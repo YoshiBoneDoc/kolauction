@@ -80,7 +80,14 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
                 before_243=sql(financial_probe)
                 definition=sql("select pg_get_functiondef('khub_bot.buy_history(uuid)'::regprocedure)")
                 sql(definition.replace('FUNCTION khub_bot.buy_history(', 'FUNCTION khub_bot.buy_history_before_243('))
+            if migration.name.startswith('202611070244_'):
+                before_244=sql(financial_probe)
+                definition=sql("select pg_get_functiondef('khub_bot.public_listing_projection(public.auctions,bigint,text,text)'::regprocedure)")
+                sql(definition.replace('FUNCTION khub_bot.public_listing_projection(', 'FUNCTION khub_bot.card_before_244('))
             sql(migration.read_text())
+            if migration.name.startswith('202611070244_'):
+                assert sql(financial_probe)==before_244, 'Card JSON optimization changed financial definitions'
+
             if migration.name.startswith('202611070243_'):
                 assert sql(financial_probe)==before_243, 'History optimization changed financial definitions'
 
@@ -316,7 +323,7 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
             print('Home recent',predicate or 'without redundant helper','[ms,shared hits]:',timings)
         # Complete snapshot is valid without exposing query text or literals.
         pressure=json.loads(sql((ROOT/'scripts/traffic-pressure-snapshot.sql').read_text()))
-        assert set(pressure)=={'captured_at','settings','database','activity_groups','blocked','financial_lock'}
+        assert set(pressure)=={'captured_at','settings','role_settings','database','activity_groups','blocked','active_operations','financial_lock'}
         assert isinstance(pressure['blocked'],list) and isinstance(pressure['financial_lock'],list)
         snapshot_sql=(ROOT/'scripts/query-stats-snapshot.sql').read_text()
         before=json.loads(sql(snapshot_sql));sql('select public.read_auction_card_context(array['+lit(buy)+'::uuid])',owner);after=json.loads(sql(snapshot_sql))
@@ -342,6 +349,17 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
                 plan=json.loads(sql(f"explain(analyze,buffers,format json) select {rpc}('{buy}')",owner))[0]
                 timings.append(plan['Execution Time'])
             print(rpc,'100-row Buy history execution ms:',timings)
+        # Direct JSON must retain every existing public key/value for Sell/Buy,
+        # bundles, drafts, completed listings, mixed terms and every viewer role.
+        for viewer in [None,owner,other,restricted,administrator]:
+            assert sql("select count(*) from public.auctions a where khub_bot.card_before_244(a,a.display_bid_count,null,null) is distinct from khub_bot.public_listing_projection(a,a.display_bid_count,null,null)",viewer)=='0'
+        for rpc in ['khub_bot.card_before_244','khub_bot.public_listing_projection']:
+            timings=[]
+            for _ in range(3):
+                plan=json.loads(sql(f"explain(analyze,buffers,format json) select jsonb_agg({rpc}(a,a.display_bid_count,null,null)) from (select * from public.auctions order by id limit 120) a"))[0]
+                timings.append(plan['Execution Time'])
+            print(rpc,'120 public-card JSON execution ms:',timings)
+        print('PASS: complete direct-card JSON parity across all fixture auctions and viewer roles')
         history_body=sql("select prosrc from pg_proc where oid='khub_bot.buy_history(uuid)'::regprocedure")
         assert history_body.count('khub_bot.can_view_usernames()')==1
         assert history_body.count('khub_bot.is_administrator(auth.uid())')==1

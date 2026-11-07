@@ -126,3 +126,82 @@ Measured 100-row Buy-history fixture (host, three local executions): original
 **27.833 / 27.052 / 27.213 ms**, optimized **3.096 / 3.215 / 3.173 ms**—about
 **88% less time** in this fixture. This verifies avoided repeated authorization
 work, not production latency or resolution of the independent browse timeout.
+
+## Earlier 23:14–23:15 timeout cluster
+
+Additional owner logs establish cancellations of `read_home_cards` (23:14:25.738,
+23:14:57.631), six-argument `read_auction_page` (23:14:52.098),
+`read_auction_detail_static` (23:14:55.826), `read_auction_viewer_context` in
+`deal_quote` (23:15:02.172), and the narrow public detail reader during startup
+(23:15:21.246). These timestamps precede the idle 23:27 pressure snapshot and do
+not demonstrate post-242/243 behavior. Moving a migration file is not confirmation
+that it was applied.
+
+Cancellation frames vary, including function startup. They locate the cancellation,
+not exclusive runtime attribution or proof of a particular slow subquery. The
+breadth warrants checking shared CPU/memory/I/O pressure and active blockers during
+an incident rather than assuming that Buy history or Mr. A creation explains all
+failures. Session start timestamps are not query start times; do not infer query
+duration from them. No supplied log shows `create_mr_a_auction` timing out.
+
+Expanded `traffic-pressure-snapshot.sql` now includes up to 40 active operations
+(with RPC name, age, waits and blockers, never raw SQL/parameters) and allowlisted
+role/database timeout/planning settings. SQL Editor settings alone do not establish
+PostgREST role timeouts. Verified the diagnostic and detection of a synthetic
+`authenticated` 3-second override in a disposable local PostgreSQL cluster. No
+production configuration was changed. Requested current 242/243 application state
+and Supabase resource graphs around the incident; these remain needed to identify
+shared resource exhaustion and evaluate rollout results.
+
+## Further pressure reduction: queued live reuse and direct card JSON
+
+### Queued live reuse (cache Worker)
+
+Identical query keys already coalesced, and finished live states already reused
+across pages. Different overlapping keys could still enter the serial queue before
+another live read finished, then perform redundant origin work. The Worker now
+rechecks complete live coverage at execution time and after any pacing delay.
+A queued batch/detail uses the existing verified states only when every requested
+ID is present, at most two seconds old and valid against scoped/global invalidations.
+Partial coverage still uses the existing full origin read. Expired/invalidated/missing
+rows never become invented successes. The entry keeps the oldest verification time
+and conservative server time; reuse never renews freshness. Live states are published
+before admitting the next queued task. Existing size bounds, admission, pacing,
+failure circuits, ACLs and private/public separation remain in place.
+
+Regression: overlapping two-ID batch and one-ID detail need **one** origin read,
+not two. Invalidation requires another read; expired/partial coverage and legacy
+mode never use the shortcut. Conservative time tests pass, together with existing
+100-visitor burst, scoped invalidation, outage and privacy tests. This reduces
+origin work and queue pressure without more polling or database concurrency.
+
+### Direct public card JSON (queued additive SQL 244)
+
+`public_listing_projection` previously serialized the entire auction composite,
+expanded JSON key/value rows, then aggregated only its public whitelist. New 244
+builds exactly those same whitelisted fields directly. Existing Buy additions,
+restrictions, derived fields, names/fee privacy and Mr. A metadata are untouched.
+The patch derives fields from the installed whitelist, validates actual columns,
+and fails closed on an unexpected layout. Matching ignored bot SQL copy included.
+
+Local 120-card execution times, same database and data:
+- Original: 16.107 / 15.520 / 15.831 ms.
+- Direct: 11.135 / 12.016 / 12.209 ms (about 25% less on average).
+
+Exact whole-JSON comparison passes for every auction in the fixture and five viewer
+roles. Public listing/privacy/financial definition regression suite passes; cache
+and detail suites **61/61** pass; changed Worker ESLint and diff checks pass.
+This is a synthetic read-workload test, not a production traffic capacity result
+or a simultaneous real-asset Buy-creation/giveaway test.
+
+### Rollout and remaining limits
+
+Apply **244 after verified 243** once; allow public snapshots to refresh. Deploy
+only the updated separate public-cache Worker for queued live reuse. That Worker
+change does not depend on 244, require a website/bot rebuild or change cache versions.
+No production actions performed. These changes reduce actual work; they do not
+increase SQL timeouts, add retries, extend TTLs or present unverified bids as live.
+Cold cache misses and complete origin outages can still yield unavailable states.
+No correctness-preserving patch can guarantee fresh auction prices while the
+origin is unavailable; cached static facts already have a separate safe fallback.
+The incident's shared resource/lock cause and actual capacity remain unverified.
