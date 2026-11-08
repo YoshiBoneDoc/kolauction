@@ -214,3 +214,12 @@ Local 120-card cost ~15.8→11.8ms (~25% less); whole JSON/privacy parity across
 fixture auctions/five roles and financial-definition suite pass. Matching ignored
 bot SQL copy included. No deployment/production SQL/live transfers; current outage
 root cause and production capacity remain unverified. See November 7 pressure doc.
+
+November 8 payout KMail: queued additive **245** (after 244) formats mixed seller
+payments as Winning bid / Total bid value / Commission / Your proceeds / Attached.
+Reuses existing guarded multi-item KMail batching for mixed sale_meat rows; gifts
+keep known-unsent split fallback. Ledger/dedupe rows, locks, envelope limits and
+unknown-send protections unchanged. Frozen/sent/uncertain bodies not rewritten.
+Mixed escrow SQL suite passes combined envelope, exact wording/assets, gift split,
+unknown/reconciled/repeated acknowledgments and legacy financial tests. Stop sole
+worker to apply SQL then resume; no binary/site rebuild. No production action run.

@@ -151,3 +151,23 @@ The [audit findings and verification](MR_A_AUDIT.md:1) require additive migratio
 activation configuration fail closed. Updated bot review reserves and valuation
 input handling have targeted regression tests. The gate remains disabled; no
 production action was performed.
+
+## Mixed seller payout KMail (245)
+
+Additive queued **202611080245_mr_a_payout_mail.sql**, after 244, changes future
+mixed seller payout wording to Winning bid / Total bid value / Commission / Your
+proceeds / Attached. Remaining-proceeds text appears only for an incomplete envelope.
+It enables these payouts in the existing guarded multi-attachment KMail claim,
+using the same queue-plan, recipient, message/footer, item/Meat limits and held-row
+checks. Physical queue rows/dedupe keys remain separate and unchanged. The batch
+freezes the exact aggregate attachments; one acknowledgment handles the envelope.
+Gift-required recipients retain the existing known-unsent split/individual package
+fallback. Size limits and verified recovery can also result in separate envelopes.
+No sent, uncertain, or already frozen messages are rewritten.
+
+Apply once with the sole connected worker stopped, then resume that same worker.
+No website or bot binary changes required; matching ignored standalone bot SQL
+copy provided. Not applied to production. Disposable mixed escrow regressions cover
+combined payment text/actual assets, unknown-send holds and reconciliation, duplicate
+acknowledgments, verified-not-sent recovery and idempotent gift splitting, alongside
+fees/promotions/refunds/Meat-only compatibility.

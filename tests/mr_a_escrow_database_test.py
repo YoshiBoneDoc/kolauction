@@ -336,7 +336,16 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
             d=json.loads(sql('set role service_role;select public.bot_claim_delivery_batch(5);') or 'null')
             if d is None: break
             before=liabilities()
-            if d['id']==target:
+            if d['id']==target or sql(f"select mail_batch from khub_bot.deliveries where id='{target}';")==d['id']:
+                target=d['id']
+                assert int(d['meat'])==5890000,d
+                assert d['items']==[{'id':194,'quantity':'2'}],d
+                body=d['display_message']
+                assert 'Winning bid: 2 Mr. As + 10,000,000 Meat' in body,body
+                assert 'Total bid value: 150,000,000 Meat' in body,body
+                assert 'Your proceeds: 2 Mr. As + 5,890,000 Meat' in body,body
+                assert 'Attached: 2 Mr. As + 5,890,000 Meat' in body,body
+                assert 'Remaining proceeds' not in body,body
                 failed=d
                 sql(f"set role service_role;select public.bot_ack_delivery('{d['id']}','{d['attempt']}',false,'Synthetic unknown-send result; no game request was made.');")
                 assert liabilities()==before,'Unknown asset send must retain all liabilities'
@@ -370,14 +379,16 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
         for _ in range(500):
             d=json.loads(sql('set role service_role;select public.bot_claim_delivery_batch(5);') or 'null')
             if d is None: break
-            if d['id']==target:
+            if d['id']==target or sql(f"select mail_batch from khub_bot.deliveries where id='{target}';")==d['id']:
+                target=d['id']
                 before=liabilities()
                 sql(f"set role service_role;select public.bot_ack_delivery('{target}','{d['attempt']}',false,'Synthetic uncertain attempt; no real send occurred.');")
                 sql(f"set role service_role;select public.bot_reconcile_delivery('{target}',false,'Synthetic independent evidence confirms this attempt was not sent; original physical payload stays reserved.');")
                 assert liabilities()==before
                 again=json.loads(sql('set role service_role;select public.bot_claim_delivery_batch(5);'))
                 assert again['id']==target and again['attempt']!=d['attempt']
-                assert again.get('quantity')==d.get('quantity') and again.get('meat')==d.get('meat')
+                assert int(again.get('quantity',0))==int(d.get('quantity',0)) and int(again.get('meat',0))==int(d.get('meat',0))
+                assert liabilities()==before, 'Verified-unsent recovery must preserve both asset reserves'
                 sql(f"set role service_role;select public.bot_ack_delivery('{target}','{again['attempt']}',true,'Synthetic confirmed retry after verified not-sent reconciliation.');")
             else:
                 sql(f"set role service_role;select public.bot_ack_delivery('{d['id']}','{d['attempt']}',true,'Synthetic confirmed unrelated delivery.');")
@@ -397,6 +408,25 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
         totals=json.loads(sql('select khub_bot.refresh_site_trade_totals();'))
         units=int(sql("select sum(khub_bot.auction_units(a)+a.payment_mr_a) from public.auctions a where auction_kind='sell' and status='completed' and winner_id is not null and final_price is not null;"))
         assert int(totals['items'])==units,totals
+        # Gift-required recipients use the existing known-unsent batch splitter.
+        gift_sale=create();fund(gift_sale);assert ingest(payload(gift_sale,meat=6000000,q=1))=='accepted';finish(gift_sale)
+        split=False
+        for _ in range(500):
+            d=json.loads(sql('set role service_role;select public.bot_claim_delivery_batch(5);') or 'null')
+            if d is None: break
+            if d['auction_id']==gift_sale and d['kind']=='sale_meat' and not split:
+                assert d['items']==[{'id':194,'quantity':'1'}],d
+                before=liabilities()
+                original=sql(f"select jsonb_agg(jsonb_build_array(id,dedupe_key,meat,item_id,quantity) order by id) from khub_bot.deliveries where auction_id='{gift_sale}' and kind='sale_meat';")
+                for _ in range(2):
+                    sql(f"set role service_role;select public.bot_split_delivery_batch('{d['id']}','{d['attempt']}');")
+                assert liabilities()==before
+                assert sql(f"select jsonb_agg(jsonb_build_array(id,dedupe_key,meat,item_id,quantity) order by id) from khub_bot.deliveries where auction_id='{gift_sale}' and kind='sale_meat';")==original
+                split=True
+                continue
+            sql(f"set role service_role;select public.bot_ack_delivery('{d['id']}','{d['attempt']}',true,'Synthetic confirmed envelope; no live transfer.');")
+        assert split and state(gift_sale)['status']=='completed'
+        print('PASS combined seller payout wording, exact attachments, idempotent gift split and recovery')
         print('PASS preparation holds, verified not-sent retries and physical-asset financial reports')
         print('PASS partial delivery, unknown reserves, no automatic resend, verified reconciliation and duplicate acknowledgment')
         print('PASS mixed intake, exact refunds, physical reserves, buyouts, commissions, promotions, bundles, retries and compatibility')
