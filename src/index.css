@@ -694,3 +694,11 @@ html[data-theme="dark"] .auction-create-form #auto-relist-options .text-stone-50
 html[data-theme="dark"] .explore-auction-type { color: #a6b0c1; }
 html[data-theme="dark"] .explore-auction-type:hover { color: #ddd0f9; }
 html[data-theme="dark"] .explore-auction-type[aria-pressed="true"] { color: #e2e8f0; background: #1e2b3e; }
+
+/* Highlight the new title-font experiment without enlarging its toolbar. */
+.title-font-toolbar, .title-font-control { color: #c2410c; }
+.title-font-control:hover:not(:disabled) { color: #9a3412; background-color: #ffedd5; }
+.title-font-control:focus-visible { outline-color: #ea580c; }
+html[data-theme="dark"] .title-font-toolbar,
+html[data-theme="dark"] .title-font-control { color: #fb923c; }
+html[data-theme="dark"] .title-font-control:hover:not(:disabled) { color: #fdba74; background-color: #431407; }
