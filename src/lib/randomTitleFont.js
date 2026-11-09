@@ -9,10 +9,11 @@ export function fontCatalog() {
         .then(googleFontFamilies).catch(error => { catalogPromise = undefined; throw error; });
     return catalogPromise;
 }
-export function fontPollActive(feed) {
+export function activeFontPoll(feed) {
     return [feed?.poll, ...(feed?.answered_polls || []), ...(feed?.repeatable_polls || []), ...(feed?.skipped_polls || [])]
-        .some(poll => poll?.active === true && /\bfonts?\b/i.test(poll.question || ''));
+        .find(poll => poll?.active === true && /\bfonts?\b/i.test(poll.question || ''));
 }
+export function fontPollActive(feed) { return Boolean(activeFontPoll(feed)); }
 export function randomFamily(families, previous, random = Math.random) {
     const choices = families.filter(name => name !== previous);
     return choices.length ? choices[Math.floor(random() * choices.length)] : null;

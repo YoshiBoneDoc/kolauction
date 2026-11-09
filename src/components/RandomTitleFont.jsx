@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { fontCatalog, loadTitleFont, randomFamily } from '../lib/randomTitleFont';
 
-export default function RandomTitleFont({ titleRef }) {
+export default function RandomTitleFont({ titleRef, heartedFonts, onHeart }) {
     const [history, setHistory] = useState(['Newsreader']);
     const [favorites, setFavorites] = useState(() => {
         try { const saved = JSON.parse(localStorage.getItem('khub.title-font-favorites.v1') || '[]'); return Array.isArray(saved) ? [...new Set(saved.filter(name => typeof name === 'string' && name.length <= 200))] : []; } catch { return []; }
@@ -46,7 +46,16 @@ export default function RandomTitleFont({ titleRef }) {
         } catch { if (generation.current === request) setError('Font unavailable. Please try again.'); }
         finally { working.current = false; if (generation.current === request) setBusy(false); }
     }
-    const saved = favorites.includes(current);
+    const saved = (heartedFonts || favorites).includes(current);
+    async function heart() {
+        if (working.current) return;
+        working.current = true; setBusy(true); setError('');
+        try {
+            if (onHeart) await onHeart(current, !saved);
+            setFavorites(previous => saved ? previous.filter(name => name !== current) : [...new Set([...previous, current])]);
+        } catch { setError('Heart could not be confirmed. Please try again.'); }
+        finally { working.current = false; setBusy(false); }
+    }
     const iconClass = 'inline-flex h-6 w-6 shrink-0 border-0 bg-transparent p-0 items-center justify-center rounded text-gray-500 hover:text-gray-900 hover:bg-gray-100 focus-visible:outline focus-visible:outline-1 disabled:opacity-30';
     return <div className="absolute right-0 top-0 z-10 flex max-w-full items-center gap-0.5 text-[10px] text-gray-500">
         <span aria-live="polite" title={current} className="mr-1 min-w-0 max-w-[min(40vw,180px)] truncate text-[10px]">{busy ? 'Loading…' : current}</span>
@@ -55,11 +64,11 @@ export default function RandomTitleFont({ titleRef }) {
         </button>
         <button type="button" title="Previous font" aria-label="Previous font" disabled={busy || history.length < 2} onClick={() => preview('previous')} className={iconClass}>←</button>
         <button type="button" title={saved ? 'Remove favorite' : 'Favorite font'} aria-label={saved ? 'Remove favorite' : 'Favorite font'} aria-pressed={saved} disabled={busy}
-            onClick={() => setFavorites(previous => saved ? previous.filter(name => name !== current) : [...previous, current])} className={iconClass}>
+            onClick={heart} className={iconClass}>
             <svg className="shrink-0" width="13" height="13" viewBox="0 0 24 24" fill={saved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" /></svg>
         </button>
         <button type="button" title="Restore Newsreader" aria-label="Restore Newsreader" disabled={busy || history.length < 2} onClick={() => preview('reset')} className={iconClass}>↺</button>
         {error && <span role="status" className="absolute right-0 top-full w-52 text-right text-[10px]">{error}</span>}
     </div>;
 }
-RandomTitleFont.propTypes = { titleRef: PropTypes.shape({ current: PropTypes.object }).isRequired };
+RandomTitleFont.propTypes = { heartedFonts: PropTypes.arrayOf(PropTypes.string), onHeart: PropTypes.func, titleRef: PropTypes.shape({ current: PropTypes.object }).isRequired };

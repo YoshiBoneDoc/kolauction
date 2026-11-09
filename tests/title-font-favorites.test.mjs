@@ -27,16 +27,16 @@ test('favorites persist, preview joins history, Previous and Reset restore origi
         let tree;
         function render() { cursor = 0; tree = nodes(module.exports.default({ titleRef })); while (effects.length) { const cleanup = effects.shift()(); if (cleanup) cleanups.push(cleanup); } }
         function button(label) { return tree.find(n => n.type === 'button' && n.props['aria-label'] === label); }
-        render(); button('Favorite font').props.onClick(); render();
+        render(); await button('Favorite font').props.onClick(); render();
         assert.deepEqual(JSON.parse(stored.get('khub.title-font-favorites.v1')), ['Newsreader']);
         assert.equal(button('Remove favorite').props['aria-pressed'], true);
         await button('Random font').props.onClick(); render();
         assert.equal(style.fontFamily, '"Example"');
-        button('Favorite font').props.onClick(); render();
+        await button('Favorite font').props.onClick(); render();
         assert.deepEqual(JSON.parse(stored.get('khub.title-font-favorites.v1')), ['Newsreader', 'Example']);
         await button('Previous font').props.onClick(); render();
         assert.equal(style.fontFamily, '"Newsreader"');
-        button('Remove favorite').props.onClick(); render();
+        await button('Remove favorite').props.onClick(); render();
         assert.deepEqual(JSON.parse(stored.get('khub.title-font-favorites.v1')), ['Example']);
         await button('Random font').props.onClick(); render();
         await button('Restore Newsreader').props.onClick(); render();

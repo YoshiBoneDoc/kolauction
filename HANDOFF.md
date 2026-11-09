@@ -236,3 +236,16 @@ once per database, deploy website separately; no bot restart required. Six targe
 Node tests, disposable PostgreSQL count/list/access tests, build, changed-source lint
 and secret scan passed. No production SQL/deployment or browser visual QA performed.
 Personal quickstart unchanged.
+
+November 9 shared font-poll hearts: queued **247** adds private per-poll/account/font
+hearts, desired-state idempotent authenticated writes, active font/free-text poll and
+restriction checks, a 100-font/account/poll cap, voter and ranking indexes, and
+cascade cleanup. Existing feed returns only the viewer's active-poll hearts;
+existing administrator inbox thread read includes top 50 aggregate counts, sorted
+most to least with alphabetical ties. Compact scrollable ranking precedes written
+responses. No extra read requests/polling/shared-cache changes. Heart clicks now
+write to Supabase; old browser favorites are not imported as votes. Apply 247 once
+then deploy website; matching ignored bot copy exists, no bot restart needed.
+33 targeted Node tests and disposable free-text/poll-heart SQL regressions pass;
+build, changed-source lint and secret scan pass. No production SQL/deployment or
+browser visual QA. Personal quickstart unchanged.

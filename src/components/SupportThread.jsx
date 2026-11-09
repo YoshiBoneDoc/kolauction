@@ -155,7 +155,13 @@ export default function SupportThread({ thread, expanded, onToggle, pending, onC
                     </section>;
                 })}</div>
             </div>}
-            <div className="divide-y divide-gray-100">{timeline.map(message => message.message_type === 'account_ban_event' ? <section key={message.id} aria-label="Ban history update" className="py-2 first:pt-0 last:pb-0">
+            <div className="divide-y divide-gray-100">{thread.poll?.font_hearts?.length > 0 && <div className="mb-3 border-b border-gray-200 pb-2">
+                <h3 className="mb-1 text-xs font-medium text-gray-600">Font hearts · top 50</h3>
+                <ol className="flex max-h-28 flex-wrap gap-x-4 gap-y-1 overflow-y-auto text-xs text-gray-600">
+                    {thread.poll.font_hearts.map(font => <li key={font.family}><span className="font-medium">{font.family}</span> <span className="tabular-nums">♥ {font.hearts}</span></li>)}
+                </ol>
+            </div>}
+            {timeline.map(message => message.message_type === 'account_ban_event' ? <section key={message.id} aria-label="Ban history update" className="py-2 first:pt-0 last:pb-0">
                 <div className={`rounded border-l-2 px-3 py-2 ${message.action === 'removed' ? 'border-green-300 bg-green-50' : 'border-red-200 bg-red-50/60'}`}>
                     <div className="flex flex-wrap items-baseline justify-between gap-1 text-xs">
                         <p className={`font-semibold ${message.action === 'removed' ? 'text-green-800' : 'text-red-800'}`}>{message.action === 'removed' ? 'Ban restriction removed' : message.action === 'updated' ? 'Ban updated' : 'Ban issued'} · {message.administrator_username}</p>

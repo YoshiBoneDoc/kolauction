@@ -173,6 +173,32 @@ with tempfile.TemporaryDirectory(prefix='khub-text-polls-',dir='/tmp') as folder
         pg('-m','fast','-w','stop');started=False
         pg('-l',str(Path(folder)/'postgres.log'),'-o',f"-F -h '' -k {folder}",'-w','start');started=True
         assert saved==sql('select jsonb_agg(to_jsonb(r) order by id) from khub_bot.bug_reports r;')
+        # Shared font hearts are a separate per-account preference, never text submissions.
+        sql(next(p for p in migrations if '247_poll_font_hearts' in p.name).read_text())
+        font_poll=draft('What font should the home page title use?',multiple=True);publish(font_poll)
+        def heart(uid,family='Newsreader',value=True):
+            return json.loads(call(f"select public.set_poll_font_heart('{font_poll}',{lit(family)},{str(value).lower()});",uid))
+        assert heart(first)==['Newsreader']
+        assert heart(first)==['Newsreader']
+        assert heart(second)==['Newsreader']
+        assert heart(first,'Example')==['Example','Newsreader']
+        assert feed(first)['font_hearts'][font_poll]==['Example','Newsreader']
+        assert feed(second)['font_hearts'][font_poll]==['Newsreader']
+        ranking=json.loads(sql(f"select khub_bot.font_heart_ranking('{font_poll}');"))
+        assert ranking==[{'family':'Newsreader','hearts':2},{'family':'Example','hearts':1}],ranking
+        assert heart(first,value=False)==['Example']
+        assert heart(first,value=False)==['Example']
+        # Add one private response so the existing inbox contains this poll thread.
+        sql(f"insert into khub_bot.bug_reports(id,reporter_id,reporter_username,category,poll_id,body) values('{uuid4()}','{first}','Poll First','other','{font_poll}','Synthetic font suggestion');")
+        thread=next(t for t in inbox()['threads'] if t['id']==font_poll)
+        assert thread['poll']['font_hearts']==[{'family':'Example','hearts':1},{'family':'Newsreader','hearts':1}]
+        call(f"select khub_bot.font_heart_ranking('{font_poll}');",first,error='permission denied')
+        call('select * from khub_bot.poll_font_hearts;',first,error='permission denied')
+        call(f"select public.set_poll_font_heart('{cap}','Newsreader',true);",first,error='closed')
+        call(f"select public.close_home_poll('{font_poll}');")
+        call(f"select public.set_poll_font_heart('{font_poll}','Newsreader',true);",first,error='closed')
+        assert font_poll not in feed(first)['font_hearts']
+        print('PASS: shared font hearts deduplicate accounts, unheart idempotently, rank correctly, remain private and reject closed/non-font polls')
         print('PASS: private free-text polls, ordered mixed queues, optional repeat responses, idempotent/concurrent retries, per-poll inbox grouping/status/category changes, privacy, size/abuse limits, unchanged Yes/No history and zero KMail/financial side effects')
     finally:
         if started:pg('-m','fast','-w','stop')

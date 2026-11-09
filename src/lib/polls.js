@@ -6,6 +6,7 @@ export function createPollService(client) {
         return data;
     }
     return {
+        heartFont: (id, family, hearted) => call('set_poll_font_heart', { p_poll_id: id, p_family: family, p_hearted: hearted }),
         read: () => call('read_home_poll_feed'),
         list: () => call('read_admin_polls'),
         voters: id => call('read_poll_voters', { p_poll_id: id }),
