@@ -213,7 +213,7 @@ export const AuctionsProvider = ({ children }) => {
     };
 
     return (
-        <AuctionsContext.Provider value={{ auctions, total, homeSections, siteTotals, priceBounds, seller, isLoading, isRefreshing, hasLoaded, publicDataDelayed, listingOrderDelayed, error, pendingTrades, pendingTotal, pendingExpanded, setPendingExpanded, pendingPage, setPendingPage, pendingError, pendingHasLoaded, addAuction, placeBid, purchaseAuction, confirmTrade, rateTrade, reserveBuyQuantity, cancelBuyReservation, cancelAuction, refreshAuctions }}>
+        <AuctionsContext.Provider value={{ auctions, total, homeSections, siteTotals, priceBounds, seller, isLoading, isRefreshing, hasLoaded, publicDataDelayed, listingOrderDelayed, error, pendingTrades, pendingTotal, pendingUpdatedAt: pending.updatedAt, pendingExpanded, setPendingExpanded, pendingPage, setPendingPage, pendingError, pendingHasLoaded, addAuction, placeBid, purchaseAuction, confirmTrade, rateTrade, reserveBuyQuantity, cancelBuyReservation, cancelAuction, refreshAuctions }}>
             {children}
         </AuctionsContext.Provider>
     );

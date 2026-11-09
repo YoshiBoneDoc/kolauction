@@ -283,3 +283,13 @@ calls is consistent with optional replay-read timeout fallback; require worker l
 before attributing to replay/new mail. 42501 is the older 249 managed-Auth-table
 ALTER failure, separate from read pressure. No production SQL/deployment/runtime
 changes; proposed optimization priorities and missing evidence are in the report.
+
+November 9 additional giveaway captures extend review through 14:24:51 UTC:
+three new adjacent interval deltas and updated docs/NOVEMBER_9_GIVEAWAY_PRESSURE.md.
+Broad recovery: final bid history/account/poll means ~47/52/54ms, but Home ~624ms,
+static detail ~309ms and full page ~1257ms (six calls). Live detail request rate
+~3x incident with lower mean, so do not blame raw polling volume. Prioritize installed
+Home/full/static/public-browse plans for persistent cost; retain resource/CPU-credit
+and replay-log investigation for transient episode. No new blockers/JIT/connection
+exhaustion observed; idle snapshots do not prove incident resolved. No runtime edits
+or production actions in this review.

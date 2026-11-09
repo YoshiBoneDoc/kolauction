@@ -79,7 +79,7 @@ const InfoPage = () => {
                 </p>
 
                 <p id="gift-packages" className="mb-6 scroll-mt-4">
-                    <strong>Gift packages:</strong> Packages sent without a valid auction command are treated as <Link to="/donate" className="text-blue-600 hover:underline">donations</Link>. To place a bid or deposit items using a gift package, include the exact command provided on the auction page in the package’s outside message.
+                    <strong>Gift Packages:</strong> HC/Ronin players can participate using gift packages with auction commands. Invalid commands are returned; packages without commands are treated as <Link to="/donate" className="font-bold text-blue-600 hover:underline">donations</Link>. Donated by accident? KMail me (teres Minor, #3552305) and I&apos;ll be happy to refund you.
                 </p>
 
                 <h2 className={`${sectionHeadingClass} mb-2`}>
@@ -87,28 +87,9 @@ const InfoPage = () => {
                 </h2>
 
                 <p className="mb-3">
-                    <Link to="/auction-item" className="font-medium text-blue-600 hover:underline">
-                        Create an auction here
-                    </Link>
-                    . Choose Buy Items or Sell Items. A Sell auction needs a minimum bid; its buyout is optional. A <Link to="/info#buy-auctions-title" className="font-medium text-blue-600 hover:underline">Buy auction</Link> needs a quantity and maximum price per item. For Sell auctions, bids and buyout prices apply to the whole listing. For Buy auctions, the advertised purchase price applies to each item; fees are added separately to the buyer’s deposit. You may not bid on your own auction.
+                    Create an auction here to <Link to="/auction-item?kind=buy" className="font-medium text-blue-600 hover:underline">buy</Link> or <Link to="/auction-item?kind=sell" className="font-medium text-blue-600 hover:underline">sell</Link> items.
                 </p>
-
-                <h3 className={`${subheadingClass} mb-2`}>
-                    When does an auction go live?
-                </h3>
-
-                <ul className="mb-6 list-disc space-y-2 pl-5">
-                    <li>
-                        <strong className={subheadingClass}>Escrow:</strong> Your auction goes live once our bot receives and verifies your items,
-                        typically within seconds. Deposit instructions are provided on your auction&apos;s page
-                        and are visible only to you.
-                    </li>
-                    <li>
-                        <strong className={subheadingClass}>Direct Trade:</strong> Your auction goes live immediately after publishing.
-                        Items must remain in your Display Case throughout the auction.
-                        Violations may result in a warning or further action.
-                    </li>
-                </ul>
+                <p className="mb-6">Escrow auctions go live once the bot verifies your deposit. Follow the instructions provided after creating your auction. Direct Trade auctions go live immediately, but items must remain in your Display Case until the auction ends. Violations may result in a warning or further action. You may not bid on your own auctions.</p>
 
                 <h2 className={`${sectionHeadingClass} mb-2`}>How to Bid</h2>
                 <ul className="mb-3 list-disc space-y-1 pl-5">
@@ -123,27 +104,14 @@ const InfoPage = () => {
                     <li><strong>Outbid?</strong> Escrow bids are automatically refunded. New bids require the full amount.</li>
                 </ul>
 
-                <h3 id="anti-sniping" className={`${subheadingClass} mb-2 scroll-mt-4`}>Anti-sniping</h3>
-                <p className="mb-3">Accepted bids in the final minute reset the countdown to 1 minute, including subsequent last-minute bids. Applies to Escrow and Direct Trade. Buyouts end bidding immediately.</p>
-
-                <h3 className={`${subheadingClass} mb-2`}>Privacy</h3>
-                <p className="mb-6">Bidders remain anonymous until the auction ends, with your own bids labeled “You.” Sellers are visible; winning bidders are revealed afterward. Player identities are hidden from guests and banned users.</p>
+                <p id="anti-sniping" className="mb-3 scroll-mt-4"><strong>Anti-sniping:</strong> Bids placed in the final minute reset the timer to 1 minute. Buyouts end auctions immediately.</p>
+                <p className="mb-6"><strong>Privacy:</strong> Bidders remain anonymous during auctions, with your own bids labeled &quot;You.&quot; All bidders&apos; identities are revealed once the auction ends. Sellers are always visible, while guests and banned users cannot view player identities.</p>
 
                 <h2 className={`${sectionHeadingClass} mb-2`}>
                     Canceling Bids or Auctions
                 </h2>
 
-                <ul className="mb-6 list-disc space-y-2 pl-5">
-                    <li>
-                        <strong className={subheadingClass}>Canceling an Auction:</strong> Sellers may cancel an auction before
-                        any bids have been accepted, without penalty. Escrowed items will be
-                        automatically returned by KMail.
-                    </li>
-                    <li>
-                        <strong className={subheadingClass}>Canceling a Bid:</strong> Accepted bids cannot be canceled.
-                        Once an auction receives a bid, the seller can no longer cancel their sale.
-                    </li>
-                </ul>
+                <p className="mb-6">Sellers may cancel auctions <strong>before receiving any bids</strong> without penalty, with escrowed items automatically returned. Once a bid is accepted, neither the bid nor the auction can be canceled.</p>
 
                 <h2 className={`${sectionHeadingClass} mb-2`}>
                     After an Auction Ends
@@ -271,6 +239,7 @@ const InfoPage = () => {
 
                     <section aria-labelledby="escrow-fees-title" className="min-w-0">
                         <h2 id="escrow-fees-title" className={`${sectionHeadingClass} mb-2 scroll-mt-4`}>Escrow Fees</h2>
+                        <p className="mb-3 rounded border-l-[3px] border-blue-300 bg-blue-50/70 px-3 py-1 text-xs leading-4 text-gray-600">These fees apply only to escrow sales. All other sales do not carry any fees.</p>
                         <div className="mb-3 space-y-1.5 leading-5">
                             <p className="text-green-800"><strong>Giving Thanks:</strong></p>
                             <p className="text-green-800">For the month of November, escrow trades are commission-free as long as you&apos;ve completed less than 20m Meat in escrow trades. If you&apos;re still below 20m, your next trade is entirely free, regardless of its value.</p>

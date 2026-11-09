@@ -43,6 +43,7 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
             create table auth.identities(id uuid primary key,provider_id text,user_id uuid references auth.users(id) on delete cascade,
                 identity_data jsonb,provider text,created_at timestamptz,updated_at timestamptz);
             create table auth.sessions(id uuid primary key,user_id uuid references auth.users(id) on delete cascade);
+            create table auth.mfa_amr_claims(id uuid primary key,session_id uuid references auth.sessions(id),authentication_method text,created_at timestamptz,updated_at timestamptz);
             create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
             grant usage on schema public,auth to anon,authenticated,service_role;
             grant execute on function auth.uid() to anon,authenticated;
@@ -149,8 +150,21 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
         bid_id=sql("select bid_id from khub_bot.bid_receipts where receipt_id='"+p['id']+"';")
         refs=json.loads(sql(f"select khub_bot.admin_bid_delivery_references('{bid_id}');",owner))
         assert len([r for r in refs if r['label']=='Bid refund'])==2,refs
+        assert any(r['label']=='Accepted' for r in refs),refs
+        history=json.loads(sql(f"set role authenticated;select public.read_auction_bid_history('{aid}');",owner))
+        admin_bid=next(b for b in history['bids'] if b['id']==bid_id)
+        assert admin_bid['admin_delivery_references']==refs,admin_bid
+        assert all(r['reference'].startswith('D-') and r['state'] for r in admin_bid['admin_delivery_references'])
+        # Administrators must still see delivery-state changes when the bid revision is unchanged.
+        repeated_history=json.loads(sql(f"set role authenticated;select public.read_auction_bid_history('{aid}',p_known_revision=>{history['revision']});",owner))
+        assert not repeated_history['unchanged']
+        assert next(b for b in repeated_history['bids'] if b['id']==bid_id)['admin_delivery_references']==refs
+
         sql(f"delete from khub_bot.administrators where user_id='{owner}';")
         assert json.loads(sql(f"select khub_bot.admin_bid_delivery_references('{bid_id}');",owner))==[]
+        ordinary_history=json.loads(sql(f"set role authenticated;select public.read_auction_bid_history('{aid}');",owner))
+        assert all('admin_delivery_references' not in b for b in ordinary_history['bids'])
+
         held_before_review=liabilities()
         sql(f"update public.auctions set status='on_hold' where id='{aid}';")
         assert liabilities()==held_before_review

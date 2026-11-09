@@ -1,5 +1,5 @@
 import { auctionQuantityLabel } from '../lib/bundles';
-import { useContext, useEffect, useId, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import ConfirmTradeButton from './ConfirmTradeButton';
 import TradeFeedback from './TradeFeedback';
 import { Link } from 'react-router-dom';
@@ -35,40 +35,58 @@ function TradeCard({ auction }) {
 
 export default function PendingTrades() {
     const { currentUser } = useContext(UserContext);
-    const [expanded, setExpanded] = useState(false);
-    const listId = useId();
-    const { pendingExpanded = true, setPendingExpanded, pendingTrades = [], pendingTotal = 0, pendingPage = 1, setPendingPage, pendingError, pendingHasLoaded = !pendingError || pendingTrades.length > 0, refreshAuctions } = useContext(AuctionsContext);
+    const [selection, setSelection] = useState({ userId: currentUser?.id, index: 0 });
+    const openedSummary = useRef(null);
+    const { pendingExpanded = true, setPendingExpanded, pendingTrades = [], pendingTotal = 0, pendingUpdatedAt, pendingPage = 1, setPendingPage, pendingError, pendingHasLoaded = !pendingError || pendingTrades.length > 0, refreshAuctions } = useContext(AuctionsContext);
     useEffect(() => () => setPendingExpanded?.(false), [setPendingExpanded]);
     useEffect(() => {
         if (pendingExpanded && pendingHasLoaded && !pendingTotal && !pendingError) setPendingExpanded?.(false);
     }, [pendingExpanded, pendingHasLoaded, pendingTotal, pendingError, setPendingExpanded]);
+    useEffect(() => {
+        if (!currentUser || currentUser.isBanned || pendingExpanded || !pendingHasLoaded || pendingTotal <= 0 || pendingError) return;
+        const summary = `${currentUser.id}:${pendingUpdatedAt ?? pendingTotal}`;
+        if (openedSummary.current === summary) return;
+        openedSummary.current = summary;
+        setPendingExpanded?.(true);
+    }, [currentUser, pendingExpanded, pendingHasLoaded, pendingTotal, pendingUpdatedAt, pendingError, setPendingExpanded]);
     if (!currentUser || currentUser.isBanned) return null;
     if (pendingError && !pendingHasLoaded) return <section aria-label="Your pending trades" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3">
         <p role="alert" className="text-red-700">Pending trades could not be loaded. <button onClick={refreshAuctions} className="min-h-11 underline">Retry</button></p>
     </section>;
     if (!pendingExpanded) return pendingTotal > 0 ? <section aria-label="Your pending trades" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3">
-        <button type="button" aria-expanded={false} onClick={() => setPendingExpanded(true)} className="font-semibold underline">{pendingTotal} pending {pendingTotal === 1 ? 'trade' : 'trades'} — view details</button>
-        {pendingError && <p role="status">Trade count refresh delayed.</p>}
+        <p role="status" className="text-sm">Loading trade details…</p>
+        {pendingError && <p role="alert">Trade details could not be loaded. <button onClick={refreshAuctions} className="underline">Retry</button></p>}
     </section> : null;
+    if (!pendingHasLoaded) return <section aria-label="Your pending trades" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3"><p role="status">Loading trade details…</p></section>;
     const visibleTrades = pendingTrades.filter(auction => !auction.escrowMode
         && ['awaiting_trade', 'completed'].includes(auction.status)
         && (auction.sellerId === currentUser.id || auction.winnerId === currentUser.id)
         && (hasResponded(auction, currentUser.id) ? auction.ownFeedback == null : auction.status === 'awaiting_trade'));
     const visibleTotal = Math.max(0, pendingTotal - (pendingTrades.length - visibleTrades.length));
     if (!visibleTotal && !pendingError) return null;
-    const displayedTrades = expanded ? visibleTrades : visibleTrades.slice(0, 3);
+    const index = Math.min(selection.userId === currentUser.id ? selection.index : 0, Math.max(0, visibleTrades.length - 1));
+    const selected = visibleTrades[index];
+    const position = (pendingPage - 1) * 12 + index + 1;
+    function move(direction) {
+        const next = index + direction;
+        if (next >= 0 && next < visibleTrades.length) setSelection({ userId: currentUser.id, index: next });
+        else if (setPendingPage) {
+            setSelection({ userId: currentUser.id, index: direction > 0 ? 0 : 11 });
+            setPendingPage(pendingPage + direction);
+        }
+    }
     return <section aria-label="Your pending trades" className="mb-4 space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3">
-        {setPendingExpanded && <button type="button" aria-expanded={true} onClick={() => setPendingExpanded(false)} className="text-xs underline">Hide trade details</button>}
-        <h2 className="text-base font-bold">{visibleTotal === 1 ? 'Trade' : 'Trades'} awaiting your response</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-base font-bold">{visibleTotal === 1 ? 'Trade' : 'Trades'} awaiting your response</h2>
+            {visibleTotal > 1 && <nav aria-label="Browse pending trades" className="flex items-center gap-2 text-xs">
+                <button type="button" aria-label="Previous pending trade" disabled={position <= 1 || index === 0 && !setPendingPage} onClick={() => move(-1)} className="inline-flex h-8 w-8 items-center justify-center rounded border border-amber-200 bg-transparent p-0 disabled:opacity-40">←</button>
+                <span aria-live="polite" className="tabular-nums">{position} / {visibleTotal}</span>
+                <button type="button" aria-label="Next pending trade" disabled={position >= visibleTotal || index === visibleTrades.length - 1 && !setPendingPage} onClick={() => move(1)} className="inline-flex h-8 w-8 items-center justify-center rounded border border-amber-200 bg-transparent p-0 disabled:opacity-40">→</button>
+            </nav>}
+        </div>
         <p className="text-xs leading-5 text-gray-600">{visibleTotal} pending {visibleTotal === 1 ? 'trade' : 'trades'} awaiting a trade response or optional experience rating.</p>
         {pendingError && <p role="alert" className="text-red-700">Refresh delayed. Showing previously loaded trades. <button onClick={refreshAuctions} className="min-h-11 underline">Retry</button></p>}
-        <div id={listId} className="space-y-2">{displayedTrades.map(auction => <TradeCard key={auction.id} auction={auction} />)}</div>
-        {visibleTrades.length > 3 && <button type="button" aria-expanded={expanded} aria-controls={listId} onClick={() => setExpanded(value => !value)} className="min-h-8 text-xs font-medium text-blue-700 underline hover:text-blue-800">{expanded ? 'Show fewer trades' : `Show ${visibleTrades.length - 3} more ${visibleTrades.length - 3 === 1 ? 'trade' : 'trades'}`}</button>}
-        {(visibleTotal > 12 || pendingPage > 1) && (expanded || visibleTrades.length <= 3) && <nav aria-label="Pending trade pages" className="flex flex-wrap items-center justify-center gap-3">
-            <button disabled={pendingPage <= 1} onClick={() => { setExpanded(false); setPendingPage(pendingPage - 1); }} className="min-h-11 rounded border bg-white px-3 disabled:opacity-50">Previous trades</button>
-            <span>Page {pendingPage} of {Math.max(1, Math.ceil(visibleTotal / 12))}</span>
-            <button disabled={pendingPage * 12 >= visibleTotal} onClick={() => { setExpanded(false); setPendingPage(pendingPage + 1); }} className="min-h-11 rounded border bg-white px-3 disabled:opacity-50">Next trades</button>
-        </nav>}
+        {selected && <TradeCard key={selected.id} auction={selected} />}
     </section>;
 }
 

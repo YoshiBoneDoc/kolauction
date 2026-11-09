@@ -126,3 +126,72 @@ Seven supplied errors:
 Missing evidence: CPU/resource graphs, cache telemetry, bot phase/replay logs,
 request filter shapes and installed Home/browse/helper definitions. Existing captures
 already narrow the investigation; no blanket migration or timeout increase is justified.
+
+## Additional captures through 14:24:51 UTC — updated recommendations
+
+Six additional exports extend the record to ~57m41s overall. File names are not
+reliable type indicators: `snap 4.csv`, `snap 5.csv`, `snap 6.csv` are statistics;
+`4.1.csv`, `snap 5.1.csv`, `snap 6.1.csv` are pressure. Three further validated
+adjacent deltas are saved as interval-3/4/5.csv in the same analysis directory.
+No reset, deallocation, removed or unbaselined entry occurs in these new pairs.
+
+| Interval UTC | Duration | Bid history mean ms | Account mean ms | Poll mean ms | Home mean ms | Public live detail calls / mean ms |
+| --- | --- | --- | --- | --- | --- | --- |
+| 13:34:14–13:41:21 (earlier incident) | 7m07s | 821.7 | 380.0 | 923.4 | 847.2 | 68 / 81.7 |
+| 13:41:21–13:59:27 | 18m06s | 137.2 | 123.2 | 274.7 | 818.3 | 116 / 26.3 |
+| 13:59:27–14:14:23 | 14m56s | 54.6 | 65.4 | 73.3 | 542.8 | 411 / 12.4 |
+| 14:14:23–14:24:51 | 10m29s | 47.4 | 52.5 | 53.6 | 624.2 | 296 / 17.4 |
+
+All are matched top-level execution counters aggregated by RPC; different argument
+mixes and unverified deployments limit before/after causal interpretations.
+Account call rate is similar in the incident and final windows (~7.7 vs ~6.8/min),
+while mean time falls ~7.2x. Public live-detail call rate rises ~9.6 to ~28.3/min,
+while mean time falls ~4.7x. This weakens a simple total-read-volume explanation.
+These exports contain no CPU graphs, client counts or giveaway end timestamp;
+recovery cannot be attributed to a particular deployment or the giveaway ending.
+
+All three new pressure captures have no blockers or financial-lock entries; the
+first two are idle. The last has account access active at 0.676s and public live
+detail at 0.195s, despite their lower interval averages. This is not proof tail
+latency or timeouts are solved. JIT remains off, backend counts are 15/12/16 of
+configured 60, and blks_read remains 9510. Additional temporary block writes remain
+classified administration/instrumentation, not matched application statements.
+
+Updated order (supersedes the earlier optimization ordering):
+
+1. Separate persistent expensive read paths from transient system-wide degradation.
+   After broad recovery, Home still averages ~543–624ms, static detail ~283–309ms,
+   public browse ~215–272ms. Full read_auction_page averages 542ms over five calls
+   then 1257ms over six calls (7.543s total), now the largest application time bucket
+   in the final interval. Profile these installed paths first for durable reductions.
+   Six calls is a small sample; capture argument shape/role without private payloads
+   and inspect nested permission/history/projection work before choosing an index.
+   Current seller/profile callers can use the full reader: do not assume an old
+   browser just because that RPC appears. Preserve visibility and history privacy.
+2. Continue the cross-system incident investigation. Recovery across unrelated
+   functions supports a transient shared episode, but CPU/credit exhaustion remains
+   unproved. Correlate resource/Worker telemetry across the full 13:27–14:25 UTC
+   period, especially 13:34–13:41. Do not increase timeouts or blanket work_mem;
+   the new data still does not show an application sort/hash spill or financial lock.
+3. Keep replay amplification high priority for resilience, but distinguish it from
+   continuous traffic. Bot ingest: 414 calls /14.323s in interval 3, then two /0.479s
+   and 17 /4.533s. The burst subsides; handled-mail recovers to ~60ms in interval 4,
+   then ~161ms in interval 5. Worker replay-failure and retained-mail counts are still
+   needed to establish causes. Batch/chunk and candidate filtering changes need
+   exact-receipt/gift/financial parity; never skip safe intake barriers.
+4. Lower the immediate priority of broad poll/account/bid-history rewrites. They
+   dominated the incident but are much faster later with similar account/poll call
+   rates. Evaluate existing coalescing/event-driven refresh first; don't weaken
+   fresh access checks or add a new competing cache on the basis of the worst window.
+5. Do not slow down live prices or remove visit tracking based on this data. Live
+   detail handles ~three times the incident call rate with lower cost. Heartbeat
+   means recover ~290→77→43→24ms; final interval has 32 calls /0.752s. That makes
+   activity analytics a lower optimization priority, not proof of zero overhead or
+   successful migration installation. Preserve existing polling bounds/pressure backoff.
+
+Suggested first implementation investigation: controlled installed-plan profiling
+of Home plus full/static detail and public browse, with exact output/privacy parity
+fixtures. In parallel, obtain resource charts and replay logs rather than collecting
+more arbitrary idle pressure snapshots. Trigger pressure captures when the slowdown
+is actually happening; keep before/after statistics pairs. No speculative runtime
+change, new migration, production action or capacity-resolution claim was made.

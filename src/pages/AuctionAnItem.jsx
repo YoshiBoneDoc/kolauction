@@ -35,7 +35,7 @@ export default function AuctionAnItem() {
     const { currentUser } = useContext(UserContext);
     const kolIdentity = useKolIdentity();
     const navigate = useNavigate();
-    const { hash, state, key: locationKey } = useLocation();
+    const { hash, search, state, key: locationKey } = useLocation();
     const relistHandled = useRef(null);
     const [catalogItems, setCatalogItems] = useState([]);
     useEffect(() => {
@@ -65,7 +65,7 @@ export default function AuctionAnItem() {
     const [mrAEnabled, setMrAEnabled] = useState(false);
     const [mrARate, setMrARate] = useState(null);
     const changeMrAPayment = useCallback((enabled, rate) => { setMrAEnabled(enabled); setMrARate(rate); }, []);
-    const [auctionKind, setAuctionKind] = useState('sell');
+    const [auctionKind, setAuctionKind] = useState(() => new URLSearchParams(search).get('kind') === 'buy' ? 'buy' : 'sell');
     const [deliveryMode, setDeliveryMode] = useState('immediate');
     const isBuy = auctionKind === 'buy';
     const isBundle = auctionKind === 'bundle';
@@ -114,6 +114,16 @@ export default function AuctionAnItem() {
     const protectionSection = useRef(null);
     const protectionLinkHandled = useRef(null);
     const protectionLink = hash === '#escrow-protection';
+    useEffect(() => {
+        if (state?.relist || protectionLink) return;
+        const kind = new URLSearchParams(search).get('kind');
+        if (kind !== 'buy' && kind !== 'sell') return;
+        setAuctionKind(kind);
+        setGiveaway(false);
+        setPreview(null);
+        setError('');
+        if (kind === 'buy') { setEscrowMode(true); setCustomDuration(false); }
+    }, [search, locationKey, state, protectionLink]);
     useEffect(() => {
         if (!protectionLink) { protectionLinkHandled.current = null; return; }
         const viewer = currentUser?.id || 'guest';
