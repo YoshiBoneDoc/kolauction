@@ -74,7 +74,7 @@ export function bundleMarketPriceDisplay(items, records, now = Date.now()) {
     let total = 0, stale = false;
     for (const item of items) {
         const record = records.get(item.id);
-        if (!record?.available || !Number.isSafeInteger(record.price_meat) || record.price_meat <= 0) {
+        if (!Number.isSafeInteger(item.quantity) || item.quantity <= 0 || !record?.available || !Number.isSafeInteger(record.price_meat) || record.price_meat <= 0) {
             return { text: 'Market value unavailable for the entire bundle', available: false, stale: false };
         }
         total += record.price_meat * item.quantity;

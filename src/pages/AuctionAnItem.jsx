@@ -6,7 +6,8 @@ import useEscrowFeePreview from '../hooks/useEscrowFeePreview';
 import ListingPriceInputs from '../components/ListingPriceInputs';
 import useListingPrice from '../hooks/useListingPrice';
 import { canRelist, relistDraft } from '../lib/relistAuction';
-import { createMarketPriceService } from '../lib/marketPrices';
+import { marketPrices as coverPrices } from '../lib/marketPriceService';
+import BundleMarketPrice from '../components/BundleMarketPrice';
 import BundleContents from '../components/BundleContents';
 import { prepareBundle, bundleCover, bundleTitle, normalizeBundleTitle, MAX_BUNDLE_ITEMS, MAX_BUNDLE_TITLE_LENGTH } from '../lib/bundles';
 import { effectiveFeePercent, feeLabel } from '../lib/feeDisplay';
@@ -27,7 +28,6 @@ import { customAuctionEnd, localDateTimeInput, formatAuctionEnd, MAX_AUCTION_DUR
 
 const catalog = createItemCatalogService(supabase, () => import('../data/items.json').then(module => module.default));
 const resultLimit = 100;
-const coverPrices = createMarketPriceService(supabase);
 const fieldClass = 'mb-4 block min-h-11 w-full min-w-0 rounded border border-gray-400 bg-white p-3 text-base text-gray-900';
 
 export default function AuctionAnItem() {
@@ -313,6 +313,7 @@ export default function AuctionAnItem() {
                             </div>
                         </div>
                         <BundleContents items={preview.bundleItems} variant="preview" />
+                        <div className="mb-3"><BundleMarketPrice items={preview.bundleItems} /></div>
                         <p className="-mt-2 mb-3 text-xs leading-relaxed text-gray-600">Minimum bid and buyout apply to the full bundle.</p>
                     </> : <div className="my-4 flex min-w-0 items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800">
                         {preview.image && <img src={preview.image} alt={preview.item} className="h-24 w-24 shrink-0 object-contain [image-rendering:pixelated]" />}
@@ -486,6 +487,7 @@ export default function AuctionAnItem() {
                                 </li>;
                             })}
                         </ul> : <p className="bundle-empty-state mt-3 rounded-lg border border-dashed border-[#EADBD3] px-3 py-3 text-center text-xs text-gray-700">Your bundle is empty. Search for an item above and add it here.</p>}
+                        {bundleEntries.length > 0 && <div className="mt-3" aria-live="polite"><BundleMarketPrice items={bundleEntries.map(entry => ({ id: Number(entry.id), quantity: parseAuctionAmount(String(entry.quantity), 5000000000) ?? 0 }))} /></div>}
                     </section>}
                     <hr className="mb-3 border-0 border-t border-[#ead8ce] dark:border-[#594337]" />
                     {!isBuy && !giveaway && <MrAPaymentOptions enabled={mrAEnabled} rate={mrARate} onChange={changeMrAPayment} />}

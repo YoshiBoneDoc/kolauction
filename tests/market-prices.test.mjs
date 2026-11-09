@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createMarketPriceService,createCompletedMarketPriceService,marketPriceDisplay} from '../src/lib/marketPrices.js';
+import {createMarketPriceService,createCompletedMarketPriceService,marketPriceDisplay,bundleMarketPriceDisplay} from '../src/lib/marketPrices.js';
 const row=(id=1)=>({item_id:id,available:true,price_meat:1250000,observed_at:'2026-10-24T12:00:00Z',checked_at:'2026-10-24T12:00:00Z'});
 
 test('concurrent lookups batch, deduplicate and cache prices across page mounts',async()=>{
@@ -70,4 +70,19 @@ test('multi-item listings display exact whole-lot market value followed by the p
     assert.equal(marketPriceDisplay({...quote,price_meat:Number.MAX_SAFE_INTEGER},Date.now(),2).text,
         'Market Value: 18,014,398,509,481,982 Meat total · 9,007,199,254,740,991 Meat per item');
     assert.equal(marketPriceDisplay({...quote,available:false},Date.now(),2).text,'Market price unavailable');
+});
+
+
+test('bundle builder edits recompute quantities from shared prices without extra requests or partial totals', async () => {
+    let reads=0;
+    const service=createMarketPriceService({async rpc(_,args){reads++;return {data:args.p_item_ids.map(id=>row(id))};}});
+    const records=await service.load([1,2]);
+    const at=Date.parse(row().checked_at);
+    assert.equal(bundleMarketPriceDisplay([{id:1,quantity:2},{id:2,quantity:3}],records,at).text,'Market Value: 6,250,000 Meat for the entire bundle');
+    const cached=await service.load([1,2]);
+    assert.equal(reads,1);
+    assert.equal(bundleMarketPriceDisplay([{id:1,quantity:4},{id:2,quantity:3}],cached,at).text,'Market Value: 8,750,000 Meat for the entire bundle');
+    assert.equal(bundleMarketPriceDisplay([{id:1,quantity:4}],cached,at).text,'Market Value: 5,000,000 Meat for the entire bundle');
+    for (const quantity of [0,-1,NaN,1.5]) assert.equal(bundleMarketPriceDisplay([{id:1,quantity}],cached,at).available,false);
+    assert.equal(bundleMarketPriceDisplay([{id:1,quantity:1},{id:3,quantity:1}],cached,at).available,false);
 });

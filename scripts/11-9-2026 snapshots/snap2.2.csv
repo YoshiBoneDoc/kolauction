@@ -1,0 +1,9 @@
+signature,definition_hash
+"read_auction_bid_history(uuid,bigint,uuid,bigint)",c2d7367d80905053e252cc88b504bb84
+"read_auction_detail_static(text,uuid,text,text,text,integer)",0b43dd3179fe682f26e31d0c267fed7d
+"read_auction_page(text,uuid,text,text,text,integer)",d1ab4a25cc2580bcb02c66c936890de6
+"read_auction_page(text,uuid,text,text,text,integer,text)",0c94eef1b2adcee389a56aab13a8f16e
+"read_auction_page(text,uuid,text,text,text,integer,text,text)",072d841fc303caf137e7496fac60fecd
+read_my_account_access(),12c92302ddc650e34c3e4f9300a97a64
+"read_my_raffle_ticket_page(uuid,integer)",d63fd45ae39646edeb30f2db56a5807f
+read_public_raffle_commitment(uuid),8845c55d15ccde4683fc9eeca8528089

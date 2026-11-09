@@ -272,3 +272,14 @@ login records retained. Bounded 50-row retention batches on existing heartbeats.
 See docs/SITE_VISIT_ANALYTICS.md. Seven Node tests, disposable SQL visit/account/
 guest/registration/privacy tests, build/lint/security checks passed. No production
 SQL/deployment or browser visual QA. Personal bot quickstart unchanged.
+
+November 9 giveaway diagnostic review: docs/NOVEMBER_9_GIVEAWAY_PRESSURE.md and
+scripts/11-9-2026 snapshots/analysis/interval-{1,2}.csv analyze complete 13:27–13:41
+UTC pairs. Broad second-interval read degradation despite fewer private calls;
+bid history/account/polls/static detail total ~76s observed execution. Overlapping
+13:40:58 pressure capture matches bot/static timeout PIDs, with no blockers or
+financial lock and JIT off. CPU/resource cause remains unverified. Bot ingest 7→411
+calls is consistent with optional replay-read timeout fallback; require worker logs
+before attributing to replay/new mail. 42501 is the older 249 managed-Auth-table
+ALTER failure, separate from read pressure. No production SQL/deployment/runtime
+changes; proposed optimization priorities and missing evidence are in the report.
