@@ -97,10 +97,13 @@ export const exploreAuctionTabs = [
 ];
 
 // Sort the full active pool before choosing one representative per catalog item.
-export function exploreAuctions(auctions, tab = 'popular', now = Date.now()) {
+export function exploreAuctions(auctions, tab = 'popular', now = Date.now(), type = 'all') {
     const { sort } = exploreAuctionTabs.find(option => option.id === tab) || exploreAuctionTabs[0];
     const seen = new Set();
-    return browseAuctions(auctions, { sort, now }).filter(auction => {
+    const pool = type === 'all' ? auctions : auctions.filter(auction => type === 'buy'
+        ? auction.auctionKind === 'buy'
+        : auction.auctionKind !== 'buy' && auction.escrowMode === (type === 'escrow'));
+    return browseAuctions(pool, { sort, now }).filter(auction => {
         if (sort === 'best-value' && !auction.giveawayTitle && dealScore(auction, now) <= 0) return false;
         const key = auction.itemId != null ? `id:${auction.itemId}` : `name:${auction.item.trim().toLocaleLowerCase()}`;
         if (seen.has(key)) return false;

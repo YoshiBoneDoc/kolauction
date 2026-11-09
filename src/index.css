@@ -3,9 +3,9 @@
 @tailwind utilities;
 
 .home-title {
-  font-family: 'Itim', cursive;
+  font-family: 'Newsreader', Georgia, serif;
   font-size: clamp(36px, calc(16px + 6.25vw), 80px);
-  font-weight: 400;
+  font-weight: 500;
 }
 
 .approval-gallery {
@@ -677,3 +677,20 @@ html[data-theme="dark"] .auction-create-form .auction-custom-duration:focus-visi
 html[data-theme="dark"] .auction-create-form .auction-relist-checkbox:focus-visible { outline-color: #7199d0; }
 
 html[data-theme="dark"] .auction-create-form #auto-relist-options .text-stone-500 { color: #aebbd0; }
+
+/* Compact auction-type selectors on the right of Explore's heading. */
+.explore-auction-type {
+  border: 0;
+  border-radius: 9999px;
+  padding: 5px 10px;
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+  color: #64748b;
+}
+.explore-auction-type:hover { color: #5f488c; }
+.explore-auction-type[aria-pressed="true"] { color: #5f488c; background: #eee9f7; }
+.explore-auction-type:focus-visible { outline: 2px solid #b6a1df; outline-offset: 2px; }
+html[data-theme="dark"] .explore-auction-type { color: #a6b0c1; }
+html[data-theme="dark"] .explore-auction-type:hover { color: #ddd0f9; }
+html[data-theme="dark"] .explore-auction-type[aria-pressed="true"] { color: #e2e8f0; background: #1e2b3e; }

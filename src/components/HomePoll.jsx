@@ -9,10 +9,13 @@ import PollResults from './PollResults';
 import PollVoters from './PollVoters';
 import { startPrivateRefresh } from '../lib/privateRefresh';
 
+import RandomTitleFont from './RandomTitleFont';
+import { fontPollActive } from '../lib/randomTitleFont';
+
 const polls = createPollService(supabase);
 const RESULTS_HIDDEN_KEY = 'khub:poll-results-hidden';
 
-export function PollPanel({ service = polls, featuredTarget }) {
+export function PollPanel({ service = polls, featuredTarget, fontTarget, titleRef }) {
     const [feed, setFeed] = useState(null);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState('');
@@ -226,14 +229,15 @@ export function PollPanel({ service = polls, featuredTarget }) {
         {error && <p role="alert" className="text-sm text-red-800">{error}{' '}<button type="button" disabled={pending} onClick={() => setAttempt(value => value + 1)} className="underline">Retry</button></p>}
     </section>;
     return <>
+        {fontTarget?.current && titleRef && !error && fontPollActive(feed) && createPortal(<RandomTitleFont titleRef={titleRef} />, fontTarget.current)}
         {questionPanel && (featuredTarget?.current ? createPortal(questionPanel, featuredTarget.current) : questionPanel)}
         {panel}
     </>;
 }
-PollPanel.propTypes = { service: PropTypes.object, featuredTarget: PropTypes.shape({ current: PropTypes.object }) };
+PollPanel.propTypes = { service: PropTypes.object, fontTarget: PropTypes.object, titleRef: PropTypes.object, featuredTarget: PropTypes.shape({ current: PropTypes.object }) };
 
-export default function HomePoll({ featuredTarget } = {}) {
+export default function HomePoll({ featuredTarget, fontTarget, titleRef } = {}) {
     const { currentUser } = useContext(UserContext);
-    return currentUser && !currentUser.isBanned ? <PollPanel key={currentUser.id} featuredTarget={featuredTarget} /> : null;
+    return currentUser && !currentUser.isBanned ? <PollPanel key={currentUser.id} featuredTarget={featuredTarget} fontTarget={fontTarget} titleRef={titleRef} /> : null;
 }
-HomePoll.propTypes = { featuredTarget: PropTypes.shape({ current: PropTypes.object }) };
+HomePoll.propTypes = { fontTarget: PropTypes.object, titleRef: PropTypes.object, featuredTarget: PropTypes.shape({ current: PropTypes.object }) };

@@ -20,6 +20,8 @@ export default function Home() {
     const now = useNow(auctions);
     const featuredGiveaway = useFeaturedGiveaway();
     const featuredPollTarget = useRef(null);
+    const fontTarget = useRef(null);
+    const titleRef = useRef(null);
     const hasActiveAuctions = auctions.some(auction => auction.liveUnavailable || ['active', 'finalizing'].includes(getAuctionStatus(auction, now)));
 
     const highRollers = useMemo(() => highRollerAuctions(homeSections?.highRollers || auctions, now), [auctions, homeSections, now]);
@@ -28,8 +30,9 @@ export default function Home() {
     return (
         <div className="site-page-background flex flex-1 w-full flex-col bg-[#F9F9F9] px-4 sm:px-6">
             <header className="mx-auto w-full max-w-6xl text-center">
-                <div className="mt-4 grid grid-cols-1 items-baseline gap-y-1 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-                    <h1 className="home-title text-[#7695FF] lg:col-start-2">KoL Auction Hub</h1>
+                <div ref={fontTarget} className="relative mt-1 h-7" />
+                <div className="grid grid-cols-1 items-baseline gap-y-1 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+                    <h1 ref={titleRef} className="home-title text-[#7695FF] lg:col-start-2">KoL Auction Hub</h1>
                     <Link to="/update-log" className="justify-self-center whitespace-nowrap text-sm font-normal text-blue-700 hover:underline lg:col-start-3 lg:ml-2 lg:justify-self-start">What’s New <span aria-hidden="true">↗</span></Link>
                 </div>
                 <SiteTradeTotals totals={siteTotals} />
@@ -65,7 +68,7 @@ export default function Home() {
                     </PopularAuctions>
                 </div>
                 <div className="mt-4">
-                    <HomePoll featuredTarget={featuredPollTarget} />
+                    <HomePoll fontTarget={fontTarget} titleRef={titleRef} featuredTarget={featuredPollTarget} />
                 </div>
             </main>
             <SiteFooter className="home-footer -mx-4 sm:-mx-6" />

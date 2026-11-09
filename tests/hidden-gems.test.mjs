@@ -56,3 +56,17 @@ test('shared transport carries public quote facts and accepts Best value without
     assert.equal(mapped.dealMarketValueMeat, 100000);
     assert.equal(mapped.dealCheckedAt, new Date(now).toISOString());
 });
+
+test('Explore types filter before per-item selection and preserve Buy as a separate type', () => {
+    const pool = [
+        { ...base, id: 'direct', itemId: 1, escrowMode: false },
+        { ...base, id: 'escrow', itemId: 1, escrowMode: true, createdAt: now - 2000 },
+        { ...base, id: 'buy', itemId: 1, auctionKind: 'buy', escrowMode: true, pricePerItem: 120000, createdAt: now - 3000 },
+    ];
+    for (const tab of ['popular', 'new', 'ending']) {
+        assert.deepEqual(exploreAuctions(pool, tab, now, 'direct').map(a => a.id), ['direct']);
+        assert.deepEqual(exploreAuctions(pool, tab, now, 'escrow').map(a => a.id), ['escrow']);
+        assert.deepEqual(exploreAuctions(pool, tab, now, 'buy').map(a => a.id), ['buy']);
+        assert.equal(exploreAuctions(pool, tab, now, 'all').length, 1);
+    }
+});
