@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
+import AdminTradingCharts from './AdminTradingCharts';
+import { percentage, tradingTotal } from '../lib/adminTrading';
 import AdminRaffleAnalytics from './AdminRaffleAnalytics';
 import AdminUserSearch from './AdminUserSearch';
 import AdminUserAnalytics from './AdminUserAnalytics';
@@ -27,16 +29,8 @@ function TransactionActivity({ transactions }) {
     }), { method, count: 0n, meat: 0n, fees: 0n }));
     return <section aria-label="Completed auction activity" className="mt-5 border-t border-gray-200 pt-4">
         <h2 className="text-sm font-semibold text-gray-900">Completed auction activity</h2>
-        <div className="my-3 grid gap-3 sm:grid-cols-3">
-            {[
-                ['Transaction volume', meat(transactions.meat)],
-                ['Completed transactions', format(transactions.count)],
-                ['Average transaction', meat(transactions.average)],
-            ].map(([label, value]) => <div key={label} className="min-w-0 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
-                <h3 className="text-xs font-medium text-gray-600">{label}</h3>
-                <p className="mt-1 text-lg font-semibold tabular-nums text-gray-900">{value}</p>
-            </div>)}
-        </div>
+        <AdminTradingCharts transactions={transactions} />
+        <details className="text-xs text-gray-600"><summary className="cursor-pointer py-2 font-medium">Detailed breakdown</summary>
         <div className="overflow-x-auto rounded-lg border border-gray-200">
             <table className="w-full text-left text-xs tabular-nums">
                 <thead className="bg-gray-50 text-gray-600"><tr>
@@ -57,7 +51,10 @@ function TransactionActivity({ transactions }) {
                 </tr>)}</tfoot>
             </table>
         </div>
-        <p className="mt-2 text-xs text-gray-500">All time · Sell and Bundle count completed auctions; Buy counts paid fulfillments, including filled portions of closed orders. Volume excludes fees and unused escrow. Average is rounded down to whole Meat. Fees here cover completed trades; the income cards include all recorded ledger income.</p>
+        <div className="mt-2 space-y-1">{['sell','buy','bundle'].map(kind => { const total=tradingTotal(rows.filter(row=>row.kind===kind)); return <p key={kind} className="capitalize">{kind} total · {format(total.count)} {kind==='buy' ? 'fulfillments' : 'auctions'} · {meat(total.meat)} · fees {meat(total.fees)}</p>; })}
+        {methods.map(row=><p key={row.method} className="capitalize">Overall {row.method}: {percentage(row.count,transactions.count)} of transaction count · {percentage(row.meat,transactions.meat)} of Meat volume (includes Buy fulfillments).</p>)}</div>
+        </details>
+
     </section>;
 }
 
@@ -100,8 +97,9 @@ export default function AdminAnalytics() {
                     {value === 'overview' ? 'Overview' : value === 'raffles' ? 'Raffles' : value === 'giveaways' ? 'Giveaways' : 'Users'}
                 </button>)}
             </nav>
-            <button onClick={() => setAttempt(value => value + 1)} className="min-h-11 text-sm text-blue-700 hover:underline">Refresh analytics</button>
+
         </div>
+        <div className="mb-3 flex flex-wrap justify-end gap-3 text-xs text-gray-500"><span>{result ? `Updated ${new Date(result.generated_at).toLocaleString()}` : ''}</span><button onClick={() => setAttempt(value => value + 1)} className="border-0 bg-transparent p-0 text-xs text-blue-700 hover:underline">Refresh analytics</button></div>
         {tab === 'raffles' ? <AdminRaffleAnalytics revision={attempt} /> : tab === 'users' ? <div><AdminUserSearch /><AdminUserAnalytics revision={attempt} /></div> : error ? <p role="alert" className="text-sm text-red-700">{error}</p> : !result ? <p role="status" className="text-sm text-gray-500">Loading analytics…</p> : <>
             {tab === 'giveaways' ? <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -109,22 +107,25 @@ export default function AdminAnalytics() {
                     <p className="text-2xl font-semibold tabular-nums tracking-tight text-gray-900">{result.giveaways ? `${format(result.giveaways.meat_stack_mania)} Meat` : 'Unavailable'}</p>
                 </div>
             </div> : <>
-            <p className="mb-3 text-xs text-gray-500">Last month is the rolling month ending now. Meat totals count escrow fees and donations recorded in the income ledger.</p>
+
             <div className="grid gap-3 sm:grid-cols-3">
                 {[
                     ['Registered users', result.users.total, result.users.month, 'new last month'],
-                    ['Escrow sales · fees', result.sales.total, result.sales.month, 'meat last month'],
-                    ['Donations · meat', result.donations.total, result.donations.month, 'meat last month'],
-                ].map(([label, total, month, caption]) => <div key={label} className="min-w-0 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                    ['Total escrow fees collected', result.sales.total, result.sales.month, 'meat last month'],
+                    ['Total donations', result.donations.total, result.donations.month, 'meat last month'],
+                    ['Total Meat traded', result.transactions?.meat, null, ''],
+                    ['Completed transactions', result.transactions?.count, null, ''],
+                    ['Average transaction value', result.transactions?.average, null, ''],
+                ].map(([label, total, month, caption]) => <div key={label} className="min-w-0 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
                     <h3 className="text-xs font-medium text-gray-600">{label}</h3>
-                    <p className="mt-2 break-words text-2xl font-semibold tabular-nums tracking-tight text-gray-900">{format(total)}</p>
+                    <p className="mt-1 break-words text-lg font-semibold tabular-nums tracking-tight text-gray-900">{total == null ? 'Unavailable' : label.includes('Meat') || label.includes('value') || label.includes('fees') || label.includes('donations') ? meat(total) : format(total)}</p>
                     <p className="mt-1 text-xs text-gray-500">All time</p>
-                    <p className="mt-3 border-t border-gray-200 pt-2 text-xs text-gray-600"><span className="font-semibold tabular-nums text-blue-700">{format(month)}</span> {caption}</p>
+                    {month != null && <p className="mt-1 text-xs text-gray-600"><span className="font-semibold tabular-nums text-blue-700">{format(month)}</span> {caption}</p>}
                 </div>)}
             </div>
             <TransactionActivity transactions={result.transactions} />
             </>}
-            <p className="mt-3 text-xs text-gray-400">Updated {new Date(result.generated_at).toLocaleString()}</p>
+
         </>}
     </section>;
 }
