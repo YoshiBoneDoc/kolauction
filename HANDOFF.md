@@ -260,3 +260,15 @@ bot SQL copy exists. See docs/LOGIN_ACTIVITY.md for Auth-trigger prerequisites,
 post-install login smoke test and recovery. Seven targeted Node tests and disposable
 PostgreSQL tests passed, including rollback/dedupe/refresh/privacy/retention. No
 production SQL or deployment; hosted Auth behavior remains to be smoke-tested.
+
+November 9 visit analytics supersedes login activity: queued **249** extends existing
+90-second presence RPC to sessionize visits after >=30 minutes without activity,
+coalescing signed-in tabs/devices by account and keeping guests separate. Existing
+admin Users RPC returns active-account, visit-start and guest series from one indexed
+30-day read; registration/list behavior unchanged. Chart uses Unique Active Users /
+Total Visits, with guest/coverage definitions collapsed. No added requests/polling,
+shared caches or financial locks. Retires custom 248 password recording via a no-op function (no Auth table alteration); previous
+login records retained. Bounded 50-row retention batches on existing heartbeats.
+See docs/SITE_VISIT_ANALYTICS.md. Seven Node tests, disposable SQL visit/account/
+guest/registration/privacy tests, build/lint/security checks passed. No production
+SQL/deployment or browser visual QA. Personal bot quickstart unchanged.

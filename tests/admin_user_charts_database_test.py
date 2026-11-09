@@ -1,5 +1,6 @@
 """Disposable PostgreSQL: rolling registration counts, pagination and access control."""
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import subprocess
 import tempfile
@@ -76,6 +77,51 @@ with tempfile.TemporaryDirectory(prefix='khub-user-charts-', dir='/tmp') as fold
             sql(f'set role {role};select * from khub_bot.login_events;',error='permission denied')
             sql(f'set role {role};insert into khub_bot.login_events values(null,null,now());',error='permission denied')
         assert len(json.loads(sql(admin+'select public.read_admin_new_users(2);'))['users'])==7
+        sql("create table public.site_activity(visitor_id uuid primary key,user_id uuid,last_seen timestamptz);")
+        sql(migration('202611090249_site_visit_analytics.sql'))
+        def visit_stats(): return json.loads(sql(admin+'select public.read_admin_new_users();'))['site_activity']
+        def touch(visitor,account=None):
+            prefix=f"set request.jwt.claim.sub='{account}';" if account else ''
+            sql(prefix+f"select public.khub_record_site_activity(md5('{visitor}')::uuid);")
+        account='00000000-0000-0000-0000-000000000002'
+        other='00000000-0000-0000-0000-000000000003'
+        assert visit_stats()['total_visits']==['0','0','0']
+        touch('tab1',account);touch('tab1',account);touch('tab2',account)
+        assert visit_stats()['unique_users']==['1','1','1']
+        assert visit_stats()['total_visits']==['1','1','1']
+        touch('tab3',other);touch('guest1');touch('guest1')
+        assert visit_stats()['unique_users']==['2','2','2']
+        assert visit_stats()['total_visits']==['2','2','2']
+        assert visit_stats()['guest_visitors']==['1','1','1']
+        assert visit_stats()['guest_visits']==['1','1','1']
+        sql(f"update khub_bot.site_visits set last_seen=now()-interval '31 minutes' where account_id='{account}';")
+        touch('tab2',account)
+        assert visit_stats()['total_visits']==['3','3','3']
+        # An ongoing visit can contribute an active account without a new start in 24h.
+        sql("update khub_bot.site_visits set started_at=now()-interval '25 hours';")
+        assert visit_stats()['total_visits']==['0','3','3']
+        assert visit_stats()['unique_users']==['2','2','2']
+        sql(f"update khub_bot.site_visits set last_seen=now()-interval '169 hours',started_at=now()-interval '170 hours' where account_id='{other}';")
+        assert visit_stats()['unique_users']==['1','1','2']
+        for role in ['anon','authenticated']:
+            sql(f'set role {role};select * from khub_bot.site_visits;',error='permission denied')
+        sql("set role anon;select public.read_admin_new_users();",error='permission denied')
+        assert len(json.loads(sql(admin+'select public.read_admin_new_users(2);'))['users'])==7
+        login_rows=sql('select count(*) from khub_bot.login_events;')
+        session(99,99)
+        assert sql('select count(*) from khub_bot.login_events;')==login_rows
+        assert sql('select count(*) from public.site_activity;')=='4'
+        sql(f"update khub_bot.site_visits set last_seen=now()-interval '31 minutes' where account_id='{account}';")
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            list(pool.map(lambda visitor: touch(visitor,account),['parallel1','parallel2']))
+        assert sql(f"select count(*) from khub_bot.site_visits where account_id='{account}';")=='3'
+        sql("insert into khub_bot.site_visits(identity_key,account_id,started_at,last_seen) select 'old:'||i,null,now()-interval '33 days',now()-interval '32 days' from generate_series(1,75) i;")
+        touch('tab1',account)
+        assert sql("select count(*) from khub_bot.site_visits where last_seen<now()-interval '31 days';")=='25'
+        before=sql('select count(*) from khub_bot.site_visits;')
+        sql("begin;select public.khub_record_site_activity(md5('rolled-back-visit')::uuid);rollback;")
+        assert sql('select count(*) from khub_bot.site_visits;')==before
+        print('PASS: repeated heartbeats, cross-tab account dedupe, 30-minute visits, guest separation, active-vs-start windows, registration parity, privacy and login trigger retirement')
         sql('truncate public.profiles;')
         assert json.loads(sql(admin + 'select public.read_admin_new_users();'))['registration_counts'] == ['0', '0', '0']
         print('PASS: password login capture, session dedupe, refresh/recovery exclusions, rollback, bounded retention, logout history and privacy')

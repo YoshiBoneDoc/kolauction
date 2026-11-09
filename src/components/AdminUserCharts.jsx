@@ -13,7 +13,7 @@ function Chart({ title, series, unavailable }) {
         </div>
         <div className="relative mt-2">
             <svg viewBox="0 0 360 190" className="block w-full text-gray-600" role="img" aria-label={`${title}: ${unavailable || 'number of users by rolling interval'}`}>
-                <text x="38" y="12" fontSize="10" fill="currentColor">{title === 'User Activity' ? 'Users / logins' : 'Users'}</text>
+                <text x="38" y="12" fontSize="10" fill="currentColor">{title === 'User Activity' ? 'Users / visits' : 'Users'}</text>
                 {[0, 1, 2, 3, 4].map(tick => {
                     const y = 148 - tick * 30;
                     return <g key={tick}>
@@ -51,17 +51,23 @@ Chart.propTypes = {
     unavailable: PropTypes.string,
 };
 
-export default function AdminUserCharts({ registrationCounts, loginActivity }) {
+export default function AdminUserCharts({ registrationCounts, siteActivity }) {
     return <div className="mb-4">
         <div className="grid gap-3 md:grid-cols-2">
             <Chart title="User Activity" series={[
-                { label: 'Unique Active Users', color: '#1e40af', values: loginActivity?.unique_users || [] },
-                { label: 'Total Logins', color: '#93c5fd', values: loginActivity?.total_logins || [] },
-            ]} unavailable={loginActivity?.status === 'recording' ? undefined : 'Unavailable: successful login events are not currently recorded for analytics.'} />
+                { label: 'Unique Active Users', color: '#1e40af', values: siteActivity?.unique_users || [] },
+                { label: 'Total Visits', color: '#93c5fd', values: siteActivity?.total_visits || [] },
+            ]} unavailable={siteActivity?.status === 'recording' ? undefined : 'Visit analytics unavailable. Apply the site visit analytics migration.'} />
             <Chart title="New Users" series={[{ label: 'New accounts', color: '#1e40af', values: registrationCounts || [] }]}
                 unavailable={registrationCounts ? undefined : 'Registration counts unavailable. Apply the user charts database migration.'} />
         </div>
+        {siteActivity?.status === 'recording' && <details className="mt-2 text-xs text-gray-500"><summary className="cursor-pointer">Guest visits &amp; measurement details</summary>
+            <p className="mt-2">Signed-in accounts only in the activity chart. A visit starts after 30 minutes without a visible-page heartbeat. Active accounts include ongoing visits; visit counts use their start time.</p>
+            <p>Recording began {new Date(siteActivity.recording_since).toLocaleString()}; earlier portions of each window are unavailable. Heartbeats are approximate and may be delayed by connectivity or load.</p>
+            <p className="mt-1">Guests (browser identifiers, not people):</p>
+            {['Last 24 Hours','Last 7 Days','Last 30 Days'].map((label,index)=><p key={label}>{label}: {exact(siteActivity.guest_visitors?.[index] || '0')} browsers · {exact(siteActivity.guest_visits?.[index] || '0')} visits</p>)}
+        </details>}
     </div>;
 }
 
-AdminUserCharts.propTypes = { loginActivity: PropTypes.shape({ status: PropTypes.string, recording_since: PropTypes.string, unique_users: PropTypes.arrayOf(PropTypes.string), total_logins: PropTypes.arrayOf(PropTypes.string) }), registrationCounts: PropTypes.arrayOf(PropTypes.string) };
+AdminUserCharts.propTypes = { siteActivity: PropTypes.shape({ status: PropTypes.string, recording_since: PropTypes.string, unique_users: PropTypes.arrayOf(PropTypes.string), total_visits: PropTypes.arrayOf(PropTypes.string), guest_visitors: PropTypes.arrayOf(PropTypes.string), guest_visits: PropTypes.arrayOf(PropTypes.string) }), registrationCounts: PropTypes.arrayOf(PropTypes.string) };

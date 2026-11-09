@@ -22,9 +22,9 @@ test('rolling registration bars expose exact counts and share the responsive cha
     assert.equal(tree.filter(n => n.type === 'title').length, 3);
     assert.ok(tree.some(n => n.type === 'table' && n.props.className === 'sr-only'));
 });
-test('missing login events are unavailable, never fabricated zero bars', () => {
+test('missing visit history are unavailable, never fabricated zero bars', () => {
     const tree = render({ registrationCounts: ['1', '2', '3'] });
-    assert.ok(tree.some(n => n.type === 'p' && n.props.children === 'Unavailable: successful login events are not currently recorded for analytics.'));
+    assert.ok(tree.some(n => n.type === 'p' && n.props.children === 'Visit analytics unavailable. Apply the site visit analytics migration.'));
     assert.equal(tree.filter(n => n.type === 'svg').length, 2);
     assert.equal(tree.filter(n => n.type === 'rect').length, 3);
 });
@@ -35,13 +35,13 @@ test('older database responses preserve the page with a migration notice', () =>
 });
 
 
-test('recorded login counts render adjacent series with exact values', () => {
-    const tree = render({ registrationCounts: ['0','1','2'], loginActivity: {
+test('recorded visit counts render adjacent series with exact values', () => {
+    const tree = render({ registrationCounts: ['0','1','2'], siteActivity: {
         status: 'recording', recording_since: '2026-11-09T12:00:00Z',
-        unique_users: ['2','3','4'], total_logins: ['5','7','9'],
+        unique_users: ['2','3','4'], total_visits: ['5','7','9'],
     } });
     assert.equal(tree.filter(n => n.type === 'rect').length, 9);
     const labels = tree.filter(n => n.type === 'rect').map(n => n.props['aria-label']);
     assert.ok(labels.includes('Last 24 Hours · Unique Active Users: 2'));
-    assert.ok(labels.includes('Last 24 Hours · Total Logins: 5'));
+    assert.ok(labels.includes('Last 24 Hours · Total Visits: 5'));
 });
