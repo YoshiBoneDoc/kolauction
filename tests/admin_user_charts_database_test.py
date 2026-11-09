@@ -44,8 +44,41 @@ with tempfile.TemporaryDirectory(prefix='khub-user-charts-', dir='/tmp') as fold
         sql('set role authenticated;select public.read_admin_new_users();', error='Administrator access required')
         sql(admin + 'select public.read_admin_new_users(0);', error='Invalid page')
         sql(admin + 'select public.read_admin_new_users(null);', error='Invalid page')
+        sql("""create table auth.sessions(id uuid primary key,user_id uuid not null,refreshed_at timestamptz);
+            create table auth.mfa_amr_claims(id uuid primary key,session_id uuid references auth.sessions(id),authentication_method text,updated_at timestamptz);
+        """)
+        sql(migration('202611090248_record_login_activity.sql'))
+        def activity(): return json.loads(sql(admin+'select public.read_admin_new_users();'))['login_activity']
+        assert activity()['unique_users']==['0','0','0']
+        assert activity()['status']=='recording' and activity()['recording_since']
+        def session(n,account=1,method='password'):
+            sql(f"insert into auth.sessions values(md5('session{n}')::uuid,md5('account{account}')::uuid,null); insert into auth.mfa_amr_claims values(md5('claim{n}')::uuid,md5('session{n}')::uuid,'{method}',now());")
+        session(1);session(2);session(3,2)
+        assert activity()['unique_users']==['2','2','2']
+        assert activity()['total_logins']==['3','3','3']
+        # Duplicate claim delivery cannot create a second event for one session.
+        sql("insert into auth.mfa_amr_claims values(md5('duplicate')::uuid,md5('session1')::uuid,'password',now());")
+        session(4,3,'token_refresh');session(5,3,'recovery');session(6,3,'totp')
+        sql("update auth.sessions set refreshed_at=now(); update auth.mfa_amr_claims set updated_at=now();")
+        assert activity()['total_logins']==['3','3','3']
+        sql("begin;insert into auth.sessions values(md5('rollback-session')::uuid,md5('account4')::uuid,null);insert into auth.mfa_amr_claims values(md5('rollback-claim')::uuid,md5('rollback-session')::uuid,'password',now());rollback;")
+        assert activity()['total_logins']==['3','3','3']
+        # Retain history after logout/session deletion, and verify rolling windows.
+        sql("delete from auth.mfa_amr_claims;delete from auth.sessions;")
+        assert activity()['total_logins']==['3','3','3']
+        sql("update khub_bot.login_events set logged_in_at=now()-interval '25 hours' where session_id=md5('session2')::uuid;update khub_bot.login_events set logged_in_at=now()-interval '169 hours' where session_id=md5('session3')::uuid;")
+        assert activity()['unique_users']==['1','1','2']
+        assert activity()['total_logins']==['1','2','3']
+        sql("insert into khub_bot.login_events select md5('old'||i)::uuid,md5('old-user')::uuid,now()-interval '32 days' from generate_series(1,150) i;")
+        session(7,1)
+        assert sql("select count(*) from khub_bot.login_events where logged_in_at<now()-interval '31 days';")=='50'
+        for role in ['anon','authenticated']:
+            sql(f'set role {role};select * from khub_bot.login_events;',error='permission denied')
+            sql(f'set role {role};insert into khub_bot.login_events values(null,null,now());',error='permission denied')
+        assert len(json.loads(sql(admin+'select public.read_admin_new_users(2);'))['users'])==7
         sql('truncate public.profiles;')
         assert json.loads(sql(admin + 'select public.read_admin_new_users();'))['registration_counts'] == ['0', '0', '0']
+        print('PASS: password login capture, session dedupe, refresh/recovery exclusions, rollback, bounded retention, logout history and privacy')
         print('PASS: rolling windows, future/old exclusions, counts, weekly list parity, pagination, empty state and administrator-only access')
     finally:
         pg('-m', 'fast', '-w', 'stop')

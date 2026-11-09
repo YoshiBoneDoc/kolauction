@@ -25,7 +25,7 @@ export default function AdminUserAnalytics({ revision = 0 }) {
     if (!result) return <p role="status" className="text-sm text-gray-500">Loading new users…</p>;
     const pages = Math.max(1, Math.ceil(Number(result.total) / 25));
     return <section aria-label="User analytics">
-        <AdminUserCharts registrationCounts={result.registration_counts} />
+        <AdminUserCharts registrationCounts={result.registration_counts} loginActivity={result.login_activity} />
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
             <div>
                 <h2 className="text-sm font-medium text-gray-700">New users · past 7 days</h2>

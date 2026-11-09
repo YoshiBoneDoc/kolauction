@@ -51,18 +51,19 @@ Chart.propTypes = {
     unavailable: PropTypes.string,
 };
 
-export default function AdminUserCharts({ registrationCounts }) {
+export default function AdminUserCharts({ registrationCounts, loginActivity }) {
     return <div className="mb-4">
         <div className="grid gap-3 md:grid-cols-2">
             <Chart title="User Activity" series={[
-                { label: 'Unique Active Users', color: '#1e40af', values: [] },
-                { label: 'Total Logins', color: '#93c5fd', values: [] },
-            ]} unavailable="Unavailable: successful login events are not currently recorded for analytics." />
+                { label: 'Unique Active Users', color: '#1e40af', values: loginActivity?.unique_users || [] },
+                { label: 'Total Logins', color: '#93c5fd', values: loginActivity?.total_logins || [] },
+            ]} unavailable={loginActivity?.status === 'recording' ? undefined : 'Unavailable: successful login events are not currently recorded for analytics.'} />
             <Chart title="New Users" series={[{ label: 'New accounts', color: '#1e40af', values: registrationCounts || [] }]}
                 unavailable={registrationCounts ? undefined : 'Registration counts unavailable. Apply the user charts database migration.'} />
         </div>
+        {loginActivity?.status === 'recording' && <p className="mt-2 text-xs text-gray-500">Password logins recorded since {new Date(loginActivity.recording_since).toLocaleString()}. Windows extending before that time show partial counts. Refreshes and visits are excluded.</p>}
         <p className="mt-2 text-xs text-gray-500">Rolling 24-hour, 7-day and 30-day windows ending at the update time below. New users are counted by account creation time. Login counts cannot be inferred from visits or token refreshes.</p>
     </div>;
 }
 
-AdminUserCharts.propTypes = { registrationCounts: PropTypes.arrayOf(PropTypes.string) };
+AdminUserCharts.propTypes = { loginActivity: PropTypes.shape({ status: PropTypes.string, recording_since: PropTypes.string, unique_users: PropTypes.arrayOf(PropTypes.string), total_logins: PropTypes.arrayOf(PropTypes.string) }), registrationCounts: PropTypes.arrayOf(PropTypes.string) };

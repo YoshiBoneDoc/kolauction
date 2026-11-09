@@ -249,3 +249,14 @@ then deploy website; matching ignored bot copy exists, no bot restart needed.
 33 targeted Node tests and disposable free-text/poll-heart SQL regressions pass;
 build, changed-source lint and secret scan pass. No production SQL/deployment or
 browser visual QA. Personal quickstart unchanged.
+
+November 9 login activity: queued **248** adds private, indexed minimal login events
+from server-side password AMR claim inserts (one per session); no browser callback,
+full audit logs, polling or shared cache changes. Existing Users RPC computes both
+series in one bounded 30-day account-grouped pass. Chart shows recording start and
+partial-history notice; registration list/counts remain. Retention deletes at most
+100 >31-day records per login; idle data waits for later logins. Matching ignored
+bot SQL copy exists. See docs/LOGIN_ACTIVITY.md for Auth-trigger prerequisites,
+post-install login smoke test and recovery. Seven targeted Node tests and disposable
+PostgreSQL tests passed, including rollback/dedupe/refresh/privacy/retention. No
+production SQL or deployment; hosted Auth behavior remains to be smoke-tested.
