@@ -61,8 +61,6 @@ export default function AdminUserCharts({ registrationCounts, loginActivity }) {
             <Chart title="New Users" series={[{ label: 'New accounts', color: '#1e40af', values: registrationCounts || [] }]}
                 unavailable={registrationCounts ? undefined : 'Registration counts unavailable. Apply the user charts database migration.'} />
         </div>
-        {loginActivity?.status === 'recording' && <p className="mt-2 text-xs text-gray-500">Password logins recorded since {new Date(loginActivity.recording_since).toLocaleString()}. Windows extending before that time show partial counts. Refreshes and visits are excluded.</p>}
-        <p className="mt-2 text-xs text-gray-500">Rolling 24-hour, 7-day and 30-day windows ending at the update time below. New users are counted by account creation time. Login counts cannot be inferred from visits or token refreshes.</p>
     </div>;
 }
 

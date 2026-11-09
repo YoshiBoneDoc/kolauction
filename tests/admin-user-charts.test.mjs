@@ -35,7 +35,7 @@ test('older database responses preserve the page with a migration notice', () =>
 });
 
 
-test('recorded login counts render adjacent series with exact values and coverage notice', () => {
+test('recorded login counts render adjacent series with exact values', () => {
     const tree = render({ registrationCounts: ['0','1','2'], loginActivity: {
         status: 'recording', recording_since: '2026-11-09T12:00:00Z',
         unique_users: ['2','3','4'], total_logins: ['5','7','9'],
@@ -44,5 +44,4 @@ test('recorded login counts render adjacent series with exact values and coverag
     const labels = tree.filter(n => n.type === 'rect').map(n => n.props['aria-label']);
     assert.ok(labels.includes('Last 24 Hours · Unique Active Users: 2'));
     assert.ok(labels.includes('Last 24 Hours · Total Logins: 5'));
-    assert.ok(tree.some(n => n.type === 'p' && Array.isArray(n.props.children) && n.props.children[0] === 'Password logins recorded since '));
 });
