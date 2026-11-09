@@ -223,3 +223,16 @@ unknown-send protections unchanged. Frozen/sent/uncertain bodies not rewritten.
 Mixed escrow SQL suite passes combined envelope, exact wording/assets, gift split,
 unknown/reconciled/repeated acknowledgments and legacy financial tests. Stop sole
 worker to apply SQL then resume; no binary/site rebuild. No production action run.
+
+November 9 Admin Analytics Users charts: additive queued **246** extends the existing
+`read_admin_new_users` response with rolling 24/168/720-hour registration counts,
+using one bounded pass over the existing registration index and reusing the 7-day
+count for the existing list. Website adds compact responsive chart panels with
+exact-count hover titles and accessible counts; weekly list/search/pagination remain.
+No application-owned successful-login event source was found. User Activity explicitly
+shows unavailable, with no inferred visits/session-refresh counts or fabricated zeros.
+No new polling/browser requests. Matching ignored bot migration copy exists; apply
+once per database, deploy website separately; no bot restart required. Six targeted
+Node tests, disposable PostgreSQL count/list/access tests, build, changed-source lint
+and secret scan passed. No production SQL/deployment or browser visual QA performed.
+Personal quickstart unchanged.

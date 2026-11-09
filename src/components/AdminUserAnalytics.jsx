@@ -1,5 +1,6 @@
 import PropTypes from 'prop-types';
 import { useEffect, useState } from 'react';
+import AdminUserCharts from './AdminUserCharts';
 import { supabase } from '../lib/supabase';
 
 const date = value => new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -23,7 +24,8 @@ export default function AdminUserAnalytics({ revision = 0 }) {
     if (error) return <p role="alert" className="text-sm text-red-700">{error}</p>;
     if (!result) return <p role="status" className="text-sm text-gray-500">Loading new users…</p>;
     const pages = Math.max(1, Math.ceil(Number(result.total) / 25));
-    return <section aria-label="New users in the past week">
+    return <section aria-label="User analytics">
+        <AdminUserCharts registrationCounts={result.registration_counts} />
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
             <div>
                 <h2 className="text-sm font-medium text-gray-700">New users · past 7 days</h2>

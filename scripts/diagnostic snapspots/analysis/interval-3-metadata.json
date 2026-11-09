@@ -1,9 +1,0 @@
-{
-  "from_time": "2026-11-06T18:00:52.380005+00:00",
-  "to_time": "2026-11-06T18:18:05.585661+00:00",
-  "elapsed_hours": 0.287002,
-  "removed_entries": 0,
-  "deallocations": 0,
-  "unbaselined_or_reset_entries": 0,
-  "caveat": "Measured snapshot interval, not historical last-24h data. New/reset/missing entries have no inferred deltas. Nested statements can overlap callers. Resets not exposed by old server versions may be undetectable."
-}
