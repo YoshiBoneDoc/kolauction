@@ -42,13 +42,13 @@ Execution time is elapsed database statement time, not CPU time. With nested tra
 
 ## Representative query plans
 
-Use a controlled database and representative authorized IDs, after installing migration 231:
-
-```sh
-psql "$DATABASE_URL" -v viewer_id='actual-viewer-uuid' -v auction_id='actual-auction-uuid' -f scripts/read-query-plans.psql
-```
-
-The script uses a read-only transaction, an authenticated viewer context and short statement/lock timeouts. It compares legacy/new Home and card/detail RPC envelopes without financial writes. Choose active Sell, active Buy with reservations, closed listings, ordinary viewers and owners for meaningful coverage; the built-in test fixtures are too small to predict production performance.
+For deeper profiling, use a controlled database with read-only transactions,
+equivalent authenticated viewer context and short statement/lock timeouts. The
+former standalone plan-profiling script has been removed. Choose active Sell,
+active Buy with reservations, closed listings, ordinary viewers and owners for
+meaningful coverage; small fixtures do not predict production performance.
+For routine captures, use `scripts/query-stats-snapshot.sql` before/after the
+interval and `scripts/traffic-pressure-snapshot.sql` during the slowdown.
 
 `EXPLAIN` of a PL/pgSQL RPC call measures its envelope, not each internal query. To identify remaining row-loop/index costs, inspect the installed function and explain its constituent reads with equivalent authorization, or use a controlled nested-plan capture with appropriate database privileges. Do not enable broad production parameter/payload logging. Add indexes only after representative plans show a useful access path and assess their write/storage cost.
 

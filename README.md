@@ -6,6 +6,8 @@ KMail bot operating **kHub (#3888760)**. Start new sessions with the
 [bot operations](bot/README.md:1) and [roadmap](ROADMAP.md:1); inspect current code
 before treating older documentation as unfinished work or deployed behavior.
 
+See the [bot architecture, cycle diagrams and recovery reference](bot/README.md#architecture-and-execution-reference) for task priorities, database locks and high-traffic risks.
+
 ## Development principle
 
 **Consider performance, database load and scalability in every feature, change and
@@ -141,10 +143,11 @@ cumulative counters cannot reconstruct an arbitrary historical window. Check res
 eviction and missing baselines; nested execution times can overlap. Correlate RPC
 costs with Worker queues/errors, database waits/resources and bot phase telemetry.
 
-[Read-query plans](scripts/read-query-plans.psql:1) is a **terminal `psql` script**,
-not paste-ready Supabase SQL Editor input. It uses read-only transactions and
-executes display reads for profiling. Prefer controlled representative fixtures;
-never run financial-write `EXPLAIN ANALYZE` on production or reset shared counters.
+During slowdowns, run the [pressure snapshot](scripts/traffic-pressure-snapshot.sql:1)
+in Supabase SQL Editor. It captures active operations, waits and blockers without
+executing application readers.
+Use controlled representative fixtures for deeper query-plan profiling; never run
+financial-write `EXPLAIN ANALYZE` on production or reset shared counters.
 Production savings, legacy-client provenance and some detail/intake/browser costs
 remain unresolved. No past outage root cause has been established.
 

@@ -143,7 +143,7 @@ database waits/resources and BOT_PERFORMANCE phase latencies at the same times.
 Check stale/provisional displays and permission/action reconciliation, not only
 latency. Compare equal public filter/page requests and private viewer contexts.
 
-Use `scripts/read-query-plans.psql` in a controlled read-only environment with
+Use controlled read-only query-plan profiling with
 representative active Sell/Buy, reservations, closed/private/ignored/admin IDs;
 repeat warm paired measurements. Extract constituent reads or use controlled
 nested auto_explain without parameter/payload logging to locate internal costs.

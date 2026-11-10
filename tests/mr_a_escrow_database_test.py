@@ -125,6 +125,26 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
             if not instant: sql(f"update public.auctions set created_at=least(created_at,now()-interval '10 minutes'),end_time=now()-interval '1 minute' where id='{aid}';")
             scan=stage([])
             sql(f"set role service_role;select public.bot_finish_inbox_scan('{scan}');")
+        # Owner's two read-only reports must be identical and reconcile physical assets.
+        ledger=(ROOT/'scripts/ledger-breakdown.sql').read_text()
+        guide_path=ROOT/'bot/QUICKSTART_README.md'
+        if guide_path.exists():  # Private bot directory is absent from fresh website clones.
+            section=guide_path.read_text().split('## View Breakdown of Protected Items and Meat via SQL',1)[1]
+            assert section.split('```sql\n',1)[1].split('\n```',1)[0].strip()==ledger.strip()
+        query=ledger[ledger.index('with\npayloads'):ledger.rindex('commit;')].strip().rstrip(';')
+        def check_ledger():
+            before=snapshot()
+            rows=json.loads(sql("begin transaction isolation level repeatable read read only;select coalesce(jsonb_agg(to_jsonb(q)),'[]'::jsonb) from ("+query+") q;commit;"))
+            assert not [r for r in rows if r['category'].startswith('UNEXPLAINED')], rows
+            from decimal import Decimal
+            expected={}
+            detailed={}
+            for r in rows:
+                target=expected if r['category']=='TOTAL PROTECTED' else detailed
+                target[r['asset']]=target.get(r['asset'],Decimal(0))+Decimal(r['amount'].replace(',',''))
+            assert expected==detailed,(expected,detailed)
+            assert snapshot()==before, 'Read-only report changed financial records'
+            return rows
         aid=create(instantPurchasePrice=150000000);fund(aid)
         baseline=liabilities()
         sql(f"set role authenticated;select public.place_mixed_bid('{aid}',6000000,1);",other,error='does not accept Direct')
@@ -132,6 +152,8 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
         p=payload(aid,meat=6000000,q=1)
         ingest(p,False,error='staged inbox')
         assert ingest(p)=='accepted'
+        ledger_rows=check_ledger()
+        assert any(r['category']=='Current funded bid' and '(#194)' in r['asset'] and r['amount']=='1' for r in ledger_rows)
         a=state(aid);assert (a['current_bid'],a['payment_meat'],a['payment_mr_a'])==(76000000,6000000,1)
         held=liabilities();assert int(held['meat'])-int(baseline['meat'])==6000000
         assert int(held['items'].get('194',0))-int(baseline['items'].get('194',0))==1
@@ -145,6 +167,7 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
         assert ingest(p2)=='accepted'
         refund=amounts("receipt_id='"+p2['id']+"' and dedupe_key like 'outbid:%'")
         assert refund=={'meat':6000000,'mr_a':1,'lot':0},refund
+        check_ledger()
         before=snapshot();assert ingest(p2,False)=='duplicate';assert snapshot()==before
         sql(f"insert into khub_bot.administrators(user_id,note) values('{owner}','Synthetic test administrator');")
         bid_id=sql("select bid_id from khub_bot.bid_receipts where receipt_id='"+p['id']+"';")
@@ -167,6 +190,7 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
 
         held_before_review=liabilities()
         sql(f"update public.auctions set status='on_hold' where id='{aid}';")
+        check_ledger()
         assert liabilities()==held_before_review
         assert state(aid)['payment_mr_a']==2
         hold=liabilities();assert int(hold['items']['194'])>=3
@@ -443,6 +467,7 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
         print('PASS combined seller payout wording, exact attachments, idempotent gift split and recovery')
         print('PASS preparation holds, verified not-sent retries and physical-asset financial reports')
         print('PASS partial delivery, unknown reserves, no automatic resend, verified reconciliation and duplicate acknowledgment')
+        check_ledger()
         print('PASS mixed intake, exact refunds, physical reserves, buyouts, commissions, promotions, bundles, retries and compatibility')
     finally:
         if started: pg('-m','immediate','-w','stop')

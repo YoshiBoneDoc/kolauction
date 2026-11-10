@@ -50,8 +50,8 @@ is not inferred from local migration locations.
 
 ## Measure during traffic
 
-Run `scripts/traffic-diagnostics.sql` manually in Supabase SQL Editor during the
-incident. It reads session/wait/lock summaries and function fingerprints without
+Run `scripts/traffic-pressure-snapshot.sql` manually in Supabase SQL Editor during the
+incident. It reads active operations and session/wait/lock summaries without
 SQL text, credentials or player payloads. Capture timestamps and affected routes.
 It creates no tables and changes no database state. Access to statistics depends
 on the SQL Editor role. Capture Supabase resource charts at the same time.

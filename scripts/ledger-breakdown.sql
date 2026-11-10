@@ -1,4 +1,6 @@
 -- Run the whole script in Supabase SQL Editor as the database owner.
+-- Physical assets only: Mr. A is item #194; its Meat-equivalent bid value is not Meat held.
+-- Requires mixed-payment migrations 237–239.
 -- One read-only snapshot. No worker start, financial locks, or ledger mutations.
 begin transaction isolation level repeatable read read only;
 set local statement_timeout = '15s';
@@ -20,10 +22,16 @@ payloads as (
     select 'SELL deposited items'::text category, 'Auction #'||a.auction_number reference,
            (x->>'id')::text item_id, (x->>'quantity')::numeric amount
     from public.auctions a cross join lateral jsonb_array_elements(khub_bot.auction_items(a)) x
-    where a.auction_kind='sell' and a.escrow_mode and a.status='active' and a.item_escrowed_at is not null
+    where a.auction_kind='sell' and a.escrow_mode and (a.status='active' or (a.mr_a_rate is not null and a.status='on_hold')) and a.item_escrowed_at is not null
     union all
-    select 'Current funded bid', 'Auction #'||a.auction_number, null, a.current_bid::numeric
-    from public.auctions a where a.auction_kind='sell' and a.escrow_mode and a.status='active'
+    select 'Current funded bid', 'Auction #'||a.auction_number, null, coalesce(a.payment_meat,a.current_bid)::numeric
+    from public.auctions a where a.auction_kind='sell' and a.escrow_mode
+      and (a.status='active' or (a.mr_a_rate is not null and a.status='on_hold'))
+    union all
+    select 'Current funded bid', 'Auction #'||a.auction_number, '194', a.payment_mr_a::numeric
+    from public.auctions a where a.auction_kind='sell' and a.escrow_mode
+      and (a.status='active' or (a.mr_a_rate is not null and a.status='on_hold'))
+      and a.payment_mr_a>0
     union all
     select 'BUY remaining funds', 'Auction #'||a.auction_number, null, b.balance_meat::numeric
     from khub_bot.buy_orders b join public.auctions a on a.id=b.auction_id

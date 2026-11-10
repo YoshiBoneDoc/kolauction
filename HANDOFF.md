@@ -30,6 +30,8 @@ Website, public-cache Worker, database SQL and bot are independent releases.
   bans/appeals, polls and trade totals already exist. Inspect before rebuilding.
   Raffle purchases have separate intake/draw/fulfillment paths from auction bids.
 
+Bot investigation reference: [architecture, cycle/poll flow, locks, recovery and pressure points](bot/README.md#architecture-and-execution-reference). November 10 local-code snapshot; deployment and bottleneck attribution remain unverified. Reuse this map before repeating the investigation.
+
 ## Invariants to preserve
 
 - SQL RPCs authorize writes and enforce visibility/accounting. Display caches,
@@ -293,3 +295,22 @@ Home/full/static/public-browse plans for persistent cost; retain resource/CPU-cr
 and replay-log investigation for transient episode. No new blockers/JIT/connection
 exhaustion observed; idle snapshots do not prove incident resolved. No runtime edits
 or production actions in this review.
+
+Later November 9 read timeouts: docs/NOVEMBER_9_LATER_READ_TIMEOUTS.md reviews
+16:30:23 UTC Home (site_trade_totals startup) and 20:33:55 UTC browse
+(deal_quote/deal_score). Current totals reader is a cached singleton SELECT, so
+cancellation there does not prove aggregate recomputation; earlier Home work may
+have consumed its budget. Browse scoring before pagination is a concrete profiling
+target, not yet a proven faulty inner plan. Morning captures do not cover these
+times. A one-off read-only definition diagnostic collected targeted installed
+code/index/stat metadata without executing app readers; validated in disposable
+PostgreSQL and subsequently removed after review. No speculative fix, migration or production action.
+
+Later timeout follow-up export (00:18:36 UTC Nov 10) confirms read-only singleton
+site_trade_totals, expected catalog/market-price/snapshot primary keys, Home seller
+LEFT JOIN and direct card whitelist in production at capture. Home has five
+visible_auctions call sites; public browse scores candidates before seller exclusion.
+Prioritize measured visibility/quote reuse with privacy/JSON parity, not another
+milestone cache or duplicate indexes. Metadata is later than errors and does not
+prove incident-time plans/root cause. Details appended to later-timeout document.
+No runtime/SQL/deployment changes.

@@ -81,6 +81,7 @@ export function PollPanel({ service = polls, featuredTarget, fontTarget, titleRe
     }
     async function close(pollId) {
         if (writing.current) return;
+        if (!window.confirm('Conclude this poll?\n\nThis will stop accepting responses. Existing responses will be kept.')) return;
         writing.current = true;
         generation.current += 1;
         setPending(true); setError('');

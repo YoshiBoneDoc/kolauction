@@ -126,7 +126,11 @@ test('failed votes retain choices and offer retry instead of claiming a vote was
  assert.match(h.html(),/role="alert"/);assert.match(h.html(),/Try again later/);assert.ok(h.button('No'));assert.ok(h.button('Retry'));
 });
 
-test('homepage administrators see all live results without voting and can conclude each poll',async()=>{
+test('homepage administrators see all live results without voting and can conclude each poll',async(t)=>{
+ const previousWindow=globalThis.window;
+ let confirmed=false;
+ globalThis.window={confirm:()=>confirmed};
+ t.after(()=>{if(previousWindow===undefined)delete globalThis.window;else globalThis.window=previousWindow;});
  let results=[{...poll,can_manage:true,results:{yes:1,no:1,total:2}}, {...poll,id:'second',question:'Another active poll?',can_manage:true,results:{yes:0,no:0,total:0}}];
  let votes=0;const closed=[];
  const h=harness({read:async()=>({poll:null,can_manage:true,answered_polls:results,published_results:[{id:'past',question:'Archived admin summary?',has_voted:false,results:{yes:3,no:0,total:3}}]}),vote:async()=>{votes++;},close:async(id)=>{closed.push(id);results=results.filter(p=>p.id!==id);}});
@@ -135,7 +139,20 @@ test('homepage administrators see all live results without voting and can conclu
  h.button('Next poll results').props.onClick();h.render();assert.match(h.html(),/Another active poll/);assert.match(h.html(),/0 votes/);
  h.button('Next poll results').props.onClick();h.render();assert.match(h.html(),/Archived admin summary/);
  h.button('Next poll results').props.onClick();h.render();assert.match(h.html(),/Admin results|View voters/);
+ await h.button('Conclude poll').props.onClick();h.render();assert.deepEqual(closed,[]);
+ confirmed=true;
  await h.button('Conclude poll').props.onClick();h.render();assert.deepEqual(closed,['poll']);assert.doesNotMatch(h.html(),/current bid/);assert.match(h.html(),/Another active poll/);assert.equal(votes,0);
+});
+
+test('poll manager requires confirmation before concluding a live poll',async(t)=>{
+ const previousWindow=globalThis.window;
+ let confirmed=false;const closed=[];const prompts=[];
+ globalThis.window={confirm:message=>{prompts.push(message);return confirmed;}};
+ t.after(()=>{if(previousWindow===undefined)delete globalThis.window;else globalThis.window=previousWindow;});
+ const h=harness({list:async()=>[{...poll,published_at:'2026-10-24T12:00:00Z'}],close:async id=>closed.push(id)},PollManager);
+ await h.load();await h.button('Conclude poll').props.onClick();assert.deepEqual(closed,[]);
+ assert.ok(prompts[0].includes(poll.question));assert.match(prompts[0],/stop accepting responses/);
+ confirmed=true;await h.button('Conclude poll').props.onClick();assert.deepEqual(closed,['poll']);
 });
 
 test('an older admin feed never restores the Yes or No voting buttons',async()=>{

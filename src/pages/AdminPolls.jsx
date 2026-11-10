@@ -98,7 +98,10 @@ export function PollManager({ service = polls }) {
                         <button type="button" disabled={pending || Boolean(editing)} onClick={() => action(() => service.publish(poll.id))}
                             className="min-h-9 rounded border border-blue-700 bg-blue-700 px-3 py-1.5 text-sm text-white hover:bg-blue-800 disabled:opacity-50">Publish poll</button>
                     </>}
-                    {poll.active && <button type="button" disabled={pending} onClick={() => action(() => service.close(poll.id))} className={button}>Conclude poll</button>}
+                    {poll.active && <button type="button" disabled={pending} onClick={() => {
+                        if (writing.current || !window.confirm(`Conclude the poll “${poll.question}”?\n\nThis will stop accepting responses. Existing responses will be kept.`)) return;
+                        return action(() => service.close(poll.id));
+                    }} className={button}>Conclude poll</button>}
                     {poll.closed_at && poll.poll_type !== 'free_text' && <button type="button" aria-pressed={poll.results_published} disabled={pending} onClick={() => action(() => service.publishResults(poll.id, !poll.results_published))} className={button}>{poll.results_published ? 'Hide homepage results' : 'Publish results on homepage'}</button>}
                     {poll.results_published && <span className="text-xs text-green-700">Results visible to voters on the homepage</span>}
                     <button type="button" disabled={pending} onClick={() => deletePoll(poll)} className="ml-auto min-h-9 border-0 bg-transparent px-2 py-1.5 text-sm text-red-700 underline disabled:opacity-50">Delete poll</button>
