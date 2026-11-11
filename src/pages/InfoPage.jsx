@@ -2,38 +2,9 @@ import { Link, useLocation } from "react-router-dom";
 import { useContext, useEffect } from 'react';
 import { UserContext } from '../context/UserContext';
 import { BID_INCREMENT_TIERS } from '../lib/bidIncrements';
-import { ESCROW_FEE_TIERS, escrowFee } from '../lib/escrowFees';
 
 const sectionHeadingClass = 'text-lg font-semibold leading-7 text-gray-800';
 const subheadingClass = 'text-sm font-semibold leading-5 text-gray-700';
-
-const auctionTypeComparison = [
-    {
-        heading: 'ITEMS',
-        escrow: 'Seller sends items to the bot before bidding begins.',
-        direct: 'Seller keeps items in their Display Case throughout the auction.',
-    },
-    {
-        heading: 'BIDDING',
-        escrow: 'Buyers send bids with Meat attached via KMail. Outbid players are automatically refunded.',
-        direct: 'Bids are placed in good faith on the website but are not backed by verified Meat.',
-    },
-    {
-        heading: 'COMPLETING THE TRADE',
-        escrow: 'The bot sends items and Meat to their respective recipients, or issues refunds when necessary.',
-        direct: 'Both players arrange the exchange within 48 hours and confirm the outcome on kHub.',
-    },
-    {
-        heading: 'FEES',
-        escrow: 'The original fee schedule ranges from 1–5%. A temporary promotion may waive or reduce fees; see current terms below. No sale, no fee.',
-        direct: 'No commission. Optional tips are appreciated.',
-    },
-    {
-        heading: 'PROTECTION',
-        escrow: <>Items and leading bid Meat are secured by the bot. Verified losses caused by errors in kHub’s automated escrow system are <Link to="/auction-item#escrow-protection" className="text-blue-700 underline">fully reimbursed, without a cap</Link>. Malicious exploits and external interference are excluded.</>,
-        direct: 'Players trade at their own risk. kHub cannot guarantee payment or delivery.',
-    },
-];
 
 const InfoPage = () => {
     const { currentUser } = useContext(UserContext);
@@ -66,16 +37,24 @@ const InfoPage = () => {
                     Official kHub Accounts
                 </h2>
 
-                <p className="mb-3">
-                    <strong>kHub (#3888760)</strong> is our official auction bot, and{' '}
-                    <strong>Teres Minor (#3552305)</strong> is the site’s creator and administrator.{' '}
-                    No other accounts are authorized to contact you on behalf of kHub.{' '}
-                    Ignore any messages claiming otherwise, especially those requesting items, Meat, or account information.
-                </p>
+
+                <div className="mb-3">
+                    <p className="py-1">
+                        <strong>kHub (#3888760)</strong> - official auction bot
+                    </p>
+                    <div className="my-1 w-[52%] border-t border-gray-200/30" />
+                    <p className="py-1">
+                        <strong>Teres Minor (#3552305)</strong> - site creator and administrator
+                    </p>
+                </div>
+
 
                 <p className="mb-3">
-                    Please send only auction-related items and Meat to <strong>kHub (#3888760)</strong>, following the KMail instructions provided on the site.{' '}
-                    Items or Meat sent without the required KMail message will be automatically returned.
+                    No other accounts represent kHub. Ignore messages claiming otherwise,
+                    especially those requesting items, Meat, or account information.
+                    Only send auction-related items and Meat to <strong>kHub (#3888760)</strong> using
+                    the site&apos;s KMail instructions. Transfers without a valid KMail command
+                    will be automatically returned.
                 </p>
 
                 <p id="gift-packages" className="mb-6 scroll-mt-4">
@@ -87,7 +66,7 @@ const InfoPage = () => {
                 </h2>
 
                 <p className="mb-3">
-                    Create an auction here to <Link to="/auction-item?kind=buy" className="font-medium text-blue-600 hover:underline">buy</Link> or <Link to="/auction-item?kind=sell" className="font-medium text-blue-600 hover:underline">sell</Link> items.
+                    Create an auction to <Link to="/auction-item?kind=buy" className="font-medium text-blue-600 hover:underline">buy</Link> or <Link to="/auction-item?kind=sell" className="font-medium text-blue-600 hover:underline">sell</Link> items.
                 </p>
                 <p className="mb-6">Escrow auctions go live once the bot verifies your deposit. Follow the instructions provided after creating your auction. Direct Trade auctions go live immediately, but items must remain in your Display Case until the auction ends. Violations may result in a warning or further action. You may not bid on your own auctions.</p>
 
@@ -95,7 +74,7 @@ const InfoPage = () => {
                 <ul className="mb-3 list-disc space-y-1 pl-5">
                     <li>
                         <strong>Escrow:</strong> KMail kHub (#3888760) the auction’s bid command{' '}
-                        <span className="inline-flex items-center gap-1 whitespace-nowrap align-middle">ex. <img src="/art/auction-bid-command.svg" alt="BID 1234" width="93" height="25" className="inline-block h-auto w-[93px] align-middle" /></span>{' '}
+                        <span className="inline-flex items-center gap-1 whitespace-nowrap align-middle">ex. <img src="/art/auction-bid-command.svg" alt="BID 1234" width="93" height="25" className="inline-block h-auto w-[83px] align-middle" /></span>{' '}
                         with your full bid in Meat attached.
                     </li>
                     <li><strong>Direct Trade:</strong> Bid on the website. If you win, arrange an in-game trade with the seller after the auction ends.</li>
@@ -119,30 +98,23 @@ const InfoPage = () => {
 
                 <ul className="mb-3 list-disc space-y-2 pl-5">
                     <li>
-                        <strong className={subheadingClass}>Escrow:</strong> The bot automatically sends the items to the winning bidder
-                        and the seller&apos;s proceeds by KMail. The seller commission is deducted from
-                        the final sale price (see the fee chart below). If no bids were accepted, the items are returned to the seller.
+                        <strong className={subheadingClass}>Escrow:</strong> Our bot automatically delivers items to the winner and proceeds to the seller, minus commission. Unsold items are returned or automatically relisted, if enabled at creation.                    <p className="mb-4 text-xs italic">
+                        Escrow deliveries and refunds typically arrive within seconds, but may be delayed during service disruptions.
+                    </p>
                     </li>
                     <li>
-                        <strong className={subheadingClass}>Direct Trade:</strong> The seller and winning bidder have 48 hours to complete
-                        their exchange. Both parties must confirm the outcome on kHub to close out the auction.
-
+                        <strong className={subheadingClass}>Direct Trade:</strong> The seller and winning bidder have 48 hours to complete the exchange and confirm the outcome on kHub.
                         <p className="mt-2 rounded border-l-[3px] border-blue-300 bg-blue-50/70 px-3 py-1 text-xs leading-4 text-gray-600">
                             <span className={subheadingClass}>Deadline exceptions:</span>{' '}
-                            Extensions may be granted by mutual agreement or when one party
-                            makes a good-faith effort to complete the trade but is delayed
-                            by the other.
+                            Extensions may be granted by mutual agreement or if one party delays the other&apos;s good-faith efforts to complete the trade.
                         </p>
                     </li>
                 </ul>
-                <p className="mb-6 text-xs italic">
-                    Escrow deliveries and refunds typically arrive within seconds, but may be delayed during service disruptions.
-                </p>
 
-
-                <h2 className={`${sectionHeadingClass} mb-2`}>
+                <h2 className={`${sectionHeadingClass} mt-6 mb-2`}>
                     Trade Enforcement &amp; Ban Policy
                 </h2>
+
                 <p className="mb-3">
                     Direct Trade auctions are binding commitments. Failure to honor a trade
                     may result in the following penalties:
@@ -165,135 +137,319 @@ const InfoPage = () => {
                 </p>
 
 
+
                 <h2 className={`${sectionHeadingClass} mb-3`}>Auction Types</h2>
+
                 <div className="mb-6 overflow-hidden rounded-lg border border-[#E0E5EB] bg-white">
                     <table className="w-full table-fixed text-xs leading-5 text-[#475569]">
-                        <caption className="sr-only">Escrow and Direct Trade auction comparison</caption>
+                        <caption className="sr-only">
+                            Escrow and Direct Trade auction comparison
+                        </caption>
+
                         <thead className="text-gray-800">
-                            <tr>
-                                <th scope="col" className={`${subheadingClass} w-1/2 border-r border-t-[3px] border-r-[#E0E5EB] border-t-[#93B4E8] bg-[#EAF2FF] px-3 py-1.5 text-center`}>Escrow</th>
-                                <th scope="col" className={`${subheadingClass} w-1/2 border-t-[3px] border-t-[#9EBFA8] bg-[#EDF5EF] px-3 py-1.5 text-center`}>Direct Trade</th>
-                            </tr>
+                        <tr>
+                            <th
+                                scope="col"
+                                className={`${subheadingClass} w-1/2 border-r border-t-[3px] border-r-[#E0E5EB] border-t-[#93B4E8] bg-[#EAF2FF] px-3 py-1.5 text-center`}
+                            >
+                                Escrow
+                            </th>
+                            <th
+                                scope="col"
+                                className={`${subheadingClass} w-1/2 border-t-[3px] border-t-[#9EBFA8] bg-[#EDF5EF] px-3 py-1.5 text-center`}
+                            >
+                                Direct Trade
+                            </th>
+                        </tr>
                         </thead>
+
                         <tbody>
-                            <tr>
-                                <td className="border-r border-[#E0E5EB] bg-[#F7FAFF] px-3 py-2 align-top">Our bot, kHub (#3888760), acts as the middleman, holding the items and bid Meat during the auction.</td>
-                                <td className="bg-[#F7FBF8] px-3 py-2 align-top">Buyers and sellers exchange items and Meat directly after the auction ends.</td>
-                            </tr>
+                        <tr className="border-t border-[#E0E5EB]">
+                            <td className="border-r border-[#E0E5EB] bg-[#F7FAFF] px-3 py-2 align-top">
+                                <strong>Items:</strong> Bot holds items during the auction.
+                            </td>
+                            <td className="bg-[#F7FBF8] px-3 py-2 align-top">
+                                <strong>Items:</strong> Seller keeps items in their Display Case.
+                            </td>
+                        </tr>
+
+                        <tr className="border-t border-[#E0E5EB]">
+                            <td className="border-r border-[#E0E5EB] px-3 py-2 align-top">
+                                <strong>Bidding:</strong> KMail with command and Meat attached.
+                                Outbid players are refunded automatically.
+                            </td>
+                            <td className="px-3 py-2 align-top">
+                                <strong>Bidding:</strong> Good faith bids placed on website but not backed by Meat.
+                            </td>
+                        </tr>
+
+                        <tr className="border-t border-[#E0E5EB]">
+                            <td className="border-r border-[#E0E5EB] px-3 py-2 align-top">
+                                <strong>Completion:</strong> Bot automatically delivers
+                                items and seller proceeds, and issues refunds as needed.
+                            </td>
+                            <td className="px-3 py-2 align-top">
+                                <strong>Completion:</strong> Players trade directly within
+                                48 hours and confirm on kHub.
+                            </td>
+                        </tr>
+
+                        <tr className="border-t border-[#E0E5EB]">
+                            <td className="border-r border-[#E0E5EB] px-3 py-2 align-top">
+                                <strong>Unsold Auctions:</strong> Automatically relisted if enabled; otherwise items are returned.
+                            </td>
+                            <td className="px-3 py-2 align-top">
+                                <strong>Unsold Auctions:</strong> Sellers can manually relist their auctions.
+                            </td>
+                        </tr>
+
+                        <tr className="border-t border-[#E0E5EB]">
+                            <td className="border-r border-[#E0E5EB] px-3 py-2 align-top">
+                                <strong>Fees:</strong> 1–4% commission, subject to promotions.
+                                No sale, no fee.
+                            </td>
+                            <td className="px-3 py-2 align-top">
+                                <strong>Fees:</strong> No commission. Optional tips appreciated.
+                            </td>
+                        </tr>
+
+                        <tr className="border-t border-[#E0E5EB]">
+                            <td className="border-r border-[#E0E5EB] px-3 py-2 align-top">
+                                <strong>Protection:</strong> Bot secures items and leading
+                                bid Meat. Verified losses caused by kHub&apos;s escrow
+                                system are <a href="/auction-item#escrow-protection" className="underline">
+                                fully reimbursed, without a cap
+                            </a>.
+                            </td>
+                            <td className="px-3 py-2 align-top">
+                                <strong>Protection:</strong> Players trade at their own risk.
+                                kHub cannot guarantee payment or delivery.
+                            </td>
+                        </tr>
                         </tbody>
-                        {auctionTypeComparison.map(({ heading, escrow, direct }) => (
-                            <tbody key={heading}>
-                                <tr>
-                                    <th scope="rowgroup" colSpan={2} className={`${subheadingClass} border-y border-[#E5E7EB] bg-[#F1F3F6] px-3 py-[3px] text-center`}>{heading}</th>
-                                </tr>
-                                <tr className="bg-white">
-                                    <td className="border-r border-[#E0E5EB] px-3 py-2 align-top">{escrow}</td>
-                                    <td className="px-3 py-2 align-top">{direct}</td>
-                                </tr>
-                            </tbody>
-                        ))}
                     </table>
                 </div>
 
-                <section aria-labelledby="buy-auctions-title" className="mb-6">
-                    <h2 id="buy-auctions-title" className={`${sectionHeadingClass} mb-2`}>Auctions for Buying Items</h2>
+
+                <section aria-labelledby="buy-auctions-title" className="mt-5 mb-6">
+                    <h2 id="buy-auctions-title" className={`${sectionHeadingClass} mb-2`}>
+                        Auctions for Buying Items
+                    </h2>
+
                     <ul className="list-disc space-y-2 pl-5">
-                        <li><strong>Getting started:</strong> Create a Buy Auction and deposit enough Meat to cover the full order plus fees within 24 hours. Your auction begins once kHub verifies your deposit.</li>
-                        <li><strong>Fulfilling orders:</strong> Sellers reserve their desired quantity on the website, then KMail the exact items using the provided message. Reservations automatically expire after 10 minutes if unfulfilled.</li>
-                        <li><strong>Partial fills:</strong> Multiple sellers can contribute toward an order. Remaining quantities stay available until the auction ends or is canceled.</li>
-                        <li><strong>Delivery options:</strong> Choose to receive items as they’re purchased or all at once when your auction ends.</li>
-                        <li><strong>Cancellations &amp; refunds:</strong> Cancel any unfilled portion of your order at any time, without penalty. Unused Meat and fee reserves are refunded. Completed purchases and their fees are final.</li>
-                        <li id="buy-gift-delivery" className="scroll-mt-4"><strong>Hardcore/Ronin:</strong> Gift packaging is free. Immediate deliveries are batched by item price: under 50 Meat (1,000 items), 50–999 (100 items), 1,000–49,999 (10 items), and 50,000+ (immediate). Once a threshold is reached, all accumulated items are sent.</li>
+                        <li>
+                            <strong>Getting started:</strong> Create a <Link to="/auction-item?kind=buy" className="font-medium text-blue-600 hover:underline">Buy Auction</Link> and deposit the order amount plus a fee reserve within 24 hours. The auction activates once the deposit is verified.
+                        </li>
+
+                        <li>
+                            <strong>Fulfilling orders:</strong> Sellers reserve a quantity on the
+                            website, then KMail the items using the provided command.
+                            Reservations expire after 10 minutes.
+                        </li>
+
+                        <li>
+                            <strong>Partial fills:</strong> Multiple sellers can fulfill an order.
+                            Remaining quantities stay available until the auction ends or is canceled.
+                        </li>
+
+                        <li>
+                            <strong>Delivery:</strong> Choose to receive items as they’re purchased or all at once when your auction ends.
+                        </li>
+
+                        <li>
+                            <strong>Cancellations &amp; refunds:</strong> Cancel any unfilled portion
+                            without penalty. Unused Meat and fee reserves are refunded;
+                            completed purchases are final.
+                        </li>
+
+
+
+                        <li id="buy-gift-delivery" className="scroll-mt-4">
+                            <strong>Hardcore/Ronin:</strong> Send a gift package with the provided
+                            command as the outside message and any required Meat attached to start the auction.
+
+                            <p className="ml-4 mt-1 text-xs italic text-gray-500">
+                                Gift packaging is free, but immediate deliveries are batched by item price:
+                                under 50 Meat (1,000 items), 50–999 (100 items),
+                                1,000–49,999 (10 items), and 50,000+ (immediate).
+                                Items are sent once the threshold is reached.
+                            </p>
+                        </li>
                     </ul>
                 </section>
 
-                <div className="mb-6 grid grid-cols-1 items-start gap-6 md:grid-cols-2 md:gap-x-8">
+
+
+                <div className="mt-8 mb-6 grid grid-cols-1 items-start gap-6 md:grid-cols-2 md:gap-x-8">
                     <section aria-labelledby="bid-increases-title" className="min-w-0">
-                        <h2 id="bid-increases-title" className={`${sectionHeadingClass} mb-2 scroll-mt-4`}>Minimum Bid Increases</h2>
-                        <div className="mb-3 space-y-1.5 leading-5">
-                            <p>The first bid must meet the seller’s minimum price. Later bids must exceed the current highest bid by at least the increase below. Applies to both Escrow and Direct Trade auctions.</p>
-                            <p>Buyouts can always be accepted at their listed price, even if below the next minimum bid.</p>
+                        <h2
+                            id="bid-increases-title"
+                            className={`${sectionHeadingClass} mb-2 scroll-mt-4`}
+                        >
+                            Minimum Bid Increases
+                        </h2>
+
+                        <p className="mb-3 leading-5">
+                            First bids must meet the seller&apos;s minimum price.
+                            Subsequent bids follow the increases below for both auction types.
+                            Buyouts bypass minimum bid increases.
+                        </p>
+
+                        <div className="overflow-hidden rounded-md border border-gray-200">
+                            <table className="w-full text-xs leading-5">
+                                <caption className="sr-only">
+                                    Minimum bid increases and rounding units in Meat
+                                </caption>
+                                <thead className="bg-gray-100 text-gray-700">
+                                <tr>
+                                    <th scope="col" className={`${subheadingClass} whitespace-nowrap px-2 py-1.5 text-left`}>
+                                        Current Bid
+                                    </th>
+                                    <th scope="col" className={`${subheadingClass} whitespace-nowrap px-2 py-1.5 text-right`}>
+                                        Increase By
+                                    </th>
+                                    <th scope="col" className={`${subheadingClass} whitespace-nowrap px-2 py-1.5 text-right`}>
+                                        Round To
+                                    </th>
+                                </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200">
+                                {BID_INCREMENT_TIERS.map(tier => (
+                                    <tr key={tier.label} className="bg-white odd:bg-gray-50">
+                                        <td className="whitespace-nowrap px-2 py-1">
+                                            {tier.label}
+                                        </td>
+                                        <td className="px-2 py-1 text-right font-medium text-gray-800">
+                                            {tier.display}
+                                        </td>
+                                        <td className="px-2 py-1 text-right text-gray-600">
+                                            {tier.roundingDisplay}
+                                        </td>
+                                    </tr>
+                                ))}
+                                </tbody>
+                            </table>
                         </div>
-                        <div>
-                            <div className="overflow-hidden rounded-md border border-gray-200">
-                                <table className="w-full text-xs leading-5">
-                                    <caption className="sr-only">Minimum increases and rounding units based on the current highest bid, in Meat</caption>
-                                    <thead className="bg-gray-100 text-gray-700"><tr>
-                                        <th scope="col" className={`${subheadingClass} whitespace-nowrap px-2 py-1.5 text-left`}>Current Bid</th>
-                                        <th scope="col" className={`${subheadingClass} whitespace-nowrap px-2 py-1.5 text-right`}>Increase By</th>
-                                        <th scope="col" className={`${subheadingClass} whitespace-nowrap px-2 py-1.5 text-right`}>Round To</th>
-                                    </tr></thead>
-                                    <tbody className="divide-y divide-gray-200">
-                                        {BID_INCREMENT_TIERS.map(tier => <tr key={tier.label} className="bg-white odd:bg-gray-50">
-                                            <td className="whitespace-nowrap px-2 py-1">{tier.label}</td>
-                                            <td className="px-2 py-1 text-right font-medium text-gray-800">{tier.display}</td>
-                                            <td className="px-2 py-1 text-right text-gray-600">{tier.roundingDisplay}</td>
-                                        </tr>)}
-                                    </tbody>
-                                </table>
-                            </div>
-                            <p className="mt-2 text-xs italic leading-5">Percentage increases are rounded up to the nearest multiple shown in the “Round To” column.</p>
-                            <p className="mt-2 text-xs leading-4"><strong>Example:</strong> A 3% increase on 1.75M is 52,500 Meat, rounded up to 60,000 Meat (nearest 10k). The next minimum bid is <strong>1.81M Meat.</strong></p>
-                        </div>
+
+                        <p className="mt-2 text-xs italic leading-5">
+                            Percentage increases are rounded up to the nearest multiple shown.
+                        </p>
+                        <p className="mt-2 text-xs leading-4">
+                            <strong>Example:</strong> 3% of 1.75M is 52,500 Meat,
+                            rounded up to 60k. Next minimum bid:{' '}
+                            <strong>1.81M Meat.</strong>
+                        </p>
                     </section>
 
                     <section aria-labelledby="escrow-fees-title" className="min-w-0">
-                        <h2 id="escrow-fees-title" className={`${sectionHeadingClass} mb-2 scroll-mt-4`}>Escrow Fees</h2>
-                        <p className="mb-3 rounded border-l-[3px] border-blue-300 bg-blue-50/70 px-3 py-1 text-xs leading-4 text-gray-600">These fees apply only to escrow sales. All other sales do not carry any fees.</p>
+                        <h2
+                            id="escrow-fees-title"
+                            className={`${sectionHeadingClass} mb-2 scroll-mt-4`}
+                        >
+                            Escrow Fees
+                        </h2>
+
+                        <p className="mb-3 rounded border-l-[3px] border-blue-300 bg-blue-50/70 px-3 py-1 text-xs leading-4 text-gray-600">
+                            Fees apply only to escrow auctions. Direct Trades are free.
+                        </p>
+
                         <div className="mb-3 space-y-1.5 leading-5">
-                            <p className="text-green-800"><strong>Giving Thanks:</strong></p>
-                            <p className="text-green-800">For the month of November, escrow trades are commission-free as long as you&apos;ve completed less than 20m Meat in escrow trades. If you&apos;re still below 20m, your next trade is entirely free, regardless of its value.</p>
-                            <p className="text-green-800">After that, fees are 2% on the first 1b Meat and 1% on anything above 1b.</p>
-                            <p className="pt-6"><em>The text below applies to the normal fee structure and isn&apos;t applicable during this promo</em></p>
-                            <p><strong>Selling:</strong> A tiered commission is deducted from your final sale proceeds. Each rate applies only to the portion of the sale within that tier.</p>
-                            <p><strong>Buying:</strong> Fees are calculated per item and paid by the buyer. Sellers receive the full listed price.</p>
-                            <p><strong>Where do the fees go?</strong> Commissions help support the time and effort that goes into developing, improving, and maintaining kHub. A portion also goes back into the community through <Link to="/giveaways" className="text-blue-700 underline">giveaways</Link>.</p>
+
+                            <div className="space-y-2 text-[13px] leading-5">
+                                <p className="font-semibold text-green-800">
+                                    Giving Thanks: November Promotion
+                                </p>
+
+                                <p className="text-green-800">
+                                    Your first 20M Meat in escrow sales is commission-free.
+                                    If you&apos;re below 20M, your entire next trade is entirely free,
+                                    regardless of value.
+                                </p>
+
+                                <p className="text-green-800">
+                                    After that, commission is 2% on the first 1B Meat
+                                    and 1% above 1B.
+                                </p>
+                            </div>
+
+                            <p className="mt-3 border-t border-gray-200/30 pt-3 text-xs italic">
+                                The normal fee schedule below does not apply during the promo.
+                            </p>
+
+                            <p>
+                                <strong>Selling:</strong> Commission is deducted from sale
+                                proceeds based on the listed rates.
+                            </p>
+
+                            <p>
+                                <strong>Buying:</strong> Buyers pay per-item fees from their fee reserve. Sellers receive the full listed price.
+                            </p>
+
+                            <p>
+                                <strong>Where do the fees go?</strong> They help support the time and effort that goes into developing, improving, and maintaining kHub, with a portion going toward community giveaways{' '}
+                                <Link to="/giveaways" className="text-blue-700 underline">
+                                    giveaways
+                                </Link>.
+                            </p>
                         </div>
+
+
+
                         <details>
-                            <summary className="cursor-pointer text-sm font-semibold text-gray-700">Detailed Breakdown</summary>
+                            <summary className="cursor-pointer text-sm font-semibold text-gray-700">
+                                Detailed Breakdown
+                            </summary>
+
                             <div className="mt-3">
                                 <div className="overflow-hidden rounded-md border border-gray-200">
                                     <table className="w-full text-xs leading-5">
-                                        <caption className="sr-only">Tiered escrow seller commission on portions of the final sale price, in Meat</caption>
-                                        <thead className="bg-gray-100 text-gray-700"><tr>
-                                            <th scope="col" className={`${subheadingClass} px-3 py-1.5 text-left`}>Sale Price Portion</th>
-                                            <th scope="col" className={`${subheadingClass} px-3 py-1.5 text-right`}>Fee Rate</th>
-                                            <th scope="col" className={`${subheadingClass} px-3 py-1.5 text-right`}>Effective Rate<sup>1</sup></th>
-                                        </tr></thead>
+                                        <caption className="sr-only">
+                                            Flat escrow commission rates by sale price
+                                        </caption>
+                                        <thead className="bg-gray-100 text-gray-700">
+                                        <tr>
+                                            <th
+                                                scope="col"
+                                                className={`${subheadingClass} px-3 py-1.5 text-left`}
+                                            >
+                                                Sale Price
+                                            </th>
+                                            <th
+                                                scope="col"
+                                                className={`${subheadingClass} px-3 py-1.5 text-right`}
+                                            >
+                                                Fee Rate
+                                            </th>
+                                        </tr>
+                                        </thead>
                                         <tbody className="divide-y divide-gray-200">
-                                            {ESCROW_FEE_TIERS.map(tier => <tr key={tier.portion} className="bg-white odd:bg-gray-50">
-                                                <td className="px-3 py-1">{tier.portion.replace(/(\d)([mb])/g, (_, amount, unit) => amount + unit.toUpperCase())}</td>
-                                                <td className="px-3 py-1 text-right font-medium text-gray-800">{tier.rate}</td>
-                                                <td className="px-3 py-1 text-right text-gray-800">{tier.upTo === null ? 'Approaches 1%' : `${(escrowFee(tier.upTo) / tier.upTo * 100).toFixed(2)}%`}</td>
-                                            </tr>)}
+                                        {[
+                                            { portion: 'Below 10M', rate: '4%' },
+                                            { portion: '10M–100M', rate: '3%' },
+                                            { portion: '100M–1B', rate: '2%' },
+                                            { portion: '1B+', rate: '1%' },
+                                        ].map(tier => (
+                                            <tr key={tier.portion} className="bg-white odd:bg-gray-50">
+                                                <td className="px-3 py-1">{tier.portion}</td>
+                                                <td className="px-3 py-1 text-right font-medium text-gray-800">
+                                                    {tier.rate}
+                                                </td>
+                                            </tr>
+                                        ))}
                                         </tbody>
                                     </table>
                                 </div>
-                                <p className="mt-2 text-xs italic leading-5"><sup>1</sup> At the upper end of each price range.</p>
-                                <p className="text-xs italic leading-5">Commissions are rounded down to whole Meat. <strong>No sale, no fee.</strong></p>
-                                <div className="mt-2 divide-y divide-gray-200 rounded-md bg-blue-50/70 text-xs leading-4">
-                                    <div className="px-3 py-2">
-                                        <h3 className="font-semibold text-gray-800">Example: Selling an Item</h3>
-                                        <p>A 10M Meat sale incurs:</p>
-                                        <ul className="list-disc pl-4">
-                                            <li>First 1M at 5% → 50,000 Meat</li>
-                                            <li>Remaining 9M at 4% → 360,000 Meat</li>
-                                        </ul>
-                                        <p>Total commission: 410,000 Meat (4.1%)</p>
-                                    </div>
-                                    <div className="px-3 py-2">
-                                        <h3 className="font-semibold text-gray-800">Example: Buying Items</h3>
-                                        <p>Two orders totaling 10M Meat:</p>
-                                        <ul className="list-disc pl-4">
-                                            <li>1,000 items × 10,000 Meat → 500,000 Meat fee (5%)</li>
-                                            <li>1 item × 10M Meat → 410,000 Meat fee (4.1%)</li>
-                                        </ul>
-                                    </div>
-                                </div>
+
+                                <p className="mt-2 text-xs italic leading-5">
+                                    The applicable rate applies to the entire sale.{' '}
+                                    <strong>No sale, no fee.</strong>
+                                </p>
+
                             </div>
                         </details>
                     </section>
                 </div>
+
 
                 <hr className="info-contact-divider mx-auto mb-5 w-[95%] opacity-60" />
                 <section aria-labelledby="brief-history-title" className="mb-6">

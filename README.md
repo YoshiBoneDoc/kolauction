@@ -137,6 +137,13 @@ changes require their own rollout if not already deployed.
 
 ## Diagnostics and known limits
 
+The [November 10 giveaway analysis](docs/NOVEMBER_10_GIVEAWAY_PRESSURE.md:190)
+confirmed active host paging and increasing I/O stalls while the bot completed
+settlement. Prioritize RAM headroom, then static detail and Home/public-browse
+profiling; cleanup approvals are a secondary target. Captured samples showed no
+financial-lock waiters. Exact attribution of the earlier timeouts remains unproven.
+
+
 Use [complete statistics snapshots](scripts/query-stats-snapshot.sql:1) and the
 [interval comparator](scripts/queryStatsDelta.py:1) on baseline/after exports;
 cumulative counters cannot reconstruct an arbitrary historical window. Check resets,

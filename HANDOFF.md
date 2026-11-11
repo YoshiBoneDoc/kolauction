@@ -97,6 +97,25 @@ is unverified; distinguish SQL timeouts from browser stale-request recovery.
 - No production SQL, deployment, connected worker or asset send was performed by
   this agent. Owner actions and local verification are separate evidence.
 
+## November 10 giveaway performance findings
+
+[Final-event analysis and evidence](docs/NOVEMBER_10_GIVEAWAY_PRESSURE.md:190)
+confirms active host paging on ~406 MiB RAM: swap-in/out reached ~1,524/1,237
+pages/s, CPU I/O wait ~44%, full I/O stalls ~44.6%. Across 81 pressure samples,
+no blocked sessions or financial-lock waiters were captured. Bot logs confirm
+winner delivery, payout, refunds and commission without a recorded crash/restart
+or database-wait episode. This supports the owner's smoother-run observation;
+individual bot changes' contributions and higher traffic are not quantified.
+
+Priorities: evaluate more RAM outside live auctions; profile installed static-detail
+and Home/public-browse paths, then cleanup approval costs. Preserve ordering,
+privacy, solvency, locks and bounded single-worker dispatch. Do not increase
+concurrency or timeouts as a substitute. Paging is confirmed during 18:08–18:14
+UTC, not direct proof of each earlier 17:23 timeout's cause. Collector end snapshot
+was unavailable; the owner's 18:16 export provides a valid later boundary.
+Reproducible rates/deltas and capture limitations are in the report; reuse them.
+No resource resize, production change or application optimization was performed.
+
 ## Verification and unresolved issues
 
 Latest Node 24 checks: **451 bot tests passed**; six relevant disposable PostgreSQL
@@ -314,3 +333,12 @@ Prioritize measured visibility/quote reuse with privacy/JSON parity, not another
 milestone cache or duplicate indexes. Metadata is later than errors and does not
 prove incident-time plans/root cause. Details appended to later-timeout document.
 No runtime/SQL/deployment changes.
+
+November 10 KMail wording: queued **254** removes “Gift packaging is covered by
+kHub.” from Buy unused-funds refunds and consolidated Buy item gifts, including
+matching never-claimed/unfrozen queue messages. Packaging accounting, attachments,
+claims, frozen/sent/uncertain bodies and evidence are preserved. Matching ignored
+bot SQL copy exists. Stop the sole worker to apply once after 253, then resume;
+no bot/site rebuild. Extended disposable Buy-message regression passed template
+parity, queued wording and financial/frozen/uncertain/sent preservation. Not applied
+to production; personal quickstart unchanged.

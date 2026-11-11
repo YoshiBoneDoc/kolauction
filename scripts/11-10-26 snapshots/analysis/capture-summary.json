@@ -1,0 +1,19 @@
+{
+  "samples": 81,
+  "valid_samples": 81,
+  "first": "2026-11-10T18:08:07.918057+00:00",
+  "last": "2026-11-10T18:14:48.191627+00:00",
+  "samples_with_blockers": 0,
+  "samples_with_financial_lock": 2,
+  "financial_waiter_samples": 0,
+  "sessions_min": 13,
+  "sessions_max": 16,
+  "collector_elapsed_max_ms": 2362,
+  "database_delta": {
+    "blks_read": 5,
+    "deadlocks": 0,
+    "temp_bytes": 22416028,
+    "xact_rollback": 0,
+    "xact_commit": 1783
+  }
+}

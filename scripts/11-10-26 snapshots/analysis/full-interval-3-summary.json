@@ -1,0 +1,10 @@
+{
+  "label": "Supabase Snippet Untitled query 5.csv \u2192 Supabase Snippet Untitled query (7).csv",
+  "from_time": "2026-11-10T17:29:33.851846+00:00",
+  "to_time": "2026-11-10T17:49:08.854375+00:00",
+  "elapsed_hours": 0.32639,
+  "removed_entries": 0,
+  "deallocations": 0,
+  "unbaselined_or_reset_entries": 0,
+  "caveat": "Measured snapshot interval, not historical last-24h data. New/reset/missing entries have no inferred deltas. Nested statements can overlap callers. Resets not exposed by old server versions may be undetectable."
+}

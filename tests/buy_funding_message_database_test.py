@@ -42,6 +42,7 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
             create table auth.identities(id uuid primary key,provider_id text,user_id uuid references auth.users(id) on delete cascade,
                 identity_data jsonb,provider text,created_at timestamptz,updated_at timestamptz);
             create table auth.sessions(id uuid primary key,user_id uuid references auth.users(id) on delete cascade);
+            create table auth.mfa_amr_claims(id uuid primary key,session_id uuid references auth.sessions(id),authentication_method text,created_at timestamptz,updated_at timestamptz);
             create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
             grant usage on schema public,auth to anon,authenticated,service_role;
             grant execute on function auth.uid() to anon,authenticated;
@@ -53,7 +54,7 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
         read_probe="""select jsonb_object_agg(p.oid::regprocedure::text,pg_get_functiondef(p.oid)) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname in ('public','khub_bot') and p.prokind='f' and (p.proname like 'read_%' or p.proname in ('bot_tick','bot_finish_inbox_scan','finalize_auction','finalize_expired_auctions','bot_worker_status')) and p.proname<>'read_public_auction_live_batch';"""
         for migration in migrations:
             if '193_automatic' in migration.name: before_reads=sql(read_probe)
-            if '240_buy_funding' not in migration.name: sql(migration.read_text())
+            if '240_buy_funding' not in migration.name and '254_remove_packaging' not in migration.name: sql(migration.read_text())
             if '193_automatic' in migration.name:
                 assert sql(read_probe)==before_reads, 'Relisting changed browsing, polling or finalization entry points'
         # Capture webhook payloads locally, without network or credentials.
@@ -94,6 +95,29 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
             'The reserve uses the standard commission rate, but promotional discounts may reduce your actual fees. Any unused reserve is refunded.')
         assert body==expected,(body,expected)
         assert sql(f"select coalesce(d.display_message,khub_bot.friendly_message(d)) from khub_bot.deliveries d where auction_id='{aid}' and dedupe_key like 'buy-funded:%';")=='Previously frozen confirmation'
-        print('PASS exact Buy deposit confirmation layout and preserved frozen messages/accounting')
+
+        # Wording migration: only the two generators and unfrozen, never-claimed
+        # matching queue messages may change; every other field stays identical.
+        obsolete=' Gift packaging is covered by kHub.'
+        targets=['public.bot_prepare_buy_delivery(uuid,boolean)','khub_bot.finish_buy_order(uuid,text)']
+        definitions={t:sql('select pg_get_functiondef('+lit(t)+'::regprocedure);') for t in targets}
+        assert all(obsolete in d for d in definitions.values())
+        for name,state,frozen in [('pending','pending',False),('frozen','pending',True),('sending','sending',True),('unknown','unknown',True),('sent','sent',True)]:
+            sql("insert into khub_bot.deliveries(dedupe_key,recipient_id,kind,message,state,display_message) values("+
+                lit('buy-order-refund:wording-'+name)+",48889901,'refund',"+lit('Unused funds returned.'+obsolete+' Completed purchases are final.')+','+lit(state)+','+
+                (lit('Frozen'+obsolete) if frozen else 'null')+");")
+        pending_filter="dedupe_key='buy-order-refund:wording-pending'"
+        pending_before=json.loads(sql('select to_jsonb(d) from khub_bot.deliveries d where '+pending_filter))
+        untouched="select jsonb_agg(to_jsonb(d) order by id) from khub_bot.deliveries d where not ("+pending_filter+");"
+        before_other=sql(untouched)
+        sql(next(p for p in migrations if '254_remove_packaging' in p.name).read_text())
+        assert sql(untouched)==before_other, 'Frozen/uncertain/sent or unrelated rows changed'
+        pending_after=json.loads(sql('select to_jsonb(d) from khub_bot.deliveries d where '+pending_filter))
+        expected=dict(pending_before,message=pending_before['message'].replace(obsolete,''))
+        assert pending_after==expected, 'Queued wording update changed financial/claim fields'
+        for t,d in definitions.items():
+            assert sql('select pg_get_functiondef('+lit(t)+'::regprocedure);')==d.replace(obsolete,'')
+        print('PASS Buy funding layout, packaging wording removal, and preserved accounting/frozen/uncertain/sent records')
+
     finally:
         if started: pg('-m','immediate','-w','stop')
