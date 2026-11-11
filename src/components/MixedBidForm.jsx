@@ -32,6 +32,14 @@ export default function MixedBidForm({ auction }) {
     try { entered = enteredPayment(); } catch { /* Invalid/overflowing input must not show a guessed value. */ }
     let preview = null;
     try { preview = payment(); } catch { /* Show validation on explicit submission. */ }
+    let meatPlaceholder = 'Maximum bid reached';
+    if (minimum !== null) {
+        try {
+            const q = quantity.trim() === '' ? 0 : /^\d+$/.test(quantity.trim()) ? Number(quantity) : NaN;
+            const itemValue = mrAPaymentValue(0, q, auction.mrARate);
+            meatPlaceholder = Math.max(0, minimum - itemValue).toLocaleString('en-US');
+        } catch { meatPlaceholder = 'Enter valid Mr. A quantity'; }
+    }
     function stepQuantity(direction) {
         const q = quantity.trim() === '' ? 0 : /^\d+$/.test(quantity.trim()) ? Number(quantity) : NaN;
         if (!Number.isSafeInteger(q)) return;
@@ -53,7 +61,7 @@ export default function MixedBidForm({ auction }) {
     return <form onSubmit={submit} className="space-y-2 text-sm" aria-label={`Bid on ${auction.item}`}>
         <p aria-live="polite">Bid value: <strong>{entered ? `${entered.value.toLocaleString('en-US')} Meat` : 'Enter valid amounts within the supported value limit.'}</strong></p>
         <div className="flex flex-wrap gap-3">
-            <label htmlFor={`${id}-meat`}>Meat<input id={`${id}-meat`} type="text" inputMode="decimal" value={meat} onChange={event => setMeat(event.target.value)} placeholder={minimum === null ? 'Maximum bid reached' : minimum.toLocaleString('en-US')} disabled={pending} className="block w-40 rounded border border-gray-400 p-2" /></label>
+            <label htmlFor={`${id}-meat`}>Meat<input id={`${id}-meat`} type="text" inputMode="decimal" value={meat} onChange={event => setMeat(event.target.value)} placeholder={meatPlaceholder} disabled={pending} className="block w-40 rounded border border-gray-400 p-2" /></label>
             <div><label htmlFor={`${id}-quantity`}>Mr. A&apos;s</label><div className="relative w-28">
                 <input id={`${id}-quantity`} type="text" inputMode="numeric" value={quantity} onChange={event => setQuantity(event.target.value)} disabled={pending}
                     onKeyDown={event => { if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); stepQuantity(event.key === 'ArrowUp' ? 1 : -1); } }}

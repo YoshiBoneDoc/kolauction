@@ -76,3 +76,25 @@ test('Mr. A quantity arrows step whole items, update value, and stop at zero', (
     arrow('Decrease').props.onClick();
     assert.equal(slots[1], '0');
 });
+
+test('Meat placeholder follows typed and stepped Mr. A quantities without changing entered Meat', () => {
+    reset();
+    const props = { minBidMeat: 150_000_000 };
+    const placeholder = () => nodes(render(props)).find(node => node.type === 'input').props.placeholder;
+    assert.equal(placeholder(), '150,000,000');
+    enter('6m', '1');
+    assert.equal(placeholder(), '80,000,000');
+    nodes(render(props)).find(node => node.props?.['aria-label'] === 'Increase Mr. A quantity').props.onClick();
+    assert.equal(placeholder(), '10,000,000');
+    nodes(render(props)).find(node => node.props?.['aria-label'] === 'Increase Mr. A quantity').props.onClick();
+    assert.equal(placeholder(), '0');
+    nodes(render(props)).find(node => node.props?.['aria-label'] === 'Decrease Mr. A quantity').props.onClick();
+    assert.equal(placeholder(), '10,000,000');
+    assert.equal(slots[0], '6m');
+    enter('', '1.5');
+    assert.equal(placeholder(), 'Enter valid Mr. A quantity');
+    enter('', '9007199254740991');
+    assert.equal(placeholder(), 'Enter valid Mr. A quantity');
+    enter('', '');
+    assert.equal(placeholder(), '150,000,000');
+});

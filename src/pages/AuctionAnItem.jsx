@@ -1,3 +1,4 @@
+import MarketPrice from '../components/MarketPrice';
 import MrAPaymentOptions from '../components/MrAPaymentOptions';
 import { canViewRaffles } from '../lib/raffleVisibility';
 import SpecialAuctionNavigation from '../components/SpecialAuctionNavigation';
@@ -451,6 +452,7 @@ export default function AuctionAnItem() {
                     </select>
                     {selectedCatalogItem?.image && <img key={selectedCatalogItem.id} src={itemImageUrl(selectedCatalogItem.image)} alt={selectedCatalogItem.name} width="36" height="36" className="h-9 w-9 shrink-0 rounded-md bg-white object-contain p-0.5 [image-rendering:pixelated]" />}
                     </div>
+                    {selectedCatalogItem && <div className="-mt-2 mb-4"><MarketPrice itemId={selectedCatalogItem.id} /></div>}
                     </>}
                     {hasItemSearch && <p id="listing-search-help" className="-mt-3 mb-3 text-xs text-gray-600">{itemSearch !== deferredSearch ? 'Searching items…' : matchingItems.length > resultLimit ? `Showing the first ${resultLimit} of ${matchingItems.length.toLocaleString('en-US')} matches. Keep typing to narrow the list.` : `${matchingItems.length} matching items.`}</p>}
                     {hasItemSearch && itemSearch === deferredSearch && searchResults.length === 0 && <p role="status" className="mb-4 text-sm text-gray-600">No items match your search.{selectedItem ? ' Your previous selection is still selected.' : ''}</p>}
