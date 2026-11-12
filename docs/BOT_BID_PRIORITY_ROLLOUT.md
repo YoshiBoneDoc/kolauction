@@ -13,11 +13,12 @@ existing cycle plan: an active auction within 90 seconds of closing (or <=30 sec
 overdue), with three accepted bids recorded within a minute. This renews priority
 for a minute. Hints never authorize money/items and require no new polling RPC.
 
-Priority ordinarily allows two delivery operations / two seconds per cycle. When
-pending work has persisted for a minute, or the database's oldest pending delivery
-is a minute old, it gets up to six operations / eight seconds. Fresh solvency,
-claims, exact send/ack and unknown-send recovery are unchanged. Buy preparation
-keeps one bounded operation per priority turn and its existing rotation.
+Priority no longer reduces delivery capacity. Funded refunds and other deliveries
+retain the normal 20 operations / ten seconds per cycle. With migration 242,
+Buy item fulfillment is skipped during bid pressure and Buy preparation is deferred;
+refunds and other deliveries remain eligible. Fresh solvency, claims, exact send/ack
+and unknown-send recovery are unchanged. The closing-window hint still prioritizes
+intake and defers closet work.
 
 Cleanup ordinarily allows two approved deletions / two seconds during priority.
 At 12 approved messages, or with retained mail a minute old, it gets up to six /

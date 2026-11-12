@@ -3,6 +3,10 @@
 Repository audit: November 2, 2026. Remaining work only; implementation is not proof
 of production deployment. Start with [the handoff](HANDOFF.md:1).
 
+## NEED TO FIX:
+- add reward tiers for escrow which reduce fees
+- add barter corner
+
 ## Traffic reliability — current priority
 
 Priorities informed by the [November 10 event evidence](docs/NOVEMBER_10_GIVEAWAY_PRESSURE.md:190).

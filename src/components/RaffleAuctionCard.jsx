@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
-import RemainingTime from './RemainingTime';
+import RaffleCardTime from './RaffleCardTime';
 import { formatCompactMeat } from '../lib/formatMeat';
 import { formatRaffleTickets } from '../lib/raffleTickets';
 import './homeRaffle.css';
@@ -10,7 +10,7 @@ export default function RaffleAuctionCard({ raffle, userTicketCount = raffle.use
         <header className="col-span-2 flex min-w-0 items-start justify-between gap-3">
             <h2 title={raffle.name} className="line-clamp-2 min-w-0 flex-1 break-words text-base font-bold leading-5">{raffle.name}</h2>
             <div className="flex max-w-[45%] shrink-0 flex-col items-end gap-1.5 text-right">
-                <time dateTime={raffle.ends_at} title={`Ends ${new Date(raffle.ends_at).toLocaleString()}`} className="text-[11px] leading-3 tabular-nums"><RemainingTime endTime={Date.parse(raffle.ends_at)} /> left</time>
+                <time dateTime={raffle.ends_at} title={`Ends ${new Date(raffle.ends_at).toLocaleString()}`} className="text-[11px] leading-3 tabular-nums"><RaffleCardTime endTime={Date.parse(raffle.ends_at)} suffix=" left" /></time>
                 <span className="home-raffle-label inline-flex shrink-0 rounded border px-1.5 py-0.5 text-[11px] font-medium leading-3">Raffle</span>
             </div>
         </header>

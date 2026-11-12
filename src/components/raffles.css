@@ -172,6 +172,8 @@ html[data-theme=dark] .raffle-ticket-history li{border-color:#50405f}
 .raffle-status-line{grid-column:2;grid-row:1;display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px 12px}
 .raffle-header-countdown{font-size:12px;color:#756b80;white-space:nowrap}
 html[data-theme=dark] .raffle-header-countdown{color:#b9aec5}
+.raffle-header-countdown.is-urgent{color:#dc3545}
+html[data-theme=dark] .raffle-header-countdown.is-urgent{color:#fda4af}
 .raffle-showcase .raffle-badges{gap:8px;font-size:12px}
 .raffle-showcase .raffle-label{border-radius:999px;padding:4px 10px;font-size:12px;line-height:1.2;background:#ebe7ee;color:#51465d;font-weight:500}
 html[data-theme=dark] .raffle-showcase .raffle-label{background:#62536f;color:#f5effa}
@@ -349,3 +351,12 @@ html[data-theme=dark] .raffle-summary.raffle-fairness .raffle-fairness-icon-butt
 @media(prefers-reduced-motion:reduce){.raffle-refresh-spinning{animation:none}.raffle-summary.raffle-fairness button{transition:none}}
 
 .raffle-summary.raffle-fairness .raffle-proof-primary{font-size:14px}
+
+.raffle-reminder{flex-basis:100%;text-align:right;font-size:12px}
+.raffle-summary .raffle-reminder button{appearance:none;border:0;border-radius:0;background:none;box-shadow:none;padding:0;color:#674a7d;font:inherit;cursor:pointer;text-decoration:none}
+.raffle-summary .raffle-reminder button:hover{background:none;box-shadow:none;text-decoration:none;text-shadow:0 0 4px currentColor}
+.raffle-summary .raffle-reminder button:focus-visible{outline:2px solid currentColor;outline-offset:3px}
+html[data-theme=dark] .raffle-summary .raffle-reminder button{color:#f5effa;background:none;border:0;box-shadow:none}
+html[data-theme=dark] .raffle-summary .raffle-reminder{color:#f5effa}
+.raffle-reminder select{margin:0 6px;padding:4px;border:1px solid #d7c9e2;border-radius:5px;background:transparent}
+.raffle-reminder [role=alert]{display:block;color:#b91c1c}

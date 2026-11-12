@@ -109,6 +109,9 @@ const InfoPage = () => {
                             Extensions may be granted by mutual agreement or if one party delays the other&apos;s good-faith efforts to complete the trade.
                         </p>
                     </li>
+                    <li>
+                        <strong>Relist unsold auctions:</strong> Go to Your Name (top right) → My Auctions → Listing History and select Relist. Escrow auctions are automatically relisted if enabled at creation.
+                    </li>
                 </ul>
 
                 <h2 className={`${sectionHeadingClass} mt-6 mb-2`}>

@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
-import RemainingTime from './RemainingTime';
+import RaffleCardTime from './RaffleCardTime';
 import { formatCompactMeat } from '../lib/formatMeat';
 import { formatRaffleTickets } from '../lib/raffleTickets';
 import './homeRaffle.css';
@@ -11,7 +11,7 @@ export default function HomeRaffleCard({ raffle, userTicketCount = raffle.user_t
         <div className="col-start-1 row-span-2 row-start-1 flex items-center justify-center"><img src="https://wiki.kingdomofloathing.com/images/a/a1/Rafflebox.gif" alt="" draggable={false} loading="lazy" className="h-10 w-10 object-contain [image-rendering:pixelated]" /></div>
         <h3 title={raffle.name} className="col-start-2 row-start-1 line-clamp-2 self-center break-words text-sm font-bold leading-4 pr-12">{raffle.name}</h3>
         <p className="col-start-2 row-start-2 min-w-0 self-center text-center text-lg font-bold leading-[22px]" title={`${Number(raffle.ticket_price).toLocaleString('en-US')} Meat per ticket`}>{formatCompactMeat(Number(raffle.ticket_price))} Meat <span className="text-[10px] font-normal">/ ticket</span></p>
-        <div className="col-span-2 col-start-1 row-start-3 flex min-w-0 items-center gap-1"><p className="min-w-0 flex-1 truncate text-[11px] leading-4">Ends in <time dateTime={raffle.ends_at}><RemainingTime endTime={Date.parse(raffle.ends_at)} /></time></p><span className="home-raffle-label shrink-0 rounded border px-1 py-0 text-[10px] font-medium leading-3">Raffle</span></div>
+        <div className="col-span-2 col-start-1 row-start-3 flex min-w-0 items-center gap-1"><p className="min-w-0 flex-1 truncate text-[11px] leading-4"><time dateTime={raffle.ends_at}><RaffleCardTime endTime={Date.parse(raffle.ends_at)} prefix="Ends in " /></time></p><span className="home-raffle-label shrink-0 rounded border px-1 py-0 text-[10px] font-medium leading-3">Raffle</span></div>
     </Link>;
 }
 HomeRaffleCard.propTypes = { raffle: PropTypes.object.isRequired, userTicketCount: PropTypes.oneOfType([PropTypes.number, PropTypes.string]) };

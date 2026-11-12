@@ -6,12 +6,50 @@ import { formatCompactMeat } from '../lib/formatMeat';
 import { raffleCountdown } from '../lib/raffles';
 import { createMarketPriceService } from '../lib/marketPrices';
 import { supabase } from '../lib/supabase';
+import { UserContext } from '../context/UserContext';
+import { useContext } from 'react';
 import mysteryBox from '../assets/raffle-mystery-box.svg';
 import { rafflePrizePositions, raffleBoxCenter } from '../lib/rafflePrizeCurve';
 import './raffles.css';
 
 const prices = createMarketPriceService(supabase);
 const quantity = value => BigInt(value).toLocaleString('en-US');
+const raffleReminderOptions = [[60, '1 hour'], [360, '6 hours'], [720, '12 hours'], [1440, '1 day'], [4320, '3 days']];
+function RaffleReminder({ raffle }) {
+    const { currentUser } = useContext(UserContext);
+    const [open, setOpen] = useState(false);
+    const [minutes, setMinutes] = useState(null);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+    useEffect(() => {
+        let active = true;
+        setOpen(false); setMinutes(null); setError('');
+        if (currentUser?.id && raffle.id) supabase.rpc('read_raffle_reminder', { p_id: raffle.id }).then(({ data, error: failure }) => {
+            if (active && !failure) setMinutes(data);
+        });
+        return () => { active = false; };
+    }, [raffle.id, currentUser?.id]);
+    if (!currentUser?.id || currentUser.isAdmin || currentUser.id === raffle.creator_id) return null;
+    async function choose(value) {
+        setBusy(true); setError('');
+        try {
+            const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+            const { error: failure } = await supabase.rpc('set_raffle_reminder', { p_id: raffle.id, p_minutes: value, p_time_zone: zone });
+            if (failure) throw failure;
+            setMinutes(value); setOpen(false);
+        } catch { setError('Reminder could not be saved. Please try again.'); }
+        finally { setBusy(false); }
+    }
+    return <div className="raffle-reminder">
+        {!open ? <button type="button" onClick={() => setOpen(true)}>{minutes ? 'Reminder set · Change' : 'Remind me'}</button> :
+            <label>When? <select aria-label="Raffle reminder time" disabled={busy} value="" onChange={event => choose(Number(event.target.value))}>
+                <option value="" disabled>Choose a time</option>
+                {raffleReminderOptions.filter(([value]) => Date.parse(raffle.ends_at) - value * 60000 > Date.now()).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select><button type="button" onClick={() => setOpen(false)}>Cancel</button></label>}
+        {error && <span role="alert">{error}</span>}
+    </div>;
+}
+RaffleReminder.propTypes = { raffle: PropTypes.object.isRequired };
 
 export function RafflePrizeDisplay({ raffle, marketPrices = new Map(), winnerResult = null, now = Date.now() }) {
     const selected = raffle.prizes.find(p => p.outcome === raffle.selected_outcome);
@@ -57,7 +95,7 @@ export function RafflePrizeDisplay({ raffle, marketPrices = new Map(), winnerRes
             <div className="raffle-badges"><span className="raffle-label">Raffle</span>{raffle.raffle_number && <span>#{raffle.raffle_number}</span>}</div>
             <div className="raffle-showcase-titleline"><h2>{raffle.name}</h2>
         <div className="raffle-facts"><strong>{quantity(raffle.ticket_price)} Meat <small>/ ticket</small></strong></div></div>
-            <div className="raffle-status-line">{!closed && <span className="raffle-header-countdown">{raffleCountdown(raffle.ends_at, now)}</span>}<span className={`raffle-showcase-status ${concluded ? 'is-concluded' : status === 'Active' ? 'is-active' : ''}`}>{status}</span></div>
+            <div className="raffle-status-line">{!closed && <span className={`raffle-header-countdown ${Date.parse(raffle.ends_at) - now < 3600000 ? 'is-urgent' : ''}`}>{raffleCountdown(raffle.ends_at, now)}</span>}<span className={`raffle-showcase-status ${concluded ? 'is-concluded' : status === 'Active' ? 'is-active' : ''}`}>{status}</span>{status === 'Active' && <RaffleReminder raffle={raffle} />}</div>
         </header>
         <h3 className="raffle-pool-heading" style={{ '--first-prize-offset': `${(positions[0]?.x ?? 5) * areaSize.width / 100}px` }}>Possible prizes</h3>
         <div className="raffle-prize-range-row" style={{ '--first-prize-offset': `${(positions[0]?.x ?? 5) * areaSize.width / 100}px` }}><span className="raffle-prize-value-range" title={range ? `Approximate current Mall value per prize, quantity included: ${quantity(range.min)}–${quantity(range.max)} Meat` : 'Market value unavailable for one or more prizes'}>{range ? `Ranging from ${formatCompactMeat(range.min, 2)} to ${formatCompactMeat(range.max, 2)} meat` : 'Prize range unavailable.'}</span></div>
