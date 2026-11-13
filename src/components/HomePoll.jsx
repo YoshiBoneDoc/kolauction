@@ -39,6 +39,7 @@ export function PollPanel({ service = polls, featuredTarget, fontTarget, titleRe
     const generation = useRef(0);
     const poll = feed?.poll;
     const fontPoll = activeFontPoll(feed);
+    const standaloneHearts = Array.isArray(feed?.title_font_hearts);
     const isAdmin = feed?.can_manage === true || poll?.can_manage === true;
     const published = (feed?.published_results || []).filter(result => result.poll_type !== 'free_text' && (isAdmin || result.has_voted) && result.id !== poll?.id);
     const repeatable = !isAdmin ? (feed?.repeatable_polls || []).filter(item => item.active && item.poll_type === 'free_text' && item.allow_multiple_responses).map(item => ({...item,has_voted:true})) : [];
@@ -233,16 +234,17 @@ export function PollPanel({ service = polls, featuredTarget, fontTarget, titleRe
     if (!hasPanelContent && !(fontTarget?.current && titleRef)) return null;
     return <>
         {fontTarget?.current && titleRef && createPortal(<RandomTitleFont titleRef={titleRef}
-            heartedFonts={fontPoll ? feed?.font_hearts?.[fontPoll.id] || [] : undefined}
-            onHeart={fontPoll ? async (family, hearted) => {
+            heartedFonts={standaloneHearts ? feed.title_font_hearts : fontPoll ? feed?.font_hearts?.[fontPoll.id] || [] : undefined}
+            onHeart={standaloneHearts || fontPoll ? async (family, hearted) => {
                 if (writing.current) throw new Error('Another poll action is pending.');
                 writing.current = true; generation.current += 1;
                 try {
-                    const fonts = await service.heartFont(fontPoll.id, family, hearted);
-                    setFeed(previous => ({ ...previous, font_hearts: { ...previous.font_hearts, [fontPoll.id]: fonts } }));
+                    const fonts = standaloneHearts ? await service.heartTitleFont(family, hearted) : await service.heartFont(fontPoll.id, family, hearted);
+                    setFeed(previous => standaloneHearts ? { ...previous, title_font_hearts: fonts }
+                        : { ...previous, font_hearts: { ...previous.font_hearts, [fontPoll.id]: fonts } });
                 } finally { writing.current = false; }
             } : undefined} />, fontTarget.current)}
-        {isAdmin && fontPoll && <p className="text-right text-xs"><Link to={`/admin/polls#poll-${fontPoll.id}`} className="text-blue-700 underline">View font heart results</Link></p>}
+        {isAdmin && (standaloneHearts || fontPoll) && <p className="text-right text-xs"><Link to={standaloneHearts ? "/admin/inbox?category=other#title-font-hearts" : `/admin/polls#poll-${fontPoll.id}`} className="text-blue-700 underline">View font heart results</Link></p>}
         {questionPanel && (featuredTarget?.current ? createPortal(questionPanel, featuredTarget.current) : questionPanel)}
         {panel}
     </>;

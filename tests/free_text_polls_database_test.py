@@ -223,6 +223,33 @@ with tempfile.TemporaryDirectory(prefix='khub-text-polls-',dir='/tmp') as folder
         assert feed(first)['font_poll'] is None
         assert admin_round()['font_hearts']==[{'family':'Mynerve','hearts':1},{'family':'Newsreader','hearts':1}]
         call(f"select public.set_poll_font_heart('{shortlist}','Mynerve',true);",first,error='closed')
+        # Standalone hearts remove the shortlist from polls and surface in the inbox.
+        sql(f"update khub_bot.site_polls set active=true,closed_at=null where id='{shortlist}';")
+        old_rows=sql('select jsonb_agg(to_jsonb(h) order by poll_id,voter_id,family) from khub_bot.poll_font_hearts h;')
+        sql(next(p for p in migrations if '260_standalone_font_hearts' in p.name).read_text())
+        assert old_rows==sql('select jsonb_agg(to_jsonb(h) order by poll_id,voter_id,family) from khub_bot.poll_font_hearts h;')
+        assert feed(second)['title_font_hearts']==['Mynerve','Newsreader']
+        assert feed(first)['title_font_hearts']==[]
+        assert all(p['id']!=shortlist for p in json.loads(call('select public.read_admin_polls();')))
+        assert feed(first)['font_poll'] is None
+        # The panel is returned even without any responses or matching inbox threads.
+        result=inbox()
+        assert len(result['title_font_hearts'])==13
+        assert result['title_font_hearts'][:2]==[{'family':'Mynerve','hearts':1},{'family':'Newsreader','hearts':1}]
+        for _ in range(2):
+            call("select public.set_title_font_heart('Mynerve',true);",first)
+        assert inbox()['title_font_hearts'][0]=={'family':'Mynerve','hearts':2}
+        for _ in range(2):
+            call("select public.set_title_font_heart('Mynerve',false);",first)
+        assert inbox()['title_font_hearts'][0]=={'family':'Mynerve','hearts':1}
+        call("select public.set_title_font_heart('Example',true);",first,error='shortlisted')
+        call('select * from khub_bot.title_font_hearts;',first,error='permission denied')
+        call('select khub_bot.title_font_heart_results();',first,error='permission denied')
+        call("select public.read_support_threads('other','open',1);",first,error='Administrator')
+        sql("select public.set_title_font_heart('Mynerve',true);",error='Log in')
+        assert 'title_font_hearts' not in json.loads(call("select public.read_support_threads('trade','open',1);"))
+        assert 'title_font_hearts' not in json.loads(call("select public.read_support_threads('other','open',2);"))
+        print('PASS: standalone heart migration preserves votes, hides the old poll, keeps private per-viewer preferences, supports dedupe/unheart, and exposes 13 ranked results only in the admin inbox')
         print('PASS: fresh shortlist hearts, queue-independent toolbar, admin-only ranking without text responses, dedupe/unheart, whitelist and preserved closed results')
         print('PASS: shared font hearts deduplicate accounts, unheart idempotently, rank correctly, remain private and reject closed/non-font polls')
         print('PASS: private free-text polls, ordered mixed queues, optional repeat responses, idempotent/concurrent retries, per-poll inbox grouping/status/category changes, privacy, size/abuse limits, unchanged Yes/No history and zero KMail/financial side effects')

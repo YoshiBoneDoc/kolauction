@@ -381,3 +381,18 @@ inbox rankings remain intact. Browser-local favorites are not imported as votes.
 Apply SQL once then deploy website; matching ignored bot copy exists, no bot/cache
 Worker runtime change. 37 focused Node tests, disposable free-text/font-heart SQL
 regressions, lint, build and secret scan passed. Nothing applied or deployed live.
+
+November 13 standalone font hearts supersedes the shortlist poll: queued **260**
+(after 259) converts existing shared shortlist votes to a separate per-account/
+font table, serializing with old heart writes. It concludes and hides the seeded
+shortlist poll without deleting its hearts/text history. Original unrestricted
+font-poll votes and browser-local favorites are not merged. Home toolbar writes
+standalone hearts using the existing private feed/refresh; no question form or
+live poll card is created. The administrator inbox All/Other first page includes
+a 13-font ranked panel, even with no messages; existing Refresh inbox updates it.
+The Home admin results link now targets Inbox → Other. Existing administrator
+checks, RLS, account restrictions, dedupe and desired-state removals are retained.
+Apply 260 once then deploy website; matching ignored bot SQL copy included, no
+bot/cache Worker runtime changes. 53 focused Node tests, disposable free-text/
+font-heart SQL regressions, changed-source lint, build and secret scan passed.
+No production SQL/deployment performed; personal bot quickstart unchanged.

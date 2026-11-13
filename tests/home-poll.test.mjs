@@ -362,3 +362,19 @@ test('admin font ranking is available without written responses and after conclu
  assert.match(h.html(),/Voting has concluded; saved counts remain available/);
  assert.ok(nodes(h.tree).some(node=>node.props?.id==='poll-shortlist'));
 });
+
+test('standalone font hearts save without a font poll and link administrators to the inbox', async () => {
+ const calls=[];
+ const props={fontTarget:{current:{name:'fonts'}},titleRef:{current:{style:{}}}};
+ const h=harness({read:async()=>({...feed(null),can_manage:true,title_font_hearts:['Mynerve']}),
+  heartTitleFont:async(...args)=>{calls.push(args);return ['Mynerve','Newsreader'];}},PollPanel,props);
+ await h.load();
+ let toolbar=nodes(h.tree).find(node=>node.props?.['data-placement']==='fonts');
+ assert.deepEqual(toolbar.props.heartedFonts,['Mynerve']);
+ await toolbar.props.onHeart('Newsreader',true);h.render();
+ toolbar=nodes(h.tree).find(node=>node.props?.['data-placement']==='fonts');
+ assert.deepEqual(calls,[['Newsreader',true]]);
+ assert.deepEqual(toolbar.props.heartedFonts,['Mynerve','Newsreader']);
+ assert.ok(nodes(h.tree).some(node=>node.props?.to==='/admin/inbox?category=other#title-font-hearts'));
+ assert.ok(!nodes(h.tree).some(node=>node.props?.['aria-label']==='Community poll'));
+});

@@ -107,6 +107,13 @@ function Inbox() {
         </div>
         {!result ? <p role="status">Loading private messages…</p> : result.error ? <p role="alert" className="text-red-700">{result.error}</p> : <>
             <p className="text-sm text-gray-600">{result.total} {result.total === 1 ? 'conversation' : 'conversations'}</p>
+            {['all', 'other'].includes(category) && page === 1 && result.title_font_hearts && <section id="title-font-hearts" aria-label="Shortlisted font hearts" className="space-y-2 rounded border bg-white p-4">
+                <h2 className="text-sm font-semibold text-gray-900">Shortlisted font hearts</h2>
+                <p className="text-xs text-gray-500">One heart per player per font. Use Refresh inbox to update the counts.</p>
+                <ol className="grid gap-x-6 gap-y-1 text-sm text-gray-700 sm:grid-cols-2">
+                    {result.title_font_hearts.map(font => <li key={font.family} className="flex items-baseline justify-between gap-3"><span>{font.family}</span><span className="tabular-nums">♥ {font.hearts}</span></li>)}
+                </ol>
+            </section>}
             {!result.threads.length && <p className="rounded border bg-white p-5">No messages here.</p>}
             <div className="space-y-2">{result.threads.map(thread => <SupportThread key={threadKey(thread)}
                 thread={thread} expanded={expanded.has(threadKey(thread))} onToggle={() => toggleThread(thread)}
