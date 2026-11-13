@@ -95,7 +95,7 @@ export function RafflePrizeDisplay({ raffle, marketPrices = new Map(), winnerRes
         <header className="raffle-showcase-heading">
             <div className="raffle-badges"><span className="raffle-label">Raffle</span>{raffle.raffle_number && <span>#{raffle.raffle_number}</span>}<span>{raffle.audience === 'public' ? 'Public entry' : 'MMG club members only'}</span></div>
             <div className="raffle-showcase-titleline"><div className="raffle-title-and-sales"><h2>{raffle.name}</h2>
-                {SHOW_RAFFLE_TICKET_TOTAL && raffle.total_tickets_sold != null && <span className="raffle-ticket-sales-total">{quantity(raffle.total_tickets_sold)} total tickets have been sold so far</span>}</div>
+                {SHOW_RAFFLE_TICKET_TOTAL && raffle.total_tickets_sold != null && raffle.total_raffle_participants != null && <span className="raffle-ticket-sales-total">{quantity(raffle.total_tickets_sold)} total tickets sold so far across {quantity(raffle.total_raffle_participants)} participants</span>}</div>
         <div className="raffle-facts"><strong>{quantity(raffle.ticket_price)} Meat <small>/ ticket</small></strong></div></div>
             <div className="raffle-status-line">{!closed && <span className={`raffle-header-countdown ${Date.parse(raffle.ends_at) - now < 3600000 ? 'is-urgent' : ''}`}>{raffleCountdown(raffle.ends_at, now)}</span>}<span className={`raffle-showcase-status ${concluded ? 'is-concluded' : status === 'Active' ? 'is-active' : ''}`}>{status}</span>{status === 'Active' && <RaffleReminder raffle={raffle} />}</div>
         </header>

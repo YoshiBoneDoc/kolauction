@@ -35,7 +35,7 @@ export default function Raffles() {
         if (id && viewerId) readRaffle(`tickets:${id}:${offset}`, () => supabase.rpc('read_my_raffle_ticket_page', { p_id: id, p_offset: offset }), { force: revision > 0 }).then(({ data, error }) => { if (active && !error) setTickets({ ...data, owner: viewerId, raffleId: id, offset }); }).catch(() => { if (active) setTicketError({ id, viewerId }); });
         async function load() {
             try {
-                let query = supabase.from('mystery_raffles').select(`id,creator_id,audience,prize_range_min,prize_range_max,prize_range_frozen_at,raffle_number,name,ticket_price,ends_at,state,completion_reason,created_at,winner_player_id,selected_outcome,prizes:mystery_raffle_prizes(outcome,item_id,name,image,quantity,probability_bps)${SHOW_RAFFLE_TICKET_TOTAL ? ',total_tickets_sold' : ''}`);
+                let query = supabase.from('mystery_raffles').select(`id,creator_id,audience,prize_range_min,prize_range_max,prize_range_frozen_at,raffle_number,name,ticket_price,ends_at,state,completion_reason,created_at,winner_player_id,selected_outcome,prizes:mystery_raffle_prizes(outcome,item_id,name,image,quantity,probability_bps)${SHOW_RAFFLE_TICKET_TOTAL ? ',total_tickets_sold,total_raffle_participants' : ''}`);
                 query = id ? query.eq('id', id) : query.eq('is_test', false).order('created_at', { ascending: false }).limit(20);
                 const { data, error } = await readRaffle(`raffles:${id || "list"}`, () => query, { force: revision > 0 });
                 if (error) throw error;

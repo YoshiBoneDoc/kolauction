@@ -1006,6 +1006,15 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
         assert sql(f"select count(*) from khub_bot.raffle_purchases where receipt_id='{private_mail['id']}'")=='0'
         assert sql(f"select sum(meat) from khub_bot.deliveries where receipt_id='{private_mail['id']}' and kind='refund'")=='100'
         print('PASS: public entry accepts verified nonmembers; club-only entry hides details and refunds payments')
+        assert call(f"select public.total_raffle_participants(r) from public.mystery_raffles r where id='{public_id}'",uid=buyer)=='1'
+        repeat_mail=mail(public_id,meat=200)
+        assert ingest(repeat_mail)=='raffle_tickets'
+        assert call(f"select public.total_raffle_participants(r) from public.mystery_raffles r where id='{public_id}'",uid=buyer)=='1'
+        assert call(f"select public.total_tickets_sold(r) from public.mystery_raffles r where id='{public_id}'",uid=buyer)=='3'
+        # Even a caller supplying an otherwise hidden composite row gets no count.
+        assert sql(f"select public.total_raffle_participants(r) is null from public.mystery_raffles r where id='{private_id}'",uid=buyer)=='t'
+        assert sql("select has_function_privilege('anon','public.total_raffle_participants(public.mystery_raffles)','execute')")=='f'
+        print('PASS: participant total deduplicates repeat purchases and preserves raffle access')
         print('PASS: full-schema lifecycle and isolation: identical items, concurrent auction/raffle Meat, exact solvency, proof guards, retries, restarts, cancellation and schema permissions')
     finally:
         if started: pg('-m','immediate','-w','stop')

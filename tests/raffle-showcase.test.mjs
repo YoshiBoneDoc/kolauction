@@ -12,9 +12,9 @@ const raffle = { name: 'Mystery raffle', raffle_number: 1006, ticket_price: 1000
 ] };
 test('optional sales total preserves exact counts and hides unavailable totals', () => {
     for (const [count, formatted] of [['0', '0'], ['9007199254740993', '9,007,199,254,740,993']]) {
-        assert.ok(compiled.exports.render({ ...raffle, total_tickets_sold: count }).includes(`${formatted} total tickets have been sold so far`));
+        assert.ok(compiled.exports.render({ ...raffle, total_tickets_sold: count, total_raffle_participants: '2' }).includes(`${formatted} total tickets sold so far across 2 participants`));
     }
-    assert.doesNotMatch(compiled.exports.render(raffle), /total tickets have been sold so far/);
+    assert.doesNotMatch(compiled.exports.render(raffle), /total tickets sold so far/);
 });
 test('raffle reveal orders known prizes by total value and places unavailable values last', () => {
     const html = compiled.exports.render(raffle, new Map([[1, { available: true, price_meat: 100 }], [2, { available: true, price_meat: 50 }]]));
