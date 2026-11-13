@@ -8,6 +8,21 @@ which commands to include and their order.
 
 # Codex Working Guidelines
 
+## Start of Every New Chat
+
+Before beginning project work in each new chat, review `HANDOFF.md`, `ROADMAP.md`,
+the root `README.md`, and relevant handoff, roadmap, and README files in
+subdirectories, including the separate, gitignored `bot/` directory when present.
+Use this review to understand the current architecture, existing functionality,
+development progress, known issues, and planned work. Follow linked technical
+documents as needed for the task.
+
+Distinguish local implementation and test results from confirmed production
+migrations, deployments, and feature activation. Documentation can lag or conflict;
+check relevant current code and available evidence before treating documented work
+as missing, complete, or deployed. Reading the owner's personal bot quickstart
+does not authorize changing it.
+
 ## Efficiency and Token Usage
 
 This is a large project. Minimize unnecessary token consumption without compromising correctness, thoroughness, security, or reliability.
