@@ -10,6 +10,12 @@ const raffle = { name: 'Mystery raffle', raffle_number: 1006, ticket_price: 1000
     { outcome: 2, item_id: 2, name: 'Winning prize name', quantity: 3, probability_bps: 3333, image: 'two.gif' },
     { outcome: 3, item_id: 3, name: 'Unpriced prize', quantity: 1, probability_bps: 3333, image: 'three.gif' },
 ] };
+test('optional sales total preserves exact counts and hides unavailable totals', () => {
+    for (const [count, formatted] of [['0', '0'], ['9007199254740993', '9,007,199,254,740,993']]) {
+        assert.ok(compiled.exports.render({ ...raffle, total_tickets_sold: count }).includes(`${formatted} total tickets have been sold so far`));
+    }
+    assert.doesNotMatch(compiled.exports.render(raffle), /total tickets have been sold so far/);
+});
 test('raffle reveal orders known prizes by total value and places unavailable values last', () => {
     const html = compiled.exports.render(raffle, new Map([[1, { available: true, price_meat: 100 }], [2, { available: true, price_meat: 50 }]]));
     const items = html.match(/<li\b[\s\S]*?<\/li>/g);

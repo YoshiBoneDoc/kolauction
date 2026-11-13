@@ -179,6 +179,9 @@ html[data-theme=dark] .raffle-header-countdown.is-urgent{color:#fda4af}
 .raffle-showcase .raffle-label{border-radius:999px;padding:4px 10px;font-size:12px;line-height:1.2;background:#ebe7ee;color:#51465d;font-weight:500}
 html[data-theme=dark] .raffle-showcase .raffle-label{background:#62536f;color:#f5effa}
 .raffle-showcase-titleline{grid-column:1/-1;grid-row:2;display:flex;flex-direction:column;align-items:flex-start;gap:12px;min-width:0}
+.raffle-title-and-sales{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px 20px;width:100%}
+.raffle-ticket-sales-total{margin-left:auto;text-align:right;font-size:12px;color:#756b80}
+html[data-theme=dark] .raffle-ticket-sales-total{color:#b9aec5}
 .raffle-pool-heading{margin:30px 0 0;font-size:15px;text-transform:uppercase;letter-spacing:1.5px;font-weight:600;color:#887194}
 .raffle-showcase-status{padding:5px 11px;border:1px solid #d7c9e2;border-radius:7px;background:#eee5f4;font-size:11px;font-weight:600;color:#674a7d}
 .raffle-showcase-status.is-concluded{color:#166534;border-color:#a7d8b8;background:#e4f4e9}

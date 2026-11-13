@@ -15,6 +15,20 @@ export default defineConfig(({ mode }) => {
       configureServer(server) {
         const publicEnv = loadEnv(mode, cwd(), 'VITE_');
         const bookmarkCounts = createBookmarkCountPreview(publicEnv);
+        server.middlewares.use('/api/public-auctions', async (req, res) => {
+          try {
+            const url = new URL(req.originalUrl || `/api/public-auctions${req.url}`, 'http://localhost');
+            const response = await bookmarkCounts(new Request(url, {
+              method: req.method,
+              headers: req.headers['x-khub-live-state'] === '1' ? { 'X-Khub-Live-State': '1' } : {},
+            }));
+            res.writeHead(response.status, Object.fromEntries(response.headers));
+            res.end(new Uint8Array(await response.arrayBuffer()));
+          } catch {
+            res.writeHead(503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+            res.end(JSON.stringify({ error: 'Public auctions unavailable.' }));
+          }
+        });
         server.middlewares.use('/api/item-catalog', async (req, res) => {
           try {
             const request = new Request(new URL(req.originalUrl || req.url, `http://${req.headers.host || 'localhost'}`), { method: req.method });

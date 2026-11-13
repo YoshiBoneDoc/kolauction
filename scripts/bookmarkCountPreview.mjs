@@ -18,6 +18,11 @@ export function createBookmarkCountPreview(env) {
     }, { SUPABASE_URL: env.VITE_SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY: env.VITE_SUPABASE_PUBLISHABLE_KEY });
     return async request => {
         await ready;
-        return cache.fetch(new Request(`https://cache.internal/public-bookmark-counts${new URL(request.url).search}`, { method: request.method }));
+        const url = new URL(request.url);
+        const path = url.pathname === '/api/public-auctions' ? '/public-auctions' : '/public-bookmark-counts';
+        return cache.fetch(new Request(`https://cache.internal${path}${url.search}`, {
+            method: request.method,
+            headers: request.headers.get('X-Khub-Live-State') === '1' ? { 'X-Khub-Live-State': '1' } : {},
+        }));
     };
 }
