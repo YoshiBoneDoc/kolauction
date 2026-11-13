@@ -360,3 +360,13 @@ html[data-theme=dark] .raffle-summary .raffle-reminder button{color:#f5effa;back
 html[data-theme=dark] .raffle-summary .raffle-reminder{color:#f5effa}
 .raffle-reminder select{margin:0 6px;padding:4px;border:1px solid #d7c9e2;border-radius:5px;background:transparent}
 .raffle-reminder [role=alert]{display:block;color:#b91c1c}
+
+.raffle-audience-field{min-width:0}
+.raffle-audience-field legend{margin-bottom:7px;font-weight:600}
+.raffle-audience-switch{display:inline-flex;max-width:100%;padding:3px;gap:3px;border:1px solid #cbbbd7;border-radius:9px;background:#f1ebf4}
+.raffle-editor .raffle-audience-switch button{border:0;border-radius:6px;padding:7px 12px;background:transparent;color:#51465d;font-weight:600;white-space:nowrap}
+.raffle-editor .raffle-audience-switch button[aria-pressed=true]{background:#74529b;color:#fff;box-shadow:0 1px 4px #342d4333}
+.raffle-editor .raffle-audience-switch button:focus-visible{outline:2px solid #74529b;outline-offset:2px}
+html[data-theme=dark] .raffle-audience-switch{background:#151320;border-color:#675875}
+html[data-theme=dark] .raffle-editor .raffle-audience-switch button{color:#ece5f3}
+html[data-theme=dark] .raffle-editor .raffle-audience-switch button[aria-pressed=true]{background:#74529b;color:#fff}

@@ -100,7 +100,7 @@ const Profile = () => {
         { title: 'Bid history', records: bidding.filter((auction) => !['active','settling'].includes(getAuctionStatus(auction, now))).sort((a, b) => historyTime(b) - historyTime(a)) },
     ];
 
-    const bidHistoryTabs = currentUser.isHighRollersMember ? [['bids', 'Bid history'], ['raffles', 'Raffle History']] : [['bids', 'Bid history']];
+    const bidHistoryTabs = currentUser.canViewRaffles ? [['bids', 'Bid history'], ['raffles', 'Raffle History']] : [['bids', 'Bid history']];
     const selectedHistorySection = sections.find(section => section.title === historyTabs.find(([id]) => id === historyTab)[1]);
     const attentionSections = sections.filter(section => ['Awaiting escrow deposit', 'Awaiting settlement'].includes(section.title) && section.records.length > 0);
 
@@ -294,15 +294,15 @@ const Profile = () => {
                                 {sections.filter(section => section.title === 'Active bids').map(renderAuctionSection)}
                                 <div className="profile-panel min-w-0 p-4 sm:p-[18px]">
                                     <div role="tablist" aria-label="Bid and raffle history" className="mb-3 flex flex-wrap gap-4 border-b pb-2 profile-divider">
-                                        {bidHistoryTabs.map(([id, label], index) => <button key={id} type="button" role="tab" id={`profile-bid-history-${id}`} aria-controls={`profile-bid-history-panel-${id}`} aria-selected={(currentUser.isHighRollersMember ? bidHistoryTab : 'bids') === id} tabIndex={(currentUser.isHighRollersMember ? bidHistoryTab : 'bids') === id ? 0 : -1} className="profile-history-tab" onClick={() => setBidHistoryTab(id)} onKeyDown={event => {
+                                        {bidHistoryTabs.map(([id, label], index) => <button key={id} type="button" role="tab" id={`profile-bid-history-${id}`} aria-controls={`profile-bid-history-panel-${id}`} aria-selected={(currentUser.canViewRaffles ? bidHistoryTab : 'bids') === id} tabIndex={(currentUser.canViewRaffles ? bidHistoryTab : 'bids') === id ? 0 : -1} className="profile-history-tab" onClick={() => setBidHistoryTab(id)} onKeyDown={event => {
                                             const next = event.key === 'ArrowRight' ? (index + 1) % bidHistoryTabs.length : event.key === 'ArrowLeft' ? (index + bidHistoryTabs.length - 1) % bidHistoryTabs.length : event.key === 'Home' ? 0 : event.key === 'End' ? bidHistoryTabs.length - 1 : null;
                                             if (next === null) return;
                                             event.preventDefault(); setBidHistoryTab(bidHistoryTabs[next][0]);
                                             document.getElementById(`profile-bid-history-${bidHistoryTabs[next][0]}`)?.focus({ preventScroll: true });
                                         }}>{label}</button>)}
                                     </div>
-                                    <div role="tabpanel" id="profile-bid-history-panel-bids" aria-labelledby="profile-bid-history-bids" hidden={currentUser.isHighRollersMember && bidHistoryTab !== 'bids'}>{renderAuctionSection({ ...sections.find(section => section.title === 'Bid history'), embedded: true })}</div>
-                                    {currentUser.isHighRollersMember && bidHistoryTab === 'raffles' && selectedTab === 'bids' && <div role="tabpanel" id="profile-bid-history-panel-raffles" aria-labelledby="profile-bid-history-raffles"><ProfileRaffleHistory key={currentUser.id} userId={currentUser.id} /></div>}
+                                    <div role="tabpanel" id="profile-bid-history-panel-bids" aria-labelledby="profile-bid-history-bids" hidden={currentUser.canViewRaffles && bidHistoryTab !== 'bids'}>{renderAuctionSection({ ...sections.find(section => section.title === 'Bid history'), embedded: true })}</div>
+                                    {currentUser.canViewRaffles && bidHistoryTab === 'raffles' && selectedTab === 'bids' && <div role="tabpanel" id="profile-bid-history-panel-raffles" aria-labelledby="profile-bid-history-raffles"><ProfileRaffleHistory key={currentUser.id} userId={currentUser.id} /></div>}
                                 </div>
                             </div>
                         </div>

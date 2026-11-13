@@ -92,7 +92,7 @@ export function RafflePrizeDisplay({ raffle, marketPrices = new Map(), winnerRes
     const sceneHeight = Math.max(340, (pool.length - 1) * entryHeight / 0.84 + 70);
     return <article className={`raffle-summary raffle-showcase ${selected ? 'raffle-has-selection' : ''}`}>
         <header className="raffle-showcase-heading">
-            <div className="raffle-badges"><span className="raffle-label">Raffle</span>{raffle.raffle_number && <span>#{raffle.raffle_number}</span>}</div>
+            <div className="raffle-badges"><span className="raffle-label">Raffle</span>{raffle.raffle_number && <span>#{raffle.raffle_number}</span>}<span>{raffle.audience === 'public' ? 'Public entry' : 'MMG club members only'}</span></div>
             <div className="raffle-showcase-titleline"><h2>{raffle.name}</h2>
         <div className="raffle-facts"><strong>{quantity(raffle.ticket_price)} Meat <small>/ ticket</small></strong></div></div>
             <div className="raffle-status-line">{!closed && <span className={`raffle-header-countdown ${Date.parse(raffle.ends_at) - now < 3600000 ? 'is-urgent' : ''}`}>{raffleCountdown(raffle.ends_at, now)}</span>}<span className={`raffle-showcase-status ${concluded ? 'is-concluded' : status === 'Active' ? 'is-active' : ''}`}>{status}</span>{status === 'Active' && <RaffleReminder raffle={raffle} />}</div>

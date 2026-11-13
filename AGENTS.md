@@ -33,7 +33,6 @@ This is a large project. Minimize unnecessary token consumption without compromi
 - Never weaken safeguards for performance, simplicity, or token savings.
 - Favor maintainable solutions consistent with the existing architecture.
 - Run targeted tests first, expanding verification when changes are complex, shared, or high-risk.
-- Do not deploy production changes without explicit authorization.
 
 ## Core Principle
 

@@ -3,6 +3,7 @@ import { defineConfig, loadEnv } from 'vite'
 import { cwd } from 'node:process'
 import react from '@vitejs/plugin-react'
 import { onRequestGet as giveawayImage } from './functions/api/giveaway-image.js'
+import { itemCatalog } from './workers/site/itemCatalog.js'
 import { assertPublicEnvironment, assetSecurityPlugin } from './scripts/assetSecurity.mjs'
 
 // https://vite.dev/config/
@@ -12,7 +13,22 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), assetSecurityPlugin(), {
       name: 'giveaway-image-preview',
       configureServer(server) {
-        const bookmarkCounts = createBookmarkCountPreview(loadEnv(mode, cwd(), 'VITE_'));
+        const publicEnv = loadEnv(mode, cwd(), 'VITE_');
+        const bookmarkCounts = createBookmarkCountPreview(publicEnv);
+        server.middlewares.use('/api/item-catalog', async (req, res) => {
+          try {
+            const request = new Request(new URL(req.originalUrl || req.url, `http://${req.headers.host || 'localhost'}`), { method: req.method });
+            const response = await itemCatalog(request, {
+              SUPABASE_URL: publicEnv.VITE_SUPABASE_URL,
+              SUPABASE_PUBLISHABLE_KEY: publicEnv.VITE_SUPABASE_PUBLISHABLE_KEY,
+            }, { waitUntil() {} }, fetch, null);
+            res.writeHead(response.status, Object.fromEntries(response.headers));
+            res.end(new Uint8Array(await response.arrayBuffer()));
+          } catch {
+            res.writeHead(503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+            res.end(JSON.stringify({ error: 'Catalogue unavailable.' }));
+          }
+        });
         server.middlewares.use('/api/public-bookmark-counts', async (req, res) => {
           try {
             const response = await bookmarkCounts(new Request(new URL(req.url, 'http://localhost'), { method: req.method }));

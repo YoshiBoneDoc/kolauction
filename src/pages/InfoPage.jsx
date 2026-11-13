@@ -488,7 +488,7 @@ const InfoPage = () => {
                             <div className="relative min-w-0 pb-4 pl-4 text-gray-700 group-last:pb-0 dark:text-gray-200">
                                 <span aria-hidden="true" className="absolute -bottom-[9px] left-0 top-[9px] w-px -translate-x-1/2 bg-gray-300 group-last:hidden dark:bg-gray-600" />
                                 <span aria-hidden="true" className="absolute left-0 top-1.5 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-gray-400 dark:bg-gray-500" />
-                                <p>First invite-only club raffle</p><p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Inaugural winner: — · Prize: —</p>
+                                <p>First invite-only club raffle</p><p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Winner: <Link to="/seller/3bb6eb2a-41d1-4090-9dc1-d5fe1cfa2e58" className="font-semibold text-blue-700 underline hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-200">XionXIV</Link> · Prize: do-it-yourself laser eye surgery kit</p>
                             </div>
                         </li>
                         </>}

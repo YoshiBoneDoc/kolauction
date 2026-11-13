@@ -9625,7 +9625,7 @@
   },
   {
     "id": 1404,
-    "name": "colored-light &quot;necklace&quot;",
+    "name": "colored-light \"necklace\"",
     "image": "lightneck.gif",
     "tradeable": true,
     "giftable": false,
@@ -10449,7 +10449,7 @@
   },
   {
     "id": 1526,
-    "name": "pet rock &quot;Snooty&quot; disguise",
+    "name": "pet rock \"Snooty\" disguise",
     "image": "monocle.gif",
     "tradeable": false,
     "giftable": true,
@@ -11505,7 +11505,7 @@
   },
   {
     "id": 1678,
-    "name": "pet rock &quot;Groucho&quot; disguise",
+    "name": "pet rock \"Groucho\" disguise",
     "image": "groucho.gif",
     "tradeable": false,
     "giftable": true,
@@ -13937,7 +13937,7 @@
   },
   {
     "id": 1999,
-    "name": "stick of &quot;gum&quot;",
+    "name": "stick of \"gum\"",
     "image": "gumstick.gif",
     "tradeable": true,
     "giftable": false,
@@ -16929,7 +16929,7 @@
   },
   {
     "id": 2528,
-    "name": "filet of tangy gnat (&quot;fotelif&quot;)",
+    "name": "filet of tangy gnat (\"fotelif\")",
     "image": "gnatfilet.gif",
     "tradeable": true,
     "giftable": false,
@@ -19617,7 +19617,7 @@
   },
   {
     "id": 2949,
-    "name": "jar of &quot;Creole Lady&quot; marrrmalade",
+    "name": "jar of \"Creole Lady\" marrrmalade",
     "image": "marmalade.gif",
     "tradeable": true,
     "giftable": false,
@@ -21009,7 +21009,7 @@
   },
   {
     "id": 3194,
-    "name": "origami &quot;gentlemen's&quot; magazine",
+    "name": "origami \"gentlemen's\" magazine",
     "image": "origamimag.gif",
     "tradeable": true,
     "giftable": false,
@@ -21273,7 +21273,7 @@
   },
   {
     "id": 3263,
-    "name": "Sp'n-Zor's Grimoire of &quot;Tasteful&quot; Gifts",
+    "name": "Sp'n-Zor's Grimoire of \"Tasteful\" Gifts",
     "image": "book4.gif",
     "tradeable": true,
     "giftable": false,
@@ -27873,7 +27873,7 @@
   },
   {
     "id": 4508,
-    "name": "&quot;DRINK ME&quot; potion",
+    "name": "\"DRINK ME\" potion",
     "image": "drinkme.gif",
     "tradeable": true,
     "giftable": false,
@@ -29145,7 +29145,7 @@
   },
   {
     "id": 4740,
-    "name": "overpriced &quot;imported&quot; beer",
+    "name": "overpriced \"imported\" beer",
     "image": "beerbottle.gif",
     "tradeable": true,
     "giftable": false,
@@ -32225,7 +32225,7 @@
   },
   {
     "id": 5326,
-    "name": "Bone's Farm &quot;wine&quot;",
+    "name": "Bone's Farm \"wine\"",
     "image": "beerbottle.gif",
     "tradeable": true,
     "giftable": false,
@@ -34705,7 +34705,7 @@
   },
   {
     "id": 5743,
-    "name": "CSA scoutmaster's &quot;water&quot;",
+    "name": "CSA scoutmaster's \"water\"",
     "image": "waterbottle.gif",
     "tradeable": true,
     "giftable": false,
@@ -35329,7 +35329,7 @@
   },
   {
     "id": 5849,
-    "name": "handyman &quot;hand soap&quot;",
+    "name": "handyman \"hand soap\"",
     "image": "handsoap.gif",
     "tradeable": true,
     "giftable": false,
@@ -38177,7 +38177,7 @@
   },
   {
     "id": 6372,
-    "name": "bottle of fruity &quot;wine&quot;",
+    "name": "bottle of fruity \"wine\"",
     "image": "wine.gif",
     "tradeable": true,
     "giftable": false,
@@ -42737,7 +42737,7 @@
   },
   {
     "id": 7161,
-    "name": "&quot;honey&quot; dipper",
+    "name": "\"honey\" dipper",
     "image": "honeydipper.gif",
     "tradeable": true,
     "giftable": false,
@@ -42817,7 +42817,7 @@
   },
   {
     "id": 7171,
-    "name": "jug of &quot;wine&quot;",
+    "name": "jug of \"wine\"",
     "image": "jug.gif",
     "tradeable": true,
     "giftable": false,
@@ -45425,7 +45425,7 @@
   },
   {
     "id": 7589,
-    "name": "glass of &quot;milk&quot;",
+    "name": "glass of \"milk\"",
     "image": "milk.gif",
     "tradeable": true,
     "giftable": false,
@@ -45433,7 +45433,7 @@
   },
   {
     "id": 7590,
-    "name": "cup of &quot;tea&quot;",
+    "name": "cup of \"tea\"",
     "image": "coffeecup.gif",
     "tradeable": true,
     "giftable": false,
@@ -45441,7 +45441,7 @@
   },
   {
     "id": 7591,
-    "name": "thermos of &quot;whiskey&quot;",
+    "name": "thermos of \"whiskey\"",
     "image": "thermos.gif",
     "tradeable": true,
     "giftable": false,
@@ -46233,7 +46233,7 @@
   },
   {
     "id": 7699,
-    "name": "&quot;KICK ME&quot; sign",
+    "name": "\"KICK ME\" sign",
     "image": "kickmesign.gif",
     "tradeable": true,
     "giftable": false,
@@ -46713,7 +46713,7 @@
   },
   {
     "id": 7772,
-    "name": "&quot;meat&quot; stick",
+    "name": "\"meat\" stick",
     "image": "owlstix.gif",
     "tradeable": true,
     "giftable": false,
@@ -50393,7 +50393,7 @@
   },
   {
     "id": 8485,
-    "name": "&quot;DEBBIE&quot; tattoo kit",
+    "name": "\"DEBBIE\" tattoo kit",
     "image": "dtat.gif",
     "tradeable": true,
     "giftable": false,
@@ -51977,7 +51977,7 @@
   },
   {
     "id": 8744,
-    "name": "Wal-Mart &quot;diamond&quot; ring",
+    "name": "Wal-Mart \"diamond\" ring",
     "image": "fatrock.gif",
     "tradeable": false,
     "giftable": true,
@@ -52001,7 +52001,7 @@
   },
   {
     "id": 8747,
-    "name": "Spring Break Beach &quot;swimsuit&quot;",
+    "name": "Spring Break Beach \"swimsuit\"",
     "image": "palette.gif",
     "tradeable": false,
     "giftable": true,
@@ -52209,7 +52209,7 @@
   },
   {
     "id": 8777,
-    "name": "bundle of &quot;fragrant&quot; herbs",
+    "name": "bundle of \"fragrant\" herbs",
     "image": "smudgestick.gif",
     "tradeable": true,
     "giftable": false,
@@ -58137,7 +58137,7 @@
   },
   {
     "id": 9843,
-    "name": "&quot;Remember the Trees&quot; Shirt",
+    "name": "\"Remember the Trees\" Shirt",
     "image": "treeshirt.gif",
     "tradeable": true,
     "giftable": false,
@@ -58233,7 +58233,7 @@
   },
   {
     "id": 9900,
-    "name": "chocolate &quot;Phoenix&quot;",
+    "name": "chocolate \"Phoenix\"",
     "image": "chocphoenix.gif",
     "tradeable": true,
     "giftable": false,
@@ -60057,7 +60057,7 @@
   },
   {
     "id": 10343,
-    "name": "tiny plastic dolphin &quot;orphan&quot;",
+    "name": "tiny plastic dolphin \"orphan\"",
     "image": "tpdolphin.gif",
     "tradeable": true,
     "giftable": false,
@@ -62561,7 +62561,7 @@
   },
   {
     "id": 10862,
-    "name": "&quot;caramel&quot; orange",
+    "name": "\"caramel\" orange",
     "image": "caramelorange.gif",
     "tradeable": true,
     "giftable": false,
@@ -64137,7 +64137,7 @@
   },
   {
     "id": 11258,
-    "name": "&quot;I survived Y2K&quot; T-Shirt",
+    "name": "\"I survived Y2K\" T-Shirt",
     "image": "2002shirt.gif",
     "tradeable": true,
     "giftable": false,
@@ -65697,7 +65697,7 @@
   },
   {
     "id": 11482,
-    "name": "chest of &quot;pirate gold&quot;",
+    "name": "chest of \"pirate gold\"",
     "image": "lilchest.gif",
     "tradeable": true,
     "giftable": false,
@@ -66793,7 +66793,7 @@
   },
   {
     "id": 11716,
-    "name": "tiny plastic &quot;Santa Claus&quot;",
+    "name": "tiny plastic \"Santa Claus\"",
     "image": "c24tpsanta.gif",
     "tradeable": true,
     "giftable": false,
@@ -69049,7 +69049,7 @@
   },
   {
     "id": 12174,
-    "name": "&quot;salvaged&quot; wine",
+    "name": "\"salvaged\" wine",
     "image": "salvagewine.gif",
     "tradeable": true,
     "giftable": false,
@@ -69971,6 +69971,38 @@
     "id": 12344,
     "name": "black rose hips extract",
     "image": "potion30.gif",
+    "tradeable": true,
+    "giftable": false,
+    "is_gift_package": false
+  },
+  {
+    "id": 12391,
+    "name": "unopened legendary acorndion",
+    "image": "acorndionbox.gif",
+    "tradeable": true,
+    "giftable": false,
+    "is_gift_package": false
+  },
+  {
+    "id": 12393,
+    "name": "cotton candy corpsedriver",
+    "image": "borrbooze2.gif",
+    "tradeable": true,
+    "giftable": false,
+    "is_gift_package": false
+  },
+  {
+    "id": 12394,
+    "name": "corpsesicle on the beach",
+    "image": "borrbooze3.gif",
+    "tradeable": true,
+    "giftable": false,
+    "is_gift_package": false
+  },
+  {
+    "id": 12395,
+    "name": "candy corn corpsetini",
+    "image": "borrbooze1.gif",
     "tradeable": true,
     "giftable": false,
     "is_gift_package": false

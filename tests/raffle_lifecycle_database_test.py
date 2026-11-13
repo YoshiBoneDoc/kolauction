@@ -48,6 +48,7 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
             create table auth.identities(id uuid primary key,provider_id text,user_id uuid references auth.users(id) on delete cascade,
                 identity_data jsonb,provider text,created_at timestamptz,updated_at timestamptz);
             create table auth.sessions(id uuid primary key,user_id uuid references auth.users(id) on delete cascade);
+            create table auth.mfa_amr_claims(session_id uuid,authentication_method text);
             create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
             grant usage on schema public,auth to anon,authenticated,service_role;
             grant execute on function auth.uid() to anon,authenticated;
@@ -512,9 +513,9 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
         assert physical['meat']==int(liabilities()['meat'])
         assert sql('select enabled from khub_bot.raffle_gate')=='t'
         call("select public.remove_high_rollers_member('48889602')")
-        assert call('select public.can_view_raffles()',uid=buyer)=='f'
+        assert call('select public.can_view_raffles()',uid=buyer)=='t'
         sql(f"update public.profiles set kol_player_name='nISemonO' where id='{buyer}'")
-        assert call('select public.can_view_raffles()',uid=buyer)=='f'
+        assert call('select public.can_view_raffles()',uid=buyer)=='t'
         rejected=mail(create_raffle(),meat=100)
         assert ingest(rejected)=='raffle_refund'
         assert ingest(rejected)=='duplicate'
@@ -832,11 +833,11 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
             assert row['ticket_price']==sql(f"select ticket_price from public.mystery_raffles where id='{row['id']}'")
             assert not {'player_id','receipt_id','revenue','ticket_count'} & row.keys()
         for viewer in [other,seller]:
-            call('select public.read_my_raffle_history()',uid=viewer,error='Accepted club membership required')
+            assert json.loads(call('select public.read_my_raffle_history()',uid=viewer))==[]
         assert sql("select has_function_privilege('anon','public.read_my_raffle_history(integer)','execute')")=='f'
         call("select public.remove_high_rollers_member('48889602')")
-        call('select public.read_my_raffle_history()',uid=buyer,error='Accepted club membership required')
-        print('PASS: self-only bounded raffle history, exact personal ticket totals, accepted-member gating and revoked access')
+        assert json.loads(call('select public.read_my_raffle_history()',uid=buyer))
+        print('PASS: self-only bounded raffle history and exact personal ticket totals for verified players')
         sql("update khub_bot.catalog set name='colored-light &quot;necklace&quot;' where id=2")
         assert sql('select name from khub_bot.catalog where id=2')=='colored-light "necklace"'
         sql(f"update public.auctions set item='colored-light &quot;necklace&quot;' where id='{escrow}'")
@@ -981,6 +982,30 @@ with tempfile.TemporaryDirectory(prefix='khub-raffle-full-',dir='/tmp') as folde
         assert pair['old']==pair['new'],pair
         assert {'920000001','920000002','920000003'} <= {m['id'] for m in pair['new']['mails']}
         print('PASS: scoped state retains both isolated-attempt IDs and reviewed legacy evidence outside the observed inbox')
+        # Per-raffle audience: a verified nonmember sees and buys public raffles,
+        # while club-only raffles remain hidden and reject payment with a refund.
+        call("select public.remove_high_rollers_member('48889602')")
+        public_id=str(uuid4())
+        prizes='[{"id":2,"quantity":3,"probability_bps":10000}]'
+        call(f"select public.publish_mystery_raffle('{public_id}','Open raffle',100,now()+interval '1 day',{lit(prizes)}::jsonb,'public')")
+        assert call(f"select audience from public.mystery_raffles where id='{public_id}'")=='public'
+        assert call(f"select count(*) from public.mystery_raffles where id='{public_id}'",uid=buyer)=='1'
+        assert call(f"select count(*) from public.mystery_raffle_prizes where raffle_id='{public_id}'",uid=buyer)=='1'
+        assert call(f"select public.can_view_raffle('{public_id}')",uid=buyer)=='t'
+        assert call(f"select public.read_raffle_fairness_summary('{public_id}')",uid=buyer)
+        private_id=create_raffle()
+        assert call(f"select count(*) from public.mystery_raffles where id='{private_id}'",uid=buyer)=='0'
+        assert call(f"select public.can_view_raffle('{private_id}')",uid=buyer)=='f'
+        call(f"select public.read_raffle_fairness_summary('{private_id}')",uid=buyer,error='Raffle access required')
+        public_mail=mail(public_id,meat=100)
+        assert ingest(public_mail)=='raffle_tickets'
+        assert ingest(public_mail)=='duplicate'
+        assert sql(f"select count(*) from khub_bot.raffle_purchases where receipt_id='{public_mail['id']}'")=='1'
+        private_mail=mail(private_id,meat=100)
+        assert ingest(private_mail)=='raffle_refund'
+        assert sql(f"select count(*) from khub_bot.raffle_purchases where receipt_id='{private_mail['id']}'")=='0'
+        assert sql(f"select sum(meat) from khub_bot.deliveries where receipt_id='{private_mail['id']}' and kind='refund'")=='100'
+        print('PASS: public entry accepts verified nonmembers; club-only entry hides details and refunds payments')
         print('PASS: full-schema lifecycle and isolation: identical items, concurrent auction/raffle Meat, exact solvency, proof guards, retries, restarts, cancellation and schema permissions')
     finally:
         if started: pg('-m','immediate','-w','stop')

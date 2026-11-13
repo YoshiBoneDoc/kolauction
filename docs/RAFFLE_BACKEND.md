@@ -43,6 +43,12 @@ production SQL, real purchase or asset transfer was performed.
 
 ## UI and privacy
 
+Queued migration 243 adds a creation-time audience choice: public entry for
+verified kHub players or accepted MMG club members only. Existing raffles remain
+club-only. Row policies hide club-only raffles from nonmembers; locked KMail intake
+accepts tickets only from eligible players and refunds rejected payments. Personal
+ticket history remains self-only. Apply 243 before deploying the new creation UI.
+
 Detail pages show private ticket ranges/history and cancellation refund status.
 Home/browse cards fetch only the signed-in player's counts in one bounded RPC.
 Auth changes discard visibility of previous private counts. Management is protected
