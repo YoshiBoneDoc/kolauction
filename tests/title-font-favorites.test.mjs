@@ -27,7 +27,13 @@ test('favorites persist, preview joins history, Previous and Reset restore origi
         let tree;
         function render() { cursor = 0; tree = nodes(module.exports.default({ titleRef })); while (effects.length) { const cleanup = effects.shift()(); if (cleanup) cleanups.push(cleanup); } }
         function button(label) { return tree.find(n => n.type === 'button' && n.props['aria-label'] === label); }
-        render(); await button('Favorite font').props.onClick(); render();
+        render();
+        // The first preview starts automatically and remains in history.
+        await new Promise(resolve => setImmediate(resolve)); render();
+        assert.equal(style.fontFamily, '"Example"');
+        assert.equal(button('Previous font').props.disabled, false);
+        await button('Restore Newsreader').props.onClick(); render();
+        await button('Favorite font').props.onClick(); render();
         assert.deepEqual(JSON.parse(stored.get('khub.title-font-favorites.v1')), ['Newsreader']);
         assert.equal(button('Remove favorite').props['aria-pressed'], true);
         await button('Random font').props.onClick(); render();
@@ -42,6 +48,23 @@ test('favorites persist, preview joins history, Previous and Reset restore origi
         await button('Restore Newsreader').props.onClick(); render();
         assert.equal(style.fontWeight, '500');
         assert.equal(button('Previous font').props.disabled, true);
+        // Deterministic choices verify full cycles independently of navigation history.
+        fontApi.fontCatalog = async () => ['Newsreader', 'A', 'B', 'C'];
+        fontApi.randomFamily = choices => choices[0] ?? null;
+        await button('Random font').props.onClick(); render();
+        assert.equal(style.fontFamily, '"A"');
+        await button('Previous font').props.onClick(); render();
+        await button('Random font').props.onClick(); render();
+        assert.equal(style.fontFamily, '"B"');
+        await button('Restore Newsreader').props.onClick(); render();
+        await button('Random font').props.onClick(); render();
+        assert.equal(style.fontFamily, '"C"');
+        const nextCycle = [];
+        for (let i = 0; i < 4; i++) {
+            await button('Random font').props.onClick(); render();
+            nextCycle.push(style.fontFamily);
+        }
+        assert.deepEqual(nextCycle, ['"Newsreader"', '"A"', '"B"', '"C"']);
         for (const cleanup of cleanups) cleanup();
         assert.equal(style.fontFamily, undefined);
         assert.deepEqual(JSON.parse(stored.get('khub.title-font-favorites.v1')), ['Example']);

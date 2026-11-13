@@ -178,8 +178,8 @@ export function createAuctionService(client, { publicReader = null, readDeadline
             if (data?.privacy_version !== 1) throw Object.assign(new Error('Auctions are temporarily unavailable while a privacy update is being completed. Please try again later.'), { code: 'KHUB_PRIVACY' });
             if (!Array.isArray(data.rows) || !Array.isArray(data.bids)
                 || !Number.isSafeInteger(Number(data.total)) || Number(data.total) < 0
-                || (view === 'home' && (!data.sections || ['popular', 'new', 'ending', 'highRollers', 'recent'].some(key => !Array.isArray(data.sections[key]) || data.sections[key].length > 24)))
-                || (view === 'home' ? data.rows.length > 120 : ['browse', 'seller'].includes(view) && data.rows.length > 24)) {
+                || (view === 'home' && (!data.sections || [...new Set(['popular', 'new', 'ending', 'highRollers', 'recent', ...Object.keys(data.sections)])].some(key => !Array.isArray(data.sections[key]) || data.sections[key].length > 24)))
+                || (view === 'home' ? data.rows.length > 336 : ['browse', 'seller'].includes(view) && data.rows.length > 24)) {
                 throw new Error('The auction list could not be verified. Please retry shortly.');
             }
             observeAuctionServerTime(data.server_time, requestStartedAt);

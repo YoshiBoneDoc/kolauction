@@ -106,7 +106,7 @@ export function publicProjection(data, request) {
     }
     if (data?.privacy_version !== 1 || !Array.isArray(data.rows) || !Array.isArray(data.bids)
         || data.bids.length || !Number.isSafeInteger(Number(data.total)) || Number(data.total) < 0
-        || !Number.isFinite(Date.parse(data.server_time)) || data.rows.length > (['home', 'batch-live'].includes(request.view) ? 120 : 24)) {
+        || !Number.isFinite(Date.parse(data.server_time)) || data.rows.length > (request.view === 'home' ? 336 : request.view === 'batch-live' ? 336 : 24)) {
         throw new Error('Invalid public snapshot.');
     }
     const pick = (value, keys) => Object.fromEntries(keys.filter(key => Object.hasOwn(value, key)).map(key => [key, value[key]]));
@@ -123,7 +123,9 @@ export function publicProjection(data, request) {
         const totals = parseSiteTradeTotals(data.site_totals);
         if (totals) result.site_totals = totals;
         const ids = new Set(rows.map(row => row.id));
-        result.sections = Object.fromEntries(['popular', 'new', 'ending', 'highRollers', 'recent'].map(key => {
+        result.sections = Object.fromEntries(['popular', 'new', 'ending', 'highRollers', 'recent',
+            ...['popular', 'new', 'ending'].flatMap(tab => ['buy', 'direct', 'escrow'].map(type => `${tab}_${type}`))
+                .filter(key => data.sections?.[key] !== undefined)].map(key => {
             const values = data.sections?.[key];
             if (!Array.isArray(values) || values.length > 24 || values.some(id => !ids.has(id))) throw new Error('Invalid public section.');
             return [key, values];

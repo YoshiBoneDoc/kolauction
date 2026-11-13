@@ -128,7 +128,7 @@ export function createPublicAuctionReader(client, { enabled = false, fetch: fetc
             }
             const data = await response.json();
             if (data?.shared_cache_version !== 1 || data?.privacy_version !== 1 || !Array.isArray(data.rows)
-                || data.rows.length > (request.view === 'home' ? 120 : 24)) {
+                || data.rows.length > (request.view === 'home' ? 336 : 24)) {
                 throw Object.assign(new Error('The public auction snapshot could not be verified.'), { code: 'KHUB_PRIVACY' });
             }
             request.signal?.throwIfAborted();

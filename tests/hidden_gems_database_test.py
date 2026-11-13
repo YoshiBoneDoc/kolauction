@@ -41,6 +41,7 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
             create table auth.identities(id uuid primary key,provider_id text,user_id uuid references auth.users(id) on delete cascade,
                 identity_data jsonb,provider text,created_at timestamptz,updated_at timestamptz);
             create table auth.sessions(id uuid primary key,user_id uuid references auth.users(id) on delete cascade);
+            create table auth.mfa_amr_claims(id uuid primary key,session_id uuid references auth.sessions(id),authentication_method text,created_at timestamptz,updated_at timestamptz);
             create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
             grant usage on schema public,auth to anon,authenticated,service_role;
             grant execute on function auth.uid() to anon,authenticated;
@@ -51,7 +52,7 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
         
         financial_probe="""select jsonb_object_agg(p.oid::regprocedure::text,pg_get_functiondef(p.oid)) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname in ('public','khub_bot') and p.prokind='f' and p.proname in ('bot_ingest_mail','bot_tick','bot_claim_delivery','bot_ack_delivery','finish_listing','finish_buy_order','bot_liabilities');"""
         for migration in migrations:
-            if migration.name=='202611030180_hidden_gems.sql':
+            if migration.name=='202611130258_home_explore_fallback.sql':
                 before_projection=sql(financial_probe)
             sql(migration.read_text())
         assert before_projection==sql(financial_probe), 'Financial definitions changed'
@@ -102,7 +103,12 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
             quote=next(r for r in values['rows'] if r['id']==best)
             assert quote['deal_market_value_meat']=='100000' and quote['deal_checked_at']
         home=json.loads(sql('select public.read_public_home_auctions();'))
-        assert home['sections']['popular']==[giveaway,best,lesser],home['sections']
+        assert home['sections']['popular'][:3]==[giveaway,best,lesser],home['sections']
+        cards=json.loads(sql('select public.read_home_cards();'))
+        assert cards['sections']['popular'][:3]==[giveaway,best,lesser],cards['sections']
+        assert set(cards['sections']['popular'])=={giveaway,best,lesser,urgent,tiny,stale,missing}
+        assert cards['sections']['popular_buy']==[]
+        assert cards['sections']['popular_direct']==cards['sections']['popular']
         # Build alternative composite inputs without changing funded rows or guards.
         def score(patch):
             return float(sql(f"select khub_bot.deal_score(jsonb_populate_record(a,{lit(json.dumps(patch))}::jsonb)) from public.auctions a where id='{best}';"))
@@ -121,6 +127,17 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
         sql(f"insert into public.auctions(seller_id,seller_username,item,quantity,min_bid_meat,duration_hours,end_time,status) select '{owner}','Traffic Seller','No quote '||n,1,100,24,now()+interval '48 hours','active' from generate_series(1,30) n;")
         assert [r['id'] for r in read('recommended')['rows']][:4]==[giveaway,urgent,best,lesser]
         assert len(read('recommended')['rows'])==24
+        # Category pools remain available even when the global selection is full.
+        sql(f"insert into public.auctions(seller_id,seller_username,item,item_id,quantity,min_bid_meat,duration_hours,end_time,status,auction_kind,escrow_mode,seller_kol_id) select '{owner}','Traffic Seller','Buy fixture '||n,catalog_id,1,80000,24,now()+interval '24 hours','active','buy',true,48889801 from (select id as catalog_id,row_number() over(order by id) n from khub_bot.catalog where is_current and tradeable order by id limit 26) fixture;")
+        cards=json.loads(sql('select public.read_home_cards();'))
+        for tab in ['popular','new','ending']:
+            assert len(cards['sections'][tab+'_buy'])==24,cards['sections']
+            assert len(cards['sections'][tab])==24
+            assert all(next(r for r in cards['rows'] if r['id']==ident)['auction_kind']=='buy' for ident in cards['sections'][tab+'_buy'])
+        live=json.loads(sql("select public.read_public_auction_live_batch(array(select id from public.auctions));"))
+        assert len(live['rows'])==63
+        sql("select public.read_public_auction_live_batch(array_fill(gen_random_uuid(),array[336]));")
+        sql("select public.read_public_auction_live_batch(array_fill(gen_random_uuid(),array[337]));",error='at most 336')
         assert sql(financial_probe)==before_projection
         print('PASS: public/private Discover, Hidden Gems selection, thresholds, next bid/buyout, Buy offers, partial bundles, stale/missing estimates, pagination and unchanged financial definitions.')
     finally:

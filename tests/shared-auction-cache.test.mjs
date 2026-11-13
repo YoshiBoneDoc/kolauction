@@ -936,3 +936,18 @@ test('live queue reuse retains conservative timestamps and is disabled for legac
     f.cache.env.LIVE_AUCTION_STATE='false';
     assert.equal(f.cache.cachedLiveEntry(query),null);
 });
+
+test('Home transports bounded per-type selections and rejects oversized sections or live batches', () => {
+    const input = source();
+    input.rows = Array.from({ length: 130 }, (_, index) => ({ ...input.rows[0], id: `fixture-${index}` }));
+    input.total = 130;
+    input.sections = { popular: [], new: [], ending: [], highRollers: [], recent: [], popular_buy: input.rows.slice(120).map(row => row.id) };
+    const result = publicProjection(input, { view: 'home' });
+    assert.deepEqual(result.sections.popular_buy, input.sections.popular_buy);
+    assert.equal(result.rows.length, 130);
+    assert.doesNotMatch(JSON.stringify(result), /PRIVATE|SECRET/);
+    input.sections.popular_buy = input.rows.slice(0, 25).map(row => row.id);
+    assert.throws(() => publicProjection(input, { view: 'home' }), /Invalid public section/);
+    input.rows = Array.from({ length: 337 }, () => source().rows[0]);
+    assert.throws(() => publicProjection(input, { view: 'batch-live' }));
+});

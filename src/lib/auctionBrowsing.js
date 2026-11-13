@@ -104,7 +104,6 @@ export function exploreAuctions(auctions, tab = 'popular', now = Date.now(), typ
         ? auction.auctionKind === 'buy'
         : auction.auctionKind !== 'buy' && auction.escrowMode === (type === 'escrow'));
     return browseAuctions(pool, { sort, now }).filter(auction => {
-        if (sort === 'best-value' && !auction.giveawayTitle && dealScore(auction, now) <= 0) return false;
         const key = auction.itemId != null ? `id:${auction.itemId}` : `name:${auction.item.trim().toLocaleLowerCase()}`;
         if (seen.has(key)) return false;
         seen.add(key);

@@ -342,3 +342,42 @@ bot SQL copy exists. Stop the sole worker to apply once after 253, then resume;
 no bot/site rebuild. Extended disposable Buy-message regression passed template
 parity, queued wording and financial/frozen/uncertain/sent preservation. Not applied
 to production; personal quickstart unchanged.
+
+November 13 Home Explore fallback: queued **258** (after 257) keeps qualifying
+Hidden Gems first and fills remaining slots with other active listings. Each
+Explore tab now selects up to 24 unique items independently for All/Buy/Direct/
+Escrow, preventing the global selection from starving a category. Existing
+visibility, public projection and financial functions remain intact. The bounded
+Home union/live read grows from 120 to 336 rows; public batch requests remain
+limited to 24. Existing cache cadence, serialized reads and polling are unchanged.
+Deploy the website and separate public-cache Worker after applying 258 once;
+matching ignored bot SQL copy exists, with no bot runtime change required.
+Targeted JavaScript tests, disposable database regression, changed-source lint
+and build passed locally. No production SQL or deployment performed.
+
+November 13 title-font finalists: Home's existing active-font-poll toolbar now
+chooses a random font on mount and shuffles only the 13 finalists from the owner's
+screenshots: ten hearted families plus Newsreader, Stack Sans Text and Comic Sans
+MS. The Wingdings April Fools aside is excluded. Heart writes, previous/reset and
+poll gating stay intact. No full font-catalog fetch remains; Comic Sans uses local
+system fonts with a cursive fallback. Five focused tests, changed-source lint and
+build passed. Website deployment only; no SQL or production action performed.
+
+Title toolbar follow-up: signed-in Home controls no longer require an active font
+poll or a successful poll feed/action. Missing/concluded font polls use the existing
+local favorites; active polls retain shared heart writes. Poll refreshes no longer
+key/remount the toolbar, preserving font history and shuffle cycle. Empty poll
+panels remain hidden. 35 focused tests, changed-source lint and build passed;
+production feed state and deployment remain unverified.
+
+November 13 shortlisted-font results: queued **259** (after 258/247) starts a fresh
+13-font round, preserving the concluded poll's hearts and written responses. The
+existing private feed includes a dedicated active shortlist pointer, so toolbar
+hearts do not depend on the ordinary question queue. Existing authorized writes
+retain account dedupe/unheart and closed-poll checks, plus a shortlist whitelist.
+Admin → Polls shows ranked heart counts (also after conclusion), including polls
+without written responses; the signed-in admin Home links to the round. Existing
+inbox rankings remain intact. Browser-local favorites are not imported as votes.
+Apply SQL once then deploy website; matching ignored bot copy exists, no bot/cache
+Worker runtime change. 37 focused Node tests, disposable free-text/font-heart SQL
+regressions, lint, build and secret scan passed. Nothing applied or deployed live.

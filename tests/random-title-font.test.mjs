@@ -1,10 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { googleFontFamilies, randomFamily, fontPollActive, fontCatalog } from '../src/lib/randomTitleFont.js';
+import { titleFontShortlist, randomFamily, fontPollActive, fontCatalog, activeFontPoll } from '../src/lib/randomTitleFont.js';
 
-test('catalog includes all eligible Google families and excludes non-Latin and non-Google entries', () => {
-    const row = { family: 'Example', type: 'google', subsets: ['latin'], styles: ['normal'] };
-    assert.deepEqual(googleFontFamilies([row, row, { ...row, family: 'Other' }, { ...row, type: 'other' }, { ...row, subsets: ['arabic'] }]), ['Example', 'Other']);
+test('shortlist contains the suggestions, current title and all ten hearted finalists', async () => {
+    assert.equal(titleFontShortlist.length, 13);
+    assert.equal(new Set(titleFontShortlist).size, 13);
+    for (const name of ['Newsreader', 'Comic Sans MS', 'Stack Sans Text', 'Jersey 25 Charted', 'Mynerve']) {
+        assert.ok(titleFontShortlist.includes(name));
+    }
+    assert.ok(!titleFontShortlist.includes('Wingdings'));
+    assert.equal(await fontCatalog(), titleFontShortlist);
 });
 test('random selection never repeats the current family', () => {
     assert.equal(randomFamily(['A', 'B'], 'A', () => 0), 'B');
@@ -18,12 +23,16 @@ test('only active font polls enable previews, including answered and skipped pol
     assert.equal(fontPollActive({ poll: { active: true, question: 'Auction fees?' } }), false);
     assert.equal(fontPollActive(null), false);
 });
-test('catalog is fetched lazily and coalesced in browser memory', async () => {
+test('shortlist needs no external catalog request', async () => {
     const original = globalThis.fetch;
-    let calls = 0;
-    globalThis.fetch = async () => { calls++; return { ok: true, json: async () => [{ family: 'Example', type: 'google', subsets: ['latin'], styles: ['normal'] }] }; };
-    try {
-        const [a, b] = await Promise.all([fontCatalog(), fontCatalog()]);
-        assert.equal(calls, 1); assert.deepEqual(a, ['Example']); assert.deepEqual(b, a);
-    } finally { globalThis.fetch = original; }
+    globalThis.fetch = () => { throw new Error('Unexpected catalog request'); };
+    try { assert.deepEqual(await fontCatalog(), titleFontShortlist); }
+    finally { globalThis.fetch = original; }
+});
+
+test('dedicated shortlist round takes priority over other active font polls', () => {
+    const original = {id:'original',active:true,question:'What font do you prefer?'};
+    const shortlist = {id:'shortlist',active:true,question:'Which shortlisted fonts do you prefer?'};
+    assert.equal(activeFontPoll({poll:original,font_poll:shortlist}).id,'shortlist');
+    assert.equal(activeFontPoll({poll:original,font_poll:{...shortlist,active:false}}).id,'original');
 });

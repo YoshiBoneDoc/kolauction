@@ -151,7 +151,7 @@ export function PollPanel({ service = polls, featuredTarget, fontTarget, titleRe
         setSelectedResult(results[(resultIndex + direction + results.length) % results.length].id);
     }
     const question = !isAdmin && poll?.active && !poll.has_voted ? poll : null;
-    if (!question && !answered.length && !published.length && !minimized.length && !feed?.can_manage && !error && !notice) return null;
+    const hasPanelContent = question || answered.length || published.length || minimized.length || feed?.can_manage || error || notice;
     const questionPanel = question && <section aria-label="Community poll" className="mx-auto mb-4 w-full max-w-6xl">
         <div className="rounded-md border border-yellow-300 bg-yellow-100 px-3 py-3 text-slate-800">
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
@@ -182,7 +182,7 @@ export function PollPanel({ service = polls, featuredTarget, fontTarget, titleRe
             </form>}
         </div>
     </section>;
-    const panel = <section aria-label="Community poll results" className="mx-auto mb-4 w-full max-w-6xl space-y-2">
+    const panel = hasPanelContent ? <section aria-label="Community poll results" className="mx-auto mb-4 w-full max-w-6xl space-y-2">
         {notice && <p role="status" className="text-sm text-gray-600">{notice}</p>}
         {result && <article aria-label={`Results: ${result.question}`} className={`max-w-sm rounded-md border border-yellow-200 bg-yellow-50 px-3 text-slate-800 ${resultsHidden ? 'flex w-fit items-center gap-4 py-1.5' : 'py-3'}`}>
             <div className={`flex items-center justify-between gap-2 ${resultsHidden ? '' : 'mb-1'}`}>
@@ -229,18 +229,20 @@ export function PollPanel({ service = polls, featuredTarget, fontTarget, titleRe
         </div>)}
         {feed?.can_manage && <p className="text-sm"><Link to="/admin/polls" className="text-blue-800 underline">Manage polls &amp; view past results</Link></p>}
         {error && <p role="alert" className="text-sm text-red-800">{error}{' '}<button type="button" disabled={pending} onClick={() => setAttempt(value => value + 1)} className="underline">Retry</button></p>}
-    </section>;
+    </section> : null;
+    if (!hasPanelContent && !(fontTarget?.current && titleRef)) return null;
     return <>
-        {fontTarget?.current && titleRef && !error && fontPoll && createPortal(<RandomTitleFont key={fontPoll.id} titleRef={titleRef}
-            heartedFonts={feed?.font_hearts?.[fontPoll.id] || []}
-            onHeart={async (family, hearted) => {
+        {fontTarget?.current && titleRef && createPortal(<RandomTitleFont titleRef={titleRef}
+            heartedFonts={fontPoll ? feed?.font_hearts?.[fontPoll.id] || [] : undefined}
+            onHeart={fontPoll ? async (family, hearted) => {
                 if (writing.current) throw new Error('Another poll action is pending.');
                 writing.current = true; generation.current += 1;
                 try {
                     const fonts = await service.heartFont(fontPoll.id, family, hearted);
                     setFeed(previous => ({ ...previous, font_hearts: { ...previous.font_hearts, [fontPoll.id]: fonts } }));
                 } finally { writing.current = false; }
-            }} />, fontTarget.current)}
+            } : undefined} />, fontTarget.current)}
+        {isAdmin && fontPoll && <p className="text-right text-xs"><Link to={`/admin/polls#poll-${fontPoll.id}`} className="text-blue-700 underline">View font heart results</Link></p>}
         {questionPanel && (featuredTarget?.current ? createPortal(questionPanel, featuredTarget.current) : questionPanel)}
         {panel}
     </>;

@@ -16,7 +16,7 @@ export default function ExploreAuctions({ auctions, sections, now, children }) {
     const [selected, setSelected] = useState(savedTab);
     const [type, setType] = useState('all');
     const buttons = useRef([]);
-    const displayed = useMemo(() => exploreAuctions(sections?.[selected] || auctions, selected, now, type).slice(0, 24), [auctions, sections, selected, now, type]);
+    const displayed = useMemo(() => exploreAuctions(sections?.[type === 'all' ? selected : `${selected}_${type}`] || auctions, selected, now, type).slice(0, 24), [auctions, sections, selected, now, type]);
     const typeQuery = type === 'buy' ? '&kind=buy' : type === 'all' ? '' : `&kind=sell&trade=${type}`;
     const tab = exploreAuctionTabs.find(option => option.id === selected);
     useEffect(() => {
@@ -52,7 +52,7 @@ export default function ExploreAuctions({ auctions, sections, now, children }) {
         </div>}>
         {children}
         {type !== 'all' && displayed.length === 0 && <p className="text-sm text-gray-500">No matching auctions in this Explore selection. Try another type or see all auctions.</p>}
-        {type === 'all' && selected === 'popular' && displayed.length === 0 && <p className="text-sm text-gray-500">No qualifying Hidden Gems right now. Try New or Ending Soon.</p>}
+        {type === 'all' && selected === 'popular' && displayed.length === 0 && <p className="text-sm text-gray-500">No active auctions right now.</p>}
     </StaticAuctionStrip>;
 }
 ExploreAuctions.propTypes = { auctions: PropTypes.arrayOf(PropTypes.object).isRequired,

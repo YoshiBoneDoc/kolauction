@@ -9,6 +9,7 @@ export default function UpdateLog() {
         <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-4 py-8 sm:px-6">
             <h1 className="text-3xl font-bold text-blue-700">Update Log</h1>
             <ul className="list-disc space-y-4 pl-5 text-gray-700">
+                <li>Introduced periodic public Mystery Raffles.</li>
                 <li>Sellers can now optionally accept Mr. A&apos;s alongside Meat, with a custom exchange rate within ±5% of market value, locked at auction creation.</li>
                 <li>Hosts can still bookmark their own auctions, but their bookmarks no longer count toward the publicly displayed total.</li>
                 <li>Quotation marks in item names should now display correctly.</li>

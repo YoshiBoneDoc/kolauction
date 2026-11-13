@@ -31,8 +31,7 @@ This is a large project. Minimize unnecessary token consumption without compromi
 - Inspect only relevant files, avoid repository-wide audits for small changes, and run targeted tests to substantially reduce usage.
 - Avoid redundant file reads, commands, tests, and lengthy explanations.
 - Consult existing project documentation rather than rediscovering or duplicating information.
-- Keep changes focused and avoid unrelated refactoring.
-
+- 
 ## Debugging and Performance
 
 - Investigate root causes, not just symptoms.

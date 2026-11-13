@@ -334,3 +334,31 @@ test('admin can enable several answers on a multiple-choice draft',async()=>{
  await nodes(h.tree).find(n=>n.type==='form').props.onSubmit({preventDefault(){}});
  assert.deepEqual(calls,[['Which features should we add?',null,'multiple_choice',true,['Search','Filters']]]);
 });
+
+
+test('font toolbar survives missing font polls and feed errors, with shared hearts only for active polls', async () => {
+ const props = {fontTarget:{current:{name:'fonts'}},titleRef:{current:{style:{}}}};
+ const fontPoll = {...poll, id:'font-poll', question:'Which font for the title?',poll_type:'free_text'};
+ for (const value of [feed(null), feed(poll), {...feed(fontPoll),font_hearts:{'font-poll':['Mynerve']}}]) {
+  const h = harness({read:async()=>value}, PollPanel, props);
+  await h.load();
+  const toolbar = nodes(h.tree).find(node=>node.props?.['data-placement']==='fonts');
+  assert.ok(toolbar);
+  assert.equal(typeof toolbar.props.onHeart, value.poll?.id==='font-poll'?'function':'undefined');
+  if (value.poll?.id==='font-poll') assert.deepEqual(toolbar.props.heartedFonts,['Mynerve']);
+ }
+ const h = harness({read:async()=>{throw Error('Feed unavailable');}},PollPanel,props);
+ await h.load();
+ assert.ok(nodes(h.tree).find(node=>node.props?.['data-placement']==='fonts'));
+});
+
+test('admin font ranking is available without written responses and after conclusion', async () => {
+ const record={id:'shortlist',question:'Which shortlisted title fonts do you prefer?',poll_type:'free_text',font_shortlist_round:true,
+  published_at:'2026-11-13T12:00:00Z',active:false,closed_at:'2026-11-14T12:00:00Z',results:{total:0},
+  font_hearts:[{family:'Mynerve',hearts:3},{family:'Newsreader',hearts:1}]};
+ const h=harness({list:async()=>[record]},PollManager);await h.load();
+ assert.match(h.html(),/Shortlisted font hearts/);
+ assert.match(h.html(),/Mynerve/);assert.match(h.html(),/♥ 3/);
+ assert.match(h.html(),/Voting has concluded; saved counts remain available/);
+ assert.ok(nodes(h.tree).some(node=>node.props?.id==='poll-shortlist'));
+});

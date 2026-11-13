@@ -32,7 +32,7 @@ test('Discover keeps urgency while Hidden Gems ranks value; giveaways lead both 
         { ...base, id: 'cheap', dealMarketValueMeat: 1000, minBidMeat: 1 },
     ].map((a, i) => ({ ...a, itemId: i + 1 }));
     assert.deepEqual(browseAuctions(pool, { sort: 'recommended', now }).map(a => a.id), ['giveaway', 'urgent', 'gem', 'lesser', 'unknown', 'cheap']);
-    assert.deepEqual(exploreAuctions(pool, 'popular', now).map(a => a.id), ['giveaway', 'gem', 'lesser']);
+    assert.deepEqual(exploreAuctions(pool, 'popular', now).map(a => a.id), ['giveaway', 'gem', 'lesser', 'unknown', 'cheap', 'urgent']);
     assert.deepEqual(browseAuctions(pool, { sort: 'best-value', now }).map(a => a.id).slice(0, 3), ['giveaway', 'gem', 'lesser']);
 });
 
@@ -69,4 +69,17 @@ test('Explore types filter before per-item selection and preserve Buy as a separ
         assert.deepEqual(exploreAuctions(pool, tab, now, 'buy').map(a => a.id), ['buy']);
         assert.equal(exploreAuctions(pool, tab, now, 'all').length, 1);
     }
+});
+
+ test('Explore appends nonqualifying Buy orders after gems and excludes inactive orders', () => {
+    const buy = { ...base, auctionKind: 'buy', escrowMode: true, pricePerItem: 80000 };
+    const pool = [
+        { ...buy, id: 'fallback', itemId: 2, createdAt: now },
+        { ...buy, id: 'qualified', itemId: 1, pricePerItem: 120000 },
+        { ...buy, id: 'duplicate', itemId: 1 },
+        { ...buy, id: 'expired', itemId: 3, status: 'expired', endTime: now - 1 },
+        { ...base, id: 'sell', itemId: 4 },
+    ];
+    assert.deepEqual(exploreAuctions(pool, 'popular', now, 'buy').map(a => a.id), ['qualified', 'fallback']);
+    assert.deepEqual(exploreAuctions([pool[0]], 'popular', now, 'buy').map(a => a.id), ['fallback']);
 });

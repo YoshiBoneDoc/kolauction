@@ -198,6 +198,32 @@ with tempfile.TemporaryDirectory(prefix='khub-text-polls-',dir='/tmp') as folder
         call(f"select public.close_home_poll('{font_poll}');")
         call(f"select public.set_poll_font_heart('{font_poll}','Newsreader',true);",first,error='closed')
         assert font_poll not in feed(first)['font_hearts']
+        # A fresh shortlist round collects separately, even with older polls in the queue.
+        before_hearts=sql('select jsonb_agg(to_jsonb(h) order by poll_id,voter_id,family) from khub_bot.poll_font_hearts h;')
+        sql(next(p for p in migrations if '259_shortlist_font_hearts' in p.name).read_text())
+        shortlist='a6b64bd4-b96e-48f4-971a-5062c8ba3391'
+        assert before_hearts==sql('select jsonb_agg(to_jsonb(h) order by poll_id,voter_id,family) from khub_bot.poll_font_hearts h;')
+        assert feed(first)['font_poll']['id']==shortlist
+        assert feed(first)['font_hearts'].get(shortlist,[])==[]
+        def shortlist_heart(uid,family='Mynerve',value=True):
+            return call(f"select public.set_poll_font_heart('{shortlist}',{lit(family)},{str(value).lower()});",uid)
+        shortlist_heart(first);shortlist_heart(first);shortlist_heart(second)
+        shortlist_heart(second,'Newsreader')
+        call(f"select public.set_poll_font_heart('{shortlist}','Example',true);",first,error='shortlisted')
+        call('select public.read_admin_polls();',first,error='Administrator')
+        def admin_round():
+            return next(p for p in json.loads(call('select public.read_admin_polls();')) if p['id']==shortlist)
+        expected=[{'family':'Mynerve','hearts':2},{'family':'Newsreader','hearts':1}]
+        assert admin_round()['font_hearts']==expected
+        assert sql(f"select count(*) from khub_bot.bug_reports where poll_id='{shortlist}';")=='0'
+        assert feed(first)['font_hearts'][shortlist]==['Mynerve']
+        assert feed(second)['font_hearts'][shortlist]==['Mynerve','Newsreader']
+        shortlist_heart(first,value=False)
+        call(f"select public.close_home_poll('{shortlist}');")
+        assert feed(first)['font_poll'] is None
+        assert admin_round()['font_hearts']==[{'family':'Mynerve','hearts':1},{'family':'Newsreader','hearts':1}]
+        call(f"select public.set_poll_font_heart('{shortlist}','Mynerve',true);",first,error='closed')
+        print('PASS: fresh shortlist hearts, queue-independent toolbar, admin-only ranking without text responses, dedupe/unheart, whitelist and preserved closed results')
         print('PASS: shared font hearts deduplicate accounts, unheart idempotently, rank correctly, remain private and reject closed/non-font polls')
         print('PASS: private free-text polls, ordered mixed queues, optional repeat responses, idempotent/concurrent retries, per-poll inbox grouping/status/category changes, privacy, size/abuse limits, unchanged Yes/No history and zero KMail/financial side effects')
     finally:

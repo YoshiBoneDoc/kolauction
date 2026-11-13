@@ -15,36 +15,51 @@ export default function RandomTitleFont({ titleRef, heartedFonts, onHeart }) {
     const generation = useRef(0);
     const activeLink = useRef(null);
     const working = useRef(false);
+    const shownFonts = useRef(new Set());
     const current = history[history.length - 1];
     useEffect(() => () => {
         generation.current++;
+        working.current = false;
         activeLink.current?.remove();
         titleRef.current?.style.removeProperty('font-family');
         titleRef.current?.style.removeProperty('font-weight');
     }, [titleRef]);
+    useEffect(() => {
+        void preview('initial');
+        // Pick once on mount; subsequent changes use the toolbar.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
     async function preview(mode, favorite) {
         if (working.current) return;
         working.current = true; setBusy(true); setError('');
         const request = ++generation.current;
+        const random = mode === 'random' || mode === 'initial';
         try {
             let family, link;
-            const failed = new Set([current]);
-            for (let attempt = 0; attempt < (mode === 'random' ? 4 : 1); attempt++) {
+            const families = random ? await fontCatalog() : [];
+            // Keep cycle progress separate from Previous/Reset navigation history.
+            const cycle = new Set(shownFonts.current);
+            if (random && families.every(name => cycle.has(name))) cycle.clear();
+            const failed = new Set(mode === 'initial' ? [] : [current]);
+            for (let attempt = 0; attempt < (random ? 4 : 1); attempt++) {
                 family = mode === 'favorite' ? favorite : mode === 'reset' ? 'Newsreader' : mode === 'previous' ? history[history.length - 2]
-                    : randomFamily((await fontCatalog()).filter(name => !failed.has(name)), current);
+                    : randomFamily(families.filter(name => !cycle.has(name) && !failed.has(name)), mode === 'initial' ? null : current);
                 if (!family) throw new Error('No fonts available');
                 try { link = family === 'Newsreader' ? null : await loadTitleFont(family); break; }
-                catch (failure) { failed.add(family); if (attempt === (mode === 'random' ? 3 : 0)) throw failure; }
+                catch (failure) { failed.add(family); if (attempt === (random ? 3 : 0)) throw failure; }
             }
             if (generation.current !== request) { link?.remove(); return; }
+            if (random) shownFonts.current = cycle;
+            shownFonts.current.add(family);
             activeLink.current?.remove(); activeLink.current = link;
             if (titleRef.current) {
-                titleRef.current.style.fontFamily = JSON.stringify(family);
+                titleRef.current.style.fontFamily = family === 'Comic Sans MS'
+                    ? '"Comic Sans MS", "Comic Sans", cursive' : JSON.stringify(family);
                 titleRef.current.style.fontWeight = family === 'Newsreader' ? '500' : '400';
             }
             setHistory(previous => mode === 'reset' ? ['Newsreader'] : mode === 'previous' ? previous.slice(0, -1) : [...previous, family]);
         } catch { if (generation.current === request) setError('Font unavailable. Please try again.'); }
-        finally { working.current = false; if (generation.current === request) setBusy(false); }
+        finally { if (generation.current === request) { working.current = false; setBusy(false); } }
     }
     const saved = (heartedFonts || favorites).includes(current);
     async function heart() {
