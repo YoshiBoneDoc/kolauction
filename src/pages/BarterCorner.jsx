@@ -23,8 +23,10 @@ export default function BarterCorner() {
     const now = useAuctionBoundaryNow(rows);
     function update(name, value) { setParams(previous => { const next = new URLSearchParams(previous); next.set(name, String(value)); if (name !== 'page') next.delete('page'); return next; }); }
     return <div className="barter-browse-page site-page-background flex flex-1 flex-col bg-[#F9F9F9] px-4 pb-8 sm:px-6"><main className="mx-auto flex w-full max-w-7xl flex-1 flex-col">
-        <h1 className="auction-page-title my-4 text-center font-bold text-[#7695FF]">Barter Corner</h1>
-        <Link to="/auction-item?kind=barter" className="mb-2 self-end text-xs text-blue-700 hover:underline dark:text-blue-300">Create Barter</Link>
+        <div className="relative my-4 flex items-center justify-between gap-3 sm:justify-center">
+            <h1 className="auction-page-title text-center font-bold text-[#7695FF]">Barter Corner</h1>
+            <Link to="/auction-item?kind=barter" className="shrink-0 text-sm text-blue-700 hover:underline dark:text-blue-300 sm:absolute sm:right-0">Create Barter <span aria-hidden="true">→</span></Link>
+        </div>
         <section aria-label="Find barter items" className="mb-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
             <div role="group" aria-label="Sort barter auctions" className="flex h-9 overflow-hidden rounded border border-gray-200 bg-white">
                 {[['ending', 'Ending Soon'], ['newest', 'Newest'], ['activity', 'Recent Activity']].map(([value, label]) => <button key={value} type="button" aria-pressed={sort === value} onClick={() => update('sort', value)} className={`h-full rounded-none border-0 border-r border-gray-200 px-2.5 py-1 text-xs font-medium last:border-r-0 ${sort === value ? 'bg-blue-50 text-blue-800' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>{label}</button>)}
