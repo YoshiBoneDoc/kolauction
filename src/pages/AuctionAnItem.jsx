@@ -444,7 +444,7 @@ export default function AuctionAnItem() {
                             aria-describedby={`bundle-title-help${bundleTitleConflict ? ' listing-error' : ''}`} className={fieldClass} />
                         <p id="bundle-title-help" className="-mt-2 mb-4 text-xs text-gray-600">Leave blank for an automatic title. Up to {MAX_BUNDLE_TITLE_LENGTH} characters.</p>
                     </>}
-                    {isBarter && <p className="mb-2 text-xs text-gray-600">What item would you like to sell? Minimum total market value: 40m Meat.</p>}
+                    {isBarter && <p className="mb-2 text-xs text-gray-600">Trade items for items and/or Meat. Required min value: 40m Meat</p>}
                     <div className="auction-item-quantity-grid"><div className="auction-item-search-field">
                     <label htmlFor="listing-item-search" className="mb-2 block text-sm font-bold">Item</label>
                     <input id="listing-item-search" type="search" value={itemSearch} onChange={(event) => setItemSearch(event.target.value)} placeholder="Start typing an item name…" aria-describedby={hasItemSearch ? 'listing-search-help' : undefined} className={fieldClass} />
