@@ -94,7 +94,11 @@ and seller financial statistics are reused without treating estimates as payment
 
 Both row types keep their existing classes, with a 20px barter symbol beside the
 item name and `/barter/:id` navigation. Bid actions go to the barter page rather
-than the ordinary bid form; ordinary relisting is suppressed for barters. Host
+than the ordinary bid form. Owner-only Relist buttons on cancelled/unsold barter
+rows open a new Direct barter draft with the original item, quantity, optional
+minimum and duration. No offers, winner, old deadline or financial state is copied;
+normal creation validation and confirmation still apply. Accepted trades awaiting
+settlement cannot be relisted. Host
 acceptance determines displayed leading values even if an own pending offer is
 worth more. This adds history visibility, not barter completion confirmations,
 financial reporting or leaderboard integration.

@@ -8,7 +8,7 @@ export default function RelistButton({ auction, now, subtle = false }) {
     const { currentUser } = useContext(UserContext);
     const location = useLocation();
     if (location.pathname === '/' || !canRelist(auction, currentUser, now)) return null;
-    return <Link to="/auction-item" state={{ relist: relistSnapshot(auction) }} aria-label={`Relist ${auction.item}`}
+    return <Link to={auction.auctionKind === 'barter' ? '/auction-item?kind=barter' : '/auction-item'} state={{ relist: relistSnapshot(auction) }} aria-label={`Relist ${auction.item}`}
         className={subtle
             ? 'relist-button profile-relist-action relative z-10 inline-flex shrink-0 items-center gap-1 text-[11px] font-medium leading-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500'
             : 'relist-button relative z-10 inline-flex shrink-0 items-center justify-center rounded-md border border-[#DDBDAA] bg-[#FFFAF7] px-2.5 py-1 text-[11px] font-medium leading-4 text-[#805238] transition-colors hover:border-[#BE947C] hover:bg-[#FFF0E6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'}>

@@ -155,6 +155,7 @@ export default function AuctionAnItem() {
         relistHandled.current = locationKey;
         const draft = relistDraft(state.relist);
         setAuctionKind(draft.kind);
+        if (draft.kind === 'barter') setGiveaway(false);
         setSelectedItem(draft.itemId); setItemSearch(draft.kind === 'bundle' ? '' : draft.itemSearch);
         setQuantity(draft.quantity); setMinBidMeat(draft.minimum);
         setInstantPrice(draft.buyout); setShowBuyout(Boolean(draft.buyout));

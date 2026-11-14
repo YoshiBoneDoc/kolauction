@@ -1,5 +1,17 @@
 # kHub handoff
 
+## November 14 barter relisting follow-up — local website change
+
+Profile/seller history Relist buttons now support owner-only cancelled/unsold
+barters using `/auction-item?kind=barter` and the existing listing snapshot flow.
+Drafts retain Direct barter type, item, quantity, optional minimum and duration;
+creation still revalidates current eligibility/prices and requires review/confirm.
+No offers, winner or old deadline is copied. Accepted trades awaiting settlement
+remain ineligible. This supersedes the earlier note excluding barter relisting.
+35 targeted relist/profile tests, changed-source lint and diff checks pass.
+Website deployment required; no additional SQL beyond history migration 286.
+Not deployed; personal quickstart unchanged.
+
 ## November 14 barter profile history — local, migration queued
 
 Queued **286** adds a unified profile/seller history RPC that adapts separate

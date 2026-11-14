@@ -94,3 +94,21 @@ test('bundle filter combines with buyout filtering and propagates to pagination 
     assert.equal(originRequest(yes).args.p_bundle, 'with'); assert.equal(originRequest(yes).args.p_buyout, 'any');
     assert.throws(() => publicRequest('https://test/api/public-auctions?bundle=invalid'));
 });
+
+
+test('barter relisting preserves Direct barter terms, optional minimum and duration without copying offers', () => {
+    const barter = { ...base, auctionKind: 'barter', escrowMode: false, auctionTime: undefined,
+        minBidMeat: 0, status: 'cancelled', createdAt: now - 72 * 3600000, endTime: now - 1 };
+    assert.equal(canRelist(barter, { id: 'owner' }, now), true);
+    assert.equal(canRelist(barter, { id: 'other' }, now), false);
+    assert.equal(canRelist(barter, { id: 'owner', isBanned: true }, now), false);
+    for (const status of ['active', 'awaiting_trade', 'settling'])
+        assert.equal(canRelist({ ...barter, status }, { id: 'owner' }, now), false);
+    const draft = relistDraft(relistSnapshot(barter));
+    assert.deepEqual([draft.kind, draft.itemId, draft.quantity, draft.minimum, draft.escrow, draft.buyout, draft.hours],
+        ['barter', '2', '50', '', false, '', 72]);
+    assert.equal(relistDraft({ ...barter, minBidMeat: 500 }).minimum, '500');
+    assert.equal(relistDraft({ ...barter, createdAt: now - 12.5 * 3600000 }).hours, 12.5);
+    for (const key of ['id', 'currentBid', 'winnerId', 'balanceMeat', 'endTime'])
+        assert.equal(Object.hasOwn(draft, key), false);
+});

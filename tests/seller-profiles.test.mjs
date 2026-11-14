@@ -414,7 +414,9 @@ test('barter seller-history rows retain the shared layout and use barter navigat
     assert.match(html, /public-profile-auction-row is-sell/);
     assert.match(html, /href="\/barter\/lot"/);
     assert.match(html, /aria-label="Barter"/);
-    assert.doesNotMatch(html, /href="\/auction\/lot"|aria-label="Relist/);
+    assert.doesNotMatch(html, /href="\/auction\/lot"/);
+    assert.match(html, /href="\/auction-item\?kind=barter"/);
+    assert.match(html, /aria-label="Relist Test lot"/);
 });
 
 test('account listing-history barter rows keep the shared styling and correct detail link', async () => {
@@ -424,5 +426,7 @@ test('account listing-history barter rows keep the shared styling and correct de
     assert.match(html, /profile-history-entry is-cancelled/);
     assert.match(html, /aria-label="Barter"/);
     assert.match(html, /href="\/barter\/lot"/);
-    assert.doesNotMatch(html, /href="\/auction\/lot"|aria-label="Relist/);
+    assert.doesNotMatch(html, /href="\/auction\/lot"/);
+    assert.match(html, /href="\/auction-item\?kind=barter"/);
+    assert.match(html, /aria-label="Relist Test lot"/);
 });
