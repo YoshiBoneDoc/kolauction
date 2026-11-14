@@ -1,5 +1,24 @@
 # kHub handoff
 
+## November 14 leaderboard split-fulfillment fix — local, migration queued
+
+Queued **284** counts one completed-trade credit per player per auction, including
+Buy hosts with multiple sellers and sellers submitting multiple paid fulfillments.
+Every eligible payment still contributes its full Meat volume. Pending/partially
+paid eligibility, Sell completion, donations, privacy, cooldown/locking and locked
+fee terms are unchanged. Historical rankings rebuild through normal discovery
+maintenance after installation; the migration expires the existing snapshot without
+running the historical aggregate during installation.
+
+Apply `supabase/migrations/queue/202611140284_leaderboard_unique_auction_trades.sql`
+once after verified 268 (compatible with 269–283). Matching ignored bot SQL is an
+alternative copy, not a second apply. No website/bot deployment or restart needed.
+Disposable leaderboard regression reproduces 100 split submissions and verifies
+per-player/per-auction counts, full values, multiple sellers/auctions, payment
+eligibility and maintenance; full-migration fee-engine regression also passes.
+Not applied to production; live recalculated rankings remain unverified. Personal
+quickstart unchanged.
+
 ## November 14 Barter Corner — local implementation, migration queued
 
 Queued **273** adds a separate Direct-only barter ledger and scoped RPCs. Website

@@ -84,6 +84,41 @@ with tempfile.TemporaryDirectory(prefix='khub-leaderboards-',dir='/tmp') as fold
         assert volume=={'Player1':9007199254741093,'Player2':9007199254740993,'Player3':300,'Player4':200},volume
         assert {r['name']:int(r['value']) for r in result['trades']}=={'Player1':2,'Player2':1,'Player3':2,'Player4':1}
         assert result['donors']==[{'id':uid(2),'name':'Player2','value':'500','rank':1}]
+        # Reproduce splitting into 100 paid submissions, multiple sellers and
+        # a second auction. Unpaid/partially paid rows above must remain excluded.
+        def split_fulfillments(unique):
+            sql(f"""begin;
+            insert into khub_bot.buy_fulfillments
+            select 'split-'||n,'{uid(105)}','{uid(3)}',1,1 from generate_series(1,100) n;
+            insert into khub_bot.buy_fulfillments values ('other-seller','{uid(105)}','{uid(2)}',50,1);
+            insert into public.auctions(id,seller_id,auction_kind,status)
+            values ('{uid(106)}','{uid(4)}','buy','active');
+            insert into khub_bot.buy_fulfillments values ('second-auction','{uid(106)}','{uid(3)}',25,1);
+            insert into khub_bot.deliveries
+            select receipt_id,'buy-fill-payment:'||receipt_id,'sent'
+            from khub_bot.buy_fulfillments where receipt_id like 'split-%'
+            or receipt_id in ('other-seller','second-auction');
+            update khub_bot.leaderboard_state set refreshed_at='-infinity';
+            select khub_bot.refresh_leaderboards();
+            """ + f"""
+            do $$begin
+              if not exists(select 1 from khub_bot.leaderboard_totals where profile_id='{uid(3)}'
+                and volume=425 and trades={3 if unique else 103}) then raise exception 'seller split count/value'; end if;
+              if not exists(select 1 from khub_bot.leaderboard_totals where profile_id='{uid(4)}'
+                and volume=375 and trades={2 if unique else 103}) then raise exception 'host split count/value'; end if;
+              if not exists(select 1 from khub_bot.leaderboard_totals where profile_id='{uid(2)}'
+                and volume=9007199254741043 and trades=2 and donated=500) then raise exception 'second seller/donation'; end if;
+            end$$;
+            rollback;""")
+        split_fulfillments(False)
+        financial_before=sql("select pg_get_functiondef('khub_bot.refresh_site_totals_before_leaderboards()'::regprocedure);")
+        sql(migration('202611140284_leaderboard_unique_auction_trades.sql'))
+        assert sql("select refreshed_at='-infinity'::timestamptz from khub_bot.leaderboard_state;")=='t'
+        assert sql("select pg_get_functiondef('khub_bot.refresh_site_totals_before_leaderboards()'::regprocedure);")==financial_before
+        sql('select public.bot_refresh_public_discovery();')
+        refreshed=read()
+        assert all(refreshed[key]==result[key] for key in ['volume','trades','donors','personal'])
+        split_fulfillments(True)
         # Exercise deletion of a nonempty snapshot through discovery maintenance.
         # A stale synthetic entry must disappear; cooldown must retain fresh state.
         sql(f"insert into khub_bot.leaderboard_totals values('{uid(14)}',999999999999999999,99,99);")
