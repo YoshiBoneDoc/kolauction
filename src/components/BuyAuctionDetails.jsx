@@ -5,7 +5,7 @@ import RemainingTime from './RemainingTime';
 import AuctionEndedTime from './AuctionEndedTime';
 import MarketPrice from './MarketPrice';
 import { effectiveFeePercent } from '../lib/feeDisplay';
-import { buyFunding, buyRefundableFeeReserve } from '../lib/buyOrders';
+import { buyRefundableFeeReserve } from '../lib/buyOrders';
 import {formatBuyAuditDate,describeBuyAuditEvent} from '../lib/buyAuctionAudit';
 import { useContext, useState } from 'react';
 import PropTypes from 'prop-types';
@@ -61,7 +61,7 @@ export default function BuyAuctionDetails({ auction, backLink }) {
         ? (auction.reservationAudit || []).filter(event=>event.kind!=='reservation_expired') : [];
     const result = getAuctionResult(auction, now);
     const funding = owns && canViewFees && result.status === 'pending_escrow'
-        ? buyFunding(auction.pricePerItem, auction.quantity) : null;
+        ? { purchase: auction.pricePerItem * auction.quantity, feeReserve: auction.fundingRequired - auction.pricePerItem * auction.quantity, total: auction.fundingRequired } : null;
     const active = result.status === 'active';
     const closed = Boolean(auction.buyClosingReason) || ['completed', 'cancelled', 'expired', 'voided', 'settling'].includes(result.status);
     const canCancel = owns && !currentUser.isBanned && !auction.buyClosingReason && ['active','pending_escrow'].includes(auction.status);

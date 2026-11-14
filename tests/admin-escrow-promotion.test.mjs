@@ -14,18 +14,24 @@ const code = readFileSync(new URL('../src/components/AdminEscrowPromotion.jsx', 
 const { outputFiles } = buildSync({ stdin: { contents: code, loader: 'jsx' }, bundle: true, write: false,
     platform: 'node', format: 'cjs', jsx: 'automatic', packages: 'external', external: ['promotion-test-*', 'react/jsx-runtime'] });
 function fixture() {
-    const state = [], effects = []; let cursor = 0, enabled = true, fail = false, invalidations = 0;
+    const state = [], effects = []; let cursor = 0, fail = false, invalidations = 0;
     const calls = [];
+    const config = { name:'Giving Thanks: November Promotion', description:'Shared allowance', mode:'lower', tiers:[0,1,2,3,4], allowance:'20000000', donor_waiver:true, sell:[{from:0,bps:200}], buy:[{from:0,bps:200}], info_message:'November info', form_message:'November form' };
+    let live = {id:'nov',revision:1,legacy:true,state:'published',config,starts_at:'2026-11-03T00:00:00Z',ends_at:null,messages:{info:'November info',form:'November form'}};
+    let draft;
     const hooks = {
-        useState(initial) { const i = cursor++; if (!(i in state)) state[i] = initial;
+        useState(initial) { const i = cursor++; if (!(i in state)) state[i] = typeof initial === 'function' ? initial() : initial;
             return [state[i], value => { state[i] = typeof value === 'function' ? value(state[i]) : value; }]; },
         useEffect(callback, deps) { const i = cursor++; if (!state[i] || deps.some((v,j) => v !== state[i][j])) { state[i] = deps; effects.push(callback); } },
     };
-    const backend = { supabase: { async rpc(name, args) {
+    const backend = { supabase: { async rpc(name, args = {}) {
         calls.push({ name, args });
         if (fail) { fail = false; return { error: { message: 'Connection failed' } }; }
-        if (args) enabled = args.p_enabled;
-        return { data: { enabled } };
+        if (args.p_action === 'save') { draft={id:'draft',revision:1,state:'draft',config:args.p_config,starts_at:null,ends_at:null,messages:{info:'Generated info',form:'Generated form'}}; return {data:draft}; }
+        if (args.p_action === 'preview') return {data:{...draft,conflicts:[],confirmation:'reviewed-revision',examples:[],messages:{info:'Generated info',form:'Generated form'}}};
+        if (args.p_action === 'end') live = {...live,state:'ended'};
+        if (args.p_action === 'publish') draft={...draft,state:'published'};
+        return { data: { engine_enabled:true, live_id:live.state==='published'?'nov':null,promotions:[live,...(draft?[draft]:[])] } };
     } } };
     const compiled = { exports: {} };
     const mockedRequire = name => name === 'promotion-test-hooks' ? hooks : name === 'promotion-test-backend' ? backend
@@ -42,23 +48,46 @@ function elements(tree, type) {
 }
 function button(tree, text) { return elements(tree,'button').find(node => node.props.children === text); }
 
-test('status loads, disable and enable buttons send explicit states and invalidate previews', async () => {
-    const f = fixture();
-    assert.equal(button(f.render(),'Enable promotion').props.disabled, true);
-    await f.effects();
-    await button(f.render(),'Disable promotion').props.onClick();
-    assert.deepEqual(f.calls.at(-1), { name:'admin_escrow_promotion', args:{ p_enabled:false } });
-    assert.equal(button(f.render(),'Enable promotion').props.disabled, false);
-    await button(f.render(),'Enable promotion').props.onClick();
-    assert.equal(f.calls.at(-1).args.p_enabled, true); assert.equal(f.invalidations(), 2);
+test('ending November requires explicit confirmation and refreshes metadata', async () => {
+    const f = fixture(); f.render(); await f.effects();
+    button(f.render(),'End promotion…').props.onClick();
+    assert.equal(f.calls.length,1);
+    await button(f.render(),'Confirm').props.onClick();
+    const write=f.calls.find(c=>c.args.p_action==='end');
+    assert.equal(write.args.p_confirmation,'CONFIRM');
+    assert.equal(write.args.p_revision,1);
+    assert.equal(f.invalidations(),1);
 });
 
-test('uncertain toggle errors disable writes until status is successfully reloaded', async () => {
-    const f = fixture(); f.render(); await f.effects();
-    f.fail(); await button(f.render(),'Disable promotion').props.onClick();
-    let tree = f.render();
-    assert.equal(button(tree,'Enable promotion').props.disabled, true);
-    assert.equal(elements(tree,'p').some(node => node.props.role === 'alert'), true);
-    button(tree,'Refresh status').props.onClick(); f.render(); await f.effects();
-    tree = f.render(); assert.equal(button(tree,'Disable promotion').props.disabled, false);
+test('saving and previewing never publish; editing invalidates the reviewed preview', async () => {
+    const f=fixture(); f.render(); await f.effects();
+    await button(f.render(),'Save and preview').props.onClick();
+    assert.ok(f.calls.some(c=>c.args.p_action==='save'));
+    assert.ok(f.calls.some(c=>c.args.p_action==='preview'));
+    assert.equal(f.invalidations(),0);
+    assert.ok(!f.calls.some(c=>c.args.p_action==='publish'));
+    const name=elements(f.render(),'input').find(n=>n.props.maxLength===100);
+    name.props.onChange({target:{value:'Changed'}});
+    assert.equal(button(f.render(),'Publish / schedule…'),undefined);
+});
+
+test('publication requires a second confirmation with exact preview revision', async () => {
+    const f=fixture(); f.render(); await f.effects();
+    await button(f.render(),'Save and preview').props.onClick();
+    button(f.render(),'Publish / schedule…').props.onClick();
+    assert.ok(!f.calls.some(c=>c.args.p_action==='publish'));
+    await button(f.render(),'Confirm').props.onClick();
+    const write=f.calls.find(c=>c.args.p_action==='publish');
+    assert.equal(write.args.p_confirmation,'reviewed-revision');
+    assert.equal(write.args.p_revision,1);
+    assert.equal(f.invalidations(),1);
+});
+
+test('uncertain mutations reconcile status and remove stale confirmation', async () => {
+    const f=fixture(); f.render(); await f.effects();
+    button(f.render(),'End promotion…').props.onClick();f.fail();
+    await button(f.render(),'Confirm').props.onClick();
+    assert.equal(button(f.render(),'Confirm'),undefined);
+    assert.equal(f.calls.at(-1).args.p_action,undefined);
+    assert.equal(f.invalidations(),0);
 });

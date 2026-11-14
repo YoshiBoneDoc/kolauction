@@ -1,3 +1,4 @@
+// Legacy tiered_v1 arithmetic only. New quotes, funding and settlement use SQL.
 export const ESCROW_FEE_POLICY = 'tiered_v1';
 export const ESCROW_FEE_TIERS = [
     { upTo: 1_000_000, bps: 500, portion: 'First 1m', rate: '5%' },

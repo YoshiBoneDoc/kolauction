@@ -12,7 +12,6 @@ import BundleMarketPrice from '../components/BundleMarketPrice';
 import BundleContents from '../components/BundleContents';
 import { prepareBundle, bundleCover, bundleTitle, normalizeBundleTitle, MAX_BUNDLE_ITEMS, MAX_BUNDLE_TITLE_LENGTH } from '../lib/bundles';
 import { effectiveFeePercent, feeLabel } from '../lib/feeDisplay';
-import { buyFunding } from '../lib/buyOrders';
 import TradeTypeBadge from '../components/TradeTypeBadge';
 import { useState, useContext, useDeferredValue, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -87,7 +86,8 @@ export default function AuctionAnItem() {
     const [bundleTitleConflict, setBundleTitleConflict] = useState(false);
     const bundleTitleInput = useRef(null);
     const [preview, setPreview] = useState(null);
-    const { fee: previewFee } = useEscrowFeePreview(preview?.minBidMeat, Boolean(preview?.escrowMode && preview?.auctionKind !== 'buy'));
+    const { fee: previewFee, quote: feeQuote } = useEscrowFeePreview(preview?.minBidMeat, Boolean(preview?.escrowMode), { kind: preview?.auctionKind === 'buy' ? 'buy' : 'sell', quantity: preview?.auctionKind === 'buy' ? preview.quantity : 1 });
+    const previewFunding = feeQuote?.funding_required ? { purchase: preview.minBidMeat * preview.quantity, feeReserve: Number(feeQuote.reserve), total: Number(feeQuote.funding_required) } : null;
     const [giveaway, setGiveaway] = useState(false);
     const [raffle, setRaffle] = useState(false);
     const [giveawayCondition, setGiveawayCondition] = useState('last_bid');
@@ -201,7 +201,7 @@ export default function AuctionAnItem() {
         if (!isBuy && instantPrice.trim() && (purchasePrice === null || purchasePrice < minimum)) {
             setError('Buyout price must be a valid Meat amount at least as large as the minimum bid.'); return;
         }
-        if (isBuy) { try { buyFunding(minimum, count); } catch (failure) { setError(failure.message); return; } }
+        if (isBuy && BigInt(minimum) * BigInt(count) > 20000000000n) { setError('A buy order cannot exceed 20 billion Meat including its fee reserve.'); return; }
         let customEndAt = null;
         if (!isBuy && customDuration) {
             try { customEndAt = customAuctionEnd(customEndTime); }
@@ -225,6 +225,7 @@ export default function AuctionAnItem() {
 
     async function confirm() {
         if (submitting.current || !preview) return;
+        if (preview.auctionKind === 'buy' && (!previewFunding || previewFunding.total > 20000000000)) { setError('Wait for a valid funding quote below 20 billion Meat.'); return; }
         submitting.current = true;
         setPending(true);
         setError('');
@@ -357,11 +358,13 @@ export default function AuctionAnItem() {
                             <dd className="min-w-0 break-words text-right font-medium tabular-nums text-gray-900">{preview.customEndAt ? formatAuctionEnd(preview.customEndAt) : `${preview.auctionTime} hours`}</dd>
                         </div>
                         {preview.autoRelist && <div className="flex justify-between gap-3 py-2.5"><dt className="text-gray-500">Relist if unsold</dt><dd className="text-right">Up to {preview.relistCount} times · {preview.relistReduction ? `Reduce minimum bid ${preview.relistReduction}% each time` : 'Keep the same price'}</dd></div>}
-                        {preview.auctionKind === 'buy' && <>{[['Purchase funds',buyFunding(preview.minBidMeat, preview.quantity).purchase],[`Commission reserve (${effectiveFeePercent(buyFunding(preview.minBidMeat, preview.quantity).feeReserve, BigInt(preview.minBidMeat) * BigInt(preview.quantity))})`,buyFunding(preview.minBidMeat, preview.quantity).feeReserve],['Required deposit, including fee reserve',buyFunding(preview.minBidMeat, preview.quantity).total]].map(([label,value]) => <div key={label} className="flex justify-between gap-3 py-3"><dt>{label}</dt><dd className="text-right font-semibold">{value.toLocaleString('en-US')} Meat</dd></div>)}</>}
+                        {preview.auctionKind === 'buy' && previewFunding && <>{[['Purchase funds',previewFunding.purchase],[`Commission reserve (${effectiveFeePercent(previewFunding.feeReserve, BigInt(preview.minBidMeat) * BigInt(preview.quantity))})`,previewFunding.feeReserve],['Required deposit, including fee reserve',previewFunding.total]].map(([label,value]) => <div key={label} className="flex justify-between gap-3 py-3"><dt>{label}</dt><dd className="text-right font-semibold">{value.toLocaleString('en-US')} Meat</dd></div>)}</>}
                     {preview.mrARate && preview.escrowMode && <p className="py-2 text-xs text-gray-600">Commission uses the full winning value, is collected only from Meat, and any shortfall is permanently waived. Every Mr. A goes to the seller.</p>}
-                    {preview.auctionKind !== 'buy' && preview.escrowMode && previewFee !== null && <div className={`${preview.bundleItems ? 'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3' : 'flex justify-between gap-3'} py-3`}><dt>{preview.bundleItems ? <>Estimated fee <span className="block text-xs font-normal text-gray-500">At minimum bid · {effectiveFeePercent(previewFee, preview.minBidMeat)}</span></> : `Estimated ${feeLabel(previewFee, preview.minBidMeat)} at minimum bid`}</dt><dd className="shrink-0 text-right font-semibold tabular-nums">{previewFee.toLocaleString('en-US')} Meat</dd></div>}
+                    {preview.auctionKind !== 'buy' && preview.escrowMode && previewFee !== null && <div className={`${preview.bundleItems ? 'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3' : 'flex justify-between gap-3'} py-3`}><dt>{preview.bundleItems ? <>Estimated fee <span className="block text-xs font-normal text-gray-500">At minimum bid · {effectiveFeePercent(previewFee, preview.minBidMeat)}</span></> : `Estimated ${feeLabel(previewFee, preview.minBidMeat, false)} at minimum bid`}</dt><dd className="shrink-0 text-right font-semibold tabular-nums">{previewFee.toLocaleString('en-US')} Meat</dd></div>}
                     </dl>
-                    {preview.auctionKind === 'buy' && <p className="text-xs text-gray-500">The original-rate reserve is retained as a rollback buffer and rounds up to whole Meat. Actual fees are rounded down per fulfillment; unused reserve is refunded.</p>}
+                    {preview.auctionKind === 'buy' && !previewFunding && <p role="status" className="text-xs text-gray-500">Waiting for the server funding estimate…</p>}
+                    {preview.auctionKind === 'buy' && previewFunding?.total > 20000000000 && <p role="alert" className="text-sm text-red-700">Required funding exceeds 20 billion Meat. Reduce the quantity or price.</p>}
+                    {preview.auctionKind === 'buy' && <p className="text-xs text-gray-500">The reserve safely covers partial fulfillments and rounds up to whole Meat. Actual fees are rounded down per fulfillment; unused reserve is refunded.</p>}
                     <div className={preview.bundleItems
                         ? 'bundle-preview-footer -mx-4 -mb-4 mt-5 grid grid-cols-1 gap-2 rounded-b-lg border-t border-[#EADBD3] bg-[#FFF7F2] p-4 dark:border-gray-700 dark:bg-gray-800/60 sm:-mx-8 sm:-mb-8 sm:grid-cols-[0.85fr_1.15fr] sm:gap-3 sm:p-5'
                         : 'mt-4 grid grid-cols-2 gap-3 border-t border-gray-100 pt-4'}>
@@ -384,7 +387,7 @@ export default function AuctionAnItem() {
                         {error && <p role="alert" className="mt-4 text-sm text-red-700">{error}</p>}
                         <div className="mt-6 flex flex-wrap justify-end gap-3">
                             <button type="button" disabled={pending} onClick={() => publishDialog.current.close()} className="min-h-11 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 disabled:opacity-50">Cancel</button>
-                            <button type="button" disabled={pending} onClick={confirm} className="button-green min-h-11 rounded-lg border border-green-700 bg-green-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? 'Publishing…' : 'Publish Auction'}</button>
+                            <button type="button" disabled={pending || (preview.auctionKind === 'buy' && (!previewFunding || previewFunding.total > 20000000000))} onClick={confirm} className="button-green min-h-11 rounded-lg border border-green-700 bg-green-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? 'Publishing…' : 'Publish Auction'}</button>
                         </div>
                     </dialog>
                 </section> : <form className={`auction-create-form ${giveaway ? 'giveaway-editor' : ''}`} onSubmit={showPreview}>

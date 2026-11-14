@@ -1,3 +1,4 @@
+import useEscrowFeePreview from '../hooks/useEscrowFeePreview';
 import { Link, useLocation } from "react-router-dom";
 import { useContext, useEffect } from 'react';
 import { UserContext } from '../context/UserContext';
@@ -7,6 +8,7 @@ const sectionHeadingClass = 'text-lg font-semibold leading-7 text-gray-800';
 const subheadingClass = 'text-sm font-semibold leading-5 text-gray-700';
 
 const InfoPage = () => {
+    const { enabled: promotionEnabled, promotion } = useEscrowFeePreview(0);
     const { currentUser } = useContext(UserContext);
     const showClubHistory = Boolean(currentUser?.id) && (currentUser.isHighRollersMember === true || currentUser.isAdmin === true);
     const { hash } = useLocation();
@@ -358,6 +360,7 @@ const InfoPage = () => {
 
                         <div className="mb-3 space-y-1.5 leading-5">
 
+                            {promotionEnabled && promotion && (promotion.legacy ? (
                             <div className="space-y-2 text-[13px] leading-5">
                                 <p className="font-semibold text-green-800">
                                     Giving Thanks: November Promotion
@@ -374,10 +377,8 @@ const InfoPage = () => {
                                     and 1% above 1B.
                                 </p>
                             </div>
-
-                            <p className="mt-3 border-t border-gray-200/30 pt-3 text-xs italic">
-                                The normal fee schedule below does not apply during the promo.
-                            </p>
+                            ) : <div className="space-y-2 text-[13px] leading-5"><p className="font-semibold text-green-800">{promotion.name}</p><p className="whitespace-pre-line text-green-800">{promotion.messages.info}</p></div>)}
+                            {promotionEnabled && <p className="mt-3 border-t border-gray-200/30 pt-3 text-xs italic">Eligible trades use the promotion rules; cheaper locked benefits apply when configured.</p>}
                             <p>Escrow fees are based on your loyalty tier, and all earned tier benefits are permanent.</p>
 
                             <p>
@@ -386,7 +387,7 @@ const InfoPage = () => {
                             </p>
 
                             <p>
-                                <strong>Buying:</strong> Buyers pay per-item fees from their fee reserve. Sellers receive the full listed price.
+                                <strong>Buying:</strong> Buyers pay fees separately from their reserve, based on each completed fulfillment’s total value. Sellers receive the full listed price.
                             </p>
 
                             <p>

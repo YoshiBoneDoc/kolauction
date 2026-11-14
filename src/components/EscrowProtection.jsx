@@ -21,7 +21,7 @@ export default function EscrowProtection({ forListing = false, buy = false, show
                 <li><strong>Automatic Settlement:</strong> The bot handles payments, item deliveries, and refunds via KMail.</li>
                 <li><strong>Fast Delivery:</strong> Transactions usually process within seconds. Service disruptions may cause delays.</li>
             </ul>
-            {showFees && <p className="italic">Normal rates (after promotion ends): fees range from 1–5% depending on the item’s price. See the <Link to="/info#escrow-fees-title" className="text-blue-700 underline">fee chart</Link> for details. No purchase, no fee.</p>}
+            {showFees && <p className="italic">Normal fees use your locked loyalty and leaderboard benefits and each fulfillment’s total value. See the <Link to="/info#escrow-fees-title" className="text-blue-700 underline">fee chart</Link> for details. No purchase, no fee.</p>}
         </div>
     </details>;
     return <details onToggle={event => setOpen(event.currentTarget.open)} className={forListing ? 'text-left text-xs text-gray-600' : 'group w-full text-left text-xs text-gray-600'}>
@@ -38,9 +38,9 @@ export default function EscrowProtection({ forListing = false, buy = false, show
                     <li><strong>Unsold Items:</strong> {forListing ? 'Your items are returned if no bids are accepted or you cancel before receiving a bid.' : 'Items are returned if no bids are accepted or the auction is canceled before receiving a bid.'}</li>
                     <li><strong>Fast Delivery:</strong> Refunds and deliveries usually arrive within seconds. Service disruptions may cause delays.</li>
                 </ul>
-                {forListing && <p className="italic">{feePolicy === 'flat' ? <>Successful sales are subject to a {feeBps / 100}% seller commission.</> : <>Normal rates (after promotion ends): fees start at 5% and decrease for higher-value sales, with each rate applying only to its portion of the final price. See the <Link to="/info#escrow-fees-title" className="text-blue-700 underline">fee chart</Link> for details.</>} The total fee is rounded down to whole Meat and automatically deducted from your proceeds. No sale, no fee.</p>}
+                {forListing && <p className="italic">{feePolicy === 'flat' ? <>Successful sales are subject to a {feeBps / 100}% seller commission.</> : <>Normal fees use your locked loyalty and leaderboard benefits. One rate applies to the entire final value. Existing legacy trades retain their original normal fee terms. See the <Link to="/info#escrow-fees-title" className="text-blue-700 underline">fee chart</Link> for details.</>} The total fee is rounded down to whole Meat and automatically deducted from your proceeds. No sale, no fee.</p>}
                 {forListing && estimatedFee !== null && feePolicy === 'tiered_v1' && Number.isSafeInteger(minimumPrice) && minimumPrice > 0 && <p>
-                    At your minimum bid: estimated {feeLabel(estimatedFee, minimumPrice)}: {estimatedFee.toLocaleString('en-US')} Meat; seller proceeds {(minimumPrice - estimatedFee).toLocaleString('en-US')} Meat. The actual fee uses the final sale price.
+                    At your minimum bid: estimated {feeLabel(estimatedFee, minimumPrice, false)}: {estimatedFee.toLocaleString('en-US')} Meat; seller proceeds {(minimumPrice - estimatedFee).toLocaleString('en-US')} Meat. The actual fee uses the final sale price.
                 </p>}
             </div>
             <p className={`${forListing ? 'mt-2' : 'mt-4'} rounded-[6px] border-l-[3px] border-[#22C55E] bg-[#F0FDF4] px-4 py-3 text-[#334155]`}>

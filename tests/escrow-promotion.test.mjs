@@ -45,3 +45,18 @@ test('preview uses the entire transaction and exact promotional marginal rates',
     assert.equal(promotionalPreviewFee(49, { enabled: true, volume: '20000000' }), 0);
     assert.equal(promotionalPreviewFee(100, null), null);
 });
+
+test('quotes coalesce and reject results from a previous account scope', async () => {
+    let resolve, calls=0;
+    const client={rpc(name) { calls++;return name==='escrow_fee_preview'?Promise.resolve({data:{enabled:false,volume:'0'}}):new Promise(r=>{resolve=r;}); },auth:{onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}})}};
+    const service=createEscrowPromotionService(client);
+    const stop=service.activate('a');await tick();
+    const a=service.quote({price:100,kind:'buy',quantity:2});
+    const b=service.quote({price:100,kind:'buy',quantity:2});await tick();
+    assert.equal(calls,2);resolve({data:{fee:'7',reserve:'10',funding_required:'210'}});
+    assert.equal((await a).fee,'7');assert.equal((await b).reserve,'10');
+    const stale=service.quote({price:200});await tick();
+    const staleRejected=assert.rejects(stale,/unavailable/);
+    const stopB=service.activate('b');resolve({data:{fee:'0'}});await staleRejected;
+    stopB();stop();
+});

@@ -1,5 +1,28 @@
 # kHub handoff
 
+## November 14 escrow fee/promotion engine — local, disabled
+
+Owner approved implementation with future promotions pinned at creation, cheaper
+normal benefits during November, and November compatibility exceptions. See
+[policy, exceptions, tests and owner-controlled rollout](docs/ESCROW_FEE_PROMOTIONS.md:1).
+Queued **269–272** add authoritative SQL fees, permanent loyalty, global financial
+ranks, locked terms/reserves, durable settlement decisions, and compact draft /
+preview / confirm promotion controls. Matching ignored bot SQL copies and generic
+financial-report Fee labels are included. Normal activation is separately gated;
+installation does not activate it or end/reset November. The current promotion
+retains progressive rates, settlement-time selection/allowance, grandfathered Buy
+fills and its original messages. Future promotions use flat brackets and retained
+creation terms. No production migration, deployment, activation or real transfer
+was performed. Personal quickstart unchanged.
+
+New engine and six existing targeted database suites pass. Website Node 24:
+644 passed / 20 failed, no new failing names versus clean HEAD (639/21). Mocked
+bot at initial verification: 486 passed / 1 malformed-mail failure; financial
+tests pass. Follow-up now filters only null inbox entries before gift discovery
+and normalization; all 95 escrow tests pass, including the original failure.
+Other malformed entries retain their review/hold protections. Not deployed.
+Build/lint/secret scan pass. Browser visual QA remains outstanding.
+
 ## November 14 leaderboard refresh repair — not applied
 
 Production log shows discovery maintenance failing at the unqualified DELETE in

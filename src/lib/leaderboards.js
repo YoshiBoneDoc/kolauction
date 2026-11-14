@@ -2,7 +2,7 @@ import { withReadDeadline } from './readDeadline.js';
 
 export function parseLeaderboards(data) {
     if (!data || !Number.isFinite(Date.parse(data.refreshed_at))) throw new Error('Invalid leaderboard snapshot.');
-    const result = { refreshedAt: data.refreshed_at, personal: null };
+    const result = { refreshedAt: data.refreshed_at, personal: null, feeEligibility: data.fee_eligibility ?? null };
     if (data.personal != null) {
         result.personal = {};
         for (const category of ['volume', 'trades', 'donors']) {
@@ -16,7 +16,7 @@ export function parseLeaderboards(data) {
         const ids = new Set();
         result[category] = data[category].map((row, index) => {
             if (typeof row.id !== 'string' || !row.id || ids.has(row.id) || typeof row.name !== 'string' || !row.name.trim()
-                || row.rank !== index + 1 || typeof row.value !== 'string' || !/^\d+$/.test(row.value) || BigInt(row.value) <= 0n) {
+                || (!Number.isInteger(row.rank) || row.rank < 1 || row.rank > 10 || (index > 0 && row.rank <= data[category][index - 1].rank)) || typeof row.value !== 'string' || !/^\d+$/.test(row.value) || BigInt(row.value) <= 0n) {
                 throw new Error('Invalid leaderboard entry.');
             }
             ids.add(row.id);

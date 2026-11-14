@@ -6,6 +6,12 @@ export const leaderboardFeeBenefits = {
 };
 export function getLeaderboardFeeBenefits(data, userId) {
     if (!data || !userId) return null;
+    if (data.feeEligibility) {
+        if (data.feeEligibility.donor) return leaderboardFeeBenefits.donor;
+        if (data.feeEligibility.leader) return leaderboardFeeBenefits.leader;
+        if (data.feeEligibility.top3) return leaderboardFeeBenefits.top3;
+        return null;
+    }
     if (data.donors?.some(row => row.id === userId && row.rank === 1)) return leaderboardFeeBenefits.donor;
     const ranks = ['volume', 'trades'].flatMap(category => data[category]?.filter(row => row.id === userId && row.rank >= 1 && row.rank <= 3).map(row => row.rank) || []);
     if (!ranks.length) return null;

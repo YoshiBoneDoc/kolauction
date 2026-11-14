@@ -122,7 +122,7 @@ export default function AuctionOutcome({ auction, now }) {
                 ? 'Bidding has closed. The bot is sending the items to the winner and payment to the seller via KMail. Settlement finishes once all required deliveries are confirmed.'
                 : 'This auction did not result in a sale. The bot is returning the deposited items to the seller via KMail. The return finishes once all required deliveries are confirmed.'}</p>}
             {result.hasWinner && <p>Winner: <strong><WinnerLink auction={auction} /></strong> · Final price: <strong>{paymentLabel(auction.paymentMeat ?? result.finalPrice, auction.paymentMrA, result.finalPrice)}</strong></p>}
-            {isSeller && result.hasWinner && <p>{feeLabel(auction.feeMeat, result.finalPrice, auction.feePolicy !== 'flat')}: {(auction.feeMeat || 0).toLocaleString('en-US')} Meat.</p>}
+            {isSeller && result.hasWinner && <p>{feeLabel(auction.feeMeat, result.finalPrice, false)}: {(auction.feeMeat || 0).toLocaleString('en-US')} Meat.</p>}
             {isSeller && auction.mrARate && result.hasWinner && <p>Seller proceeds: {paymentLabel(Math.max(0, auction.paymentMeat - auction.feeMeat), auction.paymentMrA)}. Commission permanently waived: {(auction.waivedFeeMeat || 0).toLocaleString('en-US')} Meat.</p>}
             {auction.instantPurchasedAt && <p>The buyout price ended bidding early.</p>}
             {result.status === 'completed' && <p>The items and payment have been delivered via KMail.</p>}

@@ -17,7 +17,7 @@ const { outputFiles } = buildSync({ stdin: { contents: `
     export { UserContext } from './src/context/UserContext.jsx';
     export { AuctionsContext } from './src/context/AuctionsContext.jsx';
 `, resolveDir: fileURLToPath(new URL('../', import.meta.url)), loader: 'jsx' },
-    bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external', external: ['../lib/itemCatalog'], jsx: 'automatic',
+    bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external', external: ['../lib/itemCatalog', '../hooks/useEscrowFeePreview'], jsx: 'automatic',
     define: { 'import.meta.env': '{}' }, loader: { '.gif': 'dataurl', '.css': 'empty' },
 });
 let active;
@@ -35,6 +35,8 @@ const hooks = { ...React, useSyncExternalStore: (_subscribe, getSnapshot) => get
 const compiled = { exports: {} };
 const requireModule = createRequire(import.meta.url);
 new Function('require', 'module', 'exports', outputFiles[0].text)(name => name === 'react' ? hooks
+    : name === '../hooks/useEscrowFeePreview' ? (price, enabled, { quantity = 1 } = {}) => ({ fee: enabled && price != null ? Math.floor(price * 0.05) : null,
+        quote: enabled && active.quoteAvailable !== false && price != null ? { reserve: String(Math.ceil(price * 0.05) * quantity), funding_required: String((price + Math.ceil(price * 0.05)) * quantity) } : null })
     : name === '../lib/itemCatalog' ? { ...itemCatalog, createItemCatalogService: () => ({ load: () => ({ then: callback => callback(catalogFixture) }) }) }
     : name === 'react-router-dom' ? { ...router, useNavigate: () => active.navigate, useLocation: () => ({ hash: '' }) } : requireModule(name), compiled, compiled.exports);
 const { AuctionAnItem, UserContext, AuctionsContext } = compiled.exports;
@@ -374,4 +376,17 @@ test('Giveaway duration stays editable and switching modes clears irrelevant set
     page.find(n => n.type === 'button' && n.props.children === '← Standard Auction').props.onClick(); page.render();
     assert.equal(page.find(n => n.type === 'h1').props.children, 'Create Auction');
     assert.equal(page.find(n => n.props?.id === 'auctionTime').props.value, '24');
+});
+
+test('Buy publication waits for the authoritative funding quote', async () => {
+    const writes=[];const page=harness(async listing=>{writes.push(listing);return 'buy-order';}).render();
+    page.quoteAvailable=false;
+    page.button('Buy Items').props.onClick();page.render();
+    page.input('listing-item-search','asbestos ore').input('item','364').input('quantity','2').input('minimum-price-item','2m');
+    const original=globalThis.requestAnimationFrame;globalThis.requestAnimationFrame=fn=>fn();
+    try {page.find(n=>n.type==='form').props.onSubmit({preventDefault(){}});}finally{if(original)globalThis.requestAnimationFrame=original;else delete globalThis.requestAnimationFrame;}
+    page.render();assert.equal(page.button('Publish Auction').props.disabled,true);
+    await page.button('Publish Auction').props.onClick();assert.equal(writes.length,0);
+    page.quoteAvailable=true;page.render();assert.equal(page.button('Publish Auction').props.disabled,false);
+    await page.button('Publish Auction').props.onClick();assert.equal(writes.length,1);
 });

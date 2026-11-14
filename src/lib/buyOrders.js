@@ -1,3 +1,4 @@
+// Legacy tiered_v1 arithmetic only. New quotes, funding and settlement use SQL.
 import { ESCROW_FEE_TIERS } from './escrowFees.js';
 
 export const MAX_BUY_ORDER_MEAT = 20_000_000_000;

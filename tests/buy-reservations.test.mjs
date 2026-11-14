@@ -93,7 +93,7 @@ test('Buy fees and cost explanations are private to the creator and administrato
   assert.doesNotMatch(html,/The price applies to each item/);assert.match(readable(html),/2,000 Meat paid/);
  }
  for(const [user,auction] of [[{id:'buyer'},listing],[{id:'admin'},{...listing,buyAdmin:true}]]){
-  const html=harness(auction,user).html();assert.match(html,/Commission: 100 Meat/);assert.match(html,/Fees range from 1–5%/);
+  const html=harness(auction,user).html();assert.match(html,/Commission: 100 Meat/);assert.match(html,/Normal fees use your locked loyalty and leaderboard benefits/);
   if(user.id==='buyer')assert.match(html,/Escrow Summary/);
   else {assert.doesNotMatch(html,/Escrow Summary|Purchased items still held/);assert.match(readable(html),/10\/24\/2026 3:30:30pm · User1 reserved 20 items/);}
   if(user.id==='buyer')assert.match(readable(html),/Delivery: As items are acquired/);
