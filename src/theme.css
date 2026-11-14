@@ -1182,3 +1182,84 @@ html .profile-dashboard :is(.profile-auction-tab, .profile-history-tab)[aria-sel
 .public-profile-leaderboard-honors li { display: flex; align-items: center; gap: 5px; min-width: 0; }
 .public-profile-leaderboard-honors svg { flex-shrink: 0; }
 .public-profile-honor-caption { font-size: 12px; font-weight: 400; line-height: 1.4; opacity: .8; }
+
+/* The auction searches share a compact pill and a brighter dark-mode surface. */
+html[data-theme="dark"] .site-page-background .auction-search-field input[type="search"] {
+  background-color: #243449;
+  color: #eef2f8;
+}
+html .auction-search-field input:focus-visible {
+  outline: 2px solid #7695ff;
+  outline-offset: 2px;
+}
+
+html .barter-remove-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 36px;
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #dc2626;
+  font-size: 20px;
+  line-height: 1;
+}
+html[data-theme="dark"] .barter-remove-item { color: #f87171; }
+html .barter-remove-item:is(:hover, :focus-visible) {
+  background: transparent;
+  box-shadow: none;
+  text-shadow: 0 0 6px #ef4444, 0 0 12px #ef444480;
+}
+
+html .barter-pending-notice { background-color: #fffbeb; border-color: #e6cf80; color: #785314; }
+html .barter-pending-count { background-color: #f4d477; color: #49330b; }
+html[data-theme="dark"] .barter-pending-notice { background-color: #302b1d; border-color: #695a2f; color: #eadba4; }
+html[data-theme="dark"] .barter-pending-count { background-color: #be9840; color: #111827; }
+html .barter-pending-notice:hover { color: #68430b; border-color: #b99032; }
+html[data-theme="dark"] .barter-pending-notice:hover { color: #f4e6b9; border-color: #998048; }
+
+html .barter-review-accept:hover:not(:disabled) { background-color: #15803d; }
+html .barter-review-reject:hover:not(:disabled) { background-color: #fee2e2; }
+html .barter-review-changes:hover:not(:disabled) { background-color: #e2e8f0; }
+html[data-theme="dark"] .barter-review-accept:hover:not(:disabled) { background-color: #166534; }
+html[data-theme="dark"] .barter-review-reject:hover:not(:disabled) { background-color: #4c252c; }
+html[data-theme="dark"] .barter-review-changes:hover:not(:disabled) { background-color: #334155; }
+html .barter-raise-option { color: #6b7280; }
+html .barter-raise-option.is-selected { color: #111827; }
+html[data-theme="dark"] .barter-raise-option { color: #94a3b8; }
+html[data-theme="dark"] .barter-raise-option.is-selected { color: #fff; }
+
+html .barter-revision-instruction { color: #111; }
+html[data-theme="dark"] .barter-revision-instruction { color: #fff; }
+
+html .barter-revise-action, html .barter-decline-action {
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #6452ba;
+}
+html[data-theme="dark"] .barter-revise-action { color: #a5b4fc; }
+html .barter-decline-action { color: #dc2626; }
+html[data-theme="dark"] .barter-decline-action { color: #f87171; }
+html .barter-revise-action:is(:hover, :focus-visible) { background: transparent; text-shadow: 0 0 8px #9b87ff99; filter: drop-shadow(0 0 3px #9b87ff55); }
+html .barter-decline-action:is(:hover, :focus-visible) { background: transparent; text-shadow: 0 0 7px #ef444499; }
+html .barter-revise-action:focus, html .barter-revise-action:focus-visible { outline: none; box-shadow: none; }
+
+html[data-theme="dark"] .barter-decline-action:is(:hover, :focus-visible) {
+  text-shadow: 0 0 7px #fecaca, 0 0 12px #fca5a566;
+}
+
+html .barter-withdraw-action:hover:not(:disabled) { background-color: #f1f5f9; }
+html[data-theme="dark"] .barter-withdraw-action:hover:not(:disabled) { background-color: #3a4b63; }
+
+html .auction-card .auction-card-go-action,
+html .auction-card .auction-card-go-action:hover { color: #fff; }
+html .auction-card .auction-card-close-action { color: #111827; }
+html[data-theme="dark"] .auction-card .auction-card-close-action { color: #f8fafc; }
+
+html .barter-history-toggle { padding: 0; border: 0; box-shadow: none; background: transparent; }
+html .barter-history-toggle:hover { background: transparent; text-decoration: underline; }

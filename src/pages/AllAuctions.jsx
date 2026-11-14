@@ -1,3 +1,4 @@
+import AuctionPagination from '../components/AuctionPagination';
 import RaffleAuctionCard from '../components/RaffleAuctionCard';
 import useHomeRaffles from '../hooks/useHomeRaffles';
 import { matchesRaffleBrowse } from '../lib/raffles';
@@ -110,11 +111,12 @@ export default function AllAuctions() {
                 <PendingTrades />
                 <section aria-label="Find auctions" className={`mb-1 rounded-lg border border-gray-200 bg-white px-3 pt-3 ${filtersOpen ? 'pb-1' : 'pb-3'}`}>
                     <div className="flex flex-wrap items-end gap-3">
-                        <div className="min-w-32 flex-1">
-                            <label htmlFor="auction-search" className="sr-only">Search item names</label>
+                        <label htmlFor="auction-search" className="auction-search-field flex w-64 max-w-full items-center gap-2.5 text-gray-500">
+                            <span className="sr-only">Search item names or auction number</span>
+                            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true" className="shrink-0"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>
                             <input id="auction-search" type="search" value={searchInput} onChange={event => { rememberSearch(event.target.value); setSearchInput(event.target.value); }}
-                                placeholder="Search by item or auction number…" className="h-9 w-full rounded border border-gray-400 bg-white px-3 text-sm text-gray-900" />
-                        </div>
+                                placeholder="Search by item or auction number…" className="w-full min-w-0 rounded-full border-0 bg-gray-100 px-4 py-2.5 text-xs text-gray-900 dark:text-gray-100" />
+                        </label>
                         <div role="group" aria-label="Sort auctions" className="flex flex-wrap items-center gap-2">
                             {[
                                 [deadlineSort, ['newest', 'Newest'], ['activity', 'Recent Activity']],
@@ -190,11 +192,9 @@ export default function AllAuctions() {
                             expanded={openBid?.id === auction.id && openBid?.browseKey === browseKey}
                             onToggleBid={() => setOpenBid(previous => previous?.id === auction.id && previous?.browseKey === browseKey ? null : { id: auction.id, browseKey })} /></div>)}
                     </div>
-                    {(found > 24 || page > 1) && <nav aria-label="Auction pages" className="mt-6 flex items-center justify-center gap-4">
-                        <button disabled={page <= 1} onClick={() => update('page', String(page - 1))} className="min-h-11 rounded border bg-white px-4 py-2 disabled:opacity-50">Previous</button>
-                        <span>Page {page}{!listingOrderDelayed && <> of {Math.max(1, Math.ceil(found / 24))}</>}</span>
-                        <button disabled={page * 24 >= found} onClick={() => update('page', String(page + 1))} className="min-h-11 rounded border bg-white px-4 py-2 disabled:opacity-50">Next</button>
-                    </nav>}
+                    {(found > 24 || page > 1) && <AuctionPagination page={page}
+                        totalPages={listingOrderDelayed ? undefined : Math.max(1, Math.ceil(found / 24))}
+                        hasNext={page * 24 < found} onPage={next => update('page', String(next))} />}
                 </>}
             </main>
         </div>

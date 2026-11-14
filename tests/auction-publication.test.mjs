@@ -17,7 +17,7 @@ const { outputFiles } = buildSync({ stdin: { contents: `
     export { UserContext } from './src/context/UserContext.jsx';
     export { AuctionsContext } from './src/context/AuctionsContext.jsx';
 `, resolveDir: fileURLToPath(new URL('../', import.meta.url)), loader: 'jsx' },
-    bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external', external: ['../lib/itemCatalog', '../hooks/useEscrowFeePreview'], jsx: 'automatic',
+    bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external', external: ['../lib/itemCatalog', '../hooks/useEscrowFeePreview', '../lib/barter'], jsx: 'automatic',
     define: { 'import.meta.env': '{}' }, loader: { '.gif': 'dataurl', '.css': 'empty' },
 });
 let active;
@@ -37,6 +37,7 @@ const requireModule = createRequire(import.meta.url);
 new Function('require', 'module', 'exports', outputFiles[0].text)(name => name === 'react' ? hooks
     : name === '../hooks/useEscrowFeePreview' ? (price, enabled, { quantity = 1 } = {}) => ({ fee: enabled && price != null ? Math.floor(price * 0.05) : null,
         quote: enabled && active.quoteAvailable !== false && price != null ? { reserve: String(Math.ceil(price * 0.05) * quantity), funding_required: String((price + Math.ceil(price * 0.05)) * quantity) } : null })
+    : name === '../lib/barter' ? { writeBarter: (...args) => active.barterWrite(...args) }
     : name === '../lib/itemCatalog' ? { ...itemCatalog, createItemCatalogService: () => ({ load: () => ({ then: callback => callback(catalogFixture) }) }) }
     : name === 'react-router-dom' ? { ...router, useNavigate: () => active.navigate, useLocation: () => ({ hash: '' }) } : requireModule(name), compiled, compiled.exports);
 const { AuctionAnItem, UserContext, AuctionsContext } = compiled.exports;
@@ -389,4 +390,40 @@ test('Buy publication waits for the authoritative funding quote', async () => {
     await page.button('Publish Auction').props.onClick();assert.equal(writes.length,0);
     page.quoteAvailable=true;page.render();assert.equal(page.button('Publish Auction').props.disabled,false);
     await page.button('Publish Auction').props.onClick();assert.equal(writes.length,1);
+});
+
+test('barter form publishes only to the separate ledger with an optional minimum and Direct-only terms', async () => {
+    let ordinaryWrites = 0;
+    const page = harness(() => { ordinaryWrites++; }).render();
+    const calls=[];
+    page.barterWrite=async (...args)=>{calls.push(args);return 'new-barter';};
+    page.find(n => n.props?.['aria-label'] === 'Barter Instead').props.onClick(); page.render();
+    const has = predicate => nodes(page.tree).some(predicate);
+    assert.equal(has(n => n.props?.['aria-label'] === 'Auction type'), false);
+    assert.equal(has(n => n.props?.['aria-label'] === 'Sale type'), false);
+    assert.equal(has(n => n.type?.name === 'MrAPaymentOptions'), false);
+    assert.equal(page.button('Escrow').props.disabled, true);
+    assert.equal(page.button('Direct').props.disabled, false);
+    page.button('Escrow').props.onClick(); page.render();
+    assert.equal(page.button('Direct').props['aria-pressed'], true);
+    assert.equal(has(n => n.props?.label === 'Minimum Bid Market Value (optional):' && !n.props.required), true);
+    assert.equal(has(n => n.type === 'button' && n.props.children === 'Set Buyout Price (optional)'), false);
+    page.input('listing-item-search', 'asbestos ore').input('item', '364');
+    const original = globalThis.requestAnimationFrame;
+    globalThis.requestAnimationFrame = callback => callback();
+    try { page.find(n => n.type === 'form').props.onSubmit({ preventDefault() {} }); }
+    finally { if (original) globalThis.requestAnimationFrame = original; else delete globalThis.requestAnimationFrame; }
+    page.render();
+    page.button('Continue to Publish').props.onClick(); page.render();
+    await page.button('Publish Auction').props.onClick();
+    assert.equal(ordinaryWrites,0);
+    assert.equal(calls[0][0],'create_barter_auction');
+    assert.equal(calls[0][1].p_minimum,null);
+    assert.equal(calls[0][1].p_quantity,1);
+    assert.ok(calls[0][1].p_request);
+    assert.deepEqual(page.locations,['/barter/new-barter']);
+    page.button('Back to Edit').props.onClick(); page.render();
+    page.find(n => n.props?.['aria-label'] === 'Go back').props.onClick(); page.render();
+    assert.equal(page.button('Escrow').props['aria-pressed'], true);
+    assert.ok(page.button('Sell Items'));
 });

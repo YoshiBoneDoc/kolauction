@@ -83,7 +83,7 @@ export default function SiteActivity({ children }) {
                 </ul> : <p className="mt-1 text-xs">User list unavailable until the database update is applied.</p>}
             </div> : <p role="status">Activity unavailable</p>}
         </aside>}
-        <div className="min-w-0 flex-1">{children}</div>
+        <div className="site-route-content min-w-0 flex-1">{children}</div>
     </div>;
 }
 

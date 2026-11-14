@@ -1,19 +1,46 @@
 # kHub handoff
 
-## November 14 escrow fee/promotion engine — local, disabled
+## November 14 Barter Corner — local implementation, migration queued
+
+Queued **273** adds a separate Direct-only barter ledger and scoped RPCs. Website
+creation now publishes barters, with a 40m total lot market-value check and optional
+minimum. Separate browse/details support Meat plus item offers, host accept/reject/
+item-change requests, bidder feedback, accepted-only history and pending-bid links.
+Offers/decisions close at the fixed deadline; last accepted offer wins. No ordinary
+auction, bot transfer/reserve or financial totals paths change. Direct exchange is
+manual; ordinary settlement confirmations/statistics are not integrated. See
+[rules, architecture, limitations and rollout](docs/BARTER_CORNER.md:1).
+
+Disposable full-migration barter tests pass; targeted Node 44 pass / 5 fail, with
+the same five publication failures as the baseline. Build, changed-source lint,
+secret scan and diff checks pass. No browser visual QA, production SQL/deployment
+or real transfer performed. Apply 273 once after confirmed 272, then deploy the
+website; matching ignored bot SQL is an alternative copy, not a second apply.
+Personal quickstart unchanged.
+
+## November 14 production migration status — owner confirmed
+
+Owner confirmed all migrations applied, including **268** and **269–272**.
+This confirmation supersedes older queued/not-applied migration notes below;
+do not rerun those migrations based on historical rollout instructions. Website,
+cache Worker and bot deployment versions, feature activation, and successful live
+leaderboard refresh after the repair remain unverified. SQL installation alone
+does not establish deployment or activation.
+
+## November 14 escrow fee/promotion engine — SQL applied, activation unverified
 
 Owner approved implementation with future promotions pinned at creation, cheaper
 normal benefits during November, and November compatibility exceptions. See
 [policy, exceptions, tests and owner-controlled rollout](docs/ESCROW_FEE_PROMOTIONS.md:1).
-Queued **269–272** add authoritative SQL fees, permanent loyalty, global financial
+Applied **269–272** add authoritative SQL fees, permanent loyalty, global financial
 ranks, locked terms/reserves, durable settlement decisions, and compact draft /
 preview / confirm promotion controls. Matching ignored bot SQL copies and generic
 financial-report Fee labels are included. Normal activation is separately gated;
 installation does not activate it or end/reset November. The current promotion
 retains progressive rates, settlement-time selection/allowance, grandfathered Buy
 fills and its original messages. Future promotions use flat brackets and retained
-creation terms. No production migration, deployment, activation or real transfer
-was performed. Personal quickstart unchanged.
+creation terms. Production SQL application is owner-confirmed; no deployment,
+activation or real transfer was performed by this agent. Personal quickstart unchanged.
 
 New engine and six existing targeted database suites pass. Website Node 24:
 644 passed / 20 failed, no new failing names versus clean HEAD (639/21). Mocked
@@ -23,22 +50,26 @@ and normalization; all 95 escrow tests pass, including the original failure.
 Other malformed entries retain their review/hold protections. Not deployed.
 Build/lint/secret scan pass. Browser visual QA remains outstanding.
 
-## November 14 leaderboard refresh repair — not applied
+## November 14 leaderboard refresh repair — SQL applied
 
 Production log shows discovery maintenance failing at the unqualified DELETE in
 `khub_bot.refresh_leaderboards()` with `DELETE requires a WHERE clause` (21000).
-Queued **268** adds `where profile_id is not null` (the primary key), preserving
+Applied **268** adds `where profile_id is not null` (the primary key), preserving
 the atomic full snapshot rebuild, cooldown, locks, ranking rules and grants.
-Apply once after 262; compatible with 263–267. Matching ignored bot copy exists.
+Owner confirmed application; compatible with 263–267. Matching ignored bot copy exists.
 No bot binary update/restart or website deployment is needed for this SQL-only fix.
 The migration does not force refresh; normal discovery maintenance retries it.
 Disposable leaderboard regression passes, including nonempty snapshot replacement,
 cooldown, stale entry removal and unchanged function definition outside the predicate.
 Local PostgreSQL lacks the production DELETE safeguard extension, so extension-level
-verification remains outstanding. No production SQL/data action was performed.
-The fee/promotion implementation plan remains unapproved; quickstart unchanged.
+verification remains outstanding. No production SQL/data action was performed by
+this agent; successful live refresh after installation has not been independently
+verified. Rankings have a five-minute refresh cooldown and rebuild through normal
+bot maintenance; delays/failures can extend that interval. The leaderboard page
+loads a snapshot when opened and does not automatically poll; reload to see newer
+rankings. Personal quickstart unchanged.
 
-Updated November 7, 2026. Local implementation includes migrations through **239**.
+Updated November 14, 2026. Owner confirms all migrations through **272** applied.
 Read this, then inspect the relevant code; the roadmap and older rollout notes may
 lag implementation. Source placement does not prove production installation.
 
@@ -590,3 +621,10 @@ preview state/options and button styling. Default benefits now always derive fro
 the signed-in viewer's actual loaded rankings; normal tier hover previews remain.
 Progress, personal totals and special-rate palettes are unchanged. 21 focused
 tests, changed-source lint and build passed. No settlement changes or deployment.
+
+Barter review privacy follow-up: queued **274** hides bidder names and KoL IDs in
+review responses for non-admins and adds catalog image URLs to offer items. Final
+winner contact details remain limited to settlement participants after the deadline.
+The review UI adds compact item icons and Meat-stack shorthand. Apply 274 after
+273 and deploy the website; local database privacy checks, build and lint pass.
+No production application or deployment performed. Personal quickstart unchanged.

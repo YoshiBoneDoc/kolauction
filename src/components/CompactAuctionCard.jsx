@@ -1,3 +1,4 @@
+import BarterSymbol from './BarterSymbol';
 import RemainingTime from './RemainingTime';
 import AuctionLiveUnavailable from './AuctionLiveUnavailable';
 import RelistButton from './RelistButton';
@@ -22,13 +23,15 @@ export default function CompactAuctionCard({ auction, now, expanded = false, onT
     const formId = useId();
     const linkState = { browseFrom: `${location.pathname}${location.search}` };
     if (auction.liveUnavailable) return <AuctionLiveUnavailable auction={auction} />;
+    const isBarter = auction.auctionKind === 'barter';
+    const detailPath = `${isBarter ? '/barter' : '/auction'}/${auction.id}`;
     const result = getAuctionResult(auction, now);
     const active = result.status === 'active';
     const ownsAuction = Boolean(currentUser?.id) && currentUser.id === auction.sellerId;
     const status = getAuctionDisplayStatus(auction, result);
     const ended = ['completed', 'awaiting_trade', 'settling', 'ended_no_bids', 'expired', 'cancelled', 'voided'].includes(result.status);
-    const price = result.finalPrice ?? (auction.currentBid || auction.minBidMeat);
-    const priceLabel = result.hasWinner ? 'Final price' : auction.currentBid ? active ? 'Current bid' : 'Last bid' : 'Minimum bid';
+    const price = result.finalPrice ?? (auction.currentBid || auction.minBidMeat || 0);
+    const priceLabel = isBarter && auction.currentBid ? 'Current accepted bid' : result.hasWinner ? 'Final price' : auction.currentBid ? active ? 'Current bid' : 'Last bid' : 'Minimum bid';
     const shortPriceLabel = result.hasWinner ? 'Final' : auction.currentBid ? active ? 'Bid' : 'Last' : 'Min';
     const bidCount = Math.max(auction.bidCount ?? auction.bids?.length ?? 0, auction.currentBid > 0 ? 1 : 0);
     const hasBids = bidCount > 0;
@@ -39,7 +42,7 @@ export default function CompactAuctionCard({ auction, now, expanded = false, onT
     if (auction.auctionKind === 'buy') return <BuyAuctionCard auction={auction} now={now} inlineReserve expanded={expanded} onToggleReserve={onToggleBid} />;
     return <article className={`relative isolate grid h-[134px] min-w-0 self-start grid-cols-[60px_minmax(0,1fr)] grid-rows-[32px_44px_44px] gap-x-3 overflow-hidden rounded-lg border border-gray-200 ${auctionCardBackground(result.status)} px-3 py-1.5 shadow-sm transition-shadow hover:border-gray-300 hover:shadow-md [&_button]:relative [&_button]:z-10 [&_input]:relative [&_input]:z-10 [&_label]:relative [&_label]:z-10 auction-card`}>
         <header className="col-span-2 flex min-h-0 items-start justify-between gap-3">
-            <Link to={`/auction/${auction.id}`} state={linkState} title={itemLabel}
+            <Link to={detailPath} state={linkState} title={itemLabel}
                 className="min-w-0 flex-1 rounded text-[#14248A] after:absolute after:inset-0 after:z-0 after:cursor-pointer after:rounded-lg hover:text-[#14248A] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-blue-500">
                 <h2 className="flex min-w-0 items-start gap-1 text-base font-bold leading-5">
                     <span className="line-clamp-2 min-w-0 break-words">{auction.item}</span>
@@ -51,18 +54,19 @@ export default function CompactAuctionCard({ auction, now, expanded = false, onT
                     <time dateTime={new Date(auction.endTime).toISOString()} title={`Ends ${new Date(auction.endTime).toLocaleString()}`}><RemainingTime endTime={auction.endTime} /></time> left
                 </p> : <p title={status.label} className={`max-w-full truncate leading-3 text-xs font-semibold ${status.color}`}>{status.label}</p>}
                 <TradeTypeBadge escrow={auction.escrowMode} compact short />
-                {auction.mrARate > 0 && <MrAAcceptedIcon tiny />}
+                {isBarter && <BarterSymbol size={28} />}
+                {!isBarter && auction.mrARate > 0 && <MrAAcceptedIcon tiny />}
             </div>
         </header>
-        <Link to={`/auction/${auction.id}`} state={linkState} aria-label={`View ${itemLabel}`} className="col-start-1 row-start-2 row-span-2 flex h-[60px] w-[60px] self-center items-center justify-center rounded-md bg-white/70">
+        <Link to={detailPath} state={linkState} aria-label={`View ${itemLabel}`} className="col-start-1 row-start-2 row-span-2 flex h-[60px] w-[60px] self-center items-center justify-center rounded-md bg-white/70">
             {auction.image ? <img src={auction.image} alt="" loading="lazy" className="h-[60px] w-[60px] object-contain [image-rendering:pixelated]" /> : <span className="text-[10px] text-gray-400">No image</span>}
         </Link>
         <div className="col-span-2 col-start-1 row-start-2 flex min-h-0 min-w-0 flex-col items-center justify-center text-center pt-2">
             <FittedPrice as="p" fitKey={`${price}:${auction.quantity}:${shortPriceLabel}:${active}:${hasBids}:${auction.isHot}`} title={`${priceLabel}: ${price.toLocaleString('en-US')} Meat`} className="w-full shrink-0 text-[26px] font-bold leading-7 tracking-tight text-[#112D4E]">
-                {(!active || !hasBids) && <span className="text-[11px] font-normal tracking-normal text-gray-500">{shortPriceLabel}: </span>}{active && auction.isHot && <span role="img" aria-label="Top 10% of active auctions by total bids" title="Top 10% of active auctions by total bids" className="mr-1 inline-block text-lg">🔥</span>}<SellPrice amount={price} quantity={auction.quantity} />
+                {(!active || !hasBids) && !(isBarter && !price) && <span className="text-[11px] font-normal tracking-normal text-gray-500">{shortPriceLabel}: </span>}{active && auction.isHot && <span role="img" aria-label="Top 10% of active auctions by total bids" title="Top 10% of active auctions by total bids" className="mr-1 inline-block text-lg">🔥</span>}{isBarter && !price ? 'No minimum' : <SellPrice amount={price} quantity={auction.quantity} />}
             </FittedPrice>
             {(hasBids || auction.instantPurchasePrice > 0) && <div className="flex max-w-full shrink-0 items-baseline justify-center gap-2 text-xs leading-4">
-                {hasBids && <p className="shrink-0 text-gray-500">Bid ({bidCount.toLocaleString('en-US')} total)</p>}
+                {hasBids && (!isBarter || auction.bidCount != null) && <p className="shrink-0 text-gray-500">Bid ({bidCount.toLocaleString('en-US')} total)</p>}
                 {auction.instantPurchasePrice > 0 && <p title={`Buyout: ${auction.instantPurchasePrice.toLocaleString('en-US')} Meat`} className="min-w-0 truncate font-medium text-green-800">
                     Buyout: {formatCompactMeat(auction.instantPurchasePrice)}
                 </p>}
@@ -71,7 +75,10 @@ export default function CompactAuctionCard({ auction, now, expanded = false, onT
         {ended ? <footer className="col-span-2 col-start-1 row-start-3 flex items-end">
             <AuctionEndedTime auction={auction} /><div className="relative z-10 ml-auto flex shrink-0 flex-col items-center gap-0.5">{ownsAuction && <span className="text-[10px] text-gray-500">Your Listing</span>}<RelistButton auction={auction} now={now} /></div>
         </footer> : showForm ? <section id={formId} aria-label={`Bidding for ${auction.item}`} className="col-start-2 row-start-3 min-h-0 min-w-0 [&_a]:relative [&_a]:z-10">
-            {currentUser ? <AuctionBidForm auction={auction} inline showTerms={false} onClose={onToggleBid} /> : <div className="flex h-full min-w-0 items-end gap-1">
+            {isBarter || auction.mrARate > 0 ? <div className="flex h-full min-w-0 items-end justify-end gap-1">
+                <Link to={detailPath} state={linkState} className="auction-card-go-action inline-flex h-8 min-w-0 items-center justify-center whitespace-nowrap rounded-[2px] border border-blue-600 bg-blue-600 px-3 py-0 text-xs font-semibold text-white hover:border-blue-700 hover:bg-blue-700">Go to Auction</Link>
+                <button type="button" onClick={onToggleBid} aria-label="Close Bid Form" className="auction-card-close-action inline-flex h-8 items-center justify-center rounded-[2px] border border-gray-300 bg-white px-3 py-0 text-xs font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-100">Close</button>
+            </div> : currentUser ? <AuctionBidForm auction={auction} inline showTerms={false} onClose={onToggleBid} /> : <div className="flex h-full min-w-0 items-end gap-1">
                 <div role="alert" className="relative z-10 flex h-8 min-w-0 flex-1 items-center rounded-[2px] border border-red-200 bg-red-50 px-1 py-0 text-xs leading-[14px] text-red-800">
                     <p><Link to="/register" className="font-semibold text-red-800 underline hover:text-red-900">Register</Link> or <Link to="/login" className="font-semibold text-red-800 underline hover:text-red-900">log in</Link> to bid on auctions.</p>
                 </div>

@@ -5,6 +5,7 @@ export function activeNavigationPath(pathname) {
     if (path === '/') return '/';
     if (path === '/auctions' || path.startsWith('/auction/') || path.startsWith('/seller/')) return '/auctions';
     if (path === '/auction-item') return '/auction-item';
+    if (path === '/barter' || path.startsWith('/barter/')) return '/barter';
     if (['/info', '/donate', '/support', '/report-a-bug'].includes(path)) return '/info';
     if (path === '/update-log') return '/update-log';
     if (path === '/leaderboards') return '/leaderboards';

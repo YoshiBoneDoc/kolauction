@@ -1,3 +1,5 @@
+import BarterSymbol from '../components/BarterSymbol';
+import { writeBarter } from '../lib/barter';
 import MarketPrice from '../components/MarketPrice';
 import MrAPaymentOptions from '../components/MrAPaymentOptions';
 import { canViewRaffles } from '../lib/raffleVisibility';
@@ -67,6 +69,7 @@ export default function AuctionAnItem() {
     const changeMrAPayment = useCallback((enabled, rate) => { setMrAEnabled(enabled); setMrARate(rate); }, []);
     const [auctionKind, setAuctionKind] = useState(() => new URLSearchParams(search).get('kind') === 'buy' ? 'buy' : 'sell');
     const [deliveryMode, setDeliveryMode] = useState('immediate');
+    const isBarter = auctionKind === 'barter';
     const isBuy = auctionKind === 'buy';
     const isBundle = auctionKind === 'bundle';
     const minimumPricing = useListingPrice(isBundle ? '1' : quantity, isBuy ? 'item' : 'whole');
@@ -112,6 +115,7 @@ export default function AuctionAnItem() {
     const previewHeading = useRef(null);
     const publishDialog = useRef(null);
     const submitting = useRef(false);
+    const barterPublication = useRef(null);
     const protectionSection = useRef(null);
     const protectionLinkHandled = useRef(null);
     const protectionLink = hash === '#escrow-protection';
@@ -186,7 +190,7 @@ export default function AuctionAnItem() {
         if (!isBundle && ((minimumPricing.message && !minBidMeat) || (buyoutPricing.message && !instantPrice && !isBuy))) { setError(minimumPricing.message || buyoutPricing.message); return; }
         const item = catalogItems.find(entry => String(entry.id) === selectedItem && isAuctionableItem(entry));
         const count = parseAuctionAmount(quantity, 5000000000);
-        const minimum = parseMeatAmount(minBidMeat);
+        const minimum = isBarter && !minBidMeat.trim() ? null : parseMeatAmount(minBidMeat);
         const purchasePrice = !isBuy && instantPrice.trim() ? parseMeatAmount(instantPrice) : null;
         if (!isBundle && !isBuy && (buyoutPricing.whole.trim() || buyoutPricing.item.trim()) && !instantPrice.trim()) { setError(buyoutPricing.message || 'Enter a valid positive buyout price in Meat.'); return; }
         let contents = null;
@@ -197,7 +201,7 @@ export default function AuctionAnItem() {
         }
         if (!isBundle && !item) { setError('Please select an item to auction.'); return; }
         if (!isBundle && count === null) { setError('Quantity must be a whole number between 1 and 5 billion.'); return; }
-        if (minimum === null) { setError(isBuy ? 'Enter a valid positive price per item in Meat.' : 'Enter a valid positive minimum bid in Meat.'); return; }
+        if (minimum === null && !(isBarter && !minBidMeat.trim())) { setError(isBuy ? 'Enter a valid positive price per item in Meat.' : 'Enter a valid positive minimum bid in Meat.'); return; }
         if (!isBuy && instantPrice.trim() && (purchasePrice === null || purchasePrice < minimum)) {
             setError('Buyout price must be a valid Meat amount at least as large as the minimum bid.'); return;
         }
@@ -216,8 +220,9 @@ export default function AuctionAnItem() {
         if (relisting && relistPricing === 'reduce' && !/^(?:[1-9]|[1-9][0-9])$/.test(relistReduction)) {
             setError('Enter a reduction from 1 to 99 percent.'); return;
         }
+        if (isBarter) barterPublication.current = crypto.randomUUID();
         setPreview({ ...(mrAEnabled && !isBuy && !giveaway ? { mrARate } : {}), ...(relisting ? { autoRelist: true, relistCount: Number(relistCount), relistReduction: relistPricing === 'reduce' ? Number(relistReduction) : 0 } : {}), ...(giveaway ? { giveawayTitle: giveawayTitle.trim(), giveawayWinCondition: giveawayCondition } : {}), item: contents ? bundleTitle(contents, customTitle) : item.name, itemId: contents ? contents[0].id : item.id, quantity: contents ? 1 : count, ...(contents ? { bundleItems: contents, bundleTitle: customTitle || null, bundleImageItemId: contents.some(entry => entry.id === bundleImageItemId) ? bundleImageItemId : null } : {}), minBidMeat: minimum, instantPurchasePrice: purchasePrice, auctionTime, escrowMode, ...(customEndAt ? { customEndAt } : {}),
-            image: contents ? bundleCover(contents, bundleImageItemId, bundlePrices).image : itemImageUrl(item.image), ...(isBuy ? { auctionKind, deliveryMode } : {}) });
+            image: contents ? bundleCover(contents, bundleImageItemId, bundlePrices).image : itemImageUrl(item.image), ...(isBuy ? { auctionKind, deliveryMode } : isBarter ? { auctionKind: 'barter' } : {}) });
         setError('');
         setBundleTitleConflict(false);
         requestAnimationFrame(() => previewHeading.current?.focus());
@@ -230,9 +235,12 @@ export default function AuctionAnItem() {
         setPending(true);
         setError('');
         try {
-            const id = await addAuction(preview);
+            const id = preview.auctionKind === 'barter' ? await writeBarter('create_barter_auction', {
+                p_item_id: preview.itemId, p_quantity: preview.quantity, p_minimum: preview.minBidMeat,
+                p_duration: Number(preview.auctionTime), p_end: preview.customEndAt || null, p_request: barterPublication.current,
+            }) : await addAuction(preview);
             publishDialog.current?.close();
-            navigate(id ? `/auction/${id}` : '/auctions');
+            navigate(preview.auctionKind === 'barter' ? `/barter/${id}` : id ? `/auction/${id}` : '/auctions');
         } catch (failure) {
             setError(failure.message);
             if (failure.code === 'PBT01') {
@@ -284,11 +292,23 @@ export default function AuctionAnItem() {
 
     return (
         <main className="auction-create-page site-page-background flex-1 p-4 sm:p-6">
-            <div className="auction-create-shell">
-            <h1 className={`mb-6 text-center text-3xl font-bold text-blue-600 sm:text-4xl ${giveaway ? 'special-create-title' : ''}`}>{giveaway ? 'Create Giveaway' : 'Create Auction'}</h1>
+            <div className={`auction-create-shell ${!preview && !giveaway ? 'auction-create-has-switch' : ''}`}>
+            <div className="auction-create-header mb-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
+            <h1 className={`flex-1 text-center text-3xl font-bold text-blue-600 sm:text-4xl ${giveaway ? 'special-create-title' : ''}`}>{giveaway ? 'Create Giveaway' : isBarter ? 'Create Barter' : 'Create Auction'}</h1>
+            {!preview && !giveaway && <div className="barter-switch-position">
+                <button type="button" aria-label={isBarter ? 'Go back' : 'Barter Instead'} onClick={() => {
+                    setAuctionKind(isBarter ? 'sell' : 'barter'); setEscrowMode(isBarter);
+                    setMrAEnabled(false); setMrARate(null); setShowBuyout(false); setInstantPrice('');
+                    setAutoRelist(false); setError('');
+                }} className="barter-switch inline-flex min-h-9 items-center gap-1 bg-transparent text-xs font-semibold">
+                    {!isBarter && <BarterSymbol />}
+                    <span>{isBarter ? 'Go back' : 'Barter Instead'}</span>
+                </button>
+            </div>}
+            </div>
             {!preview && !giveaway && kolIdentity && !kolIdentity.kol_player_id && <p className="mx-auto mb-4 max-w-lg text-sm text-gray-700">First <Link to="/profile" className="text-blue-700 underline">link your KoL account</Link>.</p>}
             <div className="auction-create-content">
-                {!preview && !giveaway && <div className="mb-5">
+                {!preview && !giveaway && !isBarter && <div className="mb-5">
                     <div role="group" aria-label="Auction type" className="grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
                         {[['buy','Buy Items'],['sell','Sell Items']].map(([value,label]) => {
                             const selected = value === 'buy' ? isBuy : !isBuy;
@@ -310,9 +330,9 @@ export default function AuctionAnItem() {
                     </fieldset>}
                 </div>}
                 {error && <p id="listing-error" role="alert" className="mb-4 break-words font-semibold text-red-700">{error}</p>}
-                {preview ? <section aria-label="Preview auction">
-                    <h2 ref={previewHeading} tabIndex={-1} className="text-xl font-bold text-gray-900">Preview Auction</h2>
-                    <p className="mt-1 text-sm text-gray-500">Review your listing details before publishing.</p>
+                {preview ? <section aria-label={isBarter ? 'Preview barter' : 'Preview auction'}>
+                    <h2 ref={previewHeading} tabIndex={-1} className="text-xl font-bold text-gray-900">{isBarter ? 'Preview Barter' : 'Preview Auction'}</h2>
+                    <p className="mt-1 text-sm text-gray-500">{isBarter ? 'Review your barter listing before publishing.' : 'Review your listing details before publishing.'}</p>
                     {preview.bundleItems ? <>
                         <div className="bundle-preview-summary my-4 rounded-xl border border-[#EADBD3] bg-[#FFF7F2] p-4">
                             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -346,13 +366,13 @@ export default function AuctionAnItem() {
                             <dd className="text-right"><TradeTypeBadge escrow={preview.escrowMode} short /></dd>
                         </div>
                         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] items-baseline gap-3 py-2.5">
-                            <dt className="text-gray-500">{preview.auctionKind === 'buy' ? 'Price per item' : `Minimum bid${preview.bundleItems ? '' : ' (whole listing)'}`}</dt>
-                            <dd className="min-w-0 break-words text-right font-medium tabular-nums text-gray-900">{preview.minBidMeat.toLocaleString('en-US')} Meat</dd>
+                            <dt className="text-gray-500">{isBarter ? 'Minimum Bid Market Value' : preview.auctionKind === 'buy' ? 'Price per item' : `Minimum bid${preview.bundleItems ? '' : ' (whole listing)'}`}</dt>
+                            <dd className="min-w-0 break-words text-right font-medium tabular-nums text-gray-900">{preview.minBidMeat == null ? 'No minimum' : `${preview.minBidMeat.toLocaleString('en-US')} Meat`}</dd>
                         </div>
-                        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] items-baseline gap-3 py-2.5">
+                        {!isBarter && <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] items-baseline gap-3 py-2.5">
                             <dt className="text-gray-500">{preview.auctionKind === 'buy' ? 'Delivery' : `Buyout price${preview.bundleItems ? '' : ' (whole listing)'}`}</dt>
                             <dd className="min-w-0 break-words text-right font-medium tabular-nums text-gray-900">{preview.auctionKind === 'buy' ? (preview.deliveryMode === 'immediate' ? 'As acquired' : 'When order ends') : preview.instantPurchasePrice ? `${preview.instantPurchasePrice.toLocaleString('en-US')} Meat` : 'Not offered'}</dd>
-                        </div>
+                        </div>}
                         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] items-baseline gap-3 py-2.5">
                             <dt className="text-gray-500">{preview.customEndAt ? 'Ending time' : 'Duration'}</dt>
                             <dd className="min-w-0 break-words text-right font-medium tabular-nums text-gray-900">{preview.customEndAt ? formatAuctionEnd(preview.customEndAt) : `${preview.auctionTime} hours`}</dd>
@@ -380,7 +400,7 @@ export default function AuctionAnItem() {
                         className="m-auto w-[calc(100%-2rem)] max-w-lg rounded-xl border-0 bg-white p-6 text-gray-800 shadow-xl backdrop:bg-black/40">
                         <h2 id="publish-auction-title" className="text-xl font-bold">Please review the following before publishing your auction.</h2>
                         <div id="publish-auction-description" className="mt-4 space-y-4 text-sm leading-6">
-                            {preview.auctionKind === 'buy' ? <p>Deposit the required Meat within 24 hours. Your timer starts when funding is accepted. You may cancel the unfilled portion at any time; completed purchases and their fees are final. Unused funds and fee reserve are refunded.</p> : <><p>You may cancel your auction at any time without penalty, provided no bids have been accepted.</p>
+                            {isBarter ? <><p>Offers contain the exact Meat and item quantities shown. Market values are estimates; no assets are collected or verified by kHub.</p><p>Review offers before the deadline. Only an offer you accept becomes the current highest bid. The last accepted offer at the deadline is the winning Direct barter, even if its estimated value is lower than an earlier accepted offer.</p><p>You and the winning bidder must honor the exact agreed exchange. Barters are listed only in Barter Corner.</p></> : preview.auctionKind === 'buy' ? <p>Deposit the required Meat within 24 hours. Your timer starts when funding is accepted. You may cancel the unfilled portion at any time; completed purchases and their fees are final. Unused funds and fee reserve are refunded.</p> : <><p>You may cancel your auction at any time without penalty, provided no bids have been accepted.</p>
                             <p>Once an accepted bid meets or exceeds your minimum bid, <strong>you are obligated to honor the sale</strong> and can no longer cancel or withdraw from the auction.</p>
                             <p className="text-red-600">Failure to honor a completed auction is a violation of kHub policy and will result in a temporary or permanent ban. Don’t auction items you don’t own or aren’t prepared to part with.</p></>}
                         </div>
@@ -397,8 +417,8 @@ export default function AuctionAnItem() {
                         <legend className="mb-2 text-sm font-bold">Trading Method</legend>
                         <div className="grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
                             {[[true, 'Escrow'], [false, 'Direct']].map(([value, label]) => <button
-                                key={label} type="button" disabled={isBuy && !value} aria-pressed={escrowMode === value}
-                                onClick={() => { setEscrowMode(value); setError(''); }}
+                                key={label} type="button" disabled={(isBuy && !value) || (isBarter && value)} aria-pressed={escrowMode === value}
+                                onClick={() => { if ((isBuy && !value) || (isBarter && value)) return; setEscrowMode(value); setError(''); }}
                                 className={`min-h-11 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 ${escrowMode === value
                                     ? 'border-blue-200 bg-white text-blue-800 shadow-sm hover:border-blue-300 hover:bg-blue-50'
                                     : 'border-transparent bg-transparent text-slate-500 hover:border-transparent hover:bg-white/70 hover:text-slate-800'}`}>
@@ -406,6 +426,7 @@ export default function AuctionAnItem() {
                             </button>)}
                         </div>
                         {isBuy && <p className="mt-2 text-xs text-gray-600">For now, creating a Buy auction is limited to Escrow</p>}
+                        {isBarter && <p className="mt-2 text-xs text-gray-600">For now, creating a barter is limited to Direct Trades</p>}
                     </fieldset>}
                     {!giveaway && <div id="escrow-protection" ref={protectionSection} className={`${escrowMode && !isBuy ? 'mb-2' : 'mb-5'} scroll-mt-4`}>
                         {escrowMode ? <EscrowProtection forListing buy={isBuy} minimumPrice={minimumValue} /> : <DirectTradeHelp forListing />}
@@ -419,6 +440,7 @@ export default function AuctionAnItem() {
                             aria-describedby={`bundle-title-help${bundleTitleConflict ? ' listing-error' : ''}`} className={fieldClass} />
                         <p id="bundle-title-help" className="-mt-2 mb-4 text-xs text-gray-600">Leave blank for an automatic title. Up to {MAX_BUNDLE_TITLE_LENGTH} characters.</p>
                     </>}
+                    {isBarter && <p className="mb-2 text-xs text-gray-600">What item would you like to sell? Minimum total market value: 40m Meat.</p>}
                     <div className="auction-item-quantity-grid"><div className="auction-item-search-field">
                     <label htmlFor="listing-item-search" className="mb-2 block text-sm font-bold">Item</label>
                     <input id="listing-item-search" type="search" value={itemSearch} onChange={(event) => setItemSearch(event.target.value)} placeholder="Start typing an item name…" aria-describedby={hasItemSearch ? 'listing-search-help' : undefined} className={fieldClass} />
@@ -505,12 +527,12 @@ export default function AuctionAnItem() {
                         {bundleEntries.length > 0 && <div className="mt-3" aria-live="polite"><BundleMarketPrice items={bundleEntries.map(entry => ({ id: Number(entry.id), quantity: parseAuctionAmount(String(entry.quantity), 5000000000) ?? 0 }))} /></div>}
                     </section>}
                     <hr className="mb-3 border-0 border-t border-[#ead8ce] dark:border-[#594337]" />
-                    {!isBuy && !giveaway && <MrAPaymentOptions enabled={mrAEnabled} rate={mrARate} onChange={changeMrAPayment} />}
+                    {!isBuy && !giveaway && !isBarter && <MrAPaymentOptions enabled={mrAEnabled} rate={mrARate} onChange={changeMrAPayment} />}
                     {isBundle ? <>
                     <label htmlFor="minBidMeat" className="mb-2 block text-sm font-bold">{isBuy ? 'Maximum purchase price per item (Meat):' : 'Minimum Bid (Meat, whole listing):'}</label>
                     <input id="minBidMeat" type="text" inputMode="decimal" required autoComplete="off" value={minBidMeat} onChange={(event) => setMinBidMeat(event.target.value)} onBlur={() => setMinBidMeat(value => normalizeAuctionAmount(value, { meat: true }))} placeholder="e.g. 1000, 10b, 4.53m, 50k" className={fieldClass} />
-                    </> : <ListingPriceInputs id="minimum-price" label={isBuy ? 'Maximum purchase price (Meat):' : 'Minimum Bid (Meat):'} pricing={minimumPricing} required />}
-                    {!isBuy && !giveaway && (showBuyout ? <section id="buyout-price-fields" className="mb-4 border-t border-[#ead8ce] pt-3 dark:border-[#594337]">
+                    </> : <ListingPriceInputs id="minimum-price" label={isBuy ? 'Maximum purchase price (Meat):' : isBarter ? 'Minimum Bid Market Value (optional):' : 'Minimum Bid (Meat):'} pricing={minimumPricing} required={!isBarter} />}
+                    {!isBuy && !giveaway && !isBarter && (showBuyout ? <section id="buyout-price-fields" className="mb-4 border-t border-[#ead8ce] pt-3 dark:border-[#594337]">
                         {isBundle ? <>
                         <div className="mb-2 flex items-center justify-between gap-2"><label htmlFor="instantPurchasePrice" className="text-sm font-bold">Buyout Price (Meat, whole listing, optional):</label>{removeBuyoutControl}</div>
                         <input ref={buyoutInput} id="instantPurchasePrice" type="text" inputMode="decimal" autoComplete="off" value={instantPrice}
@@ -558,7 +580,6 @@ export default function AuctionAnItem() {
                             className="block min-h-11 w-full min-w-0 max-w-full rounded border border-gray-400 bg-white p-3 text-base text-gray-900" />
                         <p id="custom-ending-help" className="mt-2 text-xs text-gray-500">Your timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}. Choose a time within 30 days.{escrowMode && ' Deposit your items before the chosen ending time.'}</p>
                     </section>}
-                    {!isBuy && !giveaway && <p className="-mt-2 mb-4 text-xs text-gray-500">Last-minute bids reset the countdown to 1 minute.</p>}
                     {escrowMode && !isBuy && !giveaway && <div className="auction-relist-panel mb-5 border border-stone-200 bg-[#fffaf6] text-sm">
                         <label className="auction-relist-toggle flex cursor-pointer items-center gap-2 text-gray-700">
                             <input type="checkbox" checked={autoRelist} onChange={event => setAutoRelist(event.target.checked)} aria-controls="auto-relist-options" aria-expanded={autoRelist} className="auction-relist-checkbox" />
@@ -582,7 +603,7 @@ export default function AuctionAnItem() {
                         </div>}
                     </div>}
                     {currentUser?.isAdmin && canViewRaffles(currentUser) && !giveaway && auctionKind === 'sell' && escrowMode && <div className="mb-4"><div className="grid grid-cols-2 gap-2"><button type="button" aria-pressed={false} onClick={selectRaffle} className="raffle-mode-button raffle-mode-purple min-h-11 w-full rounded border border-violet-700 bg-violet-700 px-4 font-bold text-white transition-[background-color,box-shadow] duration-150 hover:bg-violet-600 hover:shadow-[0_0_14px_rgba(139,92,246,0.45)] motion-reduce:transition-none">Raffle</button><button type="button" aria-pressed={giveaway} onClick={selectGiveaway} className="raffle-mode-button raffle-mode-red min-h-11 w-full rounded border border-red-700 bg-red-700 px-4 font-bold text-white transition-[background-color,box-shadow] duration-150 hover:bg-red-600 hover:shadow-[0_0_14px_rgba(239,68,68,0.4)] motion-reduce:transition-none">Giveaway</button></div></div>}
-                    <button type="submit" className={`auction-preview-button ${giveaway ? 'special-preview-button giveaway-preview-button' : ''} min-h-11 w-full rounded bg-blue-600 px-4 py-3 font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50`}>{giveaway ? 'Preview Giveaway' : 'Preview Auction'}</button>
+                    <button type="submit" className={`auction-preview-button ${giveaway ? 'special-preview-button giveaway-preview-button' : ''} min-h-11 w-full rounded bg-blue-600 px-4 py-3 font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50`}>{giveaway ? 'Preview Giveaway' : isBarter ? 'Preview Barter' : 'Preview Auction'}</button>
                 </form>}
             </div>
             </div>

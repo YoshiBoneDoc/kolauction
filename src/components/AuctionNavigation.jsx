@@ -61,7 +61,9 @@ export default function AuctionNavigation() {
                     <span aria-hidden="true" className="hidden text-base font-semibold leading-none text-slate-500 lg:inline">·</span>
                     <Link {...linkProps("/auctions")}>All auctions</Link>
                     {separator}
-                    <Link {...linkProps("/auction-item")}>Create Auction</Link>
+                    <Link {...linkProps("/auction-item")} aria-label="Create Auction"><span className="text-center leading-4">Create<br />Auction</span></Link>
+                    {separator}
+                    <Link {...linkProps("/barter")}>Barter</Link>
                     {separator}
                     <Link {...linkProps("/info")}>Info</Link>
                     {separator}

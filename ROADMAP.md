@@ -5,7 +5,7 @@ of production deployment. Start with [the handoff](HANDOFF.md:1).
 
 ## NEED TO FIX:
 - Escrow loyalty and reusable promotions are implemented locally in queued 269–272; normal activation remains disabled. See [policy, November exceptions and rollout gates](docs/ESCROW_FEE_PROMOTIONS.md:1). Production installation/deployment/activation require explicit owner approval.
-- add barter corner
+- Barter Corner is implemented locally with a separate Direct-only ledger, 40m listing minimum, item/Meat offers, host review and private feedback. Apply queued 273 then deploy the website; no production activation is confirmed. See [rules, limitations and verification](docs/BARTER_CORNER.md:1).
 
 ## Future leaderboard fee implementation — preserve trade terms
 

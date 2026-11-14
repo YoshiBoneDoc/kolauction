@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-.auction-page-title, .info-page-title, .auction-create-shell > h1 {
+.auction-page-title, .info-page-title, :is(.auction-create-shell, .auction-create-header) > h1 {
   font-family: 'Crimson Pro', Georgia, serif;
   font-size: clamp(36px, 4vw, 48px);
   line-height: 1.2;
@@ -440,7 +440,7 @@ html[data-theme="dark"] .explore-auction-tab[aria-selected="true"] { color: #ddd
 /* Creation form: warm, quiet surfaces with a single orange action accent. */
 .auction-create-page { background: radial-gradient(ellipse at top, #ffe8de, #fff4ed 75%); }
 .auction-create-shell { max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #efd9cc; border-radius: 22px; background: #fffaf6; box-shadow: 0 8px 28px #743b2010; }
-.auction-create-shell > h1 { margin-bottom: 8px; color: #49220e; font-size: clamp(30px, 3vw, 36px); }
+:is(.auction-create-shell, .auction-create-header) > h1 { margin-bottom: 8px; color: #49220e; font-size: clamp(30px, 3vw, 36px); }
 .auction-create-shell > p { max-width: none; text-align: center; color: #76675f; margin-bottom: 14px; }
 .auction-create-content { min-width: 0; }
 .auction-create-content [aria-label="Auction type"],
@@ -459,7 +459,7 @@ html[data-theme="dark"] .explore-auction-tab[aria-selected="true"] { color: #ddd
 .auction-quantity-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
 .auction-quantity-stepper { display: flex; width: 156px; border: 1px solid #dfcec5; border-radius: 11px; overflow: hidden; }
 .auction-quantity-stepper button { width: 42px; min-width: 42px; height: 38px; padding: 0; border: 0; border-radius: 0; background: transparent; color: #75655b; font-size: 22px; }
-.auction-quantity-stepper #quantity { width: 70px; height: 38px; padding: 4px; border: 0; border-left: 1px solid #efdfd6; border-right: 1px solid #efdfd6; border-radius: 0; text-align: center; box-shadow: none; }
+.auction-quantity-stepper :is(#quantity, .barter-item-quantity) { width: 70px; height: 38px; padding: 4px; border: 0; border-left: 1px solid #efdfd6; border-right: 1px solid #efdfd6; border-radius: 0; text-align: center; box-shadow: none; }
 .auction-create-form input[type="checkbox"] { accent-color: #d75d17; }
 .auction-create-form .auction-preview-button { margin-top: 10px; border: 1px solid #d55c18; border-radius: 13px; background: linear-gradient(#ed833e, #cf530c); color: white; }
 .auction-create-form .auction-preview-button:hover { background: #ce560f; }
@@ -479,10 +479,10 @@ html[data-theme="dark"] .explore-auction-tab[aria-selected="true"] { color: #ddd
 .auction-create-form #auto-relist-options select { min-height: 36px; height: 36px; padding: 6px 8px; font-size: 12px; }
 .auction-create-form #auto-relist-options > div > div { height: 36px; }
 .auction-quantity-stepper button { height: 36px; font-size: 20px; }
-.auction-create-form .auction-quantity-stepper #quantity { min-height: 36px; height: 36px; padding: 4px; }
+.auction-create-form .auction-quantity-stepper :is(#quantity, .barter-item-quantity) { min-height: 36px; height: 36px; padding: 4px; }
 html[data-theme="dark"] .auction-create-shell { background: #241f1c; border-color: #594337; }
 html[data-theme="dark"] .auction-create-page { background: #191614; }
-html[data-theme="dark"] .auction-create-shell > h1, html[data-theme="dark"] .auction-create-form > label, html[data-theme="dark"] .auction-create-form legend { color: #f4ded0; }
+html[data-theme="dark"] :is(.auction-create-shell, .auction-create-header) > h1, html[data-theme="dark"] .auction-create-form > label, html[data-theme="dark"] .auction-create-form legend { color: #f4ded0; }
 html[data-theme="dark"] .auction-create-form input:not([type="checkbox"]):not([type="radio"]), html[data-theme="dark"] .auction-create-form select { background: #302824; color: #f4ded0; border-color: #675044; }
 @media (max-width: 480px) { .auction-create-shell { padding: 20px 16px; border-radius: 16px; } .auction-create-form input:not([type="checkbox"]):not([type="radio"]), .auction-create-form select { font-size: 16px; } .auction-create-form #auto-relist-options select { max-width: 100%; } }
 
@@ -500,7 +500,7 @@ html[data-theme="dark"] .auction-create-form input:not([type="checkbox"]):not([t
 .auction-item-quantity-grid .auction-quantity-row { display: flex; flex-direction: column; align-items: stretch; gap: 8px; margin: 0; }
 .auction-item-quantity-grid .auction-quantity-stepper { width: 120px; }
 .auction-item-quantity-grid .auction-quantity-stepper button { width: 30px; min-width: 30px; height: 36px; font-size: 18px; }
-.auction-create-form .auction-quantity-stepper #quantity { flex: 1; width: 58px; }
+.auction-create-form .auction-quantity-stepper :is(#quantity, .barter-item-quantity) { flex: 1; width: 58px; }
 .auction-create-form .bundle-builder-panel { padding: 12px; }
 .auction-create-form .bundle-add-button { min-height: 36px; padding: 6px 10px; }
 .auction-create-form #escrow-protection summary { padding-top: 4px; padding-bottom: 4px; }
@@ -536,8 +536,8 @@ html[data-theme="dark"] .auction-create-form input:not([type="checkbox"]):not([t
   box-shadow: 0 1px 3px #743b2010;
   transition: transform 180ms ease;
 }
-.auction-create-content [aria-label="Auction type"]:has(button:last-child[aria-pressed="true"])::before,
-.auction-create-form > fieldset:first-child > div:has(button:last-child[aria-pressed="true"])::before { transform: translateX(100%); }
+.auction-create-content [aria-label="Auction type"]:has(button:nth-child(2)[aria-pressed="true"])::before,
+.auction-create-form > fieldset:first-child > div:has(button:nth-child(2)[aria-pressed="true"])::before { transform: translateX(100%); }
 .auction-create-content [aria-label="Auction type"] button,
 .auction-create-form > fieldset:first-child button,
 .auction-create-content [aria-label="Auction type"] button[aria-pressed="true"],
@@ -644,7 +644,7 @@ html[data-theme="dark"] .auction-create-content .listing-shape-option[data-selec
 /* Restore the cool navy palette for creation in dark mode only. */
 html[data-theme="dark"] .auction-create-page { background: #131f30; }
 html[data-theme="dark"] .auction-create-shell { background: #131f30; border-color: #33465f; box-shadow: 0 8px 28px #07101d20; }
-html[data-theme="dark"] .auction-create-shell > h1 { color: #a5b4fc; }
+html[data-theme="dark"] :is(.auction-create-shell, .auction-create-header) > h1 { color: #a5b4fc; }
 html[data-theme="dark"] .auction-create-shell > p { color: #aebbd0; }
 html[data-theme="dark"] .auction-create-form > label,
 html[data-theme="dark"] .auction-create-form legend { color: #e2e8f0; }
@@ -695,3 +695,39 @@ html[data-theme="dark"] .explore-auction-type[aria-pressed="true"] { color: #e2e
 html[data-theme="dark"] .title-font-toolbar,
 html[data-theme="dark"] .title-font-control { color: #fb923c; }
 html[data-theme="dark"] .title-font-control:hover:not(:disabled) { color: #fdba74; background-color: #431407; }
+
+
+.auction-create-shell { position: relative; }
+.auction-create-has-switch { padding-top: 44px; }
+.barter-switch-position { position: absolute; top: 5px; right: 10px; }
+html .auction-create-shell .barter-switch {
+  padding: 0 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #6452ba;
+}
+.barter-switch-symbol { width: 32px; height: 32px; color: #493d70; }
+html[data-theme="dark"] .barter-switch-symbol { color: #f1edff; }
+.barter-switch > span, .barter-switch-symbol { transition: filter 160ms ease, text-shadow 160ms ease; }
+html .auction-create-shell .barter-switch:is(:hover, :focus-visible) {
+  background: transparent;
+  box-shadow: none;
+}
+.barter-switch:is(:hover, :focus-visible) > span { text-shadow: 0 0 8px #9b87ff, 0 0 16px #9b87ff80; }
+.barter-switch:is(:hover, :focus-visible) .barter-switch-symbol { filter: drop-shadow(0 0 5px #9b87ff); }
+html .auction-create-shell .barter-switch:focus,
+html .auction-create-shell .barter-switch:focus-visible { outline: none; }
+html[data-theme="dark"] .auction-create-shell .barter-switch { color: #b7a9ff; }
+@media (max-width: 480px) { .auction-create-shell.auction-create-has-switch { padding-top: 44px; } }
+@media (prefers-reduced-motion: reduce) { .barter-switch > span, .barter-switch-symbol { transition: none; } }
+
+/* Let short barter result pages place their pager at the route's bottom. */
+.site-route-content:has(> .barter-browse-page) { display: flex; flex-direction: column; }
+
+.barter-offer-item { gap: 6px; padding: 5px 8px; }
+.barter-offer-item > img { width: 28px; height: 28px; }
+.auction-create-form .barter-offer-item .bundle-quantity-input { min-height: 30px; height: 30px; padding: 3px 8px; }
+.barter-offer-item .barter-item-step { width: 20px; min-height: 15px; height: 15px; padding: 0; line-height: 15px; }
+html .barter-offer-item .barter-remove-item { min-height: 30px; min-width: 28px; padding: 0 4px; }

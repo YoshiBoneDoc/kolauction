@@ -1,3 +1,4 @@
+import BarterPendingBids from './components/BarterPendingBids';
 import RenderBoundary from './components/RenderBoundary';
 import { UserContext } from './context/UserContext';
 import { lazy, Suspense, useContext } from "react";
@@ -10,6 +11,8 @@ const Raffles = lazy(() => import("./pages/Raffles"));
 const Leaderboards = lazy(() => import("./pages/Leaderboards"));
 const Home = lazy(() => import("./pages/Home"));
 const AllAuctions = lazy(() => import("./pages/AllAuctions"));
+const BarterDetails = lazy(() => import("./pages/BarterDetails"));
+const BarterCorner = lazy(() => import("./pages/BarterCorner"));
 const AuctionAnItem = lazy(() => import("./pages/AuctionAnItem"));
 const Register = lazy(() => import("./pages/Register"));
 const Login = lazy(() => import("./pages/Login"));
@@ -63,6 +66,7 @@ const App = () => {
         <div className={`flex min-h-screen flex-col ${isWallOfShame ? 'shame-background' : 'site-page-background bg-[#F9F9F9]'}`}>
             <div className="px-4 sm:px-6"><AuctionNavigation /></div>
             <SiteBanner />
+            <BarterPendingBids />
             <InvitationGate />
             <AuctionReadError />
             <SiteActivity><RenderBoundary key={`${pathname}${search}`}><Suspense fallback={<RouteLoading />}><Routes>
@@ -85,6 +89,8 @@ const App = () => {
                 <Route path="/info" element={<InfoPage />} /> {/* Add this route */}
                 <Route path="/giveaways" element={<GiveawayInfo />} />
                 <Route path="/auctions" element={<AllAuctions />} />
+                <Route path="/barter" element={<BarterCorner />} />
+                <Route path="/barter/:id" element={<BarterDetails />} />
                 <Route path="/auction-item" element={<AuctionAnItem />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/forgot-password" element={<AuthEmailPage key="recovery" mode="recovery" />} />
