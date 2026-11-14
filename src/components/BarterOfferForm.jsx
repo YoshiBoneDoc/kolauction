@@ -9,22 +9,22 @@ import { offerValue, writeBarter } from '../lib/barter';
 
 const catalog = createItemCatalogService(supabase, () => import('../data/items.json').then(module => module.default));
 const field = 'min-h-10 w-full min-w-0 rounded border border-gray-400 bg-white px-3 py-2 text-sm text-gray-900';
-export default function BarterOfferForm({ auction, onSubmitted, initialOffer }) {
-    const [catalogItems, setCatalogItems] = useState([]);
+export default function BarterOfferForm({ auction, onSubmitted, initialOffer, practice }) {
+    const [catalogItems, setCatalogItems] = useState(() => practice?.items || []);
     const [search, setSearch] = useState('');
     const [selected, setSelected] = useState('');
     const selectedItem = catalogItems.find(item => String(item.id) === selected);
     const [quantity, setQuantity] = useState('1');
     const [meat, setMeat] = useState(() => initialOffer?.meat ? initialOffer.meat.toLocaleString('en-US') : '');
     const [items, setItems] = useState(() => (initialOffer?.items || []).map(item => ({ id: item.id, name: item.name, quantity: item.quantity })));
-    const [prices, setPrices] = useState(new Map());
+    const [prices, setPrices] = useState(() => practice?.prices || new Map());
     const [error, setError] = useState('');
     const [pending, setPending] = useState(false);
     const lock = useRef(false);
     const token = useRef(null);
-    useEffect(() => { let active = true; catalog.load().then(rows => { if (active) setCatalogItems(rows); }); return () => { active = false; }; }, []);
+    useEffect(() => { if (practice) return; let active = true; catalog.load().then(rows => { if (active) setCatalogItems(rows); }); return () => { active = false; }; }, [practice]);
     const ids = items.map(item => item.id).sort((a, b) => a - b).join(',');
-    useEffect(() => { let active = true; marketPrices.load(ids ? ids.split(',').map(Number) : []).then(rows => { if (active) setPrices(rows); }); return () => { active = false; }; }, [ids]);
+    useEffect(() => { if (practice) return; let active = true; marketPrices.load(ids ? ids.split(',').map(Number) : []).then(rows => { if (active) setPrices(rows); }); return () => { active = false; }; }, [ids, practice]);
     const meatAmount = meat.trim() ? parseMeatAmount(meat) : 0;
     const offerItems = items.map(item => ({ ...item, quantity: parseAuctionAmount(String(item.quantity), 5000000000) ?? 0 }));
     const value = meatAmount == null ? null : offerValue(meatAmount, offerItems, prices);
@@ -45,17 +45,22 @@ export default function BarterOfferForm({ auction, onSubmitted, initialOffer }) 
         if (lock.current) return;
         if (value == null || value <= 0) { setError('Add Meat or items with available market prices. The total cannot exceed 20b Meat.'); return; }
         if (auction.minimumValue != null && value <= auction.minimumValue) { setError('Your offer must exceed the minimum bid market value.'); return; }
-        if (!globalThis.confirm(`Submit this Direct barter offer with estimated value ${value.toLocaleString('en-US')} Meat? The host may accept it before the deadline.`)) return;
+        if (!practice && !globalThis.confirm(`Submit this Direct barter offer with estimated value ${value.toLocaleString('en-US')} Meat? The host may accept it before the deadline.`)) return;
         lock.current = true; setPending(true); setError('');
-        token.current ||= crypto.randomUUID();
         try {
-            await writeBarter('submit_barter_offer', { p_auction: auction.id, p_meat: meatAmount, p_items: offerItems.map(({ id, quantity }) => ({ id, quantity })), p_request: token.current });
+            if (practice) await practice.onSubmit({ meat: meatAmount, items: offerItems, value });
+            else {
+                token.current ||= crypto.randomUUID();
+                await writeBarter('submit_barter_offer', { p_auction: auction.id, p_meat: meatAmount, p_items: offerItems.map(({ id, quantity }) => ({ id, quantity })), p_request: token.current });
+            }
             setItems([]); setMeat(''); token.current = null; onSubmitted(true);
         } catch (failure) { setError(`${failure.message} Check your offers below before submitting again.`); onSubmitted(false); }
         finally { lock.current = false; setPending(false); }
     }
     return <form onSubmit={submit} className="space-y-3">
         <h2 className="text-lg font-bold">Make a barter offer</h2>
+        {practice && <p className="text-xs text-amber-700">Practice only. Search the sample items below; prices are illustrative, not live market quotes.</p>}
+        {practice && <p className="text-xs text-gray-500">Sample items: {practice.items.map(item => item.name).join(', ')}.</p>}
         <p aria-live="polite" className="text-sm font-bold">Bid value: {value == null ? 'Market value unavailable' : `${value.toLocaleString('en-US')} Meat`}</p>
         <p className="text-xs text-gray-500">Offers aren&apos;t ranked by market value alone. The host decides which offer becomes the leading bid.</p>
         <fieldset disabled={pending} className="space-y-2">
@@ -87,7 +92,7 @@ export default function BarterOfferForm({ auction, onSubmitted, initialOffer }) 
                         </select>
                         {selectedItem?.image && <img key={selectedItem.id} src={itemImageUrl(selectedItem.image)} alt={selectedItem.name} width="36" height="36" className="h-9 w-9 shrink-0 rounded-md bg-white object-contain p-0.5 [image-rendering:pixelated]" />}
                     </div>
-                    {selectedItem && <div className="-mt-2 mb-4" aria-live="polite"><MarketPrice itemId={selectedItem.id} quantity={quantityValue || 1} /></div>}
+                    {selectedItem && <div className="-mt-2 mb-4" aria-live="polite">{practice ? <p className="text-xs text-gray-500">Demo unit value: {practice.prices.get(selectedItem.id)?.price_meat.toLocaleString('en-US')} Meat</p> : <MarketPrice itemId={selectedItem.id} quantity={quantityValue || 1} />}</div>}
                 </>}
                 {search.trim() && <p className="-mt-3 mb-3 text-xs text-gray-600">{matches.length === 100 ? 'Showing the first 100 matches. Keep typing to narrow the list.' : `${matches.length} matching items.`}</p>}
                 <section aria-label="Build your offer" className="bundle-builder-panel mb-5 rounded-xl border border-[#EADBD3] bg-[#FFFAF7] p-3 sm:p-4">
@@ -114,9 +119,9 @@ export default function BarterOfferForm({ auction, onSubmitted, initialOffer }) 
                     })}</ul> : <p className="bundle-empty-state mt-3 rounded-lg border border-dashed border-[#EADBD3] px-3 py-3 text-center text-xs text-gray-700">Your offer is empty. Search for an item above and add it here.</p>}
                 </section>
             </div>
-            <button type="submit" disabled={value == null || value <= 0} className="min-h-11 rounded bg-blue-600 px-4 py-2 font-bold text-white disabled:opacity-50">{pending ? 'Submitting…' : 'Submit offer'}</button>
+            <button type="submit" disabled={value == null || value <= 0} className="min-h-11 rounded bg-blue-600 px-4 py-2 font-bold text-white disabled:opacity-50">{pending ? 'Submitting…' : practice ? 'Submit practice offer' : 'Submit offer'}</button>
         </fieldset>
         {error && !(error === 'Select an item and a whole quantity.' && (items.length > 0 || (meatAmount != null && meatAmount > 0))) && <p role="alert" className="text-sm text-red-700">{error}</p>}
     </form>;
 }
-BarterOfferForm.propTypes = { auction: PropTypes.object.isRequired, onSubmitted: PropTypes.func.isRequired, initialOffer: PropTypes.object };
+BarterOfferForm.propTypes = { auction: PropTypes.object.isRequired, onSubmitted: PropTypes.func.isRequired, initialOffer: PropTypes.object, practice: PropTypes.shape({ items: PropTypes.array.isRequired, prices: PropTypes.instanceOf(Map).isRequired, onSubmit: PropTypes.func.isRequired }) };

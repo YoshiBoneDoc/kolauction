@@ -112,6 +112,31 @@ Apply SQL once, then deploy the website. No bot runtime update is required; the
 matching ignored bot SQL is an alternative copy. Production application,
 deployment and browser visual verification remain outstanding.
 
+## Interactive practice auctions
+
+Two compact DEMO / FAKE cards sit at the bottom, below live listings and
+pagination. The host listing uses Grimacite gown. Item-based sample offers contain
+four or five items; a separate Meat-only example remains. Guest-accessible
+`/barter/demo/host` and `/barter/demo/bidder` routes use the real offer form/review
+components with local callbacks, fixed sample items and illustrative prices. They
+never call trading, catalog or market-price RPCs, invalidate real data, create real
+auctions or affect account history/financial totals. Global site navigation and
+presence behavior remain normal. Demo membership is separate from live filtering,
+counts, sorting and pagination. Reloading or Reset demo discards practice changes.
+
+Host examples include accepted, item-only, mixed and Meat-only offers; users can
+accept a lower-valued offer, reject, mark unwanted items/request an increase, and
+simulate the bidder's new revised offer. Bidder practice includes accepted,
+rejected, change-requested, pending and superseded examples, an editable offer
+builder, withdrawal and simulated host responses. Only one own pending offer is
+allowed. Revisions create new offers and preserve originals. Preview auction
+ending expires unaccepted offers and freezes the last accepted offer as winner.
+
+This is a website-only release with no additional migration. Targeted tests cover
+routes, transitions, shared controls' no-RPC practice behavior and unchanged real
+confirmation/RPC adapters. Browser visual QA is unverified because the browser
+host was unavailable during the local preview attempt; not deployed.
+
 ## Verification
 
 - `python3 tests/barter_database_test.py`: disposable local PostgreSQL with all

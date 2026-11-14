@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { offerDescription, writeBarter } from '../lib/barter';
 
-export default function BarterOfferReview({ offer, host, active, current, onUpdated, onRevise }) {
+export default function BarterOfferReview({ offer, host, active, current, onUpdated, onRevise, onDecision }) {
     const administrator = useAdministrator();
     const [editing, setEditing] = useState(false);
     const [rejected, setRejected] = useState([]);
@@ -14,10 +14,11 @@ export default function BarterOfferReview({ offer, host, active, current, onUpda
     const lock = useRef(false);
     async function act(decision) {
         if (lock.current) return;
-        if (decision === 'accepted' && !globalThis.confirm('Accept this exact offer as the new highest bid? It replaces the current accepted bid even if its estimated value is lower.')) return;
+        if (!onDecision && decision === 'accepted' && !globalThis.confirm('Accept this exact offer as the new highest bid? It replaces the current accepted bid even if its estimated value is lower.')) return;
         lock.current = true; setPending(true); setError('');
         try {
-            await writeBarter(host ? 'review_barter_offer_changes' : 'withdraw_barter_offer', host ? { p_offer: offer.id, p_decision: decision, p_raise: decision === 'changes_requested' && raiseOffer, p_rejected: decision === 'changes_requested' ? rejected : [] } : { p_offer: offer.id });
+            if (onDecision) await onDecision({ offerId: offer.id, decision, raiseRequested: decision === 'changes_requested' && raiseOffer, rejectedItems: decision === 'changes_requested' ? rejected : [] });
+            else await writeBarter(host ? 'review_barter_offer_changes' : 'withdraw_barter_offer', host ? { p_offer: offer.id, p_decision: decision, p_raise: decision === 'changes_requested' && raiseOffer, p_rejected: decision === 'changes_requested' ? rejected : [] } : { p_offer: offer.id });
             setEditing(false); onUpdated();
         } catch (failure) { setError(failure.message); onUpdated(); }
         finally { lock.current = false; setPending(false); }
@@ -30,8 +31,8 @@ export default function BarterOfferReview({ offer, host, active, current, onUpda
         <p className="col-start-1 text-xs">{offerDescription(offer)}</p>
         <div className="col-start-1"><BarterOfferImages offer={offer} feedback={offer.status === 'changes_requested'} /></div>
         </div>
-        {offer.status === 'changes_requested' && offer.raiseRequested && <p className="mt-2 text-xs text-gray-500"><span className="text-green-600">↑</span> The host would like you to raise the offer.</p>}
-        {offer.status === 'changes_requested' && <div className="mt-8 pl-1 pr-24"><p className="barter-revision-instruction text-xs">Host requested changes. Submit a revised offer.</p><p className="text-[11px] text-gray-500">You can copy this offer by clicking the Revise Offer button on the right.</p></div>}
+        {offer.status === 'changes_requested' && offer.raiseRequested && <p className="mt-2 text-xs text-gray-500"><span className="text-green-600">↑</span> {host ? 'You asked the bidder to raise the offer.' : 'The host would like you to raise the offer.'}</p>}
+        {!host && offer.status === 'changes_requested' && <div className="mt-8 pl-1 pr-24"><p className="barter-revision-instruction text-xs">Host requested changes. Submit a revised offer.</p><p className="text-[11px] text-gray-500">You can copy this offer by clicking the Revise Offer button on the right.</p></div>}
         {!host && active && offer.status === 'changes_requested' && <button type="button" disabled={pending} onClick={() => act('withdrawn')} className="barter-decline-action absolute bottom-3 right-4 inline-flex items-center gap-1 bg-transparent text-xs"><span aria-hidden="true">✕</span>Decline</button>}
         {active && offer.status === 'pending' && <fieldset disabled={pending} className="mt-3 flex flex-wrap gap-2">
             {host ? <><button onClick={() => act('accepted')} className="barter-review-accept rounded bg-green-700 px-3 py-2 text-xs text-white">Accept</button><button onClick={() => act('rejected')} className="barter-review-reject rounded border border-red-300 px-3 py-2 text-xs text-red-700">Reject</button><button onClick={() => setEditing(value => !value)} className="barter-review-changes rounded border border-gray-300 px-3 py-2 text-xs">Request Changes</button></> : <button onClick={() => act('withdrawn')} className="barter-withdraw-action rounded border border-gray-300 px-3 py-2 text-xs">Withdraw pending offer</button>}
@@ -42,4 +43,4 @@ export default function BarterOfferReview({ offer, host, active, current, onUpda
         {error && <p role="alert" className="mt-2 text-xs text-red-700">{error}</p>}
     </article>;
 }
-BarterOfferReview.propTypes = { offer: PropTypes.object.isRequired, host: PropTypes.bool, active: PropTypes.bool, current: PropTypes.bool, onUpdated: PropTypes.func.isRequired, onRevise: PropTypes.func };
+BarterOfferReview.propTypes = { offer: PropTypes.object.isRequired, host: PropTypes.bool, active: PropTypes.bool, current: PropTypes.bool, onUpdated: PropTypes.func.isRequired, onRevise: PropTypes.func, onDecision: PropTypes.func };

@@ -4,6 +4,7 @@ import useBarterRead from '../hooks/useBarterRead';
 import CompactAuctionCard from '../components/CompactAuctionCard';
 import AuctionPagination from '../components/AuctionPagination';
 import { useAuctionBoundaryNow } from '../hooks/useAuctionBoundaryNow';
+import BarterDemoCards from '../components/BarterDemoCards';
 
 export default function BarterCorner() {
     const [params, setParams] = useSearchParams();
@@ -27,6 +28,7 @@ export default function BarterCorner() {
             <h1 className="auction-page-title text-center font-bold text-[#7695FF]">Barter Corner</h1>
             <Link to="/auction-item?kind=barter" className="shrink-0 text-sm text-blue-700 hover:underline dark:text-blue-300 sm:absolute sm:right-0">Create Barter <span aria-hidden="true">→</span></Link>
         </div>
+        <h2 className="mb-3 text-sm font-semibold">Live barter listings</h2>
         <section aria-label="Find barter items" className="mb-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
             <div role="group" aria-label="Sort barter auctions" className="flex h-9 overflow-hidden rounded border border-gray-200 bg-white">
                 {[['ending', 'Ending Soon'], ['newest', 'Newest'], ['activity', 'Recent Activity']].map(([value, label]) => <button key={value} type="button" aria-pressed={sort === value} onClick={() => update('sort', value)} className={`h-full rounded-none border-0 border-r border-gray-200 px-2.5 py-1 text-xs font-medium last:border-r-0 ${sort === value ? 'bg-blue-50 text-blue-800' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>{label}</button>)}
@@ -46,8 +48,9 @@ export default function BarterCorner() {
                     onToggleBid={() => setOpenBid(previous => previous?.id === auction.id && previous?.browseKey === browseKey ? null : { id: auction.id, browseKey })} />)}
             </div>
             {!data.rows.length && <p className="py-8 text-center text-gray-500">No barter listings match your search.</p>}
-            <div className="flex-1" />
-            <AuctionPagination page={page} hasNext={Boolean(data.more)} onPage={next => update('page', next)} label="Barter result pages" />
         </>}
+        <div className="flex-1" />
+        {data && <AuctionPagination page={page} hasNext={Boolean(data.more)} onPage={next => update('page', next)} label="Barter result pages" />}
+        <BarterDemoCards />
     </main></div>;
 }

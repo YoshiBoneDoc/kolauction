@@ -13,6 +13,7 @@ const Home = lazy(() => import("./pages/Home"));
 const AllAuctions = lazy(() => import("./pages/AllAuctions"));
 const BarterDetails = lazy(() => import("./pages/BarterDetails"));
 const BarterCorner = lazy(() => import("./pages/BarterCorner"));
+const BarterDemo = lazy(() => import("./pages/BarterDemo"));
 const AuctionAnItem = lazy(() => import("./pages/AuctionAnItem"));
 const Register = lazy(() => import("./pages/Register"));
 const Login = lazy(() => import("./pages/Login"));
@@ -90,6 +91,7 @@ const App = () => {
                 <Route path="/giveaways" element={<GiveawayInfo />} />
                 <Route path="/auctions" element={<AllAuctions />} />
                 <Route path="/barter" element={<BarterCorner />} />
+                <Route path="/barter/demo/:role" element={<BarterDemo />} />
                 <Route path="/barter/:id" element={<BarterDetails />} />
                 <Route path="/auction-item" element={<AuctionAnItem />} />
                 <Route path="/register" element={<Register />} />

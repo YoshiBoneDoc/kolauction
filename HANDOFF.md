@@ -1,5 +1,31 @@
 # kHub handoff
 
+## November 14 interactive barter practice auctions — local website change
+
+Barter Corner now has two compact DEMO / FAKE practice cards at the bottom,
+below live listings and pagination,
+opening `/barter/demo/host` and `/barter/demo/bidder`. Host practice supports
+accept/reject, item/raise feedback and simulated revised offers. Bidder practice
+supports editable item/Meat offers, one pending offer, withdrawal, copied revisions,
+five preset outcomes and simulated host responses/replacement. Both include reset,
+accepted history and an ending preview where the last accepted offer wins.
+Host practice lists Grimacite gown; item-based sample offers contain four or five
+items, alongside the separate Meat-only example.
+
+Practice uses static illustrative quotes and a browser-only reducer. Shared offer
+form/review components have explicit local callbacks; real default RPC/confirmation
+paths remain unchanged. Demo actions perform no catalog, market-price or trading
+RPCs, invalidate no real reads, create no database auctions and change no account,
+financial or leaderboard records. Public routes need no login and load separately
+from real barter detail reads; cards do not enter live search/counts/pagination.
+
+20 targeted demo/form/review/card/browse tests pass, including route rendering,
+state transitions, no-RPC practice adapters and preserved real confirmations/write
+adapters. Build, changed-source lint and secret checks pass. Browser preview was
+attempted but the computer-use browser host was unavailable; visual QA remains
+unverified. Website deployment only, no new SQL/bot release. Not deployed.
+Personal quickstart unchanged.
+
 ## November 14 barter relisting follow-up — local website change
 
 Profile/seller history Relist buttons now support owner-only cancelled/unsold
