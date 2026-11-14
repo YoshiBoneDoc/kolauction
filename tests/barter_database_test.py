@@ -202,6 +202,46 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
             results=list(workers.map(lambda query: parallel_call(query,seller),queries))
         assert sorted(r.returncode==0 for r in results)==[False,True]
         assert sql(f"select count(*) from khub_bot.barter_offers where request_id='{race_token}';")=='1'
+        # Clear all restriction side effects from the earlier ban fixture.
+        sql(f"update khub_bot.account_bans set active=false where kol_player_id=48889602;update auth.users set banned_until=null where id='{buyer}';")
+        # Cancellation is host-only, preserves offers and closes all write paths.
+        aid=create()
+        cancel_query=f"select public.cancel_barter_auction('{aid}');"
+        pending=offer(buyer,100)
+        changed=offer(other,200)
+        call(f"select public.review_barter_offer_changes('{changed}','changes_requested','{{}}',true);")
+        call(cancel_query,uid=buyer,error='Only the host')
+        sql('set role anon;'+cancel_query,error='permission denied')
+        sql(f"update public.profiles set is_banned=true where id='{seller}';")
+        call(cancel_query,error='restricted')
+        sql(f"update public.profiles set is_banned=false where id='{seller}';")
+        sql(f"update khub_bot.account_bans set active=false where kol_player_id=48889601;update auth.users set banned_until=null where id='{seller}';")
+        before_offers=sql(f"select jsonb_agg(to_jsonb(o) order by id) from khub_bot.barter_offers o where auction_id='{aid}';")
+        call(cancel_query)
+        call(cancel_query)  # Explicit repeat is harmless; browser never auto-retries.
+        assert json.loads(call(f"select public.read_barter_detail('{aid}');"))['cancelled'] is True
+        assert not any(row['id']==aid for row in json.loads(call('select public.read_barter_auctions();'))['rows'])
+        for viewer in [seller,buyer,other]:
+            assert not any(row['id']==aid for row in json.loads(call('select public.read_barter_pending();',uid=viewer)))
+        call(f"select public.submit_barter_offer('{aid}',300,'[]','{uuid4()}');",uid=buyer,error='closed')
+        call(f"select public.review_barter_offer('{pending}','accepted');",error='no longer reviewable')
+        assert before_offers==sql(f"select jsonb_agg(to_jsonb(o) order by id) from khub_bot.barter_offers o where auction_id='{aid}';")
+        aid=create()
+        accepted=offer(buyer,100)
+        call(f"select public.review_barter_offer('{accepted}','accepted');")
+        call(f"select public.cancel_barter_auction('{aid}');",error='after an offer has been accepted')
+        aid=create()
+        sql(f"update khub_bot.barter_auctions set created_at=now()-interval '2 days',end_time=now()-interval '1 day' where id='{aid}';")
+        call(f"select public.cancel_barter_auction('{aid}');",error='already ended')
+        # A cancellation racing acceptance must never produce a cancelled winner.
+        aid=create()
+        pending=offer(buyer,100)
+        queries=[f"select public.cancel_barter_auction('{aid}');",f"select public.review_barter_offer('{pending}','accepted');"]
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            results=list(workers.map(lambda query: parallel_call(query,seller),queries))
+        assert sorted(r.returncode==0 for r in results)==[False,True],[r.stderr for r in results]
+        assert sql(f"select (cancelled_at is not null)::int+(current_offer_id is not null)::int from khub_bot.barter_auctions where id='{aid}';")=='1'
+        print('PASS: host cancellation, restrictions, repeat safety, preserved offers, closed writes/notices, accepted/deadline guards and concurrent acceptance')
         print('PASS: concurrent duplicate submissions and conflicting host decisions serialize without duplication or overwrite')
         print('PASS: visibility, restrictions, immutable decisions, search and bounded ordered pagination')
         print('PASS: independent barter creation, market threshold/freshness, optional minimum, privacy, host decisions, lower acceptance, feedback, idempotency, deadline and notices')

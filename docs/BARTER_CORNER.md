@@ -27,6 +27,13 @@ not activated merely by adding the files.
 - Accepting an offer replaces the current highest bid even when its estimated
   value is lower. Previous acceptances remain in public accepted history. Pending,
   rejected, withdrawn and change-requested offers never enter public history.
+- Hosts can cancel a live listing before any offer has been accepted. The detail
+  page asks for confirmation; the server verifies the host, restrictions, deadline
+  and accepted-offer guard under the same listing lock as submission/review.
+  Cancellation hides the listing from browse/notices and closes bidding/review,
+  preserving existing offers and feedback. Accepted trades cannot be cancelled.
+  This requires queued **285** after 283 and a website deployment; not applied
+  to production. The matching ignored bot migration is an alternative SQL copy.
 - **Deadline interpretation:** offers and host decisions close at the scheduled
   deadline; no automatic extension is added. The last accepted offer wins. An
   unreviewed pending offer does not win. If there is no accepted offer, no trade

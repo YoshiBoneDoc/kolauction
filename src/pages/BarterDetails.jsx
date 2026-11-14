@@ -14,12 +14,15 @@ import RemainingTime from '../components/RemainingTime';
 import DirectTradeHelp from '../components/DirectTradeHelp';
 import BarterOfferForm from '../components/BarterOfferForm';
 import BarterOfferReview from '../components/BarterOfferReview';
-import { offerDescription } from '../lib/barter';
+import { offerDescription, writeBarter } from '../lib/barter';
 
 export default function BarterDetails() {
     const { id } = useParams();
     const { currentUser } = useContext(UserContext);
     const [revision, setRevision] = useState(null);
+    const [cancelling, setCancelling] = useState(false);
+    const [cancelError, setCancelError] = useState('');
+    const cancelLock = useRef(false);
     const offerForm = useRef(null);
     function reviseOffer(offer) {
         setRevision(previous => ({ offer, version: (previous?.version || 0) + 1 }));
@@ -37,6 +40,14 @@ export default function BarterDetails() {
     const now = useAuctionBoundaryNow(auction ? [auction] : []);
     const active = auction && !auction.cancelled && auction.endTime > now;
     const mayBid = Boolean(currentUser && !currentUser.isBanned && !auction?.isHost && active && offerState && !hasPendingOffer);
+    async function cancelListing() {
+        if (cancelLock.current || !auction?.isHost || !active || auction.currentOfferId) return;
+        if (!globalThis.confirm('Cancel this barter listing? All unaccepted offers will close. This cannot be undone.')) return;
+        cancelLock.current = true; setCancelling(true); setCancelError('');
+        try { await writeBarter('cancel_barter_auction', { p_auction: id }); }
+        catch (failure) { setCancelError(failure.message); }
+        finally { refresh(); cancelLock.current = false; setCancelling(false); }
+    }
     return <main className="site-page-background flex-1 bg-[#F1F3F5] px-4 py-6 sm:px-6">
         <div className="mx-auto mb-4 max-w-4xl"><Link to="/barter" className="text-sm text-blue-700 underline">Back to Barter Corner</Link></div>
         {error && <p role="alert" className="mx-auto max-w-4xl">{error} <button onClick={refresh}>Retry</button></p>}
@@ -67,6 +78,11 @@ export default function BarterDetails() {
                             <span aria-hidden="true" className="text-gray-400">·</span>
                             <p className={auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-600'}>Ends in <time dateTime={new Date(auction.endTime).toISOString()} title={new Date(auction.endTime).toLocaleString()}><RemainingTime endTime={auction.endTime} /></time></p>
                         </div> : <p>{auction.cancelled ? 'Cancelled' : auction.currentOfferId ? 'Ended — settle the accepted offer by Direct trade' : 'Ended without an accepted offer'}</p>}
+                        {active && auction.isHost && currentUser && !currentUser.isBanned && <div className="pt-2">
+                            <button type="button" disabled={cancelling || Boolean(auction.currentOfferId)} onClick={cancelListing} className="rounded border border-red-300 bg-transparent px-3 py-1.5 text-xs text-red-700 disabled:cursor-not-allowed disabled:opacity-50">{cancelling ? 'Cancelling…' : 'Cancel listing'}</button>
+                            {auction.currentOfferId && <p className="mt-1 text-xs text-gray-500">Listings cannot be cancelled after an offer has been accepted.</p>}
+                        </div>}
+                        {cancelError && <p role="alert" className="text-xs text-red-700">{cancelError}</p>}
                     </div>
                 </div>
             </section>

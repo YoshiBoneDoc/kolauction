@@ -1,5 +1,20 @@
 # kHub handoff
 
+## November 14 barter host cancellation — local, migration queued
+
+Queued **285** adds `cancel_barter_auction`: verified/unrestricted host only,
+active listing only, no current or historically accepted offer. Listing-first row
+locking serializes cancellation with submission/review; repeated cancellation is
+harmless. Existing offers/feedback stay intact. Existing cancelled-listing filters
+close browse, notices, submission and host review. Detail page adds a confirmed,
+host-only Cancel listing button under the timer, disabled after acceptance.
+Apply 285 once after 283 then deploy the website; ignored bot SQL is an alternative
+copy. No bot restart or asset transfer needed. Disposable full-migration barter
+suite passes cancellation authorization/restrictions, preservation, closed writes,
+deadlines and concurrent acceptance. Nine targeted UI tests, changed-source lint,
+build and diff checks pass. No browser visual QA or production migration/deployment
+performed. Personal quickstart unchanged.
+
 ## November 14 leaderboard split-fulfillment fix — local, migration queued
 
 Queued **284** counts one completed-trade credit per player per auction, including
