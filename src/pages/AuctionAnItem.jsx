@@ -63,11 +63,14 @@ export default function AuctionAnItem() {
     const durationInput = useRef(null);
     const [customEndTime, setCustomEndTime] = useState('');
     const endingTimeInput = useRef(null);
-    const [escrowMode, setEscrowMode] = useState(true);
+    const [escrowMode, setEscrowMode] = useState(() => new URLSearchParams(search).get('kind') !== 'barter');
     const [mrAEnabled, setMrAEnabled] = useState(false);
     const [mrARate, setMrARate] = useState(null);
     const changeMrAPayment = useCallback((enabled, rate) => { setMrAEnabled(enabled); setMrARate(rate); }, []);
-    const [auctionKind, setAuctionKind] = useState(() => new URLSearchParams(search).get('kind') === 'buy' ? 'buy' : 'sell');
+    const [auctionKind, setAuctionKind] = useState(() => {
+        const kind = new URLSearchParams(search).get('kind');
+        return ['buy', 'barter'].includes(kind) ? kind : 'sell';
+    });
     const [deliveryMode, setDeliveryMode] = useState('immediate');
     const isBarter = auctionKind === 'barter';
     const isBuy = auctionKind === 'buy';
@@ -122,12 +125,13 @@ export default function AuctionAnItem() {
     useEffect(() => {
         if (state?.relist || protectionLink) return;
         const kind = new URLSearchParams(search).get('kind');
-        if (kind !== 'buy' && kind !== 'sell') return;
+        if (kind !== 'buy' && kind !== 'sell' && kind !== 'barter') return;
         setAuctionKind(kind);
         setGiveaway(false);
         setPreview(null);
         setError('');
         if (kind === 'buy') { setEscrowMode(true); setCustomDuration(false); }
+        if (kind === 'barter') setEscrowMode(false);
     }, [search, locationKey, state, protectionLink]);
     useEffect(() => {
         if (!protectionLink) { protectionLinkHandled.current = null; return; }
