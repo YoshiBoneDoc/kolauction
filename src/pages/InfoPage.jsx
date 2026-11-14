@@ -240,7 +240,7 @@ const InfoPage = () => {
                     <h2 id="barters-title" className={`${sectionHeadingClass} mb-2`}>Barters</h2>
                     <ul className="list-disc space-y-2 pl-5">
                         <li><strong>General:</strong> Barters are listed separately in the <Link to="/barter" className="text-blue-700 underline">Barter Corner</Link>. Trade items for other items and Meat.</li>
-                        <li><strong>Requirements:</strong> Create a barter <Link to="/auction-item" className="text-blue-700 underline">here</Link>. Listings must have a market value of at least 40m Meat. Minimum bids are optional. Barters are Direct Trade only and otherwise follow the standard Sell auction process.</li>
+                        <li><strong>Requirements:</strong> Create a barter <Link to="/auction-item?kind=barter" className="text-blue-700 underline">here</Link>. Listings must have a market value of at least 40m Meat. Minimum bids are optional. Barters are Direct Trade only and otherwise follow the standard Sell auction process.</li>
                         <li><strong>Offers:</strong> Bidders can offer items and Meat. Hosts can accept, reject, or request changes. <strong>Only host-accepted offers become the leading bid, regardless of market value</strong>. Bidders may have only one pending offer per barter, but can cancel it to submit another.</li>
                         <li><strong>Outcome:</strong> The last accepted offer when the auction ends wins. Unaccepted offers expire. Players complete the exchange in-game and confirm it on kHub, as with other Direct Trades.</li>
                     </ul>
