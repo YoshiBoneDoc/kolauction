@@ -57,7 +57,7 @@ export default function BarterOfferForm({ auction, onSubmitted, initialOffer }) 
     return <form onSubmit={submit} className="space-y-3">
         <h2 className="text-lg font-bold">Make a barter offer</h2>
         <p aria-live="polite" className="text-sm font-bold">Bid value: {value == null ? 'Market value unavailable' : `${value.toLocaleString('en-US')} Meat`}</p>
-        <p className="text-xs text-gray-500">Estimates use current market prices. You only need to exceed the optional minimum; the host chooses which offer to accept.</p>
+        <p className="text-xs text-gray-500">Offers aren&apos;t ranked by market value alone. The host decides which offer becomes the leading bid.</p>
         <fieldset disabled={pending} className="space-y-2">
             <label className="block text-sm">Meat (optional)<input className={field} value={meat} inputMode="decimal" placeholder="e.g. 1m" onChange={event => { setMeat(event.target.value); token.current = null; }} onBlur={() => setMeat(value => normalizeAuctionAmount(value, { meat: true }))} /></label>
             <div className="auction-create-form barter-offer-item-editor">
