@@ -13,7 +13,7 @@ const InfoPage = () => {
     const showClubHistory = Boolean(currentUser?.id) && (currentUser.isHighRollersMember === true || currentUser.isAdmin === true);
     const { hash } = useLocation();
     useEffect(() => {
-        if (['#escrow-fees-title', '#buy-gift-delivery', '#buy-auctions-title', '#gift-packages', '#anti-sniping', '#bid-increases-title'].includes(hash)) document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
+        if (['#escrow-fees-title', '#buy-gift-delivery', '#buy-auctions-title', '#gift-packages', '#anti-sniping', '#bid-increases-title', '#barters-title'].includes(hash)) document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
     }, [hash]);
     return (
         <div className="site-page-background flex-1 bg-gray-50 flex flex-col items-center justify-center p-6">
