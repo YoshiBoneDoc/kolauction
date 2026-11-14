@@ -241,6 +241,58 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
             results=list(workers.map(lambda query: parallel_call(query,seller),queries))
         assert sorted(r.returncode==0 for r in results)==[False,True],[r.stderr for r in results]
         assert sql(f"select (cancelled_at is not null)::int+(current_offer_id is not null)::int from khub_bot.barter_auctions where id='{aid}';")=='1'
+        # Unified histories preserve server-side counts, pagination and privacy.
+        def history(view='profile',who=seller,sid=None,status='all',search='',page=1,trade='all',kind='all'):
+            query=f"select public.read_profile_auction_page({lit(view)},{lit(sid) if sid else 'null'},{lit(search)},{lit(status)},'newest',{page},{lit(trade)},{lit(kind)});"
+            return json.loads(sql('set role anon;'+query) if who is None else call(query,uid=who))
+        own=history()
+        assert any(row['auction_kind']=='barter' for row in own['rows'])
+        assert all(row['seller_id']==seller for row in own['rows'])
+        assert history(who=None)['rows']==[]
+        seller_page=history('seller',sid=seller)
+        assert seller_page['seller']['id']==seller and seller_page['total']>24
+        summary=json.loads(call(f"select public.read_profile_auction_page('seller','{seller}',p_summary_only=>true);"))
+        assert summary['seller']['id']==seller and summary['rows']==[]
+        assert summary['seller']['stats']==seller_page['seller']['stats']
+        first_ids={row['id'] for row in seller_page['rows']}
+        second_page=history('seller',sid=seller,page=2)
+        assert len(first_ids)==24 and not first_ids.intersection(row['id'] for row in second_page['rows'])
+        assert len(history('seller',sid=seller,search='Paging')['rows'])==24
+        assert history('seller',sid=seller,search='Paging')['total']==26
+        assert history('seller',sid=seller,trade='escrow')['rows']==[]
+        assert history('seller',sid=seller,kind='buy')['rows']==[]
+        assert all(row['status']=='cancelled' for row in history('seller',sid=seller,status='cancelled')['rows'])
+        assert history('seller',sid=seller,who=None)['bids']==[]
+        # Own offer history is private, while pending values never lead the row.
+        aid=create()
+        high=offer(buyer,900)
+        lower=offer(other,100)
+        call(f"select public.review_barter_offer('{lower}','accepted');")
+        mine=history(who=buyer)
+        assert all(bid['bidder_id']==buyer for bid in mine['bids'])
+        assert next(row for row in mine['rows'] if row['id']==aid)['current_bid']==100
+        assert next(row for row in mine['rows'] if row['id']==aid)['winner_id'] is None
+        assert history('seller',sid=seller,who=other)['bids']==[]
+        sql(f"update khub_bot.barter_auctions set created_at=now()-interval '2 days',end_time=now()-interval '1 day' where id='{aid}';")
+        assert next(row for row in history(who=other)['rows'] if row['id']==aid)['winner_id']==other
+        public_rows=history('seller',sid=seller,who=None,status='ended')['rows']
+        assert next(row for row in public_rows if row['id']==aid)['winner_id'] is None
+        assert next(row for row in history('seller',sid=seller,who=buyer,status='ended')['rows'] if row['id']==aid)['winner_id'] is None
+        call("select public.read_profile_auction_page('browse');",error='Invalid profile view')
+        # Adding an ordinary listing uses the same 24-row ordered page and leaves
+        # ordinary projections/statistics intact. Barters do not inflate totals.
+        plain=call("select public.create_auction('asbestos ore',1,100,24,null,null,364,false);")
+        mixed=history('seller',sid=seller)
+        assert mixed['rows'][0]['id']==plain and mixed['rows'][0]['auction_kind']=='sell'
+        ordinary=json.loads(call(f"select public.read_auction_page('seller','{seller}','','all','newest',1);"))
+        assert next(row for row in mixed['rows'] if row['id']==plain)==ordinary['rows'][0]
+        assert mixed['seller']['stats']==ordinary['seller']['stats']
+        # Ignore visibility applies before counts and pagination in both directions.
+        call("select public.set_player_ignored(48889601,true);",uid=buyer)
+        assert history('seller',sid=seller,who=buyer)['rows']==[]
+        assert not any(row['auction_kind']=='barter' for row in history(who=buyer)['rows'])
+        call("select public.set_player_ignored(48889601,false);",uid=buyer)
+        print('PASS: combined profile/seller barter history, ordinary projection/stat parity, pagination, filters, private bids and ignored-host visibility')
         print('PASS: host cancellation, restrictions, repeat safety, preserved offers, closed writes/notices, accepted/deadline guards and concurrent acceptance')
         print('PASS: concurrent duplicate submissions and conflicting host decisions serialize without duplication or overwrite')
         print('PASS: visibility, restrictions, immutable decisions, search and bounded ordered pagination')

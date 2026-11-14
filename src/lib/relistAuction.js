@@ -2,7 +2,7 @@ import { bundleTitle } from './bundles.js';
 import { getAuctionStatus } from './auctionLifecycle.js';
 
 export function canRelist(auction, user, now = Date.now()) {
-    return Boolean(user?.id && !user.isBanned && auction.sellerId === user.id
+    return Boolean(auction.auctionKind !== 'barter' && user?.id && !user.isBanned && auction.sellerId === user.id
         && ['completed', 'expired', 'ended_no_bids', 'cancelled', 'voided'].includes(getAuctionStatus(auction, now)));
 }
 

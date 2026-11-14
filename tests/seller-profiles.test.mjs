@@ -406,3 +406,23 @@ test('Seller Profile separates funded Buy orders created from orders fulfilled w
     const sidebar = (await render({path:'/seller/seller', seller:data, auctions:[], total:0}));
     assert.doesNotMatch(sidebar, /Buy Orders Created|Buy Orders Fulfilled/);
 });
+
+test('barter seller-history rows retain the shared layout and use barter navigation and symbol', async () => {
+    const barter = { ...auction, auctionKind: 'barter', escrowMode: false, status: 'cancelled', winnerId: null,
+        highestBidderId: null, hasWinner: false, currentBid: 0, finalPrice: null, minBidMeat: 0 };
+    const html = await render({ seller, auctions: [barter], total: 1, user: { id: 'seller' } });
+    assert.match(html, /public-profile-auction-row is-sell/);
+    assert.match(html, /href="\/barter\/lot"/);
+    assert.match(html, /aria-label="Barter"/);
+    assert.doesNotMatch(html, /href="\/auction\/lot"|aria-label="Relist/);
+});
+
+test('account listing-history barter rows keep the shared styling and correct detail link', async () => {
+    const barter = { ...auction, auctionKind: 'barter', escrowMode: false, status: 'cancelled', winnerId: null,
+        highestBidderId: null, hasWinner: false, currentBid: 0, finalPrice: null, minBidMeat: 0, createdAt: 1 };
+    const html = await render({ path: '/profile', seller, auctions: [barter], total: 1, user: { id: 'seller' } });
+    assert.match(html, /profile-history-entry is-cancelled/);
+    assert.match(html, /aria-label="Barter"/);
+    assert.match(html, /href="\/barter\/lot"/);
+    assert.doesNotMatch(html, /href="\/auction\/lot"|aria-label="Relist/);
+});

@@ -227,7 +227,7 @@ test('detail, seller and profile browsing never require financial maintenance or
         const calls=[];
         const service=createAuctionService({async rpc(name,args){
             calls.push([name,args]);
-            assert.equal(name,request.view==='detail'?'read_auction_detail_static':'read_auction_page','Browsing must not execute a maintenance/write RPC');
+            assert.equal(name,request.view==='detail'?'read_auction_detail_static':'read_profile_auction_page','Browsing must not execute a maintenance/write RPC');
             return {data:{privacy_version:1,rows:[row],bids:[],total:1}};
         }});
         const data=await service.load(request);
@@ -242,7 +242,16 @@ test('Seller Profile statistics tab reads summary only, without loading auction 
     const calls = [];
     const service = createAuctionService({ rpc(name, args) { calls.push([name,args]); return Promise.resolve({ data: {privacy_version:1,rows:[],bids:[],total:0,seller:{id:'seller',stats:{escrow_value:'123'}}} }); } });
     const result = await service.load({view:'seller',id:'seller',summaryOnly:true});
-    assert.deepEqual(calls,[['read_seller_auction_context',{p_seller_id:'seller',p_ids:[]}]]);
+    assert.deepEqual(calls,[['read_profile_auction_page',{p_view:'seller',p_id:'seller',p_search:'',p_status:'active',p_sort:'ending',p_page:1,p_trade:'all',p_kind:'all',p_summary_only:true}]]);
     assert.equal(result.seller.stats.escrow_value,'123');
     assert.deepEqual(result.auctions,[]);
+});
+
+test('unaccepted personal barter offers never replace the host-accepted leading value', () => {
+    const mapped = mapAuction({ ...row, auction_kind: 'barter', current_bid: '100', highest_bidder_id: null }, [
+        { id: 'pending', auction_id: row.id, bidder_id: 'me', amount: '900', created_at: '2026-10-18T13:00:00Z' },
+    ]);
+    assert.equal(mapped.currentBid, 100);
+    assert.equal(mapped.highestBidderId, null);
+    assert.equal(mapped.bids[0].amount, 900);
 });

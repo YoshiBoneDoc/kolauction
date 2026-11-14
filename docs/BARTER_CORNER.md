@@ -80,6 +80,34 @@ links to each detail page. Account changes clear displayed private data immediat
 write notifications invalidate reads and refresh visible consumers. No private
 payloads enter shared public caches or persistent browser storage.
 
+## Account and seller histories
+
+Queued **286**, after 285, adds `read_profile_auction_page` for merged account and
+seller histories. Read-only adapters preserve the separate ledger and project
+barters into the existing row format. Filtering, sorting, counts and seller pages
+are computed after the union, never by appending a second page in the browser.
+A bidder/auction history index supports account-scoped offer lookup. Latest own
+offers appear only in the owner's profile response; seller responses contain no
+private offer list. Winner IDs are limited to ended participants/admins. Ignore
+visibility applies before selection and counts. Existing ordinary row projections
+and seller financial statistics are reused without treating estimates as payments.
+
+Both row types keep their existing classes, with a 20px barter symbol beside the
+item name and `/barter/:id` navigation. Bid actions go to the barter page rather
+than the ordinary bid form; ordinary relisting is suppressed for barters. Host
+acceptance determines displayed leading values even if an own pending offer is
+worth more. This adds history visibility, not barter completion confirmations,
+financial reporting or leaderboard integration.
+
+Merged seller pages use the existing authorization-scoped browser read cache and
+refresh schedule; they cannot reuse ordinary-only shared page membership without
+breaking combined pagination. Home/All Auctions shared caching is unchanged. The
+existing lightweight seller statistics RPC remains the summary fast path; a
+barter-only host receives a statistics shell with no invented completed trades.
+Apply SQL once, then deploy the website. No bot runtime update is required; the
+matching ignored bot SQL is an alternative copy. Production application,
+deployment and browser visual verification remain outstanding.
+
 ## Verification
 
 - `python3 tests/barter_database_test.py`: disposable local PostgreSQL with all

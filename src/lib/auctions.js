@@ -12,6 +12,7 @@ export function mapAuction(row, bidRows) {
             bidderId: bid.bidder_id,
             bidder: bid.bidder_username,
             amount: Number(bid.amount),
+            ...(row.auction_kind === 'barter' ? { status: bid.status } : {}),
             paymentMeat: Number(bid.payment_meat ?? bid.amount),
             paymentMrA: Number(bid.payment_mr_a || 0),
             timestamp: new Date(bid.created_at).getTime(),
@@ -20,7 +21,7 @@ export function mapAuction(row, bidRows) {
             adminDeliveryReferences: Array.isArray(bid.admin_delivery_references) ? bid.admin_delivery_references : [],
         }));
     const lastBid = bids.at(-1);
-    const latestBid = lastBid?.amount >= Number(row.current_bid) ? lastBid : null;
+    const latestBid = row.auction_kind !== 'barter' && lastBid?.amount >= Number(row.current_bid) ? lastBid : null;
     return {
         id: row.id,
         liveUnavailable: row._live_unavailable === true,
@@ -85,7 +86,7 @@ export function mapAuction(row, bidRows) {
         receiptTimeBidding: row.receipt_time_bidding === true,
         escrowTimingReview: row.escrow_timing_review === true,
         finalizationNotBefore: row.finalization_not_before ? new Date(row.finalization_not_before).getTime() : null,
-        currentBid: Math.max(Number(row.current_bid), lastBid?.amount || 0),
+        currentBid: row.auction_kind === 'barter' ? Number(row.current_bid || 0) : Math.max(Number(row.current_bid), lastBid?.amount || 0),
         highestBidderId: latestBid?.bidderId || row.highest_bidder_id,
         highestBidder: latestBid?.bidder || row.highest_bidder_username,
         viewerIsHighestBidder: row.viewer_is_highest_bidder == null ? null : row.viewer_is_highest_bidder === true,
@@ -157,8 +158,12 @@ export function createAuctionService(client, { publicReader = null, readDeadline
             const requestStartedAt = auctionClockRequestStarted();
             const sharedRequest = { view, id, sellerId, excludeOwn, kind, buyout, bundle, summaryOnly, search, status, sort, trade, page, minPrice, maxPrice, signal, fresh };
             let request;
-            if (await publicReader?.accepts(sharedRequest)) request = publicReader.load(sharedRequest).then(data => ({ data }));
-            else if (view === 'seller' && summaryOnly) request = requireClient().rpc('read_seller_auction_context', { p_seller_id: id, p_ids: [] });
+            // Merge separate ledgers before pagination under the existing
+            // account-scoped read cache. Ordinary shared browse stays unchanged.
+            if (['profile', 'seller'].includes(view)) request = requireClient().rpc('read_profile_auction_page', {
+                p_view: view, p_id: id, p_search: search, p_status: status, p_sort: sort, p_page: page, p_trade: trade, p_kind: kind, p_summary_only: summaryOnly,
+            });
+            else if (await publicReader?.accepts(sharedRequest)) request = publicReader.load(sharedRequest).then(data => ({ data }));
             else if (view === 'home') request = requireClient().rpc('read_home_cards');
             else request = requireClient().rpc(view === 'browse' ? 'read_filtered_auction_page' : view === 'detail' ? 'read_auction_detail_static' : 'read_auction_page', {
                 p_view: view === 'browse' && excludeOwn ? 'others' : view === 'browse' && sellerId ? 'seller' : view,

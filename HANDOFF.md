@@ -1,5 +1,31 @@
 # kHub handoff
 
+## November 14 barter profile history — local, migration queued
+
+Queued **286** adds a unified profile/seller history RPC that adapts separate
+barter records for display, merging before search/status/trade/kind filters,
+ordering and seller pagination (24 rows). Account listings and private latest-offer
+history include barters. Shared row styles remain, with a small barter symbol and
+links to `/barter/:id`. Ordinary inline bidding and relisting are excluded for
+barters; pending offers cannot overwrite host-accepted values or appear as winning.
+
+Existing ordinary projections, seller financial/feedback statistics, settlement,
+leaderboard and asset ledgers are unchanged. Barters are not marked completed by
+this change and estimates never enter Meat totals. Bidder IDs remain private;
+ended winner IDs are limited to participants/admins, and ignores/restrictions apply
+before counts/pages. Barter-only hosts have both listing and statistics views.
+The seller statistics fast path is reused when a normal seller summary exists.
+Unified seller pages use the existing authorization-scoped browser read cache so
+separate ledgers can be paginated correctly; ordinary Home/All Auctions shared
+caching remains untouched. No additional polling or per-row browser RPCs added.
+
+Apply 286 once after 285, then deploy the website. Matching ignored bot SQL is an
+alternative copy, not a second apply; no bot restart needed. Full-migration barter
+SQL suite passes history/privacy/ordinary-projection/stat parity, filters, combined
+pagination and summary tests. 124 targeted Node tests, changed-source lint and build
+pass. No browser visual QA, production SQL or deployment performed. Personal
+quickstart unchanged.
+
 ## November 14 barter host cancellation — local, migration queued
 
 Queued **285** adds `cancel_barter_auction`: verified/unrestricted host only,

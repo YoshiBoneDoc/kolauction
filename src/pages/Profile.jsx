@@ -1,4 +1,5 @@
 import ProfileRaffleHistory from '../components/ProfileRaffleHistory';
+import BarterSymbol from '../components/BarterSymbol';
 import { flushSync } from 'react-dom';
 import { switchProfileTab } from '../lib/profileTabScroll';
 import SavedAuctions from '../components/SavedAuctions';
@@ -84,8 +85,8 @@ const Profile = () => {
         return result.status === 'awaiting_trade'
             && (auction.sellerId === currentUser.id || result.winnerId === currentUser.id);
     });
-    const completedSales = selling.filter((auction) => auction.status === 'completed' && auction.auctionKind !== 'buy');
-    const completedPurchases = auctions.filter((auction) => auction.status === 'completed' && auction.winnerId === currentUser.id);
+    const completedSales = selling.filter((auction) => auction.status === 'completed' && !['buy', 'barter'].includes(auction.auctionKind));
+    const completedPurchases = auctions.filter((auction) => auction.auctionKind !== 'barter' && auction.status === 'completed' && auction.winnerId === currentUser.id);
     const totalMeatGain = auctions.reduce((sum, auction) => sum + BigInt(auction.mySaleMeat || 0), 0n) + completedSales.reduce((sum, auction) => sum + BigInt(auction.finalPrice ?? 0) - BigInt(auction.escrowMode ? (auction.feeMeat || 0) : 0), 0n);
     const buyMeatSpent = selling.filter(a => a.auctionKind === 'buy').reduce((sum,a) => sum + BigInt(a.purchaseMeat || 0) + BigInt(a.buyCommissionMeat || 0), 0n);
     const totalMeatSpent = completedPurchases.reduce((sum, auction) => sum + BigInt(auction.finalPrice ?? 0), 0n);
@@ -146,11 +147,13 @@ const Profile = () => {
                                 : cancelled ? ' is-cancelled' : ['expired', 'ended_no_bids'].includes(result.status) ? ' is-expired' : '' : '';
                             const personallyFulfilled = auction.mySaleQuantity;
                             const bidStatus = title === 'Active bids' && auction.viewerIsHighestBidder != null
-                                ? auction.viewerIsHighestBidder ? { label: 'Winning', className: 'profile-badge-winning' }
+                                ? auction.auctionKind === 'barter' && personalBid?.status && personalBid.status !== 'accepted'
+                                    ? { label: ({ pending: 'Pending', changes_requested: 'Changes requested', rejected: 'Rejected', withdrawn: 'Withdrawn' })[personalBid.status] || 'Pending', className: 'profile-badge-neutral' }
+                                    : auction.viewerIsHighestBidder ? { label: 'Winning', className: 'profile-badge-winning' }
                                     : { label: 'Outbid', className: 'profile-badge-outbid' }
                                 : null;
-                            const historyOutcome = title === 'Bid history' && ['awaiting_trade', 'completed'].includes(result.status) && result.hasWinner && result.winnerId
-                                ? result.winnerId === currentUser.id ? { label: 'Won', className: 'profile-badge-winning' }
+                            const historyOutcome = title === 'Bid history' && ['awaiting_trade', 'completed'].includes(result.status) && result.hasWinner && (result.winnerId || auction.auctionKind === 'barter')
+                                ? result.winnerId === currentUser.id || auction.auctionKind === 'barter' && auction.viewerIsHighestBidder ? { label: 'Won', className: 'profile-badge-winning' }
                                     : { label: 'Lost', className: 'profile-badge-lost' }
                                 : title === 'Bid history' && !result.hasWinner && ['cancelled', 'voided', 'expired', 'ended_no_bids'].includes(result.status)
                                     ? { label: result.status === 'ended_no_bids' ? 'No sale' : 'Canceled', className: 'profile-badge-neutral' }
@@ -162,7 +165,8 @@ const Profile = () => {
                                     <div className="profile-entry-row">
                                         <div className="profile-entry-content flex min-w-0 flex-1 items-center">
                                             <h3 className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-[13px] leading-[18px]">
-                                                <Link to={`/auction/${auction.id}`} className="break-words font-semibold profile-text hover:underline">{auction.item}</Link>
+                                                <Link to={`/${auction.auctionKind === 'barter' ? 'barter' : 'auction'}/${auction.id}`} className="break-words font-semibold profile-text hover:underline">{auction.item}</Link>
+                                                {auction.auctionKind === 'barter' && <span role="img" title="Barter" aria-label="Barter" className="inline-flex self-center"><BarterSymbol size={20} /></span>}
                                                 <span className="text-xs font-medium profile-muted">{isBuy && title === 'Buy order fulfillments' ? `× ${personallyFulfilled == null ? '—' : formatNumber(personallyFulfilled)}` : auctionQuantityLabel(auction)}</span>
                                                 {bidStatus && <span className={`profile-outcome-badge ${bidStatus.className}`}>{bidStatus.label}</span>}
                                             </h3>
@@ -189,7 +193,7 @@ const Profile = () => {
 
                                     {result.status === 'awaiting_trade' && <div className="profile-entry-extra">
                                         <span>{auction.sellerId === currentUser.id ? 'You are the seller.' : result.winnerId === currentUser.id ? 'You won this auction.' : 'Another bidder won.'}</span>
-                                        <Link to={`/auction/${auction.id}`} className="profile-blue underline">View trade details</Link>
+                                        <Link to={`/${auction.auctionKind === 'barter' ? 'barter' : 'auction'}/${auction.id}`} className="profile-blue underline">View trade details</Link>
                                     </div>}
                                 </article>
                             );

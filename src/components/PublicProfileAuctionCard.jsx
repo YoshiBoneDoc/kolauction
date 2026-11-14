@@ -1,4 +1,5 @@
 import RemainingTime from './RemainingTime';
+import BarterSymbol from './BarterSymbol';
 import AuctionLiveUnavailable from './AuctionLiveUnavailable';
 import RelistButton from './RelistButton';
 import { auctionQuantityLabel } from '../lib/bundles';
@@ -24,6 +25,8 @@ export default function PublicProfileAuctionCard({ auction, now }) {
     const linkState = { browseFrom: `${location.pathname}${location.search}` };
     if (auction.liveUnavailable) return <AuctionLiveUnavailable auction={auction} />;
     const isBuy = auction.auctionKind === 'buy';
+    const isBarter = auction.auctionKind === 'barter';
+    const detailPath = `/${isBarter ? 'barter' : 'auction'}/${auction.id}`;
     const result = getAuctionResult(auction, now);
     const displayStatus = getAuctionDisplayStatus(auction, result);
     const active = result.status === 'active' && !auction.buyClosingReason;
@@ -62,9 +65,9 @@ export default function PublicProfileAuctionCard({ auction, now }) {
         <div className="public-profile-auction-row-main public-profile-auction-grid">
             <div className="profile-public-row-item">
                 <div className="profile-public-row-identity">
-                    {auction.image && <Link to={`/auction/${auction.id}`} state={linkState} aria-label={`View ${itemLabel}`} className="profile-public-row-image"><img src={auction.image} alt="" loading="lazy" /></Link>}
+                    {auction.image && <Link to={detailPath} state={linkState} aria-label={`View ${itemLabel}`} className="profile-public-row-image"><img src={auction.image} alt="" loading="lazy" /></Link>}
                     <span className="profile-public-row-item-text">
-                        <span className="profile-public-row-title"><Link to={`/auction/${auction.id}`} state={linkState} title={itemLabel} className="profile-public-row-name">{auction.item}</Link> <span className="profile-public-row-quantity">{auctionQuantityLabel(auction)}</span></span>
+                        <span className="profile-public-row-title"><Link to={detailPath} state={linkState} title={itemLabel} className="profile-public-row-name">{auction.item}</Link> <span className="profile-public-row-quantity">{auctionQuantityLabel(auction)}</span>{isBarter && <span role="img" title="Barter" aria-label="Barter" className="inline-flex self-center"><BarterSymbol size={20} /></span>}</span>
                         <span className="profile-public-row-number">
                             {auction.auctionNumber ? `#${auction.auctionNumber}` : 'Auction'} · {isBuy
                                 ? <>{itemCount(buyPurchased)} / {itemCount(buyTarget)} filled{buyRemaining > 0 && <> · {itemCount(buyRemaining)} remaining</>}</>
@@ -98,12 +101,12 @@ export default function PublicProfileAuctionCard({ auction, now }) {
                 </div>
                 <div className="profile-public-row-actions">
                     <RelistButton auction={auction} now={now} />
-                    {currentUserCanBid && <button type="button" aria-expanded={showBid} aria-controls={formId} onClick={() => setShowBid(value => !value)} className="profile-public-row-bid">{showBid ? 'Close' : 'Bid'}</button>}
+                    {currentUserCanBid && (isBarter ? <Link to={detailPath} state={linkState} className="profile-public-row-bid">Bid</Link> : <button type="button" aria-expanded={showBid} aria-controls={formId} onClick={() => setShowBid(value => !value)} className="profile-public-row-bid">{showBid ? 'Close' : 'Bid'}</button>)}
                     {hasBuyout && <InstantPurchaseAction auction={auction} compact dense showPrice={false} />}
                 </div>
             </div>
         </div>
-        {showBid && currentUserCanBid && <div id={formId} className="profile-public-row-expanded"><AuctionBidForm auction={auction} /></div>}
+        {showBid && currentUserCanBid && !isBarter && <div id={formId} className="profile-public-row-expanded"><AuctionBidForm auction={auction} /></div>}
     </article>;
 }
 
