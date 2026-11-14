@@ -389,7 +389,7 @@ const InfoPage = () => {
                             </p>
 
                             <p>
-                                <strong>Where do the fees go?</strong> They help support the time and effort that goes into developing, improving, and maintaining kHub, with a portion going toward community giveaways{' '}
+                                <strong>Where do the fees go?</strong> They help support the time and effort that goes into developing, improving, and maintaining kHub, with a portion going toward community {' '}
                                 <Link to="/giveaways" className="text-blue-700 underline">
                                     giveaways
                                 </Link>.

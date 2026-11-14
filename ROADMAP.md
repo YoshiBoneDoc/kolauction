@@ -4,7 +4,7 @@ Repository audit: November 2, 2026. Remaining work only; implementation is not p
 of production deployment. Start with [the handoff](HANDOFF.md:1).
 
 ## NEED TO FIX:
-- add reward tiers for escrow which reduce fees
+- Implement the lifetime completed-escrow-sales loyalty backend; the [leaderboard tier preview](src/pages/Leaderboards.jsx:59) includes a private personal-sales progress read/display; commission calculation and permanent tier settlement remain unimplemented. Thresholds: Regular 0, Silver 50M, Gold 250M, Platinum 1B, Diamond 3B; proposed flat rates and settlement rules are not active.
 - add barter corner
 
 ## Traffic reliability — current priority

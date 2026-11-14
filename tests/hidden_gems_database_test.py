@@ -138,6 +138,23 @@ with tempfile.TemporaryDirectory(prefix='khub-public-projection-',dir='/tmp') as
         assert len(live['rows'])==63
         sql("select public.read_public_auction_live_batch(array_fill(gen_random_uuid(),array[336]));")
         sql("select public.read_public_auction_live_batch(array_fill(gen_random_uuid(),array[337]));",error='at most 336')
+        # Private loyalty reads count only the caller's completed escrow Sell value.
+        assert json.loads(sql("set role authenticated;select public.read_my_loyalty_progress();",owner))['completed_escrow_sales_meat']=='0'
+        def completed_sale(seller, price, escrow=True, kind='sell', status='completed'):
+            return sql(f"insert into public.auctions(seller_id,seller_username,seller_kol_id,item,item_id,quantity,min_bid_meat,duration_hours,end_time,status,auction_kind,escrow_mode,winner_id,final_price,seller_confirmed_at,buyer_confirmed_at,completed_at,finalized_at,settled_at) values('{seller}','Fixture seller',48889801,'Loyalty fixture',{item_ids[0]},1,100,24,now()+interval '24 hours','{status}','{kind}',{str(escrow).lower()},'{other}',{price},now(),now(),now(),now(),now()) returning id;")
+        completed_sale(owner,500000000);completed_sale(owner,250000000)
+        completed_sale(owner,2000000000,escrow=False)
+        completed_sale(owner,1000000000,status='awaiting_trade')
+        completed_sale(owner,5000000000,kind='buy')
+        completed_sale(other,999000000)
+        def loyalty(uid):
+            return json.loads(sql("set role authenticated;select public.read_my_loyalty_progress();",uid))['completed_escrow_sales_meat']
+        assert loyalty(owner)=='750000000'
+        assert loyalty(other)=='999000000'
+        sql("set role anon;select public.read_my_loyalty_progress();",error='permission denied')
+        sql("select public.read_my_loyalty_progress();",error='Log in')
+        sql("set role authenticated;select public.read_my_loyalty_progress();",restricted,error='restricted')
+        print('PASS: loyalty totals isolate each authenticated seller and exclude Direct, Buy and unfinished sales')
         assert sql(financial_probe)==before_projection
         print('PASS: public/private Discover, Hidden Gems selection, thresholds, next bid/buyout, Buy offers, partial bundles, stale/missing estimates, pagination and unchanged financial definitions.')
     finally:

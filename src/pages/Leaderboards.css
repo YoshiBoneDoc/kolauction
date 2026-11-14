@@ -18,8 +18,9 @@
 .club-page :is(button, input):focus-visible { outline: 2px solid var(--club-accent); outline-offset: 3px; }
 .club-page :is(h1, h2, p) { margin: 0; }
 .club-page-header, .club-heading-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-.club-page-header { margin-bottom: 20px; }
-.club-page-header h1 { font-size: clamp(25px, 3vw, 33px); line-height: 1.2; letter-spacing: -.035em; }
+.club-page-header { justify-content: center; text-align: center; margin-bottom: 18px; }
+.club-page-header h1 { font-family: Georgia, 'Times New Roman', serif; font-size: clamp(28px, 3vw, 36px); font-weight: 400; line-height: 1.2; letter-spacing: .015em; text-transform: none; }
+.club-page-header h1 span { color: var(--club-accent); }
 .club-page-header p, .club-heading-row p { color: var(--club-muted); margin-top: 5px; line-height: 1.5; }
 .club-status { flex-shrink: 0; padding: 6px 9px; border-radius: 5px; background: var(--club-tint); color: var(--club-accent); font-size: 10px; font-weight: 750; letter-spacing: .08em; }
 .club-panel { background: var(--club-bg); border: 1px solid var(--club-line); border-radius: 12px; overflow: hidden; }
@@ -27,29 +28,57 @@
 .club-preview-tag { color: var(--club-muted); font-size: 10px; border: 1px solid var(--club-line); border-radius: 5px; padding: 5px 8px; white-space: nowrap; }
 
 /* Horizontal reward milestones */
-.club-progression { padding: 20px 22px 16px; margin-bottom: 20px; }
-.club-tier-track { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 19px; }
-.club-page .copper { --tier-color: #995d37; --tier-bg: #f3e5d9; }
-.club-page .silver { --tier-color: #5e6b7f; --tier-bg: #e8edf2; }
-.club-page .gold { --tier-color: #87631b; --tier-bg: #f7edcf; }
-.club-page .platinum { --tier-color: #39756b; --tier-bg: #e0efeb; }
-.club-page .diamond { --tier-color: #7852a0; --tier-bg: #ece2f7; }
+.club-progression { padding: 12px 18px 10px; margin-bottom: 16px; }
+.club-progression .club-heading-row h2 { font-size: 16px; }
+.club-tier-track { display: grid; grid-template-columns: minmax(0, .5fr) repeat(4, minmax(0, 1.125fr)); gap: 5px; margin-top: 8px; }
+.club-page .regular { --tier-text: #A65E35; --tier-color: #D69A70; --tier-bg: #eee8e0; }
+.club-page .silver { --tier-text: #66778F; --tier-color: #B9C2CE; --tier-bg: #e8edf2; }
+.club-page .gold { --tier-text: #A77A19; --tier-color: #EDC96B; --tier-bg: #f7edcf; }
+.club-page .platinum { --tier-text: #368875; --tier-color: #8BCDBB; --tier-bg: #e0efeb; }
+.club-page .diamond { --tier-text: #477BC4; --tier-color: #9BBFF5; --tier-bg: #e5edfc; }
 .club-page .supporter { --tier-color: #976c92; --tier-bg: #f1e3ee; }
-.club-tier-step { min-width: 0; text-align: left; padding: 0 7px 9px; color: var(--club-ink); background: transparent; border: 1px solid transparent; border-radius: 8px; }
-.club-tier-step:hover, .club-tier-step.is-selected { background: var(--club-tint); border-color: var(--club-line); }
-.club-tier-segment { display: block; height: 7px; margin: 0 -2px 12px; border-radius: 5px; background: var(--tier-color); opacity: .8; }
-.club-tier-step.is-selected .club-tier-segment { opacity: 1; box-shadow: 0 0 0 2px var(--club-line); }
-.club-tier-title { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; }
-.club-tier-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--tier-color); flex-shrink: 0; }
-.club-tier-threshold { display: block; margin-top: 5px; color: var(--club-muted); font-size: 10px; }
-.club-tier-step strong { display: block; margin-top: 9px; font-size: 17px; }
-.club-tier-step strong span { font-size: 10px; font-weight: 400; color: var(--club-muted); }
-.club-tier-detail { margin-top: 11px; padding: 12px 14px; background: var(--club-soft); border-radius: 7px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.club-tier-detail > div { display: flex; align-items: center; gap: 9px; }
-.club-tier-detail > div > span:not(.club-tier-pill) { font-size: 11px; color: var(--club-muted); }
-.club-tier-detail strong { font-size: 15px; }
-.club-tier-pill { padding: 4px 8px; border-radius: 5px; background: var(--tier-bg); color: var(--tier-color); font-weight: 750; font-size: 11px; }
-.club-rewards-note { color: var(--club-muted); font-size: 10px; line-height: 1.5; margin-top: 10px !important; }
+.club-tier-step { min-width: 0; padding: 0; text-align: center; color: var(--club-muted); background: transparent; border: 0; border-radius: 4px; }
+.club-tier-title { display: block; font-size: 13px; font-weight: 700; }
+.club-tier-labels { position: relative; display: flex; justify-content: center; align-items: baseline; gap: 2px; margin-top: 4px; }
+.club-tier-threshold { position: absolute; right: 0; display: block; text-align: right; font-size: 11px; font-variant-numeric: tabular-nums; }
+.club-tier-segment { display: block; position: relative; overflow: hidden; height: 12px; margin-top: 8px; border-radius: 5px; background: var(--club-soft); border: 1px solid var(--club-line); transition: border-color .15s, box-shadow .15s; }
+.club-tier-fill { display: block; height: 100%; background: var(--tier-color); }
+.club-tier-step.is-current .club-tier-title, .club-tier-step.is-previewing .club-tier-title { color: var(--club-ink); }
+.club-tier-step.is-current .club-tier-title { font-weight: 800; }
+.club-page .club-tier-step:focus { outline: none; }
+.club-tier-step.is-current .club-tier-segment, .club-tier-step.is-previewing .club-tier-segment, .club-tier-step:focus-visible .club-tier-segment { border-color: var(--tier-text, var(--tier-color)); box-shadow: 0 0 18px color-mix(in srgb, var(--tier-color) 55%, transparent); z-index: 1; }
+.club-tier-step.is-current:hover .club-tier-segment { box-shadow: 0 0 0 2px color-mix(in srgb, var(--tier-color) 45%, transparent), 0 0 18px color-mix(in srgb, var(--tier-color) 55%, transparent); }
+.club-tier-progress-label { display: block; min-height: 14px; font-size: 10px; color: var(--club-muted); }
+.club-tier-step.is-current .club-tier-progress-label { color: var(--club-ink); }
+.club-loyalty-actions { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.club-sales-summary { margin-top: 0; color: var(--club-muted); font-size: 12px; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.club-sales-summary > span:first-child { color: color-mix(in srgb, var(--club-muted) 55%, var(--club-ink)); font-weight: 600; }
+.club-page .club-refresh-progress { padding: 0; border: 0; color: var(--club-muted); text-decoration: underline; font-size: 10px; }
+.club-progress-status { margin-top: 12px !important; color: var(--club-muted); line-height: 1.6; }
+.club-progress-status :is(a, button), .club-return-tier { padding: 0; border: 0; background: transparent; color: var(--club-accent); text-decoration: underline; }
+.club-benefit-threshold { margin-top: 0 !important; font-size: 11px; color: var(--club-muted); }
+.club-return-tier { margin: 0; font-size: 10px; line-height: 1.5; text-align: right; }
+.club-tier-detail { margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--club-line); }
+.club-benefit-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 12px; }
+.club-benefit-heading > div { display: flex; align-items: center; gap: 10px; }
+.club-benefit-heading h3 { margin: 0; font-size: 13px; font-weight: 650; line-height: 1.5; }
+.club-tier-pill { padding: 5px 10px; border-radius: 20px; background: var(--tier-bg); color: var(--tier-text, var(--tier-color)); font-weight: 750; font-size: 11px; }
+.club-permanent { font-size: 11px; color: var(--club-muted); white-space: nowrap; }
+.club-rate-label { margin-top: 18px !important; color: var(--club-muted); font-size: 11px; }
+.club-rate-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 5px 0 0; }
+.club-rate-grid > div { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 0 16px; border-left: 1px solid var(--club-line); }
+.club-rate-grid > div:first-child { padding-left: 0; border-left: 0; }
+.club-rate-grid dt { color: var(--club-muted); font-size: 11px; }
+.club-rate-grid dd { margin: 0; font-size: 22px; font-weight: 700; line-height: 1.2; letter-spacing: -.04em; color: var(--tier-text, var(--tier-color)); }
+.club-rate-grid dd span { font-size: 17px; margin-left: 2px; }
+.club-rate-grid p { margin-top: 4px; font-size: 10px; color: var(--club-muted); }
+.club-flat-note { margin-top: 12px !important; font-size: 11px; color: var(--club-muted); }
+.club-loyalty-rules { margin-top: 6px; font-size: 11px; line-height: 1.6; }
+.club-loyalty-rules summary { width: fit-content; cursor: pointer; font-weight: 650; }
+.club-loyalty-rules summary:focus-visible { outline: 2px solid var(--club-accent); outline-offset: 3px; }
+.club-loyalty-rules ul { margin: 9px 0 0; padding-left: 18px; list-style: disc; color: var(--club-muted); }
+.club-loyalty-rules li + li { margin-top: 5px; }
+.club-rewards-note { color: var(--club-muted); font-size: 10px; line-height: 1.5; margin-top: 7px !important; }
 
 /* Leaderboard */
 .club-board-heading { padding: 20px 22px 15px; }
@@ -70,9 +99,9 @@
 .club-player { display: flex; align-items: center; gap: 12px; }
 .club-rank { width: 22px; font-size: 11px; color: var(--club-muted); font-weight: 500; }
 .club-rank-top { color: #b18a4b; font-weight: 800; }
-.club-avatar { display: grid; place-items: center; width: 34px; height: 34px; flex-shrink: 0; border-radius: 8px; background: var(--tier-bg); color: var(--tier-color); font-size: 10px; font-weight: 700; }
+.club-avatar { display: grid; place-items: center; width: 34px; height: 34px; flex-shrink: 0; border-radius: 8px; background: var(--tier-bg); color: var(--tier-text, var(--tier-color)); font-size: 10px; font-weight: 700; }
 .club-player-info strong { display: block; font-size: 12px; font-weight: 650; }
-.club-player-info small { display: block; font-size: 10px; margin-top: 3px; color: var(--tier-color); }
+.club-player-info small { display: block; font-size: 10px; margin-top: 3px; color: var(--tier-text, var(--tier-color)); }
 .club-table td { color: var(--club-muted); }
 .club-table td.club-active-value { color: var(--club-ink); font-weight: 750; }
 .club-volume-bar { display: block; margin: 6px 0 0 auto; width: 82px; height: 3px; border-radius: 5px; overflow: hidden; background: var(--club-soft); }
@@ -83,19 +112,16 @@
 .club-disclaimer { color: var(--club-muted); font-size: 11px; line-height: 1.65; margin-top: 16px !important; }
 
 html[data-theme=dark] .club-page { --club-bg: #211d2b; --club-soft: #2b2535; --club-ink: #efe8f5; --club-muted: #b7aabe; --club-line: #41364d; --club-accent: #c4a0e6; --club-tint: #30263e; }
-html[data-theme=dark] .club-page .copper { --tier-color: #e3ad85; --tier-bg: #483328; }
-html[data-theme=dark] .club-page .silver { --tier-color: #bac8dd; --tier-bg: #313c4c; }
-html[data-theme=dark] .club-page .gold { --tier-color: #e7c779; --tier-bg: #463b22; }
-html[data-theme=dark] .club-page .platinum { --tier-color: #93cfbe; --tier-bg: #253f39; }
-html[data-theme=dark] .club-page .diamond { --tier-color: #c8a4eb; --tier-bg: #413052; }
+html[data-theme=dark] .club-page .regular { --tier-text: var(--tier-color); --tier-color: #d3bd9f; --tier-bg: #40372f; }
+html[data-theme=dark] .club-page .silver { --tier-text: var(--tier-color); --tier-color: #bac8dd; --tier-bg: #313c4c; }
+html[data-theme=dark] .club-page .gold { --tier-text: var(--tier-color); --tier-color: #e7c779; --tier-bg: #463b22; }
+html[data-theme=dark] .club-page .platinum { --tier-text: var(--tier-color); --tier-color: #93cfbe; --tier-bg: #253f39; }
+html[data-theme=dark] .club-page .diamond { --tier-text: var(--tier-color); --tier-color: #648FE0; --tier-bg: #253653; }
 html[data-theme=dark] .club-page .supporter { --tier-color: #dfafd8; --tier-bg: #49354a; }
 @media (max-width: 760px) {
   .club-page { padding: 18px 16px 36px; }
-  .club-tier-track { gap: 4px; }
-  .club-tier-step { padding: 0 4px 8px; }
-  .club-tier-title { font-size: 10px; }
-  .club-tier-threshold { font-size: 9px; }
-  .club-tier-step strong { font-size: 14px; }
+  .club-benefit-heading { align-items: flex-start; }
+  .club-permanent { display: none; }
   .club-board-controls { align-items: stretch; flex-direction: column; }
   .club-tabs { width: 100%; }
   .club-tabs button { flex: 1; }
@@ -103,12 +129,19 @@ html[data-theme=dark] .club-page .supporter { --tier-color: #dfafd8; --tier-bg: 
 }
 @media (max-width: 520px) {
   .club-page-header { align-items: flex-start; }
-  .club-page-header h1 { font-size: 24px; }
+  .club-page-header h1 { font-size: 28px; }
   .club-status { font-size: 8px; }
-  .club-progression { padding: 16px 12px; }
+  .club-progression { padding: 14px 12px 10px; }
   .club-heading-row h2 { font-size: 18px; }
-  .club-tier-track { overflow-x: auto; grid-template-columns: repeat(5, minmax(105px, 1fr)); padding-bottom: 5px; }
-  .club-tier-detail { align-items: flex-start; flex-direction: column; }
+  .club-progression .club-heading-row { align-items: center; gap: 8px; }
+  .club-progression .club-heading-row h2 { font-size: 14px; }
+  .club-loyalty-actions { gap: 8px; }
+  .club-tier-title { font-size: 10px; }
+  .club-tier-threshold { font-size: 9px; }
+  .club-benefit-heading > div { align-items: flex-start; }
+  .club-benefit-heading h3 { font-size: 12px; }
+  .club-rate-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 6px; }
+  .club-rate-grid > div:nth-child(3) { padding-left: 0; border-left: 0; }
   .club-board-heading, .club-board-controls { padding-inline: 12px; }
   .club-tabs button { padding: 8px 5px; font-size: 10px; }
   .club-page .club-table tbody :is(th, td), .club-table thead th { padding-inline: 11px; }
@@ -118,3 +151,81 @@ html[data-theme=dark] .club-page .supporter { --tier-color: #dfafd8; --tier-bg: 
   .club-board-foot { padding-inline: 12px; }
 }
 @media (prefers-reduced-motion: reduce) { .club-page * { transition: none; } }
+
+/* Keep rewards beside the rankings rather than above them. */
+.club-page { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 0 24px; }
+.club-page-header { grid-column: 1; }
+.club-progression { display: contents; }
+.club-progress-main { grid-column: 1; grid-row: 2; margin-bottom: 16px; }
+.club-progress-main .club-tier-track { margin-top: 0; }
+.club-rewards-sidebar .club-sales-summary { margin-top: 8px; font-size: 11px; }
+.club-rewards-sidebar { grid-column: 2; grid-row: 2 / span 3; min-width: 0; align-self: start; }
+.club-rewards-sidebar > h2 { font-size: 16px; font-weight: 600; padding-bottom: 9px; border-bottom: 1px solid var(--club-line); }
+.club-rewards-sidebar .club-tier-detail { border: 0; margin-top: 10px; padding-top: 0; }
+.club-rewards-sidebar .club-rate-grid { grid-template-columns: 1fr; gap: 8px; margin-top: 12px; }
+.club-rewards-sidebar .club-rate-grid > div { border: 0; padding: 0; }
+.club-rewards-sidebar .club-rate-grid dd { font-size: 18px; }
+.club-rewards-sidebar .club-rate-grid dd span { font-size: 13px; }
+.club-rewards-sidebar .club-loyalty-rules { margin-top: 14px; }
+.club-board { grid-column: 1; grid-row: 3; min-width: 0; }
+.club-disclaimer { grid-column: 1; grid-row: 4; }
+@media (max-width: 760px) {
+  .club-page { grid-template-columns: minmax(0, 1fr); }
+  .club-rewards-sidebar { grid-column: 1; grid-row: 5; margin-top: 20px; }
+}
+
+.club-benefit-tier-name { color: var(--tier-text, var(--tier-color)); }
+
+/* Placement awards are independent of the loyalty tier palette. */
+.club-podium { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: 12px; list-style: none; margin: 8px 22px 24px; padding: 0; }
+.club-podium-place { min-width: 0; text-align: center; --podium-color: #66778f; --podium-height: 50px; }
+.club-podium-place-1 { grid-column: 2; grid-row: 1; --podium-color: #477bc4; --podium-height: 100px; }
+.club-podium-place-2 { grid-column: 1; grid-row: 1; --podium-color: #a77a19; --podium-height: 75px; }
+.club-podium-place-3 { grid-column: 3; grid-row: 1; }
+.club-podium-person { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 0 2px 12px; }
+.club-podium-person > strong { max-width: 100%; overflow-wrap: anywhere; font-size: 18px; font-weight: 750; }
+.club-podium-crown { display: block; width: 26px; height: 26px; color: var(--podium-color); }
+.club-podium-total { color: var(--podium-color); font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.club-podium-person small { font-size: 10px; color: var(--club-muted); }
+.club-podium-step { height: var(--podium-height); display: flex; flex-direction: column; justify-content: center; gap: 0; line-height: 1.2; border-top: 3px solid var(--podium-color); border-radius: 8px 8px 0 0; color: var(--podium-color); background: color-mix(in srgb, var(--podium-color) 12%, var(--club-bg)); }
+.club-podium-step > span { font-size: 17px; font-weight: 650; }
+.club-podium-step > strong { font-size: 13px; font-weight: 400; }
+html[data-theme=dark] .club-podium-place-1 { --podium-color: #9bbff5; }
+html[data-theme=dark] .club-podium-place-2 { --podium-color: #edc96b; }
+html[data-theme=dark] .club-podium-place-3 { --podium-color: #b9c2ce; }
+@media (max-width: 520px) {
+  .club-podium { gap: 6px; margin-inline: 12px; }
+  .club-podium-person > strong { font-size: 14px; }
+  .club-podium-total { font-size: 17px; }
+  .club-podium-step > strong { font-size: 11px; }
+}
+
+.club-board-controls { padding-top: 14px; padding-bottom: 0; }
+.club-tabs { gap: 16px; padding: 0; background: transparent; border-radius: 0; }
+.club-tabs button { padding: 10px 0 4px; border-radius: 0; border-bottom: 2px solid transparent; font-size: 12px; font-weight: 500; }
+.club-tabs button[aria-pressed=true] { background: transparent; color: var(--club-ink); box-shadow: none; border-bottom-color: var(--club-accent); font-weight: 650; }
+.club-ranking-heading { padding: 20px 22px 14px; font-size: 24px; font-weight: 650; letter-spacing: -.025em; }
+@media (max-width: 760px) {
+  .club-tabs button { flex: initial; }
+}
+@media (max-width: 520px) {
+  .club-tabs { gap: 14px; }
+  .club-tabs button { font-size: 11px; }
+  .club-ranking-heading { padding-inline: 12px; font-size: 22px; }
+}
+
+html[data-theme=dark] .club-page .club-tabs button,
+html[data-theme=dark] .club-page .club-tabs button:hover,
+html[data-theme=dark] .club-page .club-tabs button[aria-pressed=true] { background: transparent; box-shadow: none; }
+.club-ranking-period { font-size: 12px; font-weight: 400; letter-spacing: 0; color: var(--club-muted); white-space: nowrap; }
+
+.club-page .club-tabs button:focus:not(:focus-visible) { outline: none; }
+
+.club-search { gap: 10px; border: 0; border-radius: 0; padding: 0; }
+.club-search > svg { flex-shrink: 0; }
+.club-page .club-search input { padding: 10px 16px; border-radius: 999px; background: var(--club-soft); font-size: 12px; }
+.club-page .club-search input::placeholder { color: var(--club-muted); opacity: .8; }
+.club-page .club-search input:focus-visible { outline: 2px solid var(--club-accent); outline-offset: 2px; }
+
+.club-board-status { padding: 20px 22px; color: var(--club-muted); }
+.club-board-status :is(a, button) { color: var(--club-accent); background: transparent; border: 0; text-decoration: underline; }

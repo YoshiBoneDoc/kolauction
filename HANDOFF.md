@@ -396,3 +396,65 @@ Apply 260 once then deploy website; matching ignored bot SQL copy included, no
 bot/cache Worker runtime changes. 53 focused Node tests, disposable free-text/
 font-heart SQL regressions, changed-source lint, build and secret scan passed.
 No production SQL/deployment performed; personal bot quickstart unchanged.
+
+November 13 Leaderboards loyalty UI: a connected 30px tier bar replaces the old
+milestone cards. Clicking Regular/Silver/Gold/Platinum/Diamond previews the owner's
+0/50M/250M/1B/3B completed-escrow-sales thresholds and four proposed flat commission
+bands. Rules explain permanent tiers, Direct exclusion, settlement-time membership,
+subsequent-sale upgrades, completed-sale commissions and promotion compatibility.
+Fixtures explicitly separate qualifying escrow sales from overall trade volume;
+number formatting now preserves trailing integer zeros (50M, 250M). All rankings
+remain sample data and UI labels make inactive discounts clear. No SQL, bot,
+financial calculations, requests or production behavior changed. Two targeted
+threshold/interaction tests, changed-source lint and build passed. Native browser
+preview was blocked by concurrent browser use; responsive/dark styling remains
+visually unverified. No deployment performed.
+
+November 13 personal loyalty progress: queued **261** adds an authenticated,
+caller-scoped read of completed escrow Sell final values, using the existing seller
+index. Direct/Buy/pending/no-winner rows are excluded; mixed payment final values
+are counted once. It changes no fee, financial or settlement routine. Website
+progress loads once per authorization scope/route mount, with abort/deadline,
+manual refresh and no polling; failures/guests never fabricate earned tiers or
+zero balances. Exact BigInt totals drive five segment fills and next-tier distance.
+Hover/focus/tap previews and glow do not alter fills; leaving restores the earned
+tier. Example 750M: Gold earned, Platinum segment 66.7%, 250M remaining. Table
+rankings/donors remain explicitly sample data; proposed discounts stay inactive.
+Apply 261 once then deploy website; ignored bot SQL copy included, no bot/cache
+Worker release. Six targeted threshold/progress/interaction/read tests, disposable
+SQL privacy/qualification/financial-definition checks, lint and build passed.
+Browser visual QA and live total accuracy remain unverified. Nothing applied or
+deployed to production; personal quickstart unchanged.
+
+Loyalty compact-layout follow-up: tier controls explicitly use `bg-transparent`
+to override shared dark-theme button backgrounds. Segments are now 24px (22px on
+mobile), with thin tier-colored preview/focus outlines instead of glow. One line
+above the bar combines actual lifetime sales and the next milestone remainder;
+Current markers/fills remain tied to earned progress. Benefits use a short heading,
+requirement, four rates and a heading-area return link. One Coming soon label and
+one bottom explanation replace repeated status wording; reduced padding/gaps and
+one divider target a substantially shorter section. Private data reads, amounts,
+thresholds, rates and account isolation are unchanged. Seven focused UI/progress
+tests, changed-source lint, build and diff checks passed. Browser host unavailable,
+so pixel height reduction and light/dark visual QA remain unmeasured. No new SQL,
+production deployment or personal quickstart changes.
+
+November 13 real leaderboards: queued **262**, after 261/178, adds private
+per-profile display snapshots for trade volume, completed trades and recorded Meat
+donations. Completed Sell final values and confirmed paid Buy fulfillments count
+once for each participant, including partially paid orders later closed/cancelled;
+fees/deposits/refunds do not inflate trade value. Donors use existing explicit
+DONATE receipt eligibility, linked verified accounts and Meat only; items/gift
+packages are not speculatively valued. Names remain unrestricted-sign-in only;
+current restriction and bilateral ignore checks run before top-ten selection.
+The single RPC returns at most 30 ranked entries with exact text totals; browser
+BigInt formatting preserves amounts. Loading/errors/empty states replace fixtures.
+Snapshots reuse existing totals maintenance cadence (Site task normally 30 minutes),
+locks/cooldowns/deadlines and donation-only dirty markers; no browser polling or
+new scheduler. Financial routines/locks and the original site-totals body are
+unchanged. Migration seeds the initial snapshot; apply once then deploy website.
+Identical ignored bot SQL copy exists; no bot binary/cache Worker release needed.
+Eleven focused Node tests, disposable PostgreSQL accounting/privacy/ignore/top-ten/
+maintenance checks, changed-source lint, build and secret scan passed. Browser
+visual QA, production SQL installation, live totals and deployment are unverified.
+Personal bot quickstart unchanged. Leaderboard heading now says “lifetime”.
