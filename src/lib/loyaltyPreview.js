@@ -1,6 +1,6 @@
 // Leaderboard UI preview only. Never use these proposed rates to settle a sale.
 export const loyaltyTiers = [
-    { name: 'Regular', minimum: 0, color: 'regular', rates: [5, 4, 3, 2] },
+    { name: 'Base', minimum: 0, color: 'regular', rates: [5, 4, 3, 2] },
     { name: 'Silver', minimum: 50_000_000, color: 'silver', rates: [4, 3, 2.5, 1.5] },
     { name: 'Gold', minimum: 200_000_000, color: 'gold', rates: [3, 2.5, 2, 1.25] },
     { name: 'Platinum', minimum: 1_000_000_000, color: 'platinum', rates: [2.5, 2, 1.5, 1] },

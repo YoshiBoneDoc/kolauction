@@ -7,6 +7,7 @@ export function activeNavigationPath(pathname) {
     if (path === '/auction-item') return '/auction-item';
     if (['/info', '/donate', '/support', '/report-a-bug'].includes(path)) return '/info';
     if (path === '/update-log') return '/update-log';
+    if (path === '/leaderboards') return '/leaderboards';
     if (path === '/wall-of-shame') return '/wall-of-shame';
     if (path === '/profile' || ['/change-password', '/reset-password'].includes(path)) return '/profile';
     if (path === '/register' || path === '/auth/confirm') return '/register';

@@ -15,7 +15,7 @@ const InfoPage = () => {
     }, [hash]);
     return (
         <div className="site-page-background flex-1 bg-gray-50 flex flex-col items-center justify-center p-6">
-            <h1 className="text-4xl font-bold text-blue-600 mb-4">About KoL Auction Hub</h1>
+            <h1 className="info-page-title font-bold text-blue-600 mb-4">About KoL Auction Hub</h1>
             <p className="w-full max-w-3xl mb-6 text-sm leading-6 text-gray-700 text-justify">
                 Welcome to <span className="font-bold text-blue-500">kHub</span> (Kingdom of Loathing Auction Hub), a modern take on the old “kBay.”{' '}
                 I created this site because I missed the days of putting items up for auction, without having to spend hours advertising in chat with little to show for it.{' '}
@@ -378,6 +378,7 @@ const InfoPage = () => {
                             <p className="mt-3 border-t border-gray-200/30 pt-3 text-xs italic">
                                 The normal fee schedule below does not apply during the promo.
                             </p>
+                            <p>Escrow fees are based on your loyalty tier, and all earned tier benefits are permanent.</p>
 
                             <p>
                                 <strong>Selling:</strong> Commission is deducted from sale
@@ -405,11 +406,16 @@ const InfoPage = () => {
 
                             <div className="mt-3">
                                 <div className="overflow-hidden rounded-md border border-gray-200">
-                                    <table className="w-full text-xs leading-5">
+                                    <table className="w-full table-fixed text-xs leading-5">
                                         <caption className="sr-only">
-                                            Flat escrow commission rates by sale price
+                                            Flat escrow commission rates by sale price and loyalty tier
                                         </caption>
-                                        <thead className="bg-gray-100 text-gray-700">
+                                        <colgroup>
+                                            <col className="w-[54%]" />
+                                            <col className="w-[23%]" />
+                                            <col className="w-[23%]" />
+                                        </colgroup>
+                                        <thead className="divide-y divide-gray-200 bg-gray-100 text-gray-700">
                                         <tr>
                                             <th
                                                 scope="col"
@@ -418,24 +424,33 @@ const InfoPage = () => {
                                                 Sale Price
                                             </th>
                                             <th
-                                                scope="col"
-                                                className={`${subheadingClass} px-3 py-1.5 text-right`}
+                                                scope="colgroup"
+                                                colSpan={2}
+                                                className={`${subheadingClass} px-3 py-1.5 text-center`}
                                             >
                                                 Fee Rate
                                             </th>
                                         </tr>
+                                        <tr>
+                                            <td aria-hidden="true" />
+                                            <th scope="col" className="px-1 py-0.5 text-center text-xs font-normal leading-4 text-gray-700">Base</th>
+                                            <th scope="col" className="px-1 py-0.5 text-center text-xs font-normal leading-4 text-gray-700">At Max Tier</th>
+                                        </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-200">
                                         {[
-                                            { portion: 'Below 10M', rate: '4%' },
-                                            { portion: '10M–100M', rate: '3%' },
-                                            { portion: '100M–1B', rate: '2%' },
-                                            { portion: '1B+', rate: '1%' },
+                                            { portion: 'Below 10M', rate: '5%', maxRate: '2%' },
+                                            { portion: '10M–100M', rate: '4%', maxRate: '1.5%' },
+                                            { portion: '100M–1B', rate: '3%', maxRate: '1%' },
+                                            { portion: '1B+', rate: '2%', maxRate: '0.5%' },
                                         ].map(tier => (
                                             <tr key={tier.portion} className="bg-white odd:bg-gray-50">
                                                 <td className="px-3 py-1">{tier.portion}</td>
-                                                <td className="px-3 py-1 text-right font-medium text-gray-800">
+                                                <td className="px-1 py-1 text-center font-medium text-gray-800">
                                                     {tier.rate}
+                                                </td>
+                                                <td className="px-1 py-1 text-center font-medium text-gray-800">
+                                                    {tier.maxRate}
                                                 </td>
                                             </tr>
                                         ))}
@@ -446,6 +461,8 @@ const InfoPage = () => {
                                 <p className="mt-2 text-xs italic leading-5">
                                     The applicable rate applies to the entire sale.{' '}
                                     <strong>No sale, no fee.</strong>
+                                    <br />
+                                    Leaderboard perks may further reduce fees.
                                 </p>
 
                             </div>
@@ -492,6 +509,14 @@ const InfoPage = () => {
                             </div>
                         </li>
                         </>}
+                        <li className="group grid grid-cols-[110px_minmax(0,1fr)] gap-x-2 sm:grid-cols-[124px_minmax(0,1fr)] sm:gap-x-3">
+                            <time dateTime="2026-11-13" className="pt-0.5 text-xs text-gray-500 dark:text-gray-400">Nov 13, 2026</time>
+                            <div className="relative min-w-0 pb-4 pl-4 text-gray-700 group-last:pb-0 dark:text-gray-200">
+                                <span aria-hidden="true" className="absolute -bottom-[9px] left-0 top-[9px] w-px -translate-x-1/2 bg-gray-300 group-last:hidden dark:bg-gray-600" />
+                                <span aria-hidden="true" className="absolute left-0 top-1.5 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-gray-400 dark:bg-gray-500" />
+                                <p><Link to="/leaderboards" className="text-blue-700 underline dark:text-blue-300">Leaderboards</Link> Introduced</p>
+                            </div>
+                        </li>
                         <li className="group grid grid-cols-[110px_minmax(0,1fr)] gap-x-2 sm:grid-cols-[124px_minmax(0,1fr)] sm:gap-x-3">
                             <time dateTime="2026-11-15" className="pt-0.5 text-xs text-gray-500 dark:text-gray-400">Nov 15, 2026</time>
                             <div className="relative min-w-0 pb-4 pl-4 text-gray-700 group-last:pb-0 dark:text-gray-200">

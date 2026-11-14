@@ -4,9 +4,10 @@ import { buildSync } from 'esbuild';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import * as React from 'react';
-import { StaticRouter } from 'react-router-dom';
+import { Link, StaticRouter } from 'react-router-dom';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { loyaltyProgress, parseLoyaltySales, readLoyaltySales } from '../src/lib/loyaltyProgress.js';
+import { getLeaderboardFeeBenefits, leaderboardFeeBenefits } from '../src/lib/leaderboardFeePreview.js';
 import { loyaltyTiers, previewTierForEscrowSales } from '../src/lib/loyaltyPreview.js';
 
 test('preview membership changes at each inclusive completed escrow sales milestone', () => {
@@ -15,7 +16,7 @@ test('preview membership changes at each inclusive completed escrow sales milest
         assert.equal(previewTierForEscrowSales(tier.minimum - 1).name, loyaltyTiers[i - 1].name);
         assert.equal(previewTierForEscrowSales(tier.minimum).name, tier.name);
     }
-    assert.equal(previewTierForEscrowSales(0).name, 'Regular');
+    assert.equal(previewTierForEscrowSales(0).name, 'Base');
 });
 
 const { outputFiles } = buildSync({ stdin: { contents: "export { LeaderboardsPanel as default } from './src/pages/Leaderboards.jsx'; export { LoyaltyProgressPanel } from './src/components/LoyaltyProgress.jsx';",
@@ -31,7 +32,7 @@ new Function('require', 'module', 'exports', outputFiles[0].text)(name => name =
 const playerNames = ['MeatMagnate', 'DiscoBandit', 'PastamancerPrime', ...Array.from({length:7}, (_, i) => `Trader${i}`)];
 const donorNames = ['GenerousGnome', 'MeatPatron', 'KindheartedKol', ...Array.from({length:7}, (_, i) => `Donor${i}`)];
 const fixtureRows = (names, values) => names.map((name, i) => ({id:name, name, rank:i+1, value:values[i] ?? BigInt(100-i)}));
-const leaderboardFixture = {refreshedAt:'2026-11-13T12:00:00Z',
+const leaderboardFixture = {refreshedAt:'2026-11-13T12:00:00Z',personal:{volume:123400000n,trades:42n,donors:500n},
     volume:fixtureRows(playerNames, [18420000000n,12860000000n,9750000000n]),
     trades:fixtureRows([playerNames[0],playerNames[2],playerNames[1],...playerNames.slice(3)], [1248n,1102n,986n]),
     donors:fixtureRows(donorNames, [125000000n,70000000n,35000000n]),
@@ -114,27 +115,31 @@ test('leaderboard category and search controls remain available', () => {
     slots=[];cursor=0;let tree=compiled.exports.default({ data: leaderboardFixture, signedIn: true });
     nodes(tree).find(node=>node.type==='button' && node.props.children==='Top donors').props.onClick();
     cursor=0;tree=compiled.exports.default({ data: leaderboardFixture, signedIn: true });
-    assert.ok(nodes(tree).some(node=>node.props?.className==='club-donor-note'));
+    assert.ok(!nodes(tree).some(node=>node.props?.className==='club-donor-note'));
     assert.ok(nodes(tree).some(node=>node.type==='input' && node.props['aria-label']==='Search leaderboard players'));
 });
 
 test('podium awards follow each benchmark and leave seven unbadged table players', () => {
     for (const [category, expectedNames, expectedTotal] of [
-        ['Trade volume', ['MeatMagnate', 'DiscoBandit', 'PastamancerPrime'], '18.42B'],
-        ['Completed trades', ['MeatMagnate', 'PastamancerPrime', 'DiscoBandit'], '1,248'],
+        ['Meat traded', ['MeatMagnate', 'DiscoBandit', 'PastamancerPrime'], '18.42B'],
+        ['Total trades', ['MeatMagnate', 'PastamancerPrime', 'DiscoBandit'], '1,248'],
         ['Top donors', ['GenerousGnome', 'MeatPatron', 'KindheartedKol'], '125M'],
     ]) {
         slots=[];cursor=0;let tree=compiled.exports.default({ data: leaderboardFixture, signedIn: true });
         nodes(tree).find(node=>node.type==='button' && node.props.children===category).props.onClick();
         cursor=0;tree=compiled.exports.default({ data: leaderboardFixture, signedIn: true });
         const all=nodes(tree);
+        const personal=all.find(node=>node.props?.className==='club-personal-total');
+        assert.equal(personal.props.children, category==='Total trades' ? '42' : category==='Top donors' ? '500 Meat' : '123,400,000 Meat');
         const podium=all.find(node=>node.type==='ol');
-        assert.deepEqual(nodes(podium).filter(node=>node.props?.className==='club-podium-person').map(node=>nodes(node).find(child=>child.type==='strong').props.children),expectedNames);
+        assert.deepEqual(nodes(podium).filter(node=>node.props?.className==='club-podium-person').map(node=>nodes(node).find(child=>child.type===Link).props.children),expectedNames);
         assert.equal(nodes(podium).find(node=>node.props?.className==='club-podium-total').props.children,expectedTotal);
         assert.equal(nodes(podium).filter(node=>node.props?.['aria-label']==='First place crown').length,1);
+        assert.equal(nodes(podium).filter(node=>node.props?.className==='club-podium-trophy').length,2);
+        assert.equal(all.filter(node=>node.type===Link && node.props.to?.startsWith('/seller/')).length,10);
         const body=all.find(node=>node.type==='tbody');
         assert.equal(nodes(body).filter(node=>node.type==='tr').length,7);
-        const html=renderToStaticMarkup(body);
+        const html=renderToStaticMarkup(React.createElement(StaticRouter,null,body));
         assert.doesNotMatch(html,/club-avatar|club-volume-bar|Diamond|Gold|Silver|Community supporter/);
     }
 });
@@ -148,7 +153,71 @@ test('guest, loading and failed reads never render placeholder podiums', () => {
     slots=[];cursor=0;
     const tree=compiled.exports.default({data:{...leaderboardFixture,volume:[]},signedIn:true});
     const board=nodes(tree).find(node=>node.props?.className==='club-panel club-board');
-    const html=renderToStaticMarkup(board);
+    const html=renderToStaticMarkup(React.createElement(StaticRouter,null,board));
     assert.match(html,/No qualifying players yet/);
     assert.doesNotMatch(html,/Sample|Illustrative|lifetime total/);
+});
+
+test('remote search shows a player beyond the top ten with their overall rank', () => {
+    slots=[];cursor=0;
+    const onSearch=()=>{};
+    let tree=compiled.exports.default({data:leaderboardFixture,signedIn:true,onSearch});
+    nodes(tree).find(node=>node.type==='input').props.onChange({target:{value:'Outside'}});
+    cursor=0;
+    tree=compiled.exports.default({data:leaderboardFixture,signedIn:true,onSearch,searchState:{query:'Outside',category:'volume',offset:0,more:false,rows:[{id:'outside',name:'Outside',value:12345n,rank:47}]}});
+    const all=nodes(tree);
+    assert.ok(!all.some(node=>node.type==='ol'));
+    assert.equal(all.find(node=>node.props?.className==='club-rank').props.children,'47');
+    assert.equal(all.find(node=>node.type===Link && node.props.to==='/seller/outside').props.children,'Outside');
+});
+
+test('zero-activity search displays a dash for rank and zero for the stat', () => {
+    slots=[];cursor=0;const onSearch=()=>{};
+    let tree=compiled.exports.default({data:leaderboardFixture,signedIn:true,onSearch});
+    nodes(tree).find(node=>node.type==='input').props.onChange({target:{value:'Zero'}});
+    cursor=0;
+    tree=compiled.exports.default({data:leaderboardFixture,signedIn:true,onSearch,searchState:{query:'Zero',category:'volume',offset:0,more:false,rows:[{id:'zero',name:'Zero',value:0n,rank:null}]}});
+    assert.equal(nodes(tree).find(node=>node.props?.className==='club-rank').props.children,'—');
+    assert.equal(nodes(tree).find(node=>node.type==='td').props.children,'0');
+});
+
+test('leaderboard benefits choose the best trader position, with donor waiver precedence', () => {
+    const data={volume:[{id:'me',rank:3}],trades:[{id:'me',rank:1}],donors:[]};
+    assert.equal(getLeaderboardFeeBenefits(data,'me'),leaderboardFeeBenefits.leader);
+    data.trades[0].rank=2;
+    assert.equal(getLeaderboardFeeBenefits(data,'me'),leaderboardFeeBenefits.top3);
+    data.donors=[{id:'me',rank:1}];
+    assert.deepEqual(getLeaderboardFeeBenefits(data,'me').rates,[0,0,0,0]);
+    assert.equal(getLeaderboardFeeBenefits(data,'other'),null);
+    assert.equal(getLeaderboardFeeBenefits({volume:[{id:'me',rank:7}],trades:[],donors:[]},'me'),null);
+});
+
+test('leaderboard and donor defaults restore after tier preview without changing progress', () => {
+    for (const benefit of Object.values(leaderboardFeeBenefits)) {
+        slots=[];let tree;
+        const render=()=>{cursor=0;tree=compiled.exports.LoyaltyProgressPanel({sales:102300000n,signedIn:true,leaderboardBenefit:benefit});return nodes(tree);};
+        let all=render();
+        const rates=()=>nodes(tree).filter(node=>node.type==='dd').map(node=>node.props.children[0]);
+        const fills=()=>nodes(tree).filter(node=>node.props?.className==='club-tier-fill').map(node=>node.props.style.width);
+        const actual=fills();
+        assert.deepEqual(rates(),benefit.rates);
+        assert.match(renderToStaticMarkup(tree),new RegExp(benefit.label));
+        const gold=all.find(node=>node.props?.['aria-label']?.startsWith('Gold,'));
+        gold.props.onMouseEnter();all=render();
+        assert.deepEqual(rates(),loyaltyTiers[2].rates);assert.deepEqual(fills(),actual);
+        gold.props.onMouseLeave();all=render();
+        assert.deepEqual(rates(),benefit.rates);assert.deepEqual(fills(),actual);
+        gold.props.onFocus();all=render();assert.deepEqual(rates(),loyaltyTiers[2].rates);
+        gold.props.onBlur();all=render();assert.deepEqual(rates(),benefit.rates);
+    }
+});
+
+test('benefits use actual eligibility without temporary scenario controls', () => {
+    for (const [viewerId, expected] of [['MeatMagnate',leaderboardFeeBenefits.leader], ['DiscoBandit',leaderboardFeeBenefits.top3], ['GenerousGnome',leaderboardFeeBenefits.donor], ['other',null]]) {
+        slots=[];cursor=0;
+        const tree=compiled.exports.default({data:leaderboardFixture,signedIn:true,viewerId});
+        const all=nodes(tree);
+        assert.deepEqual(all.find(node=>node.props && 'leaderboardBenefit' in node.props).props.leaderboardBenefit,expected);
+        assert.ok(!all.some(node=>node.props?.['aria-label']==='Preview leaderboard fee benefits'));
+    }
 });

@@ -7,6 +7,7 @@ import { auctionFilters, auctionSorts, resolveAuctionSort } from '../lib/auction
 import { useAuctionBoundaryNow as useNow } from '../hooks/useAuctionBoundaryNow';
 import useAuctionSearch from '../hooks/useAuctionSearch';
 import TradeHistorySummary from '../components/TradeHistorySummary';
+import SellerLeaderboardHonors from '../components/SellerLeaderboardHonors';
 
 const number = value => BigInt(value ?? 0).toLocaleString('en-US');
 
@@ -49,7 +50,10 @@ export default function SellerProfile() {
                 <header className={`public-profile-header ${detailed ? 'is-detailed' : ''}`}>
                     <div className="public-profile-header-content">
                         <Link to={isOwnProfile ? '/profile' : '/auctions'} className="public-profile-back">← Back to {isOwnProfile ? 'Account Profile' : 'Auctions'}</Link>
+                        <div className="public-profile-identity">
                         <h1 className="public-profile-player-name">{currentUser && !currentUser.isBanned && seller.usernames_visible !== false ? seller.username : 'Player profile'}</h1>
+                        <SellerLeaderboardHonors sellerId={sellerId} visible={Boolean(currentUser && !currentUser.isBanned && seller.usernames_visible !== false)} />
+                        </div>
                         {(!currentUser || currentUser.isBanned || seller.usernames_visible === false) && <p className="public-profile-login-note text-sm text-gray-600">Log in with an unrestricted account to see usernames.</p>}
                         <nav aria-label="Seller profile views" className="public-profile-tabs">
                             <Link to={viewLink(false)} aria-current={!detailed ? 'page' : undefined} className={`public-profile-tab ${!detailed ? 'is-active' : ''}`}>Auctions</Link>

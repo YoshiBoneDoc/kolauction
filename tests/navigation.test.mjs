@@ -27,7 +27,7 @@ const { outputFiles } = buildSync({
         resolveDir: fileURLToPath(new URL('../', import.meta.url)), loader: 'jsx',
     },
     bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external',
-    define: { 'import.meta.env': '{}' }, jsx: 'automatic', loader: { '.gif': 'dataurl', '.css': 'empty' },
+    define: { 'import.meta.env': '{}' }, jsx: 'automatic', loader: { '.gif': 'dataurl', '.svg': 'dataurl', '.css': 'empty' },
 });
 const compiled = { exports: {} };
 new Function('require', 'module', 'exports', outputFiles[0].text)(createRequire(import.meta.url), compiled, compiled.exports);
@@ -36,7 +36,7 @@ const navigation = html => html.match(/<nav aria-label="Main navigation"[\s\S]*?
 
 test('all routed pages render one shared navbar with every primary destination', async () => {
     const paths = ['/', '/auctions', '/auction/example', '/auction/example/trade-query', '/auction/example/report-trade',
-        '/seller/example', '/auction-item', '/info', '/donate', '/wall-of-shame', '/login', '/register',
+        '/seller/example', '/auction-item', '/info', '/leaderboards', '/donate', '/wall-of-shame', '/login', '/register',
         '/forgot-password', '/resend-confirmation', '/reset-password', '/change-password', '/auth/confirm',
         '/profile', '/update-log', '/admin/banner', '/support', '/report-a-bug', '/submit-appeal', '/admin/inbox', '/admin/bug-reports', '/unknown-page'];
     for (const path of paths) {
@@ -44,7 +44,7 @@ test('all routed pages render one shared navbar with every primary destination',
         assert.equal((html.match(/aria-label="Main navigation"/g) || []).length, 1, path);
         assert.doesNotMatch(html, /aria-label="Page navigation"/, path);
         const nav = navigation(html);
-        for (const destination of ['/', '/auctions', '/auction-item', '/info', '/wall-of-shame', '/login', '/register']) {
+        for (const destination of ['/', '/auctions', '/auction-item', '/info', '/leaderboards', '/wall-of-shame', '/login', '/register']) {
             assert.ok(nav.includes(`href="${destination}"`), `${path}: ${destination}`);
         }
     }
@@ -54,7 +54,7 @@ test('active links follow nested auction, account, help and admin routes without
     const cases = [['/', '/'], ['/auctions/?q=tooth', '/auctions'], ['/auction/example', '/auctions'],
         ['/auction/example/trade-query', '/auctions'], ['/seller/example?view=stats', '/auctions'],
         ['/auction-item', '/auction-item'], ['/info', '/info'], ['/support', '/info'], ['/donate', '/info'],
-        ['/wall-of-shame', '/wall-of-shame'], ['/profile/', '/profile'], ['/change-password', '/profile'],
+        ['/leaderboards', '/leaderboards'], ['/wall-of-shame', '/wall-of-shame'], ['/profile/', '/profile'], ['/change-password', '/profile'],
         ['/login', '/login'], ['/register', '/register']];
     for (const [path, expected] of cases) {
         const nav = navigation((await render(path, { id: 'user', khubUsername: 'KH_Tester' })));
@@ -135,6 +135,15 @@ test('mobile menu starts collapsed and controls the shared links while Home and 
         const panelStart = nav.indexOf('id="main-navigation-links"');
         assert.ok(nav.indexOf('>Home</a>') < panelStart);
         assert.ok(nav.indexOf('aria-label="Switch to dark mode"') < panelStart);
-        assert.ok(nav.indexOf('>View All Auctions</a>') > panelStart);
+        assert.ok(nav.indexOf('>All auctions</a>') > panelStart);
     }
+});
+
+test('navbar uses All auctions and a labeled trophy directly after Info', async () => {
+    const nav=navigation(await render('/leaderboards'));
+    assert.match(nav,/>All auctions<\/a>/);
+    assert.doesNotMatch(nav,/View All Auctions/);
+    const links=[...nav.matchAll(/<a\b[^>]*href="([^"]+)"[^>]*>/g)];
+    assert.equal(links[links.findIndex(link=>link[1]==='/info')+1][1],'/leaderboards');
+    assert.match(nav,/<a[^>]*title="Leaderboards"[^>]*aria-label="Leaderboards"[^>]*>[\s\S]*?<svg/);
 });

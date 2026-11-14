@@ -4,8 +4,27 @@ Repository audit: November 2, 2026. Remaining work only; implementation is not p
 of production deployment. Start with [the handoff](HANDOFF.md:1).
 
 ## NEED TO FIX:
-- Implement the lifetime completed-escrow-sales loyalty backend; the [leaderboard tier preview](src/pages/Leaderboards.jsx:59) includes a private personal-sales progress read/display; commission calculation and permanent tier settlement remain unimplemented. Thresholds: Regular 0, Silver 50M, Gold 250M, Platinum 1B, Diamond 3B; proposed flat rates and settlement rules are not active.
+- Implement the lifetime completed-escrow-sales loyalty backend; the [leaderboard tier preview](src/pages/Leaderboards.jsx:59) includes a private personal-sales progress read/display; commission calculation and permanent tier settlement remain unimplemented. Thresholds: Base 0, Silver 50M, Gold 200M, Platinum 1B, Diamond 3B; proposed flat rates and settlement rules are not active.
 - add barter corner
+
+## Future leaderboard fee implementation — preserve trade terms
+
+Leaderboard fee perks are currently display-only. When implementing them, lock
+in the player's eligible reduced escrow rate when they create a trade while
+holding a qualifying leaderboard position. Persist those fee terms with the trade;
+do not recalculate them upward from the player's ranking at settlement.
+
+Losing the position must not increase fees on existing active trades. Those trades
+retain their original reduced rate through completion, including across restarts
+or delayed settlement. Only new trades created after the player loses the position
+use the higher rate applicable to their current eligibility. A later ranking change
+must never rewrite already locked or finalized fees.
+
+When multiple leaderboard perks apply, select the best eligible rate without
+stacking benefits; the top donor's full waiver takes precedence. Preserve the
+existing financial safeguards and verify loss of leadership between creation and
+settlement, new trades after loss, and concurrent ranking changes in regression
+tests before activation. No fee or settlement behavior is implemented by this note.
 
 ## Traffic reliability — current priority
 

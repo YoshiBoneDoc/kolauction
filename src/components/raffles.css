@@ -103,7 +103,7 @@ html[data-theme=dark] .auction-create-content .giveaway-editor .giveaway-preview
 .auction-create-content .special-auction-navigation button.raffle-mode-red:disabled:hover{background:#dc2626;border-color:#dc2626;box-shadow:0 0 16px #ef444473}
 
 /* Shared typography for dedicated Raffle and Giveaway creation. */
-.auction-create-shell .special-create-title{font-size:30px;line-height:1.2;font-weight:700;margin-bottom:20px}
+.auction-create-shell .special-create-title{line-height:1.2;font-weight:700;margin-bottom:20px}
 .auction-create-content :is(.raffle-editor,.giveaway-editor){font-size:13px;line-height:1.5}
 .auction-create-content :is(.raffle-editor,.giveaway-editor) label{font-size:13px;font-weight:600}
 .auction-create-content :is(.raffle-editor,.giveaway-editor) :is(input,select){font-size:14px;line-height:20px;font-weight:400}

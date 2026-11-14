@@ -323,8 +323,37 @@ html[data-theme="dark"] [class~="hover:text-gray-900"]:hover { color: #f8fafc; }
 html[data-theme="dark"] .button-red { background: #991b1b; border-color: #dc6a75; color: #fff; }
 html[data-theme="dark"] .button-red:hover:not(:disabled):not([aria-disabled="true"]) { background: #542a36; color: #fecdd3; border-color: #fb7185; }
 html[data-theme="dark"] .button-green:hover:not(:disabled):not([aria-disabled="true"]) { background: #184b34; color: #bbf7d0; border-color: #4ade80; }
-html[data-theme="dark"] .site-nav-link[aria-current="page"],
-html[data-theme="dark"] .site-navigation :is(a,button):focus-visible { color: #fecdd3; text-shadow: 0 0 7px #fb718580; }
+/* Navbar states override generic link colors in both themes. Hover is a
+   lighter, tighter glow; the current page retains a stronger, wider glow. */
+.site-navigation {
+  --nav-link: #C84237;
+  --nav-hover: #D23F54;
+  --nav-current: #B91C1C;
+  --nav-glow: #DC262680;
+}
+html[data-theme="dark"] .site-navigation {
+  --nav-link: #FDA4AF;
+  --nav-hover: #F9BCCB;
+  --nav-current: #FFE1E6;
+  --nav-glow: #FB7185A6;
+}
+html .site-navigation .site-nav-link { color: var(--nav-link); }
+html .site-navigation .site-nav-link:is(:hover, :focus-visible),
+html .site-navigation button:focus-visible {
+  color: var(--nav-hover);
+  text-shadow: 0 0 4px var(--nav-glow), 0 0 8px var(--nav-glow);
+}
+html .site-navigation .site-nav-link[aria-current="page"] {
+  color: var(--nav-current);
+  font-weight: 500;
+  text-shadow: 0 0 5px var(--nav-glow), 0 0 13px var(--nav-glow);
+}
+html .site-navigation .site-nav-link[aria-current="page"]:is(:hover, :focus-visible) {
+  text-shadow: 0 0 6px var(--nav-glow), 0 0 16px var(--nav-glow);
+}
+.site-navigation .site-nav-link:is(:hover, :focus-visible, [aria-current="page"]) > svg {
+  filter: drop-shadow(0 0 4px var(--nav-glow));
+}
 html[data-theme="dark"] .poll-result-arrow { color: #cbd5e1; }
 html[data-theme="dark"] .poll-result-arrow:hover { color: #f8fafc; }
 html[data-theme="dark"] :is(.shame-page,.shame-background) { background-color: #211e1b; color: #eadfce; }
@@ -1146,3 +1175,10 @@ html .profile-dashboard :is(.profile-auction-tab, .profile-history-tab)[aria-sel
 }
 
 .profile-dashboard .profile-entry-winner a { font-weight: 400; color: #167C80; }
+
+.public-seller-profile .public-profile-identity { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 12px; }
+.public-seller-profile .public-profile-identity .public-profile-player-name { margin-bottom: 0; }
+.public-profile-leaderboard-honors { display: flex; flex-wrap: wrap; gap: 6px 14px; list-style: none; margin: 0; padding: 0; min-width: 0; }
+.public-profile-leaderboard-honors li { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.public-profile-leaderboard-honors svg { flex-shrink: 0; }
+.public-profile-honor-caption { font-size: 12px; font-weight: 400; line-height: 1.4; opacity: .8; }

@@ -21,7 +21,7 @@ const { outputFiles } = buildSync({ stdin: { contents: `
         </UserContext.Provider></StaticRouter>);
     }`, resolveDir: fileURLToPath(new URL('../', import.meta.url)), loader: 'jsx' },
     bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external', jsx: 'automatic',
-    define: { 'import.meta.env': '{}' }, loader: { '.gif': 'dataurl', '.css': 'empty' },
+    define: { 'import.meta.env': '{}' }, loader: { '.gif': 'dataurl', '.svg': 'dataurl', '.css': 'empty' },
 });
 const compiled = { exports: {} };
 const requireModule = createRequire(import.meta.url);

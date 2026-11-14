@@ -285,7 +285,7 @@ export default function AuctionAnItem() {
         <main className="auction-create-page site-page-background flex-1 p-4 sm:p-6">
             <div className="auction-create-shell">
             <h1 className={`mb-6 text-center text-3xl font-bold text-blue-600 sm:text-4xl ${giveaway ? 'special-create-title' : ''}`}>{giveaway ? 'Create Giveaway' : 'Create Auction'}</h1>
-            {!preview && !giveaway && <p className="mx-auto mb-4 max-w-lg text-sm text-gray-700">{kolIdentity && !kolIdentity.kol_player_id && <>First <Link to="/profile" className="text-blue-700 underline">link your KoL account</Link>. </>}Choose Buy or Sell. Mode is fixed after publishing.</p>}
+            {!preview && !giveaway && kolIdentity && !kolIdentity.kol_player_id && <p className="mx-auto mb-4 max-w-lg text-sm text-gray-700">First <Link to="/profile" className="text-blue-700 underline">link your KoL account</Link>.</p>}
             <div className="auction-create-content">
                 {!preview && !giveaway && <div className="mb-5">
                     <div role="group" aria-label="Auction type" className="grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">

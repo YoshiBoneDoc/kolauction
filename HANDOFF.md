@@ -458,3 +458,97 @@ Eleven focused Node tests, disposable PostgreSQL accounting/privacy/ignore/top-t
 maintenance checks, changed-source lint, build and secret scan passed. Browser
 visual QA, production SQL installation, live totals and deployment are unverified.
 Personal bot quickstart unchanged. Leaderboard heading now says “lifetime”.
+
+Leaderboard follow-up: queued **263** (after 262) excludes the owner's verified
+KoL identity **#3552305 (teres minor)** before ranking/limit across all categories,
+so the next eligible player fills the slot. No accounting or snapshot totals are
+altered. Podium and list names now link to `/seller/:id`. Matching ignored bot SQL
+copy exists. Apply once then deploy website; no bot binary update. Eleven focused
+Node tests, disposable database exclusion/top-ten/privacy checks, lint and build
+passed. No production SQL/deployment or browser visual QA performed.
+
+Personal leaderboard sidebar: queued **264** after 263 extends the existing
+private leaderboard RPC with caller-only volume/trades/Meat-donation totals from
+the same snapshot. Owner ranking exclusion does not hide their personal totals.
+No additional requests, polling, aggregation or financial changes. Sidebar adds
+space/divider below the loyalty note and updates its personal stat with the active
+category; unavailable/loading data never becomes a fabricated zero. Matching
+ignored bot SQL copy exists. Apply once then deploy website. Twelve targeted Node
+tests, disposable PostgreSQL privacy/owner-exclusion/personal-total tests, lint and
+build passed. No production SQL/deployment or browser visual QA performed.
+
+Owner alt exclusion: queued **265** after 264 resolves verified Anrath1 to its
+stable KoL ID at application and stores both owner identities in a private
+leaderboard exclusion table. All three categories exclude them before ranking;
+name changes preserve exclusion, and caller-only sidebar stats remain available.
+Migration aborts if verified Anrath1 cannot be resolved instead of guessing an ID.
+Matching ignored bot copy exists. Disposable PostgreSQL all-category/name-change/
+personal-stat/top-ten checks passed. Apply once; no website/bot rebuild required
+for this SQL-only change. No production SQL performed.
+
+Leaderboard search: migration **266** after 265 adds a private category/name search
+RPC over existing per-profile snapshots. Current restrictions, owner exclusions
+and bilateral ignores precede global row-number ranking; literal case-insensitive
+name filtering follows ranking. Responses contain at most 20 matches plus a next-
+page flag, with bounded offsets and a 2.5s read deadline. Default top-ten view is
+unchanged. Browser debounces search 300ms, aborts superseded work, scopes results
+to authorization/category/query and paginates; search renders ordinary rows with
+actual overall ranks, including outside top ten. Personal totals stay unchanged.
+Matching ignored bot SQL copy exists. Apply once then deploy website; no bot/cache
+Worker update. Fourteen focused Node tests, disposable PostgreSQL rank/ignore/
+exclusion/literal-search/pagination checks, lint, build and secret scan passed.
+Migration 266 is now in the parent directory; installation is unconfirmed.
+No production SQL/deployment or browser visual QA performed by this agent. Quickstart unchanged.
+
+Zero-activity search: migration **267** after 266 includes all eligible verified
+profiles via a left join to the snapshot. Zero totals (including accounts with no
+snapshot row) return value `0` and null rank; positive ranks remain unchanged.
+Zero matches sort after ranked matches with deterministic name/ID ordering.
+Owner exclusions, restrictions, bilateral ignores, literal matching, pagination
+and read deadline remain intact. UI shows a dash for null ranks. Sixteen focused
+Node tests, disposable PostgreSQL all-category/zero/missing-snapshot/ignore checks,
+lint and build passed. Apply once then deploy website; matching ignored bot SQL
+copy included. No production SQL/deployment or browser visual QA performed.
+
+Seller leaderboard honors: shared seller header now shows each top-three category
+position beside the name, above both Auctions/Seller Profile tabs. First uses an
+outlined crown; second/third use medals, with smaller colored captions and category
+colors (Meat #9BBFF5, trades #76D0C4, donors #F2C66D). Multiple positions wrap as
+separate labels. Reuses the existing bounded private leaderboard RPC once per
+seller/authorization scope, with abort/cancellation, no polling or reads on profile
+tab/filter changes. Named honors remain hidden for anonymous/banned/masked views;
+read failures omit optional honors without blocking profile use. No SQL changes.
+Forty-four focused tests (26 seller route, 18 leaderboard/honors), changed-source
+lint, build and secret scan passed. Seller test bundler now handles existing SVG
+assets. Website deployment required; no production deployment or browser visual QA
+performed. Personal bot quickstart unchanged.
+
+Leaderboard Escrow Privileges display: unboxed section below the rankings shows
+three compact responsive Diamond/Gold/Silver rate columns, using existing podium
+colors and crown/trophy symbols. Diamond rates 1/1/.75/.5%; Gold and Silver
+1.5/1.25/.75/.5%, across Below 10M/10M–100M/100M–1B/1B+. Copy explains flat-rate
+replacement, best eligible nonstacked rate, and top-donor waiver precedence.
+Static display only: no queries, SQL, fee computation or settlement changes.
+18 focused tests, changed-source lint and build passed; no deployment or browser
+visual QA performed. Personal bot quickstart unchanged.
+
+Leaderboard benefits display preview: unhovered Tier Benefits now selects the
+signed-in viewer's best top-three Meat/Trades position from the already loaded
+leaderboard response. #1 shows “Current: Top leader rates” (1/1/.5/.5%); #2/#3
+shows “Current: Top 3 leaderboard rates” (1.5/1.25/.75/.5%). Top donor takes
+precedence with all zero rates. Nonqualifiers retain their earned loyalty tier.
+Hover/focus/tap tier previews retain prior behavior and restore the selected
+default on exit; progress fills/earned markers/totals remain based on real sales.
+Temporary buttons below personal stats preview normal, rank 7, leader, top-three,
+dual-ranked and top-donor cases; My rates restores actual eligibility. They change
+only displayed benefits, never identity, personal totals or financial terms.
+No new queries, SQL, fee/settlement implementation or deployment. 21 targeted
+Node tests, changed-source lint, build and secret scan passed. Browser visual QA
+remains unperformed; quickstart unchanged. Preserve the roadmap's locked-trade
+rate requirements when implementing real financial eligibility later.
+
+Temporary leaderboard-benefit scenario controls have been removed, including
+preview state/options and button styling. Default benefits now always derive from
+the signed-in viewer's actual loaded rankings; normal tier hover previews remain.
+Progress, personal totals and special-rate palettes are unchanged. 21 focused
+tests, changed-source lint and build passed. No settlement changes or deployment.

@@ -41,9 +41,15 @@ with tempfile.TemporaryDirectory(prefix='khub-leaderboards-',dir='/tmp') as fold
         financial_definition=sql("select pg_get_functiondef('khub_bot.refresh_site_trade_totals()'::regprocedure);")
         sql(migration('202611130262_real_leaderboards.sql'))
         assert sql("select prosrc from pg_proc where oid='khub_bot.refresh_site_totals_before_leaderboards()'::regprocedure;") in financial_definition
+        sql(migration('202611130263_leaderboard_owner_exclusion.sql'))
+        sql(migration('202611130264_personal_leaderboard_stats.sql'))
+        sql(migration('202611130266_search_leaderboards.sql'))
+        sql(migration('202611130267_search_zero_activity_players.sql'))
         def uid(i): return f'00000000-0000-0000-0000-{i:012d}'
         for i in range(1,15):
             sql(f"insert into public.profiles values('{uid(i)}','User{i}','Player{i}',{100+i},now(),false);")
+        sql(f"update public.profiles set kol_player_name='Anrath1' where id='{uid(5)}';")
+        sql(migration('202611130265_leaderboard_alt_exclusion.sql'))
         # Direct/escrow Sell share authoritative completion, canceled and pending do not qualify.
         sql(f"""insert into public.auctions(id,seller_id,winner_id,auction_kind,status,final_price) values
         ('{uid(101)}','{uid(1)}','{uid(2)}','sell','completed',9007199254740993),
@@ -83,6 +89,43 @@ with tempfile.TemporaryDirectory(prefix='khub-leaderboards-',dir='/tmp') as fold
         sql(f"update public.profiles set kol_player_name='Renamed' where id='{uid(1)}';")
         assert read(13)['volume'][0]['name']=='Renamed'
         assert [r['rank'] for r in read(13)['volume']]==list(range(1,11))
+        sql(f"update public.profiles set kol_player_id=3552305 where id='{uid(1)}';")
+        assert all(r['id']!=uid(1) for category in ['volume','trades','donors'] for r in read(13)[category])
+        assert len(read(13)['volume'])==10
+        assert read(13)['volume'][0]['rank']==1
+        assert read(1)['personal']['volume']=='9007199254741093'
+        assert read(2)['personal']['donors']=='500'
+        assert read(4)['personal']['donors']=='0'
+        sql(f"update public.profiles set kol_player_name='RenamedAlt' where id='{uid(5)}';update khub_bot.leaderboard_totals set volume=9999999999999999999,trades=9999,donated=9999 where profile_id='{uid(5)}';")
+        assert all(r['id']!=uid(5) for category in ['volume','trades','donors'] for r in read(13)[category])
+        assert read(5)['personal']['trades']=='9999'
+        assert len(read(13)['volume'])==10
+        def search(term,category='volume',offset=0):
+            return json.loads(sql(f"set request.jwt.claim.sub='{uid(13)}';set role authenticated;select public.search_leaderboards('{category}','{term}',{offset});"))
+        beyond=search('Player14')['rows']
+        assert len(beyond)==1 and beyond[0]['rank']>10,beyond
+        assert not search('RenamedAlt')['rows']
+        assert not search('Player3')['rows']
+        assert not search('Renamed')['rows']
+        sql(f"insert into public.player_ignores values('{uid(13)}',114);")
+        assert not search('Player14')['rows']
+        sql(f"delete from public.player_ignores where user_id='{uid(13)}';")
+        for i in range(30,60):
+            sql(f"insert into public.profiles values('{uid(i)}','Shared{i}','Shared%_{i}',{100+i},now(),false);insert into khub_bot.leaderboard_totals values('{uid(i)}',10,1,10);")
+        sql(f"insert into public.profiles values('{uid(90)}','ZeroActivity','ZeroActivity',190,now(),false);")
+        for category in ['volume','trades','donors']:
+            assert search('ZeroActivity',category)['rows']==[{'id':uid(90),'name':'ZeroActivity','value':'0','rank':None}]
+        assert search('Player4','donors')['rows'][0]['rank'] is None
+        sql(f"insert into public.player_ignores values('{uid(13)}',190);")
+        assert not search('ZeroActivity')['rows']
+        sql(f"delete from public.player_ignores where user_id='{uid(13)}';")
+        page1=search('%_');page2=search('%_',offset=20)
+        assert len(page1['rows'])==20 and page1['more']
+        assert len(page2['rows'])==10 and not page2['more']
+        assert page2['rows'][0]['rank']>page1['rows'][-1]['rank']
+        assert not search('no-match')['rows']
+        sql("set role anon;select public.search_leaderboards('volume','Player',0);",error='permission denied')
+        sql(f"set request.jwt.claim.sub='{uid(13)}';set role authenticated;select public.search_leaderboards('invalid','Player',0);",error='Invalid leaderboard search')
         print('Leaderboard accounting, exact totals, privacy, ignores, top-ten bounds and maintenance wiring passed.')
     finally:
         if started: subprocess.run([str(BIN/'pg_ctl'),'-D',str(data),'-m','immediate','-w','stop'],check=True,capture_output=True)

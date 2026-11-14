@@ -59,11 +59,17 @@ export default function AuctionNavigation() {
             <div id="main-navigation-links" className={`${menuOpen ? 'flex' : 'hidden'} w-full min-w-0 flex-col gap-2 border-t border-gray-300 pb-2 pt-2 lg:flex lg:w-auto lg:flex-1 lg:flex-row lg:items-center lg:justify-between lg:gap-x-6 lg:border-0 lg:p-0`}>
                 <div className="mobile-primary-links grid min-w-0 grid-cols-2 gap-x-4 lg:flex lg:flex-wrap lg:items-center lg:gap-x-3">
                     <span aria-hidden="true" className="hidden text-base font-semibold leading-none text-slate-500 lg:inline">·</span>
-                    <Link {...linkProps("/auctions")}>View All Auctions</Link>
+                    <Link {...linkProps("/auctions")}>All auctions</Link>
                     {separator}
                     <Link {...linkProps("/auction-item")}>Create Auction</Link>
                     {separator}
                     <Link {...linkProps("/info")}>Info</Link>
+                    {separator}
+                    <Link {...linkProps("/leaderboards")} title="Leaderboards" aria-label="Leaderboards">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M7 3h10v5a5 5 0 0 1-10 0V3Z" /><path d="M7 5H4v2a4 4 0 0 0 4 4m9-6h3v2a4 4 0 0 1-4 4M12 13v5m-4 3h8m-6-3h4l2 3H8l2-3Z" />
+                        </svg>
+                    </Link>
                     {separator}
                     <Link {...linkProps("/wall-of-shame")}>Wall of Shame</Link>
                 </div>
