@@ -32,6 +32,8 @@ with tempfile.TemporaryDirectory(prefix='khub-leaderboards-',dir='/tmp') as fold
         create table khub_bot.receipts(mail_id text primary key,sender_id bigint,result text,payload jsonb);
         create table public.player_ignores(user_id uuid,kol_player_id bigint);
         create table khub_bot.site_totals_dirty(transaction_id bigint primary key);
+        create table public.site_activity(last_seen timestamptz);
+        create function khub_bot.refresh_public_discovery() returns void language plpgsql as $$begin null;end;$$;
         grant usage on schema public,auth to anon,authenticated;
         ''')
         # Use the established aggregate and donation eligibility definitions, not replicas.
@@ -45,6 +47,15 @@ with tempfile.TemporaryDirectory(prefix='khub-leaderboards-',dir='/tmp') as fold
         sql(migration('202611130264_personal_leaderboard_stats.sql'))
         sql(migration('202611130266_search_leaderboards.sql'))
         sql(migration('202611130267_search_zero_activity_players.sql'))
+        refresh_before=sql("select pg_get_functiondef('khub_bot.refresh_leaderboards()'::regprocedure);")
+        sql(migration('202611140268_leaderboard_safe_refresh.sql'))
+        refresh_after=sql("select pg_get_functiondef('khub_bot.refresh_leaderboards()'::regprocedure);")
+        assert refresh_after==refresh_before.replace(
+            'delete from khub_bot.leaderboard_totals;',
+            'delete from khub_bot.leaderboard_totals where profile_id is not null;')
+        # Fail closed on unexpected definitions, including accidental reapplication.
+        sql(migration('202611140268_leaderboard_safe_refresh.sql'),error='Unexpected leaderboard refresh definition')
+        sql('-- Preserve discovery'+migration('202611030174_read_only_home_totals.sql').split('-- Preserve discovery')[1])
         def uid(i): return f'00000000-0000-0000-0000-{i:012d}'
         for i in range(1,15):
             sql(f"insert into public.profiles values('{uid(i)}','User{i}','Player{i}',{100+i},now(),false);")
@@ -73,6 +84,15 @@ with tempfile.TemporaryDirectory(prefix='khub-leaderboards-',dir='/tmp') as fold
         assert volume=={'Player1':9007199254741093,'Player2':9007199254740993,'Player3':300,'Player4':200},volume
         assert {r['name']:int(r['value']) for r in result['trades']}=={'Player1':2,'Player2':1,'Player3':2,'Player4':1}
         assert result['donors']==[{'id':uid(2),'name':'Player2','value':'500','rank':1}]
+        # Exercise deletion of a nonempty snapshot through discovery maintenance.
+        # A stale synthetic entry must disappear; cooldown must retain fresh state.
+        sql(f"insert into khub_bot.leaderboard_totals values('{uid(14)}',999999999999999999,99,99);")
+        sql('select public.bot_refresh_public_discovery();')
+        assert sql(f"select count(*) from khub_bot.leaderboard_totals where profile_id='{uid(14)}';")=='1'
+        sql("update khub_bot.leaderboard_state set refreshed_at='-infinity';select public.bot_refresh_public_discovery();")
+        assert sql(f"select count(*) from khub_bot.leaderboard_totals where profile_id='{uid(14)}';")=='0'
+        rebuilt=read()
+        assert all(rebuilt[category]==result[category] for category in ['volume','trades','donors','personal'])
         assert int(sql('select count(*) from khub_bot.site_totals_dirty;'))>0
         sql(f"insert into public.player_ignores values('{uid(14)}',101);")
         assert all(r['name']!='Player1' for r in read()['volume'])

@@ -1,5 +1,20 @@
 # kHub handoff
 
+## November 14 leaderboard refresh repair — not applied
+
+Production log shows discovery maintenance failing at the unqualified DELETE in
+`khub_bot.refresh_leaderboards()` with `DELETE requires a WHERE clause` (21000).
+Queued **268** adds `where profile_id is not null` (the primary key), preserving
+the atomic full snapshot rebuild, cooldown, locks, ranking rules and grants.
+Apply once after 262; compatible with 263–267. Matching ignored bot copy exists.
+No bot binary update/restart or website deployment is needed for this SQL-only fix.
+The migration does not force refresh; normal discovery maintenance retries it.
+Disposable leaderboard regression passes, including nonempty snapshot replacement,
+cooldown, stale entry removal and unchanged function definition outside the predicate.
+Local PostgreSQL lacks the production DELETE safeguard extension, so extension-level
+verification remains outstanding. No production SQL/data action was performed.
+The fee/promotion implementation plan remains unapproved; quickstart unchanged.
+
 Updated November 7, 2026. Local implementation includes migrations through **239**.
 Read this, then inspect the relevant code; the roadmap and older rollout notes may
 lag implementation. Source placement does not prove production installation.
