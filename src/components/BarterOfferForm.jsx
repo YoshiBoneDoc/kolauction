@@ -57,14 +57,13 @@ export default function BarterOfferForm({ auction, onSubmitted, initialOffer, pr
         } catch (failure) { setError(`${failure.message} Check your offers below before submitting again.`); onSubmitted(false); }
         finally { lock.current = false; setPending(false); }
     }
-    return <form onSubmit={submit} className="space-y-3">
-        <h2 className="text-lg font-bold">Make a barter offer</h2>
+    return <form onSubmit={submit} className="space-y-4">
+        <h2 className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xl font-bold">Make a barter offer: <span aria-live="polite" className="text-lg font-semibold text-gray-600">{value == null ? 'Market value unavailable' : `${value.toLocaleString('en-US')} Meat`} <span className="text-xs font-normal text-gray-500">· Est. value</span></span></h2>
         {practice && <p className="text-xs text-amber-700">Practice only. Search the sample items below; prices are illustrative, not live market quotes.</p>}
         {practice && <p className="text-xs text-gray-500">Sample items: {practice.items.map(item => item.name).join(', ')}.</p>}
-        <p aria-live="polite" className="text-sm font-bold">Bid value: {value == null ? 'Market value unavailable' : `${value.toLocaleString('en-US')} Meat`}</p>
-        <p className="text-xs text-gray-500">Offers aren&apos;t ranked by market value alone. The host decides which offer becomes the leading bid.</p>
+        <p className="text-xs text-gray-500">Leading bid is determined by the host, not automatically.</p>
         <fieldset disabled={pending} className="space-y-2">
-            <label className="block text-sm">Meat (optional)<input className={field} value={meat} inputMode="decimal" placeholder="e.g. 1m" onChange={event => { setMeat(event.target.value); token.current = null; }} onBlur={() => setMeat(value => normalizeAuctionAmount(value, { meat: true }))} /></label>
+            <label className="block max-w-48 text-sm">Meat (optional)<input className={field} value={meat} inputMode="decimal" placeholder="e.g. 1m" onChange={event => { setMeat(event.target.value); token.current = null; }} onBlur={() => setMeat(value => normalizeAuctionAmount(value, { meat: true }))} /></label>
             <div className="auction-create-form barter-offer-item-editor">
                 <div className="auction-item-quantity-grid">
                     <div className="auction-item-search-field">
@@ -84,39 +83,39 @@ export default function BarterOfferForm({ auction, onSubmitted, initialOffer, pr
                 </div>
                 {(search.trim() || selected) && <>
                     <label htmlFor="barter-selected-item" className="mb-2 block text-sm font-bold">Select an Item:</label>
-                    <div className="mb-4 flex min-w-0 items-center gap-2">
+                    <div className="barter-selected-item-row mb-4 grid min-w-0 grid-cols-[minmax(0,1fr)_80px] items-end gap-6">
                         <select id="barter-selected-item" className="block w-full min-w-0 flex-1 border border-gray-400 text-gray-900" value={selected} onChange={event => setSelected(event.target.value)}>
                             <option value="" disabled>Select an item</option>
                             {selectedItem && !matches.some(item => String(item.id) === selected) && <option value={selected}>{selectedItem.name}</option>}
                             {matches.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
                         </select>
-                        {selectedItem?.image && <img key={selectedItem.id} src={itemImageUrl(selectedItem.image)} alt={selectedItem.name} width="36" height="36" className="h-9 w-9 shrink-0 rounded-md bg-white object-contain p-0.5 [image-rendering:pixelated]" />}
+                        {selectedItem?.image && <img key={selectedItem.id} src={itemImageUrl(selectedItem.image)} alt={selectedItem.name} width="36" height="36" className="mx-auto h-9 w-9 rounded-md bg-white object-contain p-0.5 [image-rendering:pixelated]" />}
                     </div>
                     {selectedItem && <div className="-mt-2 mb-4" aria-live="polite">{practice ? <p className="text-xs text-gray-500">Demo unit value: {practice.prices.get(selectedItem.id)?.price_meat.toLocaleString('en-US')} Meat</p> : <MarketPrice itemId={selectedItem.id} quantity={quantityValue || 1} />}</div>}
                 </>}
                 {search.trim() && <p className="-mt-3 mb-3 text-xs text-gray-600">{matches.length === 100 ? 'Showing the first 100 matches. Keep typing to narrow the list.' : `${matches.length} matching items.`}</p>}
-                <section aria-label="Build your offer" className="bundle-builder-panel mb-5 rounded-xl border border-[#EADBD3] bg-[#FFFAF7] p-3 sm:p-4">
+                <section aria-label="Build your offer" className="bundle-builder-panel mb-4 rounded-lg border border-gray-200 bg-transparent p-3 sm:p-4">
                     <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-                        <div><h3 className="text-sm font-semibold text-gray-900">Offer contents</h3><p className="mt-1 text-xs leading-relaxed text-gray-700">Choose up to 10 different items to include in your offer.</p></div>
-                        <span className="bundle-count-badge rounded-full bg-[#FFF0E6] px-2.5 py-1 text-xs font-semibold tabular-nums text-[#593D31]">{items.length} / 10</span>
+                        <div><h3 className="text-sm font-semibold text-gray-900">Offer contents</h3><p className="mt-1 text-xs leading-relaxed text-gray-700">Pick up the 10 items.</p></div>
+                        <span className="bundle-count-badge rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium tabular-nums text-gray-600">{items.length} / 10</span>
                     </div>
-                    <button type="button" onClick={add} disabled={items.length >= 10} className="bundle-add-button min-h-10 w-full rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-90">{selected ? 'Add selected item' : 'Select an item above to add'}</button>
+                    <button type="button" onClick={add} disabled={items.length >= 10} className="bundle-add-button min-h-10 w-full rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-800 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-70">{selected ? 'Add selected item' : 'Select an item above to add'}</button>
                     {items.length ? <ul className="mt-3 space-y-2">{items.map(item => {
                         const catalogItem = catalogItems.find(row => row.id === item.id);
-                        return <li key={item.id} className="barter-offer-item bundle-builder-item flex min-w-0 flex-wrap items-center gap-2 rounded-lg border border-[#EEE1DA] bg-white px-2.5 py-2">
+                        return <li key={item.id} className="barter-offer-item bundle-builder-item flex min-w-0 flex-wrap items-center gap-2 rounded-md border border-gray-200 bg-white px-2.5 py-2">
                             {catalogItem?.image && <img src={itemImageUrl(catalogItem.image)} alt="" className="h-8 w-8 shrink-0 object-contain [image-rendering:pixelated]" />}
                             <span className="min-w-0 flex-1 break-words text-sm font-medium leading-snug text-gray-900">{item.name}</span>
                             <label className="flex shrink-0 items-center gap-1.5 text-xs text-gray-700">Qty:
                                 <input aria-label={`Quantity of ${item.name}`} inputMode="decimal" value={item.quantity} onChange={event => changeQuantity(item.id, event.target.value)}
                                     className="bundle-quantity-input w-[4.5rem] rounded-md border border-gray-300 bg-[#FFFCFA] px-2 py-1.5 text-sm tabular-nums text-gray-900 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-200" />
                             </label>
-                            <span className="flex flex-col">{[1, -1].map(step => <button key={step} type="button" aria-label={`${step > 0 ? 'Increase' : 'Decrease'} quantity of ${item.name}`} className="barter-item-step rounded text-[10px] text-gray-700 hover:bg-blue-50" onClick={() => {
+                            <span className="flex flex-col">{[1, -1].map(step => <button key={step} type="button" aria-label={`${step > 0 ? 'Increase' : 'Decrease'} quantity of ${item.name}`} className="barter-item-step rounded text-[10px] text-gray-500 hover:bg-blue-50" onClick={() => {
                                 const count = parseAuctionAmount(String(item.quantity), 5000000000);
                                 if (count != null) changeQuantity(item.id, String(Math.max(1, Math.min(5000000000, count + step))));
                             }}>{step > 0 ? '▲' : '▼'}</button>)}</span>
                             <button type="button" aria-label={`Remove ${item.name}`} onClick={() => { setItems(rows => rows.filter(row => row.id !== item.id)); token.current = null; }} title={`Remove ${item.name}`} className="barter-remove-item bg-transparent"><span aria-hidden="true">×</span></button>
                         </li>;
-                    })}</ul> : <p className="bundle-empty-state mt-3 rounded-lg border border-dashed border-[#EADBD3] px-3 py-3 text-center text-xs text-gray-700">Your offer is empty. Search for an item above and add it here.</p>}
+                    })}</ul> : <p className="bundle-empty-state mt-3 rounded-md border border-dashed border-gray-300 px-3 py-3 text-center text-xs text-gray-600">Your offer is empty. Search for an item above and add it here.</p>}
                 </section>
             </div>
             <button type="submit" disabled={value == null || value <= 0} className="min-h-11 rounded bg-blue-600 px-4 py-2 font-bold text-white disabled:opacity-50">{pending ? 'Submitting…' : practice ? 'Submit practice offer' : 'Submit offer'}</button>

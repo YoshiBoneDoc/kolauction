@@ -731,3 +731,34 @@ html[data-theme="dark"] .auction-create-shell .barter-switch { color: #b7a9ff; }
 .auction-create-form .barter-offer-item .bundle-quantity-input { min-height: 30px; height: 30px; padding: 3px 8px; }
 .barter-offer-item .barter-item-step { width: 20px; min-height: 15px; height: 15px; padding: 0; line-height: 15px; }
 html .barter-offer-item .barter-remove-item { min-height: 30px; min-width: 28px; padding: 0 4px; }
+
+/* Compact editable quantity control for barter offers. */
+.barter-offer-item-editor .auction-item-quantity-grid { grid-template-columns: minmax(0, 1fr) 80px; gap: 24px; max-width: 458px; }
+.barter-offer-item-editor .auction-quantity-stepper { display: flex; width: 80px; height: 38px; border: 1px solid #64748b; border-radius: 5px; background: transparent; }
+.barter-offer-item-editor .auction-quantity-stepper button,
+.auction-item-quantity-grid .barter-offer-item-editor .auction-quantity-stepper button { flex: 0 0 20px; width: 20px; min-width: 20px; height: 36px; padding: 0; border: 0; border-radius: 0; background: transparent; color: #a6b3c4; font-size: 13px; }
+.barter-offer-item-editor .auction-quantity-stepper button:hover:not(:disabled) { color: #e2e8f0; }
+.auction-create-form.barter-offer-item-editor .auction-quantity-stepper .barter-item-quantity { flex: 1; min-width: 0; width: 38px; min-height: 36px; height: 36px; padding: 0; border: 0; border-radius: 0; background: transparent; text-align: center; box-shadow: none; }
+.barter-offer-item-editor .auction-item-search-field input { width: 100%; }
+.barter-offer-item-editor .barter-offer-item .bundle-quantity-input { width: 4.5rem; text-align: center; }
+@media (max-width: 480px) { .barter-offer-item-editor .auction-item-quantity-grid { grid-template-columns: minmax(0, 1fr) 80px; gap: 12px; } }
+/* Override the shared auction stepper's dividers and dark button fill. */
+html[data-theme="dark"] .auction-create-form.barter-offer-item-editor .auction-quantity-stepper button,
+html[data-theme="light"] .auction-create-form.barter-offer-item-editor .auction-quantity-stepper button { background: transparent; border: 0; }
+html[data-theme="dark"] .auction-create-form.barter-offer-item-editor .auction-quantity-stepper .barter-item-quantity,
+html[data-theme="light"] .auction-create-form.barter-offer-item-editor .auction-quantity-stepper .barter-item-quantity { border: 0; background: transparent; }
+html .auction-create-form.barter-offer-item-editor .auction-quantity-stepper button { background: transparent; border: 0; }
+html .auction-create-form.barter-offer-item-editor .auction-quantity-stepper .barter-item-quantity { border: 0; background: transparent; }
+html[data-theme="dark"] .auction-create-form.barter-offer-item-editor .auction-quantity-stepper button { background: transparent; color: #a6b3c4; }
+html .auction-create-form.barter-offer-item-editor .auction-quantity-stepper .barter-item-quantity,
+html .auction-create-form.barter-offer-item-editor .auction-quantity-stepper .barter-item-quantity:focus,
+html .auction-create-form.barter-offer-item-editor .auction-quantity-stepper .barter-item-quantity:focus-visible { border: 0 !important; outline: 0 !important; box-shadow: none !important; }
+html .auction-create-form.barter-offer-item-editor .auction-quantity-stepper button:focus,
+html .auction-create-form.barter-offer-item-editor .auction-quantity-stepper button:focus-visible,
+html .auction-create-form.barter-offer-item-editor .auction-quantity-stepper button:active { outline: 0 !important; box-shadow: none !important; }
+html .auction-create-form.barter-offer-item-editor .auction-quantity-stepper button:hover:not(:disabled) { color: #bfdbfe; text-shadow: 0 0 7px #60a5fa, 0 0 14px #3b82f6; }
+.barter-offer-item-editor > label[for="barter-selected-item"],
+.barter-offer-item-editor > label[for="barter-selected-item"] + div { max-width: 458px; }
+
+.barter-offer-item-editor .barter-selected-item-row { max-width: 458px; }
+.barter-offer-item-editor .barter-selected-item-row > select { width: 100%; min-width: 0; flex: none; }

@@ -45,10 +45,9 @@ function PracticeAuction({ role }) {
                     <div className="space-y-2"><h2 className="text-xl font-bold">{listing.item} ×1</h2><p className="text-xs text-gray-500">Direct Trade · No minimum bid · {active ? 'Practice auction open' : 'Practice auction ended'}</p>
                         <p className="text-xs text-gray-500">Current accepted bid · estimated value</p><p className="text-2xl font-extrabold">{leader ? `${leader.value.toLocaleString('en-US')} Meat` : 'No accepted offers'}</p>
                         {leader && <><p className="text-xs">{offerDescription(leader)}</p><BarterOfferImages offer={leader} /></>}
-                        <p className="text-xs text-gray-500">Only an offer the host accepts becomes the leading bid, regardless of market value.</p>
                     </div>
                 </section>
-                <p className="my-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm" role="status" aria-live="polite">{state.notice || (role === 'host' ? 'You are the host. An offer with an estimated value of 70m Meat already leads. Try accepting a lower-valued offer, rejecting one, or asking a bidder to change it.' : 'You are the bidder. Explore the sample outcomes below, or submit your own practice offer and choose a simulated host response.')}</p>
+                <p className="my-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm" role="status" aria-live="polite">{state.notice || (role === 'host' ? 'You are the host.' : 'You are the bidder. Explore the sample outcomes below, or submit your own practice offer and choose a simulated host response.')}</p>
                 {!active && <section aria-label="Practice outcome" className="my-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm">
                     <h2 className="font-bold">{leader ? `${role === 'bidder' && leader.bidderLabel === 'You' ? 'You win' : `${leader.bidderLabel} wins`} this practice auction` : 'No accepted offer — no winner'}</h2>
                     {leader && <p className="mt-1">Winning exchange: {offerDescription(leader)} for {listing.item} ×1.</p>}
@@ -72,7 +71,7 @@ function PracticeAuction({ role }) {
                 {role === 'bidder' && active && !pending && <section ref={offerForm} className="mx-auto mt-5 max-w-xl rounded border border-gray-200 p-4"><BarterOfferForm key={state.formVersion} auction={{ id: 'demo-only', minimumValue: null }} initialOffer={state.draftOffer} practice={practice} onSubmitted={noop} /></section>}
             </div>
             <section aria-label="Practice accepted bid history" className="rounded-lg border border-gray-200 bg-white p-4 shadow sm:p-6">
-                <h2 className="mb-3 text-lg font-bold">Accepted bid history</h2><p className="mb-3 text-xs text-gray-500">Only accepted offers appear in a real barter&apos;s public bid history. Your other offers and host feedback stay private.</p>
+                <h2 className="mb-3 text-lg font-bold">Accepted bid history</h2>
                 <ul className="divide-y divide-gray-200">{accepted.map(offer => <li key={offer.id} className="space-y-1 py-3 text-sm"><p className="flex flex-wrap justify-between gap-2"><strong>{offer.bidderLabel} · {offer.value.toLocaleString('en-US')} Meat <span className="text-xs font-normal text-gray-500">estimated</span></strong><span className="text-xs text-gray-500">{offer.id === state.currentOfferId ? state.ended ? 'Winning offer' : 'Current accepted bid' : 'Previously accepted'}</span></p><p className="text-xs">{offerDescription(offer)}</p><BarterOfferImages offer={offer} /></li>)}</ul>
             </section>
         </div>

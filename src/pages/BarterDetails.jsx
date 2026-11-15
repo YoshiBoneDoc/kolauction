@@ -1,4 +1,6 @@
 import BarterBidHistoryRow from '../components/BarterBidHistoryRow';
+import BarterOfferImages from '../components/BarterOfferImages';
+import { auctionQuantityLabel } from '../lib/bundles';
 import ItemResources from '../components/ItemResources';
 import SellerLink from '../components/SellerLink';
 import { formatCompactMeat } from '../lib/formatMeat';
@@ -33,6 +35,8 @@ export default function BarterDetails() {
     const { data: auction, error, refresh } = useBarterRead('read_barter_detail', { p_id: id, p_history_page: historyPage, p_private_page: privatePage });
     const firstOffers = useBarterRead('read_barter_detail', { p_id: id, p_history_page: historyPage, p_private_page: 1 }, Boolean(privatePage !== 1 && currentUser && !currentUser.isBanned && auction && !auction.isHost));
     const offerState = privatePage === 1 ? auction : firstOffers.data;
+    const leadingHistory = useBarterRead('read_barter_detail', { p_id: id, p_history_page: 1, p_private_page: privatePage }, historyPage !== 1);
+    const acceptedOffer = (historyPage === 1 ? auction : leadingHistory.data)?.history?.find(offer => offer.id === auction?.currentOfferId);
     const hasPendingOffer = offerState?.offers?.some(offer => offer.status === 'pending');
     const visibleOffers = auction?.isHost
         ? auction.offers.filter(offer => offer.status === 'pending')
@@ -53,53 +57,72 @@ export default function BarterDetails() {
         {error && <p role="alert" className="mx-auto max-w-4xl">{error} <button onClick={refresh}>Retry</button></p>}
         {auction === undefined && !error && <p role="status">Loading barter…</p>}
         {auction === null && <p>Barter not found.</p>}
-        {auction && <><div className="mx-auto max-w-4xl rounded-lg border border-gray-200 bg-white p-4 shadow-lg sm:p-6">
-            <section className="grid gap-6 sm:grid-cols-[200px_minmax(0,1fr)]">
-                <img src={auction.image} alt={auction.item} className="mx-auto h-48 w-48 rounded-lg bg-white p-3 object-contain [image-rendering:pixelated]" />
-                <div className="space-y-3">
-                    <div className="space-y-1">
-                        <h1 className="text-2xl font-bold">{auction.item}{auction.quantity > 1 && ` ×${auction.quantity.toLocaleString('en-US')}`}</h1>
-                        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-                            <span title={auction.minimumValue == null ? 'No minimum bid market value' : `Offer value must exceed ${auction.minimumValue.toLocaleString('en-US')} Meat`}>Min Bid: {auction.minimumValue == null ? 'None' : `${formatCompactMeat(auction.minimumValue)} Meat`}</span>
-                            <span aria-hidden="true">·</span><TradeTypeBadge escrow={false} short /><BarterSymbol size={42} />
-                        </div>
-                        <ItemResources item={auction.item} itemId={auction.itemId} />
-                    </div>
-                    <div className="space-y-1">
-                        {auction.currentBid > 0 && <p className="text-xs text-gray-600">Current Accepted Bid</p>}
-                        <p className="text-3xl font-extrabold">{auction.currentBid ? `${auction.currentBid.toLocaleString('en-US')} Meat` : 'No accepted bids yet'}</p>
-                        {auction.currentBid > 0 && <p className="text-xs text-gray-500">Estimated bid value</p>}
-                    </div>
+        {auction && <><div className="mx-auto max-w-4xl rounded-lg border border-gray-200 relative bg-white p-4 shadow-lg sm:p-6">
+            <div className="absolute right-4 top-4 flex items-center gap-3 sm:right-6 sm:top-6"><TradeTypeBadge escrow={false} short /><BarterSymbol size={42} /></div>
+            <section className="grid gap-x-6 gap-y-3 sm:grid-cols-[200px_minmax(0,1fr)]">
+                <div className="min-w-0 space-y-2 text-center">
+                    <img src={auction.image} alt={auction.item} className="mx-auto h-48 w-48 rounded-lg bg-white p-3 object-contain [image-rendering:pixelated]" />
                     <MarketPrice itemId={auction.itemId} quantity={auction.quantity} />
-                    <div className="mt-5 space-y-2 border-t border-gray-200 pt-5 text-sm text-gray-700">
-                        <p className="break-words">Sold by: <SellerLink auction={{ ...auction, owner: auction.host }} /></p>
-                        {active ? <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                            <span className="inline-flex rounded border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Live</span>
-                            <span aria-hidden="true" className="text-gray-400">·</span>
-                            <p className={auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-600'}>Ends in <time dateTime={new Date(auction.endTime).toISOString()} title={new Date(auction.endTime).toLocaleString()}><RemainingTime endTime={auction.endTime} /></time></p>
-                        </div> : <p>{auction.cancelled ? 'Cancelled' : auction.currentOfferId ? 'Ended — settle the accepted offer by Direct trade' : 'Ended without an accepted offer'}</p>}
-                        {active && auction.isHost && currentUser && !currentUser.isBanned && <div className="pt-2">
-                            <button type="button" disabled={cancelling || Boolean(auction.currentOfferId)} onClick={cancelListing} className="rounded border border-red-300 bg-transparent px-3 py-1.5 text-xs text-red-700 disabled:cursor-not-allowed disabled:opacity-50">{cancelling ? 'Cancelling…' : 'Cancel listing'}</button>
-                            {auction.currentOfferId && <p className="mt-1 text-xs text-gray-500">Listings cannot be cancelled after an offer has been accepted.</p>}
-                        </div>}
-                        {cancelError && <p role="alert" className="text-xs text-red-700">{cancelError}</p>}
+                </div>
+                <div className="space-y-3">
+                    <div className="space-y-1 pr-36">
+                        <h1 className="break-words text-3xl font-bold text-blue-600 sm:text-4xl">{auction.item} <span className="text-xl text-gray-600">{auctionQuantityLabel(auction)}</span></h1>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-600">
+                            <ItemResources item={auction.item} itemId={auction.itemId} separator={false} />
+                            <span aria-hidden="true">·</span>
+                            <span title={auction.minimumValue == null ? 'No minimum bid market value' : `Offer value must exceed ${auction.minimumValue.toLocaleString('en-US')} Meat`}>Min: {auction.minimumValue == null ? 'None' : `${formatCompactMeat(auction.minimumValue)} Meat`}</span>
+                        </div>
+
+                    </div>
+                    <div className="space-y-4 py-6">
+                        {auction.currentBid > 0 && <p className="text-sm text-gray-800">Current Accepted Bid:</p>}
+                        {acceptedOffer && <>
+                            <div><BarterOfferImages offer={acceptedOffer} /></div>
+                            <ul className="space-y-2 text-sm text-gray-600">
+                                {acceptedOffer.meat > 0 && <li>{acceptedOffer.meat.toLocaleString('en-US')} Meat</li>}
+                                {acceptedOffer.items.map(item => <li key={item.id} className="break-words">{item.quantity > 1 && `${item.quantity.toLocaleString('en-US')} × `}{item.name}</li>)}
+                            </ul>
+                        </>}
+                        <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 pt-3">
+                            <span className="text-3xl font-extrabold">{auction.currentBid ? `${auction.currentBid.toLocaleString('en-US')} Meat` : 'No bids'}</span>
+                            {auction.currentBid > 0 && <span className="whitespace-nowrap text-xs font-normal text-gray-500">· Est. value</span>}
+                        </p>
                     </div>
                 </div>
             </section>
-            <div className="my-4"><DirectTradeHelp forListing /></div>
+            <div className="mt-4 grid items-end gap-x-6 gap-y-2 pb-4 sm:grid-cols-[200px_minmax(0,1fr)]">
+                <div className="text-sm text-gray-700 sm:col-start-2 sm:row-start-1">
+                    <div className="space-y-2">
+                    <p className="break-words">Sold by: <SellerLink auction={{ ...auction, owner: auction.host }} /></p>
+                    {active ? <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+                        <span className="inline-flex rounded border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Live</span>
+                        <span aria-hidden="true" className="text-gray-400">·</span>
+                        <p className={auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-600'}>Ends in <time dateTime={new Date(auction.endTime).toISOString()} title={new Date(auction.endTime).toLocaleString()}><RemainingTime endTime={auction.endTime} /></time></p>
+                    </div> : <p>{auction.cancelled ? 'Cancelled' : auction.currentOfferId ? 'Ended — settle the accepted offer by Direct trade' : 'Ended without an accepted offer'}</p>}
+                    {cancelError && <p role="alert" className="text-xs text-red-700">{cancelError}</p>}
+                    </div>
+                </div>
+                <div className="min-w-0 sm:col-start-1 sm:row-start-1 sm:has-[details[open]]:col-span-2 sm:has-[details[open]]:row-start-2"><DirectTradeHelp forListing /></div>
+            </div>
+            <hr className="m-0 border-0 border-t border-gray-200" />
+            {active && auction.isHost && currentUser && !currentUser.isBanned && <>
+            <div className="grid gap-x-6 pt-4 pb-1 sm:grid-cols-[200px_minmax(0,1fr)]"><div className="sm:col-start-2">
+                        <button type="button" disabled={cancelling || Boolean(auction.currentOfferId)} onClick={cancelListing} className="rounded border border-red-300 bg-transparent px-3 py-1.5 text-xs text-red-700 transition-colors enabled:hover:border-red-700 enabled:hover:bg-red-700 enabled:hover:text-white disabled:cursor-not-allowed disabled:opacity-50">{cancelling ? 'Cancelling…' : 'Cancel listing'}</button>
+                        {auction.currentOfferId && <p className="mt-1 text-xs text-gray-500">Listings cannot be cancelled after an offer has been accepted.</p>}
+            </div></div></>}
             {!active && auction.currentOfferId && <p className="my-3 rounded border border-amber-200 bg-amber-50 p-3 text-sm">The last accepted offer is the winning barter. The host and winning bidder arrange the exact item-and-Meat exchange directly. No assets are held or sent by kHub.</p>}
             {!active && auction.winningOffer && <section className="my-3 rounded border border-gray-200 p-3 text-sm"><h2 className="font-bold">Winning barter details</h2><p className="mt-1 text-xs">{offerDescription(auction.winningOffer)}</p><p className="mt-2">Host: {auction.host} (#{auction.hostKolId})</p><p>Winning bidder: {auction.winningOffer.bidder} (#{auction.winningOffer.bidderKolId})</p><Link to="/support" className="mt-2 inline-block text-xs text-blue-700 underline">Contact support about this barter</Link></section>}
             {active && !auction.isHost && hasPendingOffer && <p role="status" className="mx-auto mt-5 max-w-xl rounded border border-amber-200 bg-amber-50 p-3 text-sm">You already have a bid awaiting the host’s response. You cannot submit another bid on this auction while it is pending.</p>}
             {mayBid && <section ref={offerForm} className="mx-auto mt-5 max-w-xl rounded border border-gray-200 p-4"><BarterOfferForm key={`${auction.id}:${revision?.version || 0}`} initialOffer={revision?.offer} auction={auction} onSubmitted={success => { if (success) setRevision(null); refresh(); }} /></section>}
             {!currentUser && active && <p><Link to="/login" className="text-blue-700 underline">Log in</Link> to offer items and Meat.</p>}
-            {currentUser && !currentUser.isBanned && (auction.isHost || auction.offers.length > 0) && <section className="mt-6 border-t border-gray-200 pt-4"><h2 className="mb-3 text-lg font-bold">{auction.isHost ? 'Review offers' : 'Your offers and host feedback'}</h2>
+            {currentUser && !currentUser.isBanned && (auction.isHost || auction.offers.length > 0) && <section className={`${auction.isHost ? 'mt-4' : 'mt-6'} border-t border-gray-200 pt-4`}><h2 className="mb-3 text-lg font-bold">{auction.isHost ? 'Review offers' : 'Your offers and host feedback'}</h2>
                 <div className="space-y-3">{visibleOffers.slice(0, 20).map(offer => <BarterOfferReview key={offer.id} offer={offer} host={auction.isHost} active={Boolean(active)} current={offer.id === auction.currentOfferId} onUpdated={refresh} onRevise={mayBid ? reviseOffer : undefined} />)}</div>
                 {!visibleOffers.length && <p className="text-sm text-gray-500">{auction.isHost ? 'No pending offers to review.' : 'No offers yet.'}</p>}
                 {auction.isHost && (privatePage > 1 || auction.offers.length > 20) && <nav aria-label="Private offer pages" className="mt-3 flex gap-4 text-xs"><button disabled={privatePage === 1} onClick={() => setPrivatePage(page => page - 1)}>Previous</button><span>Page {privatePage}</span><button disabled={auction.offers.length <= 20} onClick={() => setPrivatePage(page => page + 1)}>Next</button></nav>}
             </section>}
         </div>
             <section aria-label="Bid history" className="mx-auto mt-6 max-w-4xl rounded-lg border border-gray-200 bg-white p-4 shadow sm:p-6">
-                <header className="mb-2 flex items-center justify-between gap-3 border-b border-gray-200 pb-4"><h2 className="text-xl font-bold text-gray-800">Bid History</h2><span className="text-xs text-gray-500">{currentUser && !currentUser.isBanned && !auction.isHost ? 'Accepted bids · Your rejected bids' : 'Accepted bids only'}</span></header>
+                <header className="mb-2 flex items-center justify-between gap-3 border-b border-gray-200 pb-4"><h2 className="text-xl font-bold text-gray-800">Bid History</h2><span className="text-xs text-gray-500">{currentUser && !currentUser.isBanned && !auction.isHost ? 'Accepted bids' : 'Accepted bids only'}</span></header>
                 <ul className="divide-y divide-gray-200">{auction.history.slice(0, 20).map(offer => <BarterBidHistoryRow key={offer.id} offer={offer} />)}</ul>
                 {!auction.history.length && <p className="text-sm text-gray-500">No bids to show yet.</p>}
                 {(historyPage > 1 || auction.history.length > 20) && <nav aria-label="Accepted bid history pages" className="mt-3 flex gap-4 text-xs"><button disabled={historyPage === 1} onClick={() => setHistoryPage(page => page - 1)}>Previous</button><span>Page {historyPage}</span><button disabled={auction.history.length <= 20} onClick={() => setHistoryPage(page => page + 1)}>Next</button></nav>}
