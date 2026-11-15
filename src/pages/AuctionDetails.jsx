@@ -123,8 +123,9 @@ export default function AuctionDetails() {
                             endTime={auction.endTime}
                             now={now}
                             countdown={auction.giveawayTitle ? <GiveawayCountdown endTime={auction.endTime} now={now} /> : undefined}
+                            noteAlign={auction.giveawayTitle ? 'left' : 'right'}
                             note={active && !(auction.isBundle && currentUser?.id === auction.sellerId)
-                                ? auction.giveawayTitle ? <>Giveaway ends at the scheduled time. <span className="giveaway-bid-warning">Minimum increases only. <strong>Overbids won&apos;t count!</strong></span></> : 'Late bids extend the auction by 1 minute.'
+                                ? auction.giveawayTitle ? <>Giveaway ends at the scheduled time. <span className="giveaway-bid-warning block">Minimum increases only. <strong>Overbids won&apos;t count!</strong></span></> : 'Late bids extend the auction by 1 minute.'
                                 : undefined}
                         >
                             {closedSale && <p className="break-words">Winning bidder: <strong><WinnerLink auction={auction} /></strong></p>}
