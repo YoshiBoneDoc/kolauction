@@ -9,7 +9,7 @@ export default function BarterBidHistoryRow({ offer }) {
     const [expanded, setExpanded] = useState(false);
     const detailsId = useId();
     const timestamp = offer.historyAt || offer.acceptedAt;
-    return <li className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,auto)] items-start gap-x-4 gap-y-2 py-3 text-sm">
+    return <li className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,auto)] items-start gap-x-4 gap-y-0 py-3 text-sm">
         <div className="min-w-0">
             <span className="break-words font-medium text-gray-700">{offer.isOwn ? 'You' : administrator && offer.bidder ? offer.bidder : offer.bidderLabel || 'Bidder'}</span>
             <p className="mt-1 text-xs text-gray-500"><time dateTime={timestamp}>{new Date(timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</time></p>
@@ -22,11 +22,11 @@ export default function BarterBidHistoryRow({ offer }) {
             <span className="font-medium text-gray-900">{offer.value.toLocaleString('en-US')} Meat</span>
             {offer.status === 'rejected' && <span className="text-xs text-red-600">Rejected</span>}
             </div>
-            {expanded && <div id={detailsId} className="mt-2 min-w-0 text-right text-[11px] text-gray-500">
+        </div>
+            {expanded && <div id={detailsId} className="col-span-2 min-w-0 text-right text-[11px] text-gray-500">
                 <BarterOfferImages offer={offer} alignRight />
                 <p className="mt-1 [overflow-wrap:anywhere]">{offerDescription(offer)}</p>
             </div>}
-        </div>
     </li>;
 }
 BarterBidHistoryRow.propTypes = { offer: PropTypes.object.isRequired };

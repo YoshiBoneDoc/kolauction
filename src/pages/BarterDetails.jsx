@@ -1,5 +1,5 @@
 import BarterBidHistoryRow from '../components/BarterBidHistoryRow';
-import BarterOfferImages from '../components/BarterOfferImages';
+import BarterAcceptedBid from '../components/BarterAcceptedBid';
 import { auctionQuantityLabel } from '../lib/bundles';
 import ItemResources from '../components/ItemResources';
 import SellerLink from '../components/SellerLink';
@@ -32,7 +32,10 @@ export default function BarterDetails() {
     }
     const [historyPage, setHistoryPage] = useState(1);
     const [privatePage, setPrivatePage] = useState(1);
+    const [revisionsOpen, setRevisionsOpen] = useState(false);
+    const [revisionPage, setRevisionPage] = useState(1);
     const { data: auction, error, refresh } = useBarterRead('read_barter_detail', { p_id: id, p_history_page: historyPage, p_private_page: privatePage });
+    const revisions = useBarterRead('read_barter_revisions', { p_id: id, p_page: revisionPage }, Boolean(auction?.isHost && revisionsOpen));
     const firstOffers = useBarterRead('read_barter_detail', { p_id: id, p_history_page: historyPage, p_private_page: 1 }, Boolean(privatePage !== 1 && currentUser && !currentUser.isBanned && auction && !auction.isHost));
     const offerState = privatePage === 1 ? auction : firstOffers.data;
     const leadingHistory = useBarterRead('read_barter_detail', { p_id: id, p_history_page: 1, p_private_page: privatePage }, historyPage !== 1);
@@ -74,20 +77,7 @@ export default function BarterDetails() {
                         </div>
 
                     </div>
-                    <div className="space-y-4 py-6">
-                        {auction.currentBid > 0 && <p className="text-sm text-gray-800">Current Accepted Bid:</p>}
-                        {acceptedOffer && <>
-                            <div><BarterOfferImages offer={acceptedOffer} /></div>
-                            <ul className="space-y-2 text-sm text-gray-600">
-                                {acceptedOffer.meat > 0 && <li>{acceptedOffer.meat.toLocaleString('en-US')} Meat</li>}
-                                {acceptedOffer.items.map(item => <li key={item.id} className="break-words">{item.quantity > 1 && `${item.quantity.toLocaleString('en-US')} × `}{item.name}</li>)}
-                            </ul>
-                        </>}
-                        <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 pt-3">
-                            <span className="text-3xl font-extrabold">{auction.currentBid ? `${auction.currentBid.toLocaleString('en-US')} Meat` : 'No bids'}</span>
-                            {auction.currentBid > 0 && <span className="whitespace-nowrap text-xs font-normal text-gray-500">· Est. value</span>}
-                        </p>
-                    </div>
+                    <BarterAcceptedBid offer={acceptedOffer} value={auction.currentBid} />
                 </div>
             </section>
             <div className="mt-4 grid items-end gap-x-6 gap-y-2 pb-4 sm:grid-cols-[200px_minmax(0,1fr)]">
@@ -118,11 +108,21 @@ export default function BarterDetails() {
             {currentUser && !currentUser.isBanned && (auction.isHost || auction.offers.length > 0) && <section className={`${auction.isHost ? 'mt-4' : 'mt-6'} border-t border-gray-200 pt-4`}><h2 className="mb-3 text-lg font-bold">{auction.isHost ? 'Review offers' : 'Your offers and host feedback'}</h2>
                 <div className="space-y-3">{visibleOffers.slice(0, 20).map(offer => <BarterOfferReview key={offer.id} offer={offer} host={auction.isHost} active={Boolean(active)} current={offer.id === auction.currentOfferId} onUpdated={refresh} onRevise={mayBid ? reviseOffer : undefined} />)}</div>
                 {!visibleOffers.length && <p className="text-sm text-gray-500">{auction.isHost ? 'No pending offers to review.' : 'No offers yet.'}</p>}
+                {auction.isHost && <details className="mt-6 text-sm" onToggle={event => setRevisionsOpen(event.currentTarget.open)}>
+                    <summary className="w-fit cursor-pointer text-white">Requested revisions</summary>
+                    <div className="mt-3 space-y-3">
+                        {revisions.error && <p role="alert">Revision history unavailable. <button type="button" onClick={revisions.refresh}>Retry</button></p>}
+                        {!revisions.data && !revisions.error && <p role="status">Loading revisions…</p>}
+                        {revisions.data?.slice(0, 20).map(offer => <div key={offer.id} className="space-y-2"><p className="text-xs text-gray-500">{offer.status === 'withdrawn' ? <span className="font-bold text-red-700 dark:text-red-300">Withdrawn:</span> : <span className="font-bold text-yellow-800 dark:text-yellow-300">Pending:</span>}</p><BarterOfferReview offer={offer} host active={false} current={false} onUpdated={refresh} /></div>)}
+                        {revisions.data?.length === 0 && <p className="text-gray-500">No requested revisions.</p>}
+                        {revisions.data && (revisionPage > 1 || revisions.data.length > 20) && <nav aria-label="Requested revision pages" className="flex gap-4 text-xs"><button disabled={revisionPage === 1} onClick={() => setRevisionPage(page => page - 1)}>Previous</button><span>Page {revisionPage}</span><button disabled={revisions.data.length <= 20} onClick={() => setRevisionPage(page => page + 1)}>Next</button></nav>}
+                    </div>
+                </details>}
                 {auction.isHost && (privatePage > 1 || auction.offers.length > 20) && <nav aria-label="Private offer pages" className="mt-3 flex gap-4 text-xs"><button disabled={privatePage === 1} onClick={() => setPrivatePage(page => page - 1)}>Previous</button><span>Page {privatePage}</span><button disabled={auction.offers.length <= 20} onClick={() => setPrivatePage(page => page + 1)}>Next</button></nav>}
             </section>}
         </div>
             <section aria-label="Bid history" className="mx-auto mt-6 max-w-4xl rounded-lg border border-gray-200 bg-white p-4 shadow sm:p-6">
-                <header className="mb-2 flex items-center justify-between gap-3 border-b border-gray-200 pb-4"><h2 className="text-xl font-bold text-gray-800">Bid History</h2><span className="text-xs text-gray-500">{currentUser && !currentUser.isBanned && !auction.isHost ? 'Accepted bids' : 'Accepted bids only'}</span></header>
+                <header className="mb-2 flex items-center justify-between gap-3 border-b border-gray-200 pb-4"><h2 className="text-xl font-bold text-gray-800">Bid History</h2><span className="text-xs text-gray-500">{currentUser && !currentUser.isBanned && !auction.isHost ? 'Accepted bids' : 'Accepted bids'}</span></header>
                 <ul className="divide-y divide-gray-200">{auction.history.slice(0, 20).map(offer => <BarterBidHistoryRow key={offer.id} offer={offer} />)}</ul>
                 {!auction.history.length && <p className="text-sm text-gray-500">No bids to show yet.</p>}
                 {(historyPage > 1 || auction.history.length > 20) && <nav aria-label="Accepted bid history pages" className="mt-3 flex gap-4 text-xs"><button disabled={historyPage === 1} onClick={() => setHistoryPage(page => page - 1)}>Previous</button><span>Page {historyPage}</span><button disabled={auction.history.length <= 20} onClick={() => setHistoryPage(page => page + 1)}>Next</button></nav>}

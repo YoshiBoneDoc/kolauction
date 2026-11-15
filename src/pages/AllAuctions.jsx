@@ -1,3 +1,5 @@
+import TradeTypeBadge from '../components/TradeTypeBadge';
+import AuctionSortMenu from '../components/AuctionSortMenu';
 import AuctionPagination from '../components/AuctionPagination';
 import RaffleAuctionCard from '../components/RaffleAuctionCard';
 import useHomeRaffles from '../hooks/useHomeRaffles';
@@ -55,6 +57,13 @@ export default function AllAuctions() {
     const trade = ['escrow', 'direct', 'none'].includes(params.get('trade')) ? params.get('trade') : 'all';
     const minPrice = AUCTION_PRICE_RANGE_ENABLED ? parsePrice(params.get('minPrice')) : null;
     const maxPrice = AUCTION_PRICE_RANGE_ENABLED ? parsePrice(params.get('maxPrice')) : null;
+    const activeFilterSummary = [
+        trade !== 'all' && (trade === 'none' ? 'No trading methods' : trade === 'escrow' ? 'Escrow' : 'Direct'),
+        buyout !== 'any' && `Buyout: ${buyout === 'with' ? 'Yes' : 'No'}`,
+        bundle !== 'any' && `Bundle: ${bundle === 'with' ? 'Yes' : 'No'}`,
+        ownershipFiltered && (mineOnly ? 'Mine' : 'Others'),
+        (minPrice != null || maxPrice != null) && `Price: ${minPrice == null ? '0' : minPrice.toLocaleString('en-US')}–${maxPrice == null ? 'Any' : maxPrice.toLocaleString('en-US')} Meat`,
+    ].filter(Boolean);
     const visibleRaffles = raffles.filter(raffle => matchesRaffleBrowse(raffle, { query: params.get('q') || '', status, kind, trade, buyout, bundle, ownershipFiltered, minPrice, maxPrice }));
     const requestedPage = Math.min(1000000, Math.max(1, Number.parseInt(params.get('page'), 10) || 1));
     // The reader filters and sorts the complete matching set BEFORE pagination.
@@ -109,39 +118,18 @@ export default function AllAuctions() {
             <main className="mx-auto max-w-7xl">
                 <h1 className="auction-page-title my-4 text-center font-bold text-[#7695FF]">All Auctions</h1>
                 <PendingTrades />
-                <section aria-label="Find auctions" className={`mb-1 rounded-lg border border-gray-200 bg-white px-3 pt-3 ${filtersOpen ? 'pb-1' : 'pb-3'}`}>
+
+                <section aria-label="Find auctions" className={`browse-toolbar mb-1 rounded-xl border border-gray-200 bg-white px-3 pt-3 ${filtersOpen ? 'pb-1' : 'pb-3'}`}>
                     <div className="flex flex-wrap items-end gap-3">
-                        <label htmlFor="auction-search" className="auction-search-field flex w-64 max-w-full items-center gap-2.5 text-gray-500">
+                        <label htmlFor="auction-search" className="auction-search-field flex w-80 max-w-full items-center gap-2.5 text-gray-500">
                             <span className="sr-only">Search item names or auction number</span>
                             <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true" className="shrink-0"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>
                             <input id="auction-search" type="search" value={searchInput} onChange={event => { rememberSearch(event.target.value); setSearchInput(event.target.value); }}
-                                placeholder="Search by item or auction number…" className="w-full min-w-0 rounded-full border-0 bg-gray-100 px-4 py-2.5 text-xs text-gray-900 dark:text-gray-100" />
+                                placeholder="Find an item or auction #…" className="w-full min-w-0 rounded-full border-0 bg-gray-100 px-4 py-2.5 text-xs text-gray-900 dark:text-gray-100" />
                         </label>
-                        <div role="group" aria-label="Sort auctions" className="flex flex-wrap items-center gap-2">
-                            {[
-                                [deadlineSort, ['newest', 'Newest'], ['activity', 'Recent Activity']],
-                                [
-                                    ['recommended', 'Discover'],
-                                    [sort === 'bids-desc' ? 'bids-asc' : 'bids-desc', `Most Bids ${sort === 'bids-desc' ? '▴' : sort === 'bids-asc' ? '▾' : '▴▾'}`],
-                                    [sort === 'price-desc' ? 'price-asc' : 'price-desc', `Price ${sort === 'price-desc' ? '▴' : sort === 'price-asc' ? '▾' : '▴▾'}`],
-                                ],
-                            ].map((options, group) => <div key={group} className={group === 0 ? 'flex h-9 overflow-hidden rounded border border-gray-200 bg-white' : 'flex gap-1'}>
-                                {options.map(([value, label]) => {
-                                    const selected = value.startsWith('bids-') ? sort.startsWith('bids-') : value.startsWith('price-') ? sort.startsWith('price-') : sort === value;
-                                    const hasDirection = value.startsWith('bids-') || value.startsWith('price-');
-                                    return <button key={label.split(' ')[0]} type="button" aria-label={label} aria-pressed={selected} onClick={() => update('sort', value)}
-                                        className={`inline-flex items-center justify-center gap-2 px-2.5 py-1 text-xs font-medium transition-colors ${group === 0 ? 'h-full rounded-none border-0 border-r border-gray-200 last:border-r-0' : 'h-9 rounded border'} ${selected ? `${group === 0 ? '' : 'border-blue-200'} bg-blue-50 text-blue-800` : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}>
-                                        {hasDirection ? <>
-                                            <span>{value.startsWith('bids-') ? 'Most Bids' : 'Price'}</span>
-                                            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                                                {!selected ? <path d="m7 8 5-5 5 5M7 16l5 5 5-5" /> : <path d={sort.endsWith('-desc') ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6'} />}
-                                            </svg>
-                                        </> : label}
-                                    </button>;
-                                })}
-                            </div>)}
-                        </div>
-                        <button type="button" aria-label={`Auction type: ${kindLabel}`} aria-pressed={kind !== 'all'}
+                        <div className="ml-auto"><AuctionSortMenu title="Status" ariaLabel="Auction status" value={status} options={[["all", "All Auctions"], ...auctionFilters.filter(([value]) => value !== 'all')]} onChange={value => update('status', value)} /></div>
+                        <AuctionSortMenu value={sort} onChange={value => update('sort', value)} options={[deadlineSort, ['newest', 'Newest'], ['activity', 'Recent Activity'], ['recommended', 'Discover'], ['bids-desc', 'Bids ↑'], ['bids-asc', 'Bids ↓'], ['price-desc', 'Price: High to Low'], ['price-asc', 'Price: Low to High']]} />
+                        <button type="button" aria-label={`Auction type: ${kindLabel}`} data-kind={kind} aria-pressed={kind !== 'all'}
                             onClick={() => update('kind', kind === 'all' ? 'sell' : kind === 'sell' ? 'buy' : '')}
                             title={`Showing ${kindLabel}. Click to show ${kind === 'all' ? 'Sell' : kind === 'sell' ? 'Buy' : 'Buy & Sell'} auctions.`}
                             className={`inline-flex h-9 w-32 shrink-0 items-center gap-2 whitespace-nowrap rounded border px-3 text-sm font-semibold transition-colors ${kindColors}`}>
@@ -150,16 +138,13 @@ export default function AllAuctions() {
                         <AuctionFiltersButton open={filtersOpen} controls={filtersId}
                             count={Number(status !== 'active') + Number(trade !== 'all') + Number(minPrice != null || maxPrice != null) + Number(ownershipFiltered) + Number(buyout !== 'any') + Number(bundle !== 'any')}
                             onToggle={() => setFiltersOpen(previous => !previous)} />
-                        <button type="button" aria-label="View all auctions" onClick={clearAdvancedFilters}
-                            title="Reset search, sorting, and all filters"
-                            className="inline-flex h-9 w-36 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded border border-blue-700 bg-white px-3 text-sm font-semibold text-blue-700 hover:bg-blue-50">
-                            <span>View All</span>
-                            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0">
-                                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8m0-5v5h-5" />
-                                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16m5 0H3v5" />
-                            </svg>
-                        </button>
+                        <button type="button" onClick={clearAdvancedFilters} className="inline-flex h-9 shrink-0 items-center gap-2 rounded-full border border-gray-200 px-3 text-sm text-gray-600 hover:bg-gray-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700">Reset <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 10a9 9 0 1 1 2 8M3 4v6h6" /></svg></button>
+
                     </div>
+                    {!filtersOpen && activeFilterSummary.length > 0 && <div aria-label="Active filters" className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-slate-400">
+                        {activeFilterSummary.map(text => text === 'Direct' || text === 'Escrow' ? <TradeTypeBadge key={text} escrow={text === 'Escrow'} short compact pill /> : <span key={text} className={text === 'Buyout: Yes' ? 'text-green-800' : undefined}>{text}</span>)}
+                        <button type="button" onClick={clearAdvancedFilters} className="auction-clear-text border-0 bg-transparent p-0 text-xs text-[#C18462] no-underline underline-offset-2 hover:underline hover:text-[#DCA58D]">Clear filters</button>
+                    </div>}
                     {filtersOpen && <AuctionFilters id={filtersId} status={status} trade={trade} buyout={buyout} bundle={bundle} bounds={priceBounds} minPrice={minPrice} maxPrice={maxPrice}
                         ownership={currentUser ? mineOnly ? '1' : othersOnly ? 'others' : 'all' : null}
                         onUpdate={update} onRangeChange={updatePriceRange} onClear={clearAdvancedFilters} />}
@@ -171,7 +156,6 @@ export default function AllAuctions() {
                 {isLoading ? <p role="status">Loading auctions…</p> : <>
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
                         {hasLoaded && <p role="status">{listingOrderDelayed ? 'Results may be out of date. Count and ordering are being refreshed.' : `${found} ${found === 1 ? 'auction' : 'auctions'} found${visibleRaffles.length ? ` · ${visibleRaffles.length} raffle ${visibleRaffles.length === 1 ? 'preview' : 'previews'}` : ''}`}</p>}
-                        <button onClick={clearAdvancedFilters} className="min-h-9 border-0 bg-transparent px-2 text-sm text-blue-700 underline">Reset filters</button>
                     </div>
                     {!error && pageRows.length === 0 && visibleRaffles.length === 0 && <p className="rounded-lg border bg-white p-6">{trade === 'none' ? 'Select Escrow or Direct to show auctions.' : mineOnly ? 'No auctions of yours match these filters.' : 'No auctions match your search and filters. Try another item name or status.'}</p>}
                     <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">

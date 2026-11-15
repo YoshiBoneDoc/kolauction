@@ -1,3 +1,4 @@
+import { formatCompactMeat } from '../lib/formatMeat';
 import BarterSymbol from '../components/BarterSymbol';
 import { writeBarter } from '../lib/barter';
 import MarketPrice from '../components/MarketPrice';
@@ -178,6 +179,9 @@ export default function AuctionAnItem() {
     const searchResults = matchingItems.slice(0, resultLimit);
     const quantityValue = parseAuctionAmount(quantity, 5000000000);
     const minimumValue = parseMeatAmount(minBidMeat);
+    const nextRelistMinimum = minimumValue != null && minimumValue > 0 && /^(?:[1-9]|[1-9][0-9])$/.test(relistReduction)
+        ? ((BigInt(minimumValue) * BigInt(100 - Number(relistReduction))) / 100n || 1n)
+        : null;
 
     function stepQuantity(change) {
         setQuantity((value) => {
@@ -446,6 +450,7 @@ export default function AuctionAnItem() {
                         <p id="bundle-title-help" className="-mt-2 mb-4 text-xs text-gray-600">Leave blank for an automatic title. Up to {MAX_BUNDLE_TITLE_LENGTH} characters.</p>
                     </>}
                     {isBarter && <p className="mb-2 text-xs text-gray-600">Trade items for items and/or Meat. Required min value: 40m Meat</p>}
+                    <div className="auction-create-form barter-offer-item-editor">
                     <div className="auction-item-quantity-grid"><div className="auction-item-search-field">
                     <label htmlFor="listing-item-search" className="mb-2 block text-sm font-bold">Item</label>
                     <input id="listing-item-search" type="search" value={itemSearch} onChange={(event) => setItemSearch(event.target.value)} placeholder="Start typing an item name…" aria-describedby={hasItemSearch ? 'listing-search-help' : undefined} className={fieldClass} />
@@ -464,7 +469,7 @@ export default function AuctionAnItem() {
                                     stepQuantity(event.key === 'ArrowUp' ? 1 : -1);
                                 }
                             }}
-                            className={`block w-full min-w-0 rounded border border-gray-400 bg-white text-base text-gray-900 h-9 px-3 py-1.5 leading-5`} />
+                            className="barter-item-quantity block w-full min-w-0 rounded border border-gray-400 bg-white text-base text-gray-900 h-9 px-3 py-1.5 leading-5" />
                         <button type="button" aria-label="Increase quantity" title="Increase quantity by 1"
                             disabled={quantityValue === 5000000000 || (quantityValue === null && quantity.trim() !== '')}
                             onClick={() => stepQuantity(1)} className={`h-9 min-w-11 shrink-0 rounded border border-gray-400 bg-white px-3 text-gray-900 disabled:opacity-40`}>+</button>
@@ -472,7 +477,7 @@ export default function AuctionAnItem() {
                     </div>
                     {(hasItemSearch || selectedItem) && <>
                     <label htmlFor="item" className="mb-2 block text-sm font-bold">Select an Item:</label>
-                    <div className="mb-4 flex min-w-0 items-center gap-2">
+                    <div className="barter-selected-item-row mb-4 grid min-w-0 grid-cols-[minmax(0,1fr)_80px] items-end gap-6">
                     <select id="item" required={!isBundle} value={selectedItem} onChange={(event) => setSelectedItem(event.target.value)} aria-describedby={hasItemSearch ? 'listing-search-help' : undefined} className="block w-full min-w-0 flex-1 border border-gray-400 text-gray-900">
                         <option value="" disabled>Select an item</option>
                         {selectedItem && !searchResults.some(item => String(item.id) === selectedItem)
@@ -480,12 +485,13 @@ export default function AuctionAnItem() {
                             && <option value={selectedItem}>{catalogItems.find(item => String(item.id) === selectedItem).name}</option>}
                         {searchResults.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
                     </select>
-                    {selectedCatalogItem?.image && <img key={selectedCatalogItem.id} src={itemImageUrl(selectedCatalogItem.image)} alt={selectedCatalogItem.name} width="36" height="36" className="h-9 w-9 shrink-0 rounded-md bg-white object-contain p-0.5 [image-rendering:pixelated]" />}
+                    {selectedCatalogItem?.image && <img key={selectedCatalogItem.id} src={itemImageUrl(selectedCatalogItem.image)} alt={selectedCatalogItem.name} width="36" height="36" className="mx-auto h-9 w-9 rounded-md bg-white object-contain p-0.5 [image-rendering:pixelated]" />}
                     </div>
                     {selectedCatalogItem && <div className="-mt-2 mb-4"><MarketPrice itemId={selectedCatalogItem.id} /></div>}
                     </>}
                     {hasItemSearch && <p id="listing-search-help" className="-mt-3 mb-3 text-xs text-gray-600">{itemSearch !== deferredSearch ? 'Searching items…' : matchingItems.length > resultLimit ? `Showing the first ${resultLimit} of ${matchingItems.length.toLocaleString('en-US')} matches. Keep typing to narrow the list.` : `${matchingItems.length} matching items.`}</p>}
                     {hasItemSearch && itemSearch === deferredSearch && searchResults.length === 0 && <p role="status" className="mb-4 text-sm text-gray-600">No items match your search.{selectedItem ? ' Your previous selection is still selected.' : ''}</p>}
+                    </div>
                     {isBundle && <section aria-label="Build your bundle" className="bundle-builder-panel mb-5 rounded-xl border border-[#EADBD3] bg-[#FFFAF7] p-3 sm:p-4">
                         <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
                             <div>
@@ -602,7 +608,7 @@ export default function AuctionAnItem() {
                             </select>
                             </div>
                             {relistPricing === 'reduce' && <div className="flex flex-col gap-1 text-stone-500"><label htmlFor="relist-reduction" className="text-xs">By</label><div className="flex min-h-10 items-center gap-1.5">
-                                <input id="relist-reduction" aria-label="Price reduction percentage" type="number" min="1" max="99" step="1" required value={relistReduction} onChange={event => { const value = event.target.value; if (value === '' || /^(?:[1-9]|[1-9][0-9])$/.test(value)) setRelistReduction(value); }} onKeyDown={event => { if (['e', 'E', '+', '-', '.'].includes(event.key)) event.preventDefault(); }} onBlur={() => { if (!relistReduction) setRelistReduction('1'); }} className="w-20 rounded-full border border-stone-200 bg-transparent px-3 py-1.5 text-sm text-stone-800 focus:ring-2 focus:ring-stone-300" /><span>%</span>
+                                <input id="relist-reduction" aria-label="Price reduction percentage" type="number" min="1" max="99" step="1" required value={relistReduction} onChange={event => { const value = event.target.value; if (value === '' || /^(?:[1-9]|[1-9][0-9])$/.test(value)) setRelistReduction(value); }} onKeyDown={event => { if (['e', 'E', '+', '-', '.'].includes(event.key)) event.preventDefault(); }} onBlur={() => { if (!relistReduction) setRelistReduction('1'); }} className="w-20 rounded-full border border-stone-200 bg-transparent px-3 py-1.5 text-sm text-stone-800 focus:ring-2 focus:ring-stone-300" /><span>%</span><span aria-live="polite" className="ml-1 whitespace-nowrap text-xs">{nextRelistMinimum != null && `(${formatCompactMeat(nextRelistMinimum)} Meat)`}</span>
                             </div></div>}
                             <p className="w-full text-xs leading-relaxed text-stone-500">{relistPricing === 'reduce' ? `Reduce the minimum bid by ${relistReduction || 1}% each time the auction is relisted.` : 'Keep the same starting price each time the auction is relisted.'}</p>
                         </div>}

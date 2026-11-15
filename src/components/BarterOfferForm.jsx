@@ -58,10 +58,9 @@ export default function BarterOfferForm({ auction, onSubmitted, initialOffer, pr
         finally { lock.current = false; setPending(false); }
     }
     return <form onSubmit={submit} className="space-y-4">
-        <h2 className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xl font-bold">Make a barter offer: <span aria-live="polite" className="text-lg font-semibold text-gray-600">{value == null ? 'Market value unavailable' : `${value.toLocaleString('en-US')} Meat`} <span className="text-xs font-normal text-gray-500">· Est. value</span></span></h2>
-        {practice && <p className="text-xs text-amber-700">Practice only. Search the sample items below; prices are illustrative, not live market quotes.</p>}
-        {practice && <p className="text-xs text-gray-500">Sample items: {practice.items.map(item => item.name).join(', ')}.</p>}
-        <p className="text-xs text-gray-500">Leading bid is determined by the host, not automatically.</p>
+        <h2 className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[21px] font-bold">Make a barter offer: <span aria-live="polite" className="text-[19px] font-semibold text-gray-600">{value == null ? 'Market value unavailable' : `${value.toLocaleString('en-US')} Meat`} <span className="text-xs font-normal text-gray-500">· Est. value</span></span></h2>
+        {practice && <p className="text-xs text-amber-700">Demo Only. Not a live barter.</p>}
+        <p className="!mt-1 pb-4 text-xs text-gray-500">Leading bid is determined by the host, not automatically.</p>
         <fieldset disabled={pending} className="space-y-2">
             <label className="block max-w-48 text-sm">Meat (optional)<input className={field} value={meat} inputMode="decimal" placeholder="e.g. 1m" onChange={event => { setMeat(event.target.value); token.current = null; }} onBlur={() => setMeat(value => normalizeAuctionAmount(value, { meat: true }))} /></label>
             <div className="auction-create-form barter-offer-item-editor">
@@ -118,7 +117,10 @@ export default function BarterOfferForm({ auction, onSubmitted, initialOffer, pr
                     })}</ul> : <p className="bundle-empty-state mt-3 rounded-md border border-dashed border-gray-300 px-3 py-3 text-center text-xs text-gray-600">Your offer is empty. Search for an item above and add it here.</p>}
                 </section>
             </div>
-            <button type="submit" disabled={value == null || value <= 0} className="min-h-11 rounded bg-blue-600 px-4 py-2 font-bold text-white disabled:opacity-50">{pending ? 'Submitting…' : practice ? 'Submit practice offer' : 'Submit offer'}</button>
+            <button type="submit" disabled={pending || value == null || value <= 0} className="group inline-flex min-h-9 items-center gap-2 rounded-full bg-blue-600 px-4 py-1.5 text-sm font-medium text-white transition-[background-color,box-shadow] enabled:hover:bg-blue-700 enabled:hover:shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-50">
+                <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="transition-transform motion-safe:group-enabled:group-hover:translate-x-0.5"><path d="m21 3-7 18-4-7-7-4 18-7Z" /><path d="m10 14 5-5" /></svg>
+                {pending ? 'Submitting…' : practice ? 'Submit practice offer' : 'Submit offer'}
+            </button>
         </fieldset>
         {error && !(error === 'Select an item and a whole quantity.' && (items.length > 0 || (meatAmount != null && meatAmount > 0))) && <p role="alert" className="text-sm text-red-700">{error}</p>}
     </form>;

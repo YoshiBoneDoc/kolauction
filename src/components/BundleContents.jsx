@@ -7,7 +7,7 @@ export default function BundleContents({ items, variant = 'default' }) {
             <h3 className={`text-sm font-semibold ${isPreview ? 'text-gray-900' : 'text-gray-800'}`}>Bundle contents</h3>
             <span className={`text-xs tabular-nums ${isPreview ? 'text-gray-700' : 'text-gray-600'}`}>{items.length} item types</span>
         </div>
-        <p className={`mt-1 text-xs ${isPreview ? 'text-gray-700' : 'text-gray-600'}`}>One bid buys the entire bundle; items cannot be purchased separately.</p>
+        <p className={`mt-1 text-xs ${isPreview ? 'text-gray-700' : 'text-gray-600'}`}>Bid on entire bundle. Items not sold separately.</p>
         <ul className={`mt-3 ${isPreview ? 'grid grid-cols-1 gap-2 sm:grid-cols-2' : 'divide-y divide-gray-200'}`}>
             {items.map(item => <li key={item.id} className={`${isPreview ? 'bundle-preview-item min-h-12 rounded-lg border border-[#EEE1DA] bg-white/70 px-2.5 py-2 text-gray-900' : 'py-2 text-gray-800'} flex min-w-0 items-center gap-2 text-sm`}>
                 {item.image && <img src={item.image} alt="" className={`${isPreview ? 'h-7 w-7' : 'h-8 w-8'} shrink-0 object-contain [image-rendering:pixelated]`} />}

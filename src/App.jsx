@@ -70,7 +70,7 @@ const App = () => {
             <BarterPendingBids />
             <InvitationGate />
             <AuctionReadError />
-            <SiteActivity><RenderBoundary key={`${pathname}${search}`}><Suspense fallback={<RouteLoading />}><Routes>
+            <SiteActivity><RenderBoundary key={pathname.replace(/\/+$/, '') === '/auctions' ? pathname : `${pathname}${search}`}><Suspense fallback={<RouteLoading />}><Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/raffles" element={<Raffles />} />
                 <Route path="/raffle/:id/commitment" element={<RaffleCommitment />} />

@@ -93,8 +93,10 @@ export default function AuctionDetails() {
                                 <TradeTypeBadge escrow={auction.escrowMode} />
                                 {auction.mrARate > 0 && <MrAAcceptedIcon />}
                             </div>
-                            {auction.mrARate && <p className="text-sm text-gray-600">Accepts Mr. A&apos;s · Fixed rate: {auction.mrARate.toLocaleString()} Meat each.</p>}
-                            {auction.isBundle ? <BundleContents items={auction.bundleItems} /> : <ItemResources item={auction.item} itemId={auction.itemId} />}
+                            <div className={`space-y-1 ${auction.mrARate > 0 && !auction.isBundle ? 'relative -top-2' : ''}`}>
+                                {auction.isBundle ? <BundleContents items={auction.bundleItems} /> : <ItemResources item={auction.item} itemId={auction.itemId} />}
+                                {auction.mrARate && <p className="text-sm text-gray-600">Accepts Mr. A&apos;s at {auction.mrARate.toLocaleString()} Meat each.</p>}
+                            </div>
                         </div>
                         <div className="space-y-3">
                             <div className={closedSale ? 'space-y-0.5 py-1' : 'space-y-1'}>
@@ -109,7 +111,7 @@ export default function AuctionDetails() {
                                 ? <BundleMarketPrice items={auction.bundleItems} completed={result.status === 'completed'} />
                                 : <MarketPrice itemId={auction.itemId} auctionId={auction.id} quantity={auction.quantity} completed={result.status === 'completed'} />)}
                         </div>
-                        {active && <InstantPurchaseAction key={`purchase-${auction.id}`} auction={auction} showTerms={false} />}
+                        {active && auction.instantPurchasePrice > 0 && <div className="!mt-2"><InstantPurchaseAction key={`purchase-${auction.id}`} auction={auction} showTerms={false} /></div>}
                         <div className="space-y-2 text-sm text-gray-700">
                             <p className="break-words">Sold by: <SellerLink auction={auction} /></p>
                             {closedSale && <p className="break-words">Winning bidder: <strong><WinnerLink auction={auction} /></strong></p>}
@@ -117,7 +119,7 @@ export default function AuctionDetails() {
                                 <span className="inline-flex rounded border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Live</span>
                                 <span aria-hidden="true" className="text-gray-400">·</span>
                                 {auction.giveawayTitle ? <GiveawayCountdown endTime={auction.endTime} now={now} /> : <p className={auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-600'}>Ends in <time dateTime={new Date(auction.endTime).toISOString()}><RemainingTime endTime={auction.endTime} /></time></p>}
-                                <p className="w-full text-[11px] text-gray-500">{auction.giveawayTitle ? <>Giveaway ends at the scheduled time. <span className="giveaway-bid-warning">Minimum increases only. <strong>Overbids won&apos;t count!</strong></span></> : 'Late bids extend the auction by 1 minute.'}</p>
+                                {!(auction.isBundle && currentUser?.id === auction.sellerId) && <p className="w-full text-[11px] text-gray-500">{auction.giveawayTitle ? <>Giveaway ends at the scheduled time. <span className="giveaway-bid-warning">Minimum increases only. <strong>Overbids won&apos;t count!</strong></span></> : 'Late bids extend the auction by 1 minute.'}</p>}
                             </div>}
                         </div>
                         {closedSale ? <>

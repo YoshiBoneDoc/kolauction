@@ -762,3 +762,92 @@ html .auction-create-form.barter-offer-item-editor .auction-quantity-stepper but
 
 .barter-offer-item-editor .barter-selected-item-row { max-width: 458px; }
 .barter-offer-item-editor .barter-selected-item-row > select { width: 100%; min-width: 0; flex: none; }
+
+/* Quiet browse controls, shared by auction and barter search. */
+.browse-toolbar .auction-filters-button,
+.browse-toolbar button[aria-label^="Auction type:"] {
+    border-color: transparent;
+    background: #f3f4f6;
+    color: #4b5563;
+    border-radius: 9999px;
+}
+.browse-toolbar .auction-filters-active {
+    background: #eef2ff;
+    color: #4338ca;
+}
+.browse-toolbar .auction-advanced-filters {
+    justify-content: flex-end;
+    gap: 12px;
+    padding-top: 12px;
+    padding-bottom: 8px;
+    margin-top: 12px;
+    border-color: #e5e7eb;
+}
+.browse-toolbar .auction-advanced-filters > button:not(.auction-clear-filters) {
+    border-color: #e5e7eb;
+    border-radius: 9999px;
+    font-weight: 400;
+    color: #4b5563;
+}
+html[data-theme=dark] .browse-toolbar { background: #172334; border-color: #344155; }
+html[data-theme=dark] .browse-toolbar .browse-sort-select { color: #d8deea; }
+html[data-theme=dark] .browse-toolbar .browse-sort-select option { background: #172334; }
+html[data-theme=dark] .browse-toolbar .auction-filters-button,
+html[data-theme=dark] .browse-toolbar button[aria-label^="Auction type:"] { background: #253247; color: #d8deea; }
+html[data-theme=dark] .browse-toolbar .auction-advanced-filters,
+html[data-theme=dark] .browse-toolbar .auction-advanced-filters > button:not(.auction-clear-filters) { border-color: #344155; }
+html[data-theme=dark] .browse-toolbar .auction-advanced-filters > button:not(.auction-clear-filters) { color: #d8deea; }
+
+.browse-toolbar button[data-kind="sell"] { background: #dcfce7; border-color: #22c55e; color: #166534; }
+.browse-toolbar button[data-kind="buy"] { background: #fee2e2; border-color: #f87171; color: #991b1b; }
+html[data-theme=dark] .browse-toolbar button[data-kind="sell"] { background: #14532d; border-color: #22c55e; color: #bbf7d0; }
+html[data-theme=dark] .browse-toolbar button[data-kind="buy"] { background: #7f1d1d; border-color: #f87171; color: #fecaca; }
+
+button.auction-clear-text, button.auction-clear-text:hover { background: transparent; border: 0; box-shadow: none; padding: 0; border-radius: 0; }
+
+.auction-sort-trigger { background: #f3f4f6; }
+html[data-theme=dark] .auction-sort-trigger { background: #0c1727; }
+
+/* Shared dropdown presentation; retain native selection and form behavior. */
+:root { --dropdown-surface: #f3f4f6; --dropdown-popup: #fff; --dropdown-text: #374151; --dropdown-border: #e5e7eb; --dropdown-hover: #f3f4f6; }
+html[data-theme=dark] { --dropdown-surface: #0c1727; --dropdown-popup: #1e293b; --dropdown-text: #e2e8f0; --dropdown-border: #475569; --dropdown-hover: #334155; }
+html body select:not([multiple]):not([size]) {
+    appearance: none;
+    min-height: 36px;
+    border: 0;
+    border-radius: 8px;
+    background-color: var(--dropdown-surface);
+    color: var(--dropdown-text);
+    padding: 8px 32px 8px 12px;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 20px;
+    box-shadow: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='1.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    cursor: pointer;
+}
+html body select:not([multiple]):not([size]):focus-visible { outline: 2px solid #7695ff; outline-offset: 2px; }
+html body select:disabled { opacity: .5; cursor: not-allowed; }
+html body select option { background: var(--dropdown-popup); color: var(--dropdown-text); }
+@supports (appearance: base-select) {
+    html body select:not([multiple]):not([size]),
+    html body select:not([multiple]):not([size])::picker(select) { appearance: base-select; }
+    html body select:not([multiple]):not([size]) { display: inline-flex; background-image: none; padding-right: 12px; align-items: center; gap: 12px; }
+    html body select:not([multiple]):not([size])::picker-icon { color: var(--dropdown-text); margin-left: auto; }
+    html body select:not([multiple]):not([size])::picker(select) {
+        margin-top: 4px;
+        padding: 4px;
+        border: 1px solid var(--dropdown-border);
+        border-radius: 12px;
+        background: var(--dropdown-popup);
+        color: var(--dropdown-text);
+        box-shadow: 0 8px 24px #0002;
+        max-height: min(360px, 60vh);
+        overflow-y: auto;
+    }
+    html body select:not([multiple]):not([size]) option { padding: 8px 12px; border-radius: 8px; gap: 8px; }
+    html body select:not([multiple]):not([size]) option:hover,
+    html body select:not([multiple]):not([size]) option:focus { background: var(--dropdown-hover); }
+}

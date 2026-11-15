@@ -1,10 +1,11 @@
 import { useMemo, useReducer, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import PropTypes from 'prop-types';
+import BarterBidHistoryRow from '../components/BarterBidHistoryRow';
+import BarterAcceptedBid from '../components/BarterAcceptedBid';
 import BarterSymbol from '../components/BarterSymbol';
 import BarterOfferForm from '../components/BarterOfferForm';
 import BarterOfferReview from '../components/BarterOfferReview';
-import BarterOfferImages from '../components/BarterOfferImages';
 import { offerDescription } from '../lib/barter';
 import { barterDemoReducer, createBarterDemo, demoItems, demoListings, demoPrices, latestDemoOffer } from '../lib/barterDemo';
 
@@ -32,7 +33,7 @@ function PracticeAuction({ role }) {
         <div className="mx-auto max-w-4xl space-y-4">
             <nav className="flex flex-wrap justify-between gap-3 text-sm"><Link to="/barter" className="text-blue-700 underline">Back to Barter Corner</Link><Link to={`/barter/demo/${role === 'host' ? 'bidder' : 'host'}`} className="text-blue-700 underline">Try the {role === 'host' ? 'bidder' : 'host'} demo →</Link></nav>
             <aside aria-label="Practice auction notice" className="rounded-lg border border-amber-300 bg-amber-50 p-4">
-                <p className="text-sm font-bold text-amber-800">DEMO / FAKE — no items or Meat exchanged</p>
+                <p className="text-sm font-bold text-amber-800">{role === 'bidder' ? 'Demo Only. Not a live barter.' : 'DEMO / FAKE — no items or Meat exchanged'}</p>
                 <p className="mt-1 text-xs text-gray-600">All actions are practice only. Sample offers and prices are illustrative. Nothing is published, sent, or added to your account.</p>
             </aside>
             <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-lg sm:p-6">
@@ -43,8 +44,7 @@ function PracticeAuction({ role }) {
                 <section aria-label="Practice listing" className="grid gap-5 sm:grid-cols-[150px_minmax(0,1fr)]">
                     <img src={listing.image} alt={listing.item} className="mx-auto h-36 w-36 rounded-lg bg-white p-4 object-contain [image-rendering:pixelated]" />
                     <div className="space-y-2"><h2 className="text-xl font-bold">{listing.item} ×1</h2><p className="text-xs text-gray-500">Direct Trade · No minimum bid · {active ? 'Practice auction open' : 'Practice auction ended'}</p>
-                        <p className="text-xs text-gray-500">Current accepted bid · estimated value</p><p className="text-2xl font-extrabold">{leader ? `${leader.value.toLocaleString('en-US')} Meat` : 'No accepted offers'}</p>
-                        {leader && <><p className="text-xs">{offerDescription(leader)}</p><BarterOfferImages offer={leader} /></>}
+                        <BarterAcceptedBid offer={leader} value={leader?.value || 0} />
                     </div>
                 </section>
                 <p className="my-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm" role="status" aria-live="polite">{state.notice || (role === 'host' ? 'You are the host.' : 'You are the bidder. Explore the sample outcomes below, or submit your own practice offer and choose a simulated host response.')}</p>
@@ -71,8 +71,9 @@ function PracticeAuction({ role }) {
                 {role === 'bidder' && active && !pending && <section ref={offerForm} className="mx-auto mt-5 max-w-xl rounded border border-gray-200 p-4"><BarterOfferForm key={state.formVersion} auction={{ id: 'demo-only', minimumValue: null }} initialOffer={state.draftOffer} practice={practice} onSubmitted={noop} /></section>}
             </div>
             <section aria-label="Practice accepted bid history" className="rounded-lg border border-gray-200 bg-white p-4 shadow sm:p-6">
-                <h2 className="mb-3 text-lg font-bold">Accepted bid history</h2>
-                <ul className="divide-y divide-gray-200">{accepted.map(offer => <li key={offer.id} className="space-y-1 py-3 text-sm"><p className="flex flex-wrap justify-between gap-2"><strong>{offer.bidderLabel} · {offer.value.toLocaleString('en-US')} Meat <span className="text-xs font-normal text-gray-500">estimated</span></strong><span className="text-xs text-gray-500">{offer.id === state.currentOfferId ? state.ended ? 'Winning offer' : 'Current accepted bid' : 'Previously accepted'}</span></p><p className="text-xs">{offerDescription(offer)}</p><BarterOfferImages offer={offer} /></li>)}</ul>
+                <header className="mb-2 flex items-center justify-between gap-3 border-b border-gray-200 pb-4"><h2 className="text-xl font-bold text-gray-800">Bid History</h2><span className="text-xs text-gray-500">{role === 'bidder' ? 'Accepted bids' : 'Accepted bids'}</span></header>
+                <ul className="divide-y divide-gray-200">{accepted.map(offer => <BarterBidHistoryRow key={offer.id} offer={{ ...offer, historyAt: new Date(Date.UTC(2026, 10, 14, 12, offer.acceptedOrder)).toISOString(), isOwn: role === 'bidder' && offer.bidderLabel === 'You' }} />)}</ul>
+                {!accepted.length && <p className="text-sm text-gray-500">No bids to show yet.</p>}
             </section>
         </div>
     </main>;

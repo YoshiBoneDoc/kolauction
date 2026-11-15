@@ -1,3 +1,7 @@
+# Host barter revision follow-up — local change
+
+Host detail now has a lazy, paginated Requested revisions section separate from pending review. Queued migration 287 adds a host-only read for changes-requested offers and withdrawn offers retaining revision feedback. Accepted and outright rejected offers are excluded. Requires manual SQL application and website deployment; neither performed. Changed-source lint passes; database execution and browser QA unverified.
+
 # kHub handoff
 
 ## November 15 Home Barters row — local website change

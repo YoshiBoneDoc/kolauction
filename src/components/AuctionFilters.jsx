@@ -1,5 +1,4 @@
 import PropTypes from 'prop-types';
-import { auctionFilters } from '../lib/auctionBrowsing';
 import AuctionPriceRange from './AuctionPriceRange';
 
 // Temporary switch: also disables URL/session price constraints in All Auctions.
@@ -25,7 +24,7 @@ AuctionFiltersButton.propTypes = {
     count: PropTypes.number.isRequired, onToggle: PropTypes.func.isRequired,
 };
 
-export default function AuctionFilters({ id, status, trade, bounds, minPrice, maxPrice, ownership = null, buyout = 'any', bundle = 'any', onUpdate, onRangeChange, onClear }) {
+export default function AuctionFilters({ id, trade, bounds, minPrice, maxPrice, ownership = null, buyout = 'any', bundle = 'any', onUpdate, onRangeChange }) {
     const ownershipLabel = ownership === 'others' ? 'Others' : ownership === '1' ? 'Mine' : 'All Auctions';
     const nextOwnership = ownership === 'all' ? 'others' : ownership === 'others' ? '1' : '';
     const nextOwnershipLabel = ownership === 'all' ? 'Others' : ownership === 'others' ? 'Mine' : 'All Auctions';
@@ -43,18 +42,12 @@ export default function AuctionFilters({ id, status, trade, bounds, minPrice, ma
                         : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50';
                     return <button key={method} type="button" aria-pressed={selected}
                         onClick={() => onUpdate('trade', trade === 'all' ? (method === 'escrow' ? 'direct' : 'escrow') : trade === method ? 'none' : trade === 'none' ? method : '')}
-                        className={`h-8 rounded border px-2.5 py-1 text-xs font-medium transition-colors ${colors}`}>
+                        className={`h-8 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${colors}`}>
                         {method === 'escrow' ? 'Escrow' : 'Direct'}
                     </button>;
                 })}
             </div>
         </fieldset>
-        <label className="block w-56 max-w-full shrink-0">
-            <span className="sr-only">Auction status</span>
-            <select value={status} onChange={event => onUpdate('status', event.target.value)} className="h-8 w-full rounded border border-[#E5D5CD] bg-white px-2 text-sm font-normal text-gray-900">
-                {auctionFilters.map(([value, label]) => <option key={value} value={value}>Status: {label}</option>)}
-            </select>
-        </label>
         {[[ 'buyout', 'Buyout', buyout ], [ 'bundle', 'Bundle', bundle ]].map(([name, label, value]) => <button key={name} type="button"
             aria-label={`${label}: ${value === 'with' ? 'Yes' : value === 'without' ? 'No' : 'All'}`} aria-pressed={value !== 'any'}
             onClick={() => onUpdate(name, value === 'any' ? 'with' : value === 'with' ? 'without' : '')}
@@ -71,7 +64,7 @@ export default function AuctionFilters({ id, status, trade, bounds, minPrice, ma
         {AUCTION_PRICE_RANGE_ENABLED && <div className="w-[320px] max-w-full shrink-0">
             <AuctionPriceRange bounds={bounds} minPrice={minPrice} maxPrice={maxPrice} onChange={onRangeChange} />
         </div>}
-        <button type="button" onClick={onClear} className="auction-clear-filters inline-flex h-8 shrink-0 items-center border-0 bg-transparent p-0 text-xs font-medium text-[#A65332] underline underline-offset-2">Clear filters</button>
+
     </section>;
 }
 AuctionFilters.propTypes = {

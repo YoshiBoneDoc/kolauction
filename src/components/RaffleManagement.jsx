@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
+import { itemImageUrl } from '../lib/itemCatalog';
 import CopyMessage from './CopyMessage';
 import { supabase } from '../lib/supabase';
 
-export default function RaffleManagement({ raffleId, ownerId, onChange }) {
+export default function RaffleManagement({ raffleId, ownerId, onChange, prizes = [] }) {
     const [data, setData] = useState(null);
     const [error, setError] = useState('');
     const [busy, setBusy] = useState(false);
@@ -44,12 +45,25 @@ export default function RaffleManagement({ raffleId, ownerId, onChange }) {
             <div className="raffle-management-deposit"><span>Deposit prize items:</span><CopyMessage text={`SUPPLY ${data.raffle_number}`} label="prize deposit command" inline /></div>
             <p className="raffle-management-note">Partial and repeat deposits supported.</p>
             <p className="raffle-management-proceeds">Ticket Sales: <strong>{BigInt(data.revenue).toLocaleString('en-US')} Meat</strong> <small className="raffle-management-ticket-total">({BigInt(data.ticket_count ?? 0).toLocaleString('en-US')} tickets)</small></p>
-            <details className="raffle-management-reserves">
-                <summary><svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="m6 3 5 5-5 5"/></svg><span>Reserved Items</span><span className="raffle-management-inventory">{data.inventory.filter(i => BigInt(i.quantity) > 0n).map(i => `${i.name} × ${BigInt(i.quantity).toLocaleString('en-US')}`).join(' · ') || 'None'}</span></summary>
-                <div className="raffle-management-history"><h3>Deposit History</h3>{data.deposits.length ? <ul>{data.deposits.map(d => <li key={d.receipt_id}><time dateTime={d.received_at}>{new Date(d.received_at).toLocaleString()}</time><span>{d.items.map(i => `${data.inventory.find(item => item.item_id === i.id)?.name ?? i.name ?? `Item #${i.id}`} × ${BigInt(i.quantity).toLocaleString('en-US')}`).join(' · ')}</span><span className="raffle-management-deposit-status">Received</span></li>)}</ul> : <p>No deposits yet.</p>}</div>
-            </details>
+            <div className="raffle-management-reserves">
+                <div className="flex items-center justify-between gap-4">
+                    <div className="flex flex-wrap items-center gap-2"><span>Reserved Items</span>
+                        {(() => {
+                            const missing = prizes.filter(prize => BigInt(data.inventory.find(item => item.item_id === prize.item_id)?.quantity ?? 0) < BigInt(prize.quantity));
+                            return missing.length > 0 && <><span className="text-xs text-gray-600">· Missing:</span>{missing.map(prize => prize.image && <img key={prize.item_id} src={itemImageUrl(prize.image)} alt={prize.name} title={prize.name} className="h-8 w-8 rounded bg-white object-contain p-0.5 [image-rendering:pixelated]" />)}</>;
+                        })()}
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-1">
+                        {data.inventory.some(item => BigInt(item.quantity) > 0n) ? data.inventory.filter(item => BigInt(item.quantity) > 0n).map(item => {
+                            const prize = prizes.find(prize => prize.item_id === item.item_id);
+                            return <span key={item.item_id} title={`${item.name} × ${BigInt(item.quantity).toLocaleString('en-US')}`} className="inline-flex items-center gap-0.5">{prize?.image ? <img src={itemImageUrl(prize.image)} alt={item.name} className="h-8 w-8 rounded bg-white object-contain p-0.5 [image-rendering:pixelated]" /> : <span>{item.name}</span>}{BigInt(item.quantity) > 1n && <small>×{BigInt(item.quantity).toLocaleString('en-US')}</small>}</span>;
+                        }) : <span>None</span>}
+                    </div>
+                </div>
+
+            </div>
             {['preview', 'active'].includes(data.state) && <button type="button" className="raffle-management-cancel" disabled={busy} onClick={() => act('cancel_mystery_raffle')}>Cancel raffle and refund tickets</button>}
         </>}
     </section>;
 }
-RaffleManagement.propTypes = { raffleId: PropTypes.string.isRequired, ownerId: PropTypes.string.isRequired, onChange: PropTypes.func.isRequired };
+RaffleManagement.propTypes = { raffleId: PropTypes.string.isRequired, ownerId: PropTypes.string.isRequired, onChange: PropTypes.func.isRequired, prizes: PropTypes.array };

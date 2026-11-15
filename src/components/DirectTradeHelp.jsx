@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 export default function DirectTradeHelp({ forListing = false }) {
     return <details className={forListing ? 'text-left text-xs text-gray-600' : 'group w-full text-left text-xs text-gray-600'}>
-        <summary className={forListing ? 'w-fit cursor-pointer' : 'cursor-pointer py-1 text-sm font-semibold text-[#334155] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600'}>{forListing ? 'Direct Trades' : 'Direct Trade — How It Works'}</summary>
+        <summary className={forListing ? 'w-fit cursor-pointer text-slate-700 dark:text-slate-300' : 'cursor-pointer py-1 text-sm font-semibold text-slate-700 dark:text-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600'}>{forListing ? 'Direct Trades' : 'Direct Trade — How It Works'}</summary>
         <div className={`mt-1 space-y-1 leading-[1.4] ${forListing ? '' : 'pt-2'}`}>
             <p>{forListing ? 'Trade directly with the winning bidder in-game once the auction concludes.' : 'Buyers and sellers trade directly in-game after the auction ends.'}</p>
             <ol className="list-decimal space-y-0 pl-4">

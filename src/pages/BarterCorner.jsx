@@ -1,3 +1,4 @@
+import AuctionSortMenu from '../components/AuctionSortMenu';
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import useBarterRead from '../hooks/useBarterRead';
@@ -29,14 +30,12 @@ export default function BarterCorner() {
             <Link to="/auction-item?kind=barter" className="shrink-0 text-sm text-blue-700 hover:underline dark:text-blue-300 sm:absolute sm:right-0">Create Barter <span aria-hidden="true">→</span></Link>
         </div>
         <h2 className="mb-3 text-sm font-semibold">Live barter listings</h2>
-        <section aria-label="Find barter items" className="mb-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-            <div role="group" aria-label="Sort barter auctions" className="flex h-9 overflow-hidden rounded border border-gray-200 bg-white">
-                {[['ending', 'Ending Soon'], ['newest', 'Newest'], ['activity', 'Recent Activity']].map(([value, label]) => <button key={value} type="button" aria-pressed={sort === value} onClick={() => update('sort', value)} className={`h-full rounded-none border-0 border-r border-gray-200 px-2.5 py-1 text-xs font-medium last:border-r-0 ${sort === value ? 'bg-blue-50 text-blue-800' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>{label}</button>)}
-            </div>
+        <section aria-label="Find barter items" className="browse-toolbar mb-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-xl border border-gray-200 bg-white p-3">
             <label className="auction-search-field flex w-64 max-w-full items-center gap-2.5 text-gray-500">
                 <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true" className="shrink-0"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>
                 <input type="search" value={search} maxLength={120} onChange={event => setDraft({ from: query, value: event.target.value })} aria-label="Search barter item names" placeholder="Find an item…" className="w-full min-w-0 rounded-full border-0 bg-gray-100 px-4 py-2.5 text-xs text-gray-900 dark:text-gray-100" />
             </label>
+            <div className="ml-auto"><AuctionSortMenu ariaLabel="Sort barter auctions" value={sort} onChange={value => update('sort', value)} options={[['ending', 'Ending Soon'], ['newest', 'Newest'], ['activity', 'Recent Activity']]} /></div>
         </section>
         <hr className="mb-3 border-0 border-t border-gray-200" />
         {error && <p role="alert">Barters could not be loaded. {error} <button onClick={refresh}>Retry</button></p>}
