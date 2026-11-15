@@ -32,7 +32,7 @@ export default function AllAuctions() {
     const [filtersOpen, setFiltersOpen] = useState(false);
     const filtersId = useId();
     useEffect(() => {
-        if (navigationType !== 'REPLACE') { setFiltersOpen(false); setOpenBid(null); }
+        if (navigationType !== 'REPLACE') setOpenBid(null);
     }, [navigationType, locationKey]);
     const browseKey = params.toString();
     const mineOnly = Boolean(currentUser && params.get('mine') === '1');

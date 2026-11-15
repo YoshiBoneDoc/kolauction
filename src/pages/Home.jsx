@@ -4,6 +4,7 @@ import HighRollers from '../components/HighRollers';
 import GiveawayCard from '../components/GiveawayCard';
 import useFeaturedGiveaway from '../hooks/useFeaturedGiveaway';
 import ExploreAuctions from '../components/ExploreAuctions';
+import HomeBarters from '../components/HomeBarters';
 import { useContext, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { AuctionsContext } from '../context/AuctionsContext';
@@ -60,6 +61,7 @@ export default function Home() {
                     {isLoading && <p role="status">Loading auctions…</p>}
                     {!isLoading && !error && !hasActiveAuctions && <p>No active auctions right now. <Link to="/auctions?status=all" className="text-blue-700 underline">Browse auction history</Link> or <Link to="/auction-item" className="text-blue-700 underline">list an item</Link>.</p>}
                 </ExploreAuctions>
+                <HomeBarters />
 
                 <div className="mt-8">
                     <PopularAuctions auctions={completed} now={now} completed>

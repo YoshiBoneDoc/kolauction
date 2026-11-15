@@ -7,13 +7,13 @@ import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { StaticRouter } from 'react-router-dom';
 const { outputFiles } = buildSync({
-    stdin: { contents: `export {default as Card} from './src/components/CompactAuctionCard.jsx'; export {default as Pagination} from './src/components/AuctionPagination.jsx';`, resolveDir: fileURLToPath(new URL('../', import.meta.url)), loader: 'jsx' },
+    stdin: { contents: `export {default as Card} from './src/components/CompactAuctionCard.jsx'; export {default as HomeCard} from './src/components/HomeAuctionCard.jsx'; export {default as Pagination} from './src/components/AuctionPagination.jsx';`, resolveDir: fileURLToPath(new URL('../', import.meta.url)), loader: 'jsx' },
     bundle: true, write: false, platform: 'node', format: 'cjs', packages: 'external', jsx: 'automatic', define: { 'import.meta.env': '{}' },
 });
 const require = createRequire(import.meta.url), mod = { exports: {} };
 new Function('require', 'module', 'exports', outputFiles[0].text)(name => name === 'react' ? { ...React, useContext: () => ({ currentUser: null }), useId: () => 'card-form' }
     : name === 'react-router-dom' ? { ...require(name), useLocation: () => ({ pathname: '/barter', search: '' }) } : require(name), mod, mod.exports);
-const { Card, Pagination } = mod.exports;
+const { Card, HomeCard, Pagination } = mod.exports;
 const now = Date.now();
 const auction = { id: 'barter-id', auctionKind: 'barter', item: 'Test item', quantity: 2, status: 'active', endTime: now + 86400000, sellerId: 'seller', escrowMode: false, minBidMeat: 0, currentBid: 0 };
 const html = tree => renderToStaticMarkup(React.createElement(StaticRouter, { location: '/barter' }, tree));
@@ -66,4 +66,19 @@ test('Meat plus Mr. A Sell cards use the same navigation actions for Direct and 
         nodes(tree).find(n => n.type === 'button' && n.props.children === 'Close').props.onClick();
         assert.equal(closed, true);
     }
+});
+
+test('Home barter cards share mixed Sell layout and link to barter with accepted value or optional minimum', () => {
+    const render = listing => html(React.createElement(HomeCard, { auction: listing, now }));
+    const mixed = { ...auction, auctionKind: 'sell', mrARate: 76000000, currentBid: 1500000000 };
+    const barter = { ...mixed, auctionKind: 'barter' };
+    assert.equal(HomeCard({ auction: mixed, now }).props.className, HomeCard({ auction: barter, now }).props.className);
+    const output = render(barter);
+    assert.match(output, /href="\/barter\/barter-id"/);
+    assert.match(output, /barter-switch-symbol/);
+    assert.doesNotMatch(output, /mr-a-accepted/);
+    assert.match(output, /1.5b/);
+    assert.match(output, /Direct/);
+    assert.match(render(auction), /No minimum/);
+    assert.match(render({ ...auction, minBidMeat: 40000000 }), /40m/);
 });

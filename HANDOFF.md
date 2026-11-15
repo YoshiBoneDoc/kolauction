@@ -1,5 +1,18 @@
 # kHub handoff
 
+## November 15 Home Barters row — local website change
+
+Home now shows a newest-first Barters strip below Explore Auctions, using the
+existing static carousel and Home Sell card layout with a barter symbol replacing
+the Mr. A icon. Cards link to barter details and show the accepted estimate,
+optional minimum, or No minimum. Reuses the existing bounded (24-row),
+viewer-scoped barter browse cache/coalescing and visible-only 30-second refresh;
+ignore-sensitive barter membership does not enter the ordinary public cache.
+Expired cards disappear at the existing lifecycle boundary. No new SQL or bot
+release required. Six targeted card/browse tests, changed-source lint, build and
+diff checks pass. Browser visual QA and deployment remain unverified.
+
+
 ## November 14 interactive barter practice auctions — local website change
 
 Barter Corner now has two compact DEMO / FAKE practice cards at the bottom,
