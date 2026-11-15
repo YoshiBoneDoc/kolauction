@@ -1,3 +1,29 @@
+# November 15 host message length — local, migration queued
+
+Listing form now caps optional host messages at 250 characters with a two-row
+input and preview validation. Queued **291** after 288 tightens creator validation
+and both table constraints. Existing longer messages are shortened to 250 characters before validating
+the constraints, so later settlement updates cannot fail on old message lengths. Matching ignored bot SQL is an
+alternative copy. Apply once then deploy website; no bot restart. Not applied or
+deployed. Personal quickstart unchanged. Database regression covers the 250/251
+boundary; local PostgreSQL initialization remains unavailable. Three focused
+message tests, changed-source lint and build pass.
+
+# November 15 Home title font selection — local, SQL cleanup queued
+
+Home title now uses Mynerve (400). Removed shuffle/history/favorites toolbar,
+font-loading helper, heart RPC adapters and all admin font-ranking displays.
+Queued **290**, after 260 and compatible through 289, removes font additions from
+current authorized readers, drops both heart tables, finalists, four functions and
+the shortlist flag. Ordinary polls, written responses and financial records remain.
+Historical migrations stay intact for reproducible installs. Matching ignored bot
+SQL is an alternative copy; apply once then deploy website, no bot restart.
+Not applied/deployed. Personal quickstart unchanged.
+
+29 poll UI/service tests, changed-source lint and build pass. Database regression
+now checks cleanup and preserved votes/privacy, but initdb failed before execution;
+SQL execution and browser visual QA remain unverified.
+
 # November 15 Barter Corner status filter — local, migration queued
 
 Barter Corner now uses the same Status dropdown component as All Auctions, with

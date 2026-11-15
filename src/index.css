@@ -9,9 +9,9 @@
 }
 
 .home-title {
-  font-family: 'Newsreader', Georgia, serif;
+  font-family: 'Mynerve', cursive;
   font-size: clamp(36px, calc(16px + 6.25vw), 80px);
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .approval-gallery {

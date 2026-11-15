@@ -330,8 +330,10 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         assert sql(f"select host_message from public.auctions where id='{message_id}';") == 'Hello <b>world</b>!'
         detail = json.loads(sql(f"set role anon; select public.read_auction_detail_static('detail','{message_id}');"))
         assert detail['rows'][0]['host_message'] == 'Hello <b>world</b>!'
+        boundary_id = with_message({**listing, 'hostMessage': 'x' * 250})
+        assert sql(f"select char_length(host_message) from public.auctions where id='{boundary_id}';") == '250'
         before = sql('select count(*) from public.auctions;')
-        with_message({**listing, 'hostMessage': 'x' * 501}, error='500 characters')
+        with_message({**listing, 'hostMessage': 'x' * 251}, error='250 characters')
         assert sql('select count(*) from public.auctions;') == before
         with_message({**listing, 'quantity': 0}, error='quantity')
         blank_id = with_message({**listing, 'hostMessage': '   '})

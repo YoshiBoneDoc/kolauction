@@ -9,13 +9,11 @@ import PollResults from './PollResults';
 import PollVoters from './PollVoters';
 import { startPrivateRefresh } from '../lib/privateRefresh';
 
-import RandomTitleFont from './RandomTitleFont';
-import { activeFontPoll } from '../lib/randomTitleFont';
 
 const polls = createPollService(supabase);
 const RESULTS_HIDDEN_KEY = 'khub:poll-results-hidden';
 
-export function PollPanel({ service = polls, featuredTarget, fontTarget, titleRef }) {
+export function PollPanel({ service = polls, featuredTarget }) {
     const [feed, setFeed] = useState(null);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState('');
@@ -38,8 +36,6 @@ export function PollPanel({ service = polls, featuredTarget, fontTarget, titleRe
     const writing = useRef(false);
     const generation = useRef(0);
     const poll = feed?.poll;
-    const fontPoll = activeFontPoll(feed);
-    const standaloneHearts = Array.isArray(feed?.title_font_hearts);
     const isAdmin = feed?.can_manage === true || poll?.can_manage === true;
     const published = (feed?.published_results || []).filter(result => result.poll_type !== 'free_text' && (isAdmin || result.has_voted) && result.id !== poll?.id);
     const repeatable = !isAdmin ? (feed?.repeatable_polls || []).filter(item => item.active && item.poll_type === 'free_text' && item.allow_multiple_responses).map(item => ({...item,has_voted:true})) : [];
@@ -231,28 +227,16 @@ export function PollPanel({ service = polls, featuredTarget, fontTarget, titleRe
         {feed?.can_manage && <p className="text-sm"><Link to="/admin/polls" className="text-blue-800 underline">Manage polls &amp; view past results</Link></p>}
         {error && <p role="alert" className="text-sm text-red-800">{error}{' '}<button type="button" disabled={pending} onClick={() => setAttempt(value => value + 1)} className="underline">Retry</button></p>}
     </section> : null;
-    if (!hasPanelContent && !(fontTarget?.current && titleRef)) return null;
+    if (!hasPanelContent) return null;
     return <>
-        {fontTarget?.current && titleRef && createPortal(<RandomTitleFont titleRef={titleRef}
-            heartedFonts={standaloneHearts ? feed.title_font_hearts : fontPoll ? feed?.font_hearts?.[fontPoll.id] || [] : undefined}
-            onHeart={standaloneHearts || fontPoll ? async (family, hearted) => {
-                if (writing.current) throw new Error('Another poll action is pending.');
-                writing.current = true; generation.current += 1;
-                try {
-                    const fonts = standaloneHearts ? await service.heartTitleFont(family, hearted) : await service.heartFont(fontPoll.id, family, hearted);
-                    setFeed(previous => standaloneHearts ? { ...previous, title_font_hearts: fonts }
-                        : { ...previous, font_hearts: { ...previous.font_hearts, [fontPoll.id]: fonts } });
-                } finally { writing.current = false; }
-            } : undefined} />, fontTarget.current)}
-        {isAdmin && (standaloneHearts || fontPoll) && <p className="text-right text-xs"><Link to={standaloneHearts ? "/admin/inbox?category=other#title-font-hearts" : `/admin/polls#poll-${fontPoll.id}`} className="text-blue-700 underline">View font heart results</Link></p>}
         {questionPanel && (featuredTarget?.current ? createPortal(questionPanel, featuredTarget.current) : questionPanel)}
         {panel}
     </>;
 }
-PollPanel.propTypes = { service: PropTypes.object, fontTarget: PropTypes.object, titleRef: PropTypes.object, featuredTarget: PropTypes.shape({ current: PropTypes.object }) };
+PollPanel.propTypes = { service: PropTypes.object, featuredTarget: PropTypes.shape({ current: PropTypes.object }) };
 
-export default function HomePoll({ featuredTarget, fontTarget, titleRef } = {}) {
+export default function HomePoll({ featuredTarget } = {}) {
     const { currentUser } = useContext(UserContext);
-    return currentUser && !currentUser.isBanned ? <PollPanel key={currentUser.id} featuredTarget={featuredTarget} fontTarget={fontTarget} titleRef={titleRef} /> : null;
+    return currentUser && !currentUser.isBanned ? <PollPanel key={currentUser.id} featuredTarget={featuredTarget} /> : null;
 }
-HomePoll.propTypes = { fontTarget: PropTypes.object, titleRef: PropTypes.object, featuredTarget: PropTypes.shape({ current: PropTypes.object }) };
+HomePoll.propTypes = { featuredTarget: PropTypes.shape({ current: PropTypes.object }) };

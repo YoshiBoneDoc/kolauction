@@ -253,5 +253,17 @@ with tempfile.TemporaryDirectory(prefix='khub-text-polls-',dir='/tmp') as folder
         print('PASS: fresh shortlist hearts, queue-independent toolbar, admin-only ranking without text responses, dedupe/unheart, whitelist and preserved closed results')
         print('PASS: shared font hearts deduplicate accounts, unheart idempotently, rank correctly, remain private and reject closed/non-font polls')
         print('PASS: private free-text polls, ordered mixed queues, optional repeat responses, idempotent/concurrent retries, per-poll inbox grouping/status/category changes, privacy, size/abuse limits, unchanged Yes/No history and zero KMail/financial side effects')
+        preserved=sql("select jsonb_agg(to_jsonb(v) order by poll_id,voter_id) from khub_bot.site_poll_votes v;")
+        sql(next(p for p in migrations if '290_remove_title_font_voting' in p.name).read_text())
+        assert preserved==sql("select jsonb_agg(to_jsonb(v) order by poll_id,voter_id) from khub_bot.site_poll_votes v;")
+        assert not {'title_font_hearts','font_hearts','font_poll'}.intersection(feed(first))
+        assert 'title_font_hearts' not in inbox()
+        assert all('font_hearts' not in p for p in json.loads(call('select public.read_admin_polls();')))
+        for table in ['title_font_hearts','title_font_finalists','poll_font_hearts']:
+            assert sql(f"select to_regclass('khub_bot.{table}') is null;")=='t'
+        for function in ['public.set_title_font_heart(text,boolean)','public.set_poll_font_heart(uuid,text,boolean)','khub_bot.title_font_heart_results()','khub_bot.font_heart_ranking(uuid)']:
+            assert sql(f"select to_regprocedure('{function}') is null;")=='t'
+        call("select public.read_support_threads('other','open',1);",first,error='Administrator')
+        print('PASS: font voting removed from schema/feed/inbox/admin while preserving ordinary votes and authorization')
     finally:
         if started:pg('-m','fast','-w','stop')

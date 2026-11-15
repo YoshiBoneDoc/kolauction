@@ -92,13 +92,6 @@ export function PollManager({ service = polls }) {
                 {poll.published_at && <>
                     {poll.poll_type === 'free_text' ? <p className="text-sm text-gray-600">{poll.results?.total || 0} responses · {poll.allow_multiple_responses ? 'Multiple responses allowed' : 'One response per player'} · <Link to="/admin/inbox?category=other" className="text-blue-700 underline">View in inbox</Link></p> : <><PollResults results={poll.results} /><PollVoters pollId={poll.id} service={service} /></>}
                 </>}
-                {poll.poll_type === 'free_text' && /\bfonts?\b/i.test(poll.question) && poll.published_at && <section aria-label="Font heart results" className="space-y-2">
-                    <h3 className="text-sm font-semibold text-slate-800">{poll.font_shortlist_round ? 'Shortlisted font hearts' : 'Font hearts'} · top 50</h3>
-                    <p className="text-xs text-gray-500">One heart per player per font. {poll.active ? 'Use Refresh results to update the counts.' : 'Voting has concluded; saved counts remain available.'}</p>
-                    {poll.font_hearts?.length ? <ol className="space-y-1 text-sm text-gray-700">
-                        {poll.font_hearts.map(font => <li key={font.family} className="flex items-baseline justify-between gap-3"><span>{font.family}</span><span className="tabular-nums">♥ {font.hearts}</span></li>)}
-                    </ol> : <p className="text-sm text-gray-500">No hearts recorded yet.</p>}
-                </section>}
                 <div className="flex flex-wrap items-center gap-2">
                     {!poll.published_at && <>
                         <button type="button" disabled={pending} onClick={() => { setEditing(poll.id); setQuestion(poll.question);setPollType(poll.poll_type || 'yes_no');setMultiple(Boolean(poll.allow_multiple_responses));setChoiceText((poll.choices || []).join('\n')); }} className={button}>Edit draft</button>

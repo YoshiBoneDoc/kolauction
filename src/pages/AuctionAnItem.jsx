@@ -196,6 +196,7 @@ export default function AuctionAnItem() {
 
     function showPreview(event) {
         event.preventDefault();
+        if ([...hostMessage.trim()].length > 250) { setError('Host message must be 250 characters or fewer.'); return; }
         if (mrAEnabled && !isBuy && !giveaway && (!Number.isSafeInteger(mrARate) || mrARate <= 0)) {
             setError('Choose a valid Mr. A valuation from a fresh market quote.'); return;
         }
@@ -619,8 +620,8 @@ export default function AuctionAnItem() {
                     </div>}
                     {currentUser?.isAdmin && canViewRaffles(currentUser) && !giveaway && auctionKind === 'sell' && escrowMode && <div className="mb-4"><div className="grid grid-cols-2 gap-2"><button type="button" aria-pressed={false} onClick={selectRaffle} className="raffle-mode-button raffle-mode-purple min-h-11 w-full rounded border border-violet-700 bg-violet-700 px-4 font-bold text-white transition-[background-color,box-shadow] duration-150 hover:bg-violet-600 hover:shadow-[0_0_14px_rgba(139,92,246,0.45)] motion-reduce:transition-none">Raffle</button><button type="button" aria-pressed={giveaway} onClick={selectGiveaway} className="raffle-mode-button raffle-mode-red min-h-11 w-full rounded border border-red-700 bg-red-700 px-4 font-bold text-white transition-[background-color,box-shadow] duration-150 hover:bg-red-600 hover:shadow-[0_0_14px_rgba(239,68,68,0.4)] motion-reduce:transition-none">Giveaway</button></div></div>}
                     <label htmlFor="host-message" className="mb-2 block text-sm font-bold">Host message (optional)</label>
-                    <textarea id="host-message" rows={3} maxLength={500} value={hostMessage} onChange={event => setHostMessage(event.target.value)} aria-describedby="host-message-help" className={fieldClass} placeholder="Anything you would like bidders to know?" />
-                    <p id="host-message-help" className="-mt-2 mb-4 text-xs text-gray-500">Public plain-text message · {hostMessage.length}/500 characters. Leave blank to hide.</p>
+                    <textarea id="host-message" rows={2} maxLength={250} value={hostMessage} onChange={event => setHostMessage(event.target.value)} aria-describedby="host-message-help" className={fieldClass} placeholder="Anything you would like bidders to know?" />
+                    <p id="host-message-help" className="-mt-2 mb-4 text-xs text-gray-500">Public plain-text message · {hostMessage.length}/250 characters. Leave blank to hide.</p>
                     <button type="submit" className={`auction-preview-button ${giveaway ? 'special-preview-button giveaway-preview-button' : ''} min-h-11 w-full rounded bg-blue-600 px-4 py-3 font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50`}>{giveaway ? 'Preview Giveaway' : isBarter ? 'Preview Barter' : 'Preview Auction'}</button>
                 </form>}
             </div>
