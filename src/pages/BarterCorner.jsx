@@ -34,12 +34,12 @@ export default function BarterCorner() {
             <h1 className="auction-page-title text-center font-bold text-[#7695FF]">Barter Corner</h1>
             <Link to="/auction-item?kind=barter" className="shrink-0 text-sm text-blue-700 hover:underline dark:text-blue-300 sm:absolute sm:right-0">Create Barter <span aria-hidden="true">→</span></Link>
         </div>
-        <section aria-label="Find barter items" className="browse-toolbar mb-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-xl border border-gray-200 bg-white p-3">
+        <section aria-label="Find barter items" className="browse-toolbar browse-controls mb-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-xl border border-gray-200 bg-white p-3">
             <label className="auction-search-field flex w-80 max-w-full items-center gap-2.5 text-gray-500">
                 <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true" className="shrink-0"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>
                 <input type="search" value={search} maxLength={120} onChange={event => setDraft({ from: query, value: event.target.value })} aria-label="Search barter item names" placeholder="Find an item…" className="w-full min-w-0 rounded-full border-0 bg-gray-100 px-4 py-2.5 text-xs text-gray-900 dark:text-gray-100" />
             </label>
-            <div className="ml-auto"><AuctionSortMenu title="Status" ariaLabel="Barter status" value={status} options={barterStatuses} onChange={value => update('status', value)} /></div>
+            <div className="browse-status-control ml-auto"><AuctionSortMenu title="Status" ariaLabel="Barter status" value={status} options={barterStatuses} onChange={value => update('status', value)} /></div>
             <AuctionSortMenu ariaLabel="Sort barter auctions" value={sort} onChange={value => update('sort', value)} options={[deadlineSort, ['newest', 'Newest'], ['activity', 'Recent Activity']]} />
         </section>
         <hr className="mb-3 border-0 border-t border-gray-200" />

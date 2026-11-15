@@ -851,3 +851,65 @@ html body select option { background: var(--dropdown-popup); color: var(--dropdo
     html body select:not([multiple]):not([size]) option:hover,
     html body select:not([multiple]):not([size]) option:focus { background: var(--dropdown-hover); }
 }
+
+/* Keep browse controls aligned and comfortably tappable on narrow screens. */
+@media (max-width: 639px) {
+  .browse-controls {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    align-items: end;
+    gap: 12px 8px;
+  }
+  .browse-controls > .auction-search-field {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+  .browse-controls > .auction-search-field input {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .browse-controls > .browse-status-control,
+  .browse-controls > .auction-sort-menu {
+    grid-column: span 3;
+    min-width: 0;
+    margin-left: 0;
+  }
+  .browse-controls .auction-sort-menu {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    min-width: 0;
+  }
+  .browse-controls .auction-sort-details {
+    min-width: 0;
+    width: 100%;
+  }
+  .browse-controls .auction-sort-trigger {
+    width: 100%;
+    height: 44px;
+    padding-inline: 8px;
+    gap: 6px;
+    font-size: 12px;
+  }
+  .browse-controls .auction-sort-trigger > span {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .browse-controls .auction-sort-details > fieldset {
+    max-width: calc(100vw - 56px);
+  }
+  .browse-controls .browse-status-control .auction-sort-details > fieldset {
+    left: 0;
+    right: auto;
+  }
+  .browse-controls > button {
+    grid-column: span 2;
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    justify-content: center;
+    padding-inline: 6px;
+    font-size: 12px;
+  }
+}

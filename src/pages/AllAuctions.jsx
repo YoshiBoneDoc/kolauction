@@ -129,14 +129,14 @@ export default function AllAuctions() {
                         {hasLoaded && <p role="status">{listingOrderDelayed ? 'Results may be out of date. Count and ordering are being refreshed.' : `${found} ${found === 1 ? 'auction' : 'auctions'} found${visibleRaffles.length ? ` · ${visibleRaffles.length} raffle ${visibleRaffles.length === 1 ? 'preview' : 'previews'}` : ''}`}</p>}
                 </div>}
                 <section aria-label="Find auctions" className={`browse-toolbar mb-3 rounded-xl border border-gray-200 bg-white px-3 pt-3 ${filtersOpen ? 'pb-1' : 'pb-3'}`}>
-                    <div className="flex flex-wrap items-end gap-3">
+                    <div className="browse-controls flex flex-wrap items-end gap-3">
                         <label htmlFor="auction-search" className="auction-search-field flex w-80 max-w-full items-center gap-2.5 text-gray-500">
                             <span className="sr-only">Search item names or auction number</span>
                             <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true" className="shrink-0"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>
                             <input id="auction-search" type="search" value={searchInput} onChange={event => { rememberSearch(event.target.value); setSearchInput(event.target.value); }}
                                 placeholder="Find an item or auction #…" className="w-full min-w-0 rounded-full border-0 bg-gray-100 px-4 py-2.5 text-xs text-gray-900 dark:text-gray-100" />
                         </label>
-                        <div className="ml-auto"><AuctionSortMenu title="Status" ariaLabel="Auction status" value={status} options={[["all", "All Auctions"], ...auctionFilters.filter(([value]) => value !== 'all')]} onChange={value => update('status', value)} /></div>
+                        <div className="browse-status-control ml-auto"><AuctionSortMenu title="Status" ariaLabel="Auction status" value={status} options={[["all", "All Auctions"], ...auctionFilters.filter(([value]) => value !== 'all')]} onChange={value => update('status', value)} /></div>
                         <AuctionSortMenu value={sort} onChange={value => update('sort', value)} options={[deadlineSort, ['newest', 'Newest'], ['activity', 'Recent Activity'], ['recommended', 'Discover'], ['bids-desc', 'Bids ↑'], ['bids-asc', 'Bids ↓'], ['price-desc', 'Price: High to Low'], ['price-asc', 'Price: Low to High']]} />
                         <button type="button" aria-label={`Auction type: ${kindLabel}`} data-kind={kind} aria-pressed={kind !== 'all'}
                             onClick={() => update('kind', kind === 'all' ? 'sell' : kind === 'sell' ? 'buy' : '')}

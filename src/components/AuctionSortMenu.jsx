@@ -36,8 +36,8 @@ export default function AuctionSortMenu({ value, options, onChange, title = 'Sor
     function label(key, text) {
         return key.startsWith('price-') ? <><span>Price:</span><SignalBars descending={key === 'price-desc'} /></> : <><SortSymbol sort={key} /><span>{text}</span></>;
     }
-    return <div className="flex items-center gap-2 text-xs text-gray-500"><span>{title}</span>
-        <details ref={menu} className="relative" onKeyDown={event => { if (event.key === 'Escape') { menu.current.open = false; menu.current.querySelector('summary').focus(); } }}>
+    return <div className="auction-sort-menu flex items-center gap-2 text-xs text-gray-500"><span>{title}</span>
+        <details ref={menu} className="auction-sort-details relative" onKeyDown={event => { if (event.key === 'Escape') { menu.current.open = false; menu.current.querySelector('summary').focus(); } }}>
             <summary aria-label={ariaLabel} className="auction-sort-trigger flex h-9 w-[190px] cursor-pointer list-none items-center gap-2 rounded-lg px-3 text-sm text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400 dark:text-slate-200 [&::-webkit-details-marker]:hidden">
                 {label(value, options.find(([key]) => key === value)?.[1])}<svg aria-hidden="true" className="ml-auto shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="m6 9 6 6 6-6" /></svg>
             </summary>
