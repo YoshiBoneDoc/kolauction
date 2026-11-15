@@ -1,7 +1,9 @@
 import { paymentLabel } from '../lib/mrAPayment';
+import HostMessage from '../components/HostMessage';
+import './listingDetails.css';
 import AuctionWatching from '../components/AuctionWatching';
 import SavedAuctions from '../components/SavedAuctions';
-import RemainingTime from '../components/RemainingTime';
+import AuctionDetailFooter from '../components/AuctionDetailFooter';
 import BidHistory from '../components/BidHistory';
 import AuctionLiveUnavailable from '../components/AuctionLiveUnavailable';
 import { giveawayConditionLabel } from '../lib/giveaway';
@@ -75,16 +77,16 @@ export default function AuctionDetails() {
         <main className={`site-page-background flex-1 bg-[#F1F3F5] px-4 py-6 sm:px-6 ${auction.giveawayTitle ? 'giveaway-detail' : ''}`}>
             {auction.giveawayTitle && <div className="giveaway-page-art" aria-hidden="true"><GiveawayDecorations source={auction.image} /></div>}
             {backLink}
-            <div className={`relative mx-auto max-w-4xl rounded-lg border border-gray-200 bg-white p-4 shadow-lg sm:p-6 ${auction.giveawayTitle ? 'giveaway-detail-card' : ''}`}>
+            <div className={`listing-detail relative mx-auto max-w-4xl rounded-xl border border-gray-200 bg-white p-4 shadow-lg sm:p-5 ${auction.giveawayTitle ? 'giveaway-detail-card' : ''}`}>
                 <AuctionWatching auctionId={auction.id} />
                 <SavedAuctions auctionId={auction.id} hostId={auction.sellerId} />
-                <section aria-label="Auction overview" className="grid min-w-0 pr-8 grid-cols-1 items-start gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:gap-6">
+                <section aria-label="Auction overview" className="grid min-w-0 grid-cols-1 items-start gap-4 sm:grid-cols-[180px_minmax(0,1fr)] sm:gap-6">
                     <div className="flex min-w-0 items-center justify-center sm:pt-2">
                         {auction.image ? <AuctionItemImage key={auction.id} src={auction.giveawayTitle ? giveawayImage : auction.image} item={auction.item} enhanceEnabled /> : <p className="text-gray-500">No Image Available</p>}
                     </div>
-                    <div className={`min-w-0 space-y-6 text-left ${auction.giveawayTitle ? 'giveaway-detail-info' : ''}`}>
+                    <div className={`min-w-0 space-y-4 text-left ${auction.giveawayTitle ? 'giveaway-detail-info' : ''}`}>
                         {auction.giveawayTitle && <GiveawayItemImage source="https://wiki.kingdomofloathing.com/Special:Redirect/file/Shoppeng.gif" className="giveaway-penguin" />}
-                        <div className="space-y-1">
+                        <div className="space-y-3 pr-8">
                             <h1 className={`break-words text-3xl font-bold text-blue-600 sm:text-4xl ${auction.giveawayTitle ? 'giveaway-item-title giveaway-detail-item' : ''}`}>{auction.item} <span className="text-xl text-gray-600">{auctionQuantityLabel(auction)}</span></h1>
                             {auction.giveawayTitle && <div><p className="text-base font-bold">Win Condition: {giveawayConditionLabel(auction.giveawayWinCondition)}</p>{auction.giveawayWinCondition === 'random_draw' && <p className="text-xs text-gray-500">Each participant has an equal chance of winning, regardless of how many bids they place.</p>}</div>}
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-600">
@@ -93,15 +95,16 @@ export default function AuctionDetails() {
                                 <TradeTypeBadge escrow={auction.escrowMode} />
                                 {auction.mrARate > 0 && <MrAAcceptedIcon />}
                             </div>
-                            <div className={`space-y-1 ${auction.mrARate > 0 && !auction.isBundle ? 'relative -top-2' : ''}`}>
-                                {auction.isBundle ? <BundleContents items={auction.bundleItems} /> : <ItemResources item={auction.item} itemId={auction.itemId} />}
-                                {auction.mrARate && <p className="text-sm text-gray-600">Accepts Mr. A&apos;s at {auction.mrARate.toLocaleString()} Meat each.</p>}
+                            <div className="space-y-2.5">
+                                {auction.mrARate > 0 && <p className="text-sm text-gray-600">Accepts Mr. A&apos;s at <strong>{auction.mrARate.toLocaleString()} Meat</strong> each.</p>}
+                                {auction.isBundle ? <BundleContents items={auction.bundleItems} /> : <ItemResources item={auction.item} itemId={auction.itemId} separator={false} />}
                             </div>
                         </div>
-                        <div className="space-y-3">
+                        <div className="listing-price-panel grid min-w-0 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                          <div className="min-w-0 space-y-1">
                             <div className={closedSale ? 'space-y-0.5 py-1' : 'space-y-1'}>
                                 <div className={closedSale ? 'flex flex-wrap items-baseline gap-x-3 gap-y-1' : undefined}>
-                                    <p className="text-xs text-gray-600">{active ? 'Current Bid (whole listing)' : result.hasWinner ? 'Final price: (whole listing)' : 'Last Bid (whole listing)'}</p>
+                                    <p className="text-xs text-gray-600">{active ? 'Current Bid:' : result.hasWinner ? 'Final price: (whole listing)' : 'Last Bid (whole listing)'}</p>
                                     {auction.giveawayTitle ? <FittedPrice as="p" fitKey={String(price)} className="giveaway-price giveaway-detail-price">{price ? `${Number(price).toLocaleString('en-US')} Meat` : 'No bids yet'}</FittedPrice> : <p className="break-words text-3xl font-extrabold text-gray-900 sm:text-4xl">{price ? <SellPrice amount={price} quantity={auction.quantity} compact={false} /> : 'No bids yet'}</p>}
                                 </div>
                                 {closedSale && auction.instantPurchasedAt && <p className="text-sm leading-6 text-green-700">Buyout accepted for {result.finalPrice.toLocaleString('en-US')} Meat on <span className="inline-block whitespace-nowrap">{new Date(auction.instantPurchasedAt).toLocaleString()}.</span></p>}
@@ -110,18 +113,22 @@ export default function AuctionDetails() {
                             {(active || result.status === 'completed') && (auction.isBundle
                                 ? <BundleMarketPrice items={auction.bundleItems} completed={result.status === 'completed'} />
                                 : <MarketPrice itemId={auction.itemId} auctionId={auction.id} quantity={auction.quantity} completed={result.status === 'completed'} />)}
+                          </div>
+                          {active && auction.instantPurchasePrice > 0 && <div className="listing-buyout min-w-0 border-t border-gray-200 pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0"><InstantPurchaseAction key={`purchase-${auction.id}`} auction={auction} showTerms={false} /></div>}
                         </div>
-                        {active && auction.instantPurchasePrice > 0 && <div className="!mt-2"><InstantPurchaseAction key={`purchase-${auction.id}`} auction={auction} showTerms={false} /></div>}
-                        <div className="space-y-2 text-sm text-gray-700">
-                            <p className="break-words">Sold by: <SellerLink auction={auction} /></p>
+                        <HostMessage message={auction.hostMessage} />
+                        <AuctionDetailFooter
+                            seller={<SellerLink auction={auction} />}
+                            active={active}
+                            endTime={auction.endTime}
+                            now={now}
+                            countdown={auction.giveawayTitle ? <GiveawayCountdown endTime={auction.endTime} now={now} /> : undefined}
+                            note={active && !(auction.isBundle && currentUser?.id === auction.sellerId)
+                                ? auction.giveawayTitle ? <>Giveaway ends at the scheduled time. <span className="giveaway-bid-warning">Minimum increases only. <strong>Overbids won&apos;t count!</strong></span></> : 'Late bids extend the auction by 1 minute.'
+                                : undefined}
+                        >
                             {closedSale && <p className="break-words">Winning bidder: <strong><WinnerLink auction={auction} /></strong></p>}
-                            {!closedSale && active && <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                                <span className="inline-flex rounded border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Live</span>
-                                <span aria-hidden="true" className="text-gray-400">·</span>
-                                {auction.giveawayTitle ? <GiveawayCountdown endTime={auction.endTime} now={now} /> : <p className={auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-600'}>Ends in <time dateTime={new Date(auction.endTime).toISOString()}><RemainingTime endTime={auction.endTime} /></time></p>}
-                                {!(auction.isBundle && currentUser?.id === auction.sellerId) && <p className="w-full text-[11px] text-gray-500">{auction.giveawayTitle ? <>Giveaway ends at the scheduled time. <span className="giveaway-bid-warning">Minimum increases only. <strong>Overbids won&apos;t count!</strong></span></> : 'Late bids extend the auction by 1 minute.'}</p>}
-                            </div>}
-                        </div>
+                        </AuctionDetailFooter>
                         {closedSale ? <>
                             <div className="space-y-0.5 border-t border-gray-200 pt-3">
                                 <p className={`text-lg font-bold ${statusColor}`}>{statusLabel}</p>

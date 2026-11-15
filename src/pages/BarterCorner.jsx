@@ -1,3 +1,4 @@
+import { auctionFilters } from '../lib/auctionBrowsing';
 import AuctionSortMenu from '../components/AuctionSortMenu';
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -7,35 +8,40 @@ import AuctionPagination from '../components/AuctionPagination';
 import { useAuctionBoundaryNow } from '../hooks/useAuctionBoundaryNow';
 import BarterDemoCards from '../components/BarterDemoCards';
 
+const barterStatuses = [['all', 'All Barters'], ...auctionFilters.filter(([value]) => !['all', 'completed'].includes(value))];
+
 export default function BarterCorner() {
     const [params, setParams] = useSearchParams();
     const [draft, setDraft] = useState(null);
     const query = params.get('q') || '';
     const search = draft?.from === query ? draft.value : query;
-    const sort = ['ending', 'newest', 'activity'].includes(params.get('sort')) ? params.get('sort') : 'ending';
+    const status = barterStatuses.some(([value]) => value === params.get('status')) ? params.get('status') : 'active';
+    const deadlineSort = ['active', 'all'].includes(status) ? ['ending', 'Ending Soon'] : ['ended-desc', 'Recently Ended'];
+    const sort = [deadlineSort[0], 'newest', 'activity'].includes(params.get('sort')) ? params.get('sort') : deadlineSort[0];
     const page = Math.min(10000, Math.max(1, Number.parseInt(params.get('page'), 10) || 1));
     useEffect(() => { const timer = setTimeout(() => {
         if (search === query) return;
         setParams(previous => { const next = new URLSearchParams(previous); next.delete('page'); if (search) next.set('q', search); else next.delete('q'); return next; }, { replace: true });
     }, 250); return () => clearTimeout(timer); }, [search, query, setParams]);
-    const { data, error, refresh } = useBarterRead('read_barter_auctions', { p_search: query, p_sort: sort, p_page: page });
+    const { data, error, refresh } = useBarterRead('read_barter_auctions', { p_search: query, p_sort: sort, p_page: page, p_status: status });
     const [openBid, setOpenBid] = useState(null);
-    const browseKey = `${query}:${sort}:${page}`;
-    const rows = (data?.rows || []).map(row => ({ ...row, auctionKind: 'barter', status: 'active', escrowMode: false, minBidMeat: row.minimumValue || 0 }));
+    const browseKey = `${query}:${status}:${sort}:${page}`;
+    const rows = (data?.rows || []).map(row => ({ ...row, auctionKind: 'barter', status: row.status || 'active', escrowMode: false, minBidMeat: row.minimumValue || 0 }));
     const now = useAuctionBoundaryNow(rows);
-    function update(name, value) { setParams(previous => { const next = new URLSearchParams(previous); next.set(name, String(value)); if (name !== 'page') next.delete('page'); return next; }); }
+    function update(name, value) { setParams(previous => { const next = new URLSearchParams(previous); next.set(name, String(value)); if (name !== 'page') next.delete('page'); if (name === 'status') next.delete('sort'); return next; }); }
     return <div className="barter-browse-page site-page-background flex flex-1 flex-col bg-[#F9F9F9] px-4 pb-8 sm:px-6"><main className="mx-auto flex w-full max-w-7xl flex-1 flex-col">
         <div className="relative my-4 flex items-center justify-between gap-3 sm:justify-center">
             <h1 className="auction-page-title text-center font-bold text-[#7695FF]">Barter Corner</h1>
             <Link to="/auction-item?kind=barter" className="shrink-0 text-sm text-blue-700 hover:underline dark:text-blue-300 sm:absolute sm:right-0">Create Barter <span aria-hidden="true">→</span></Link>
         </div>
-        <h2 className="mb-3 text-sm font-semibold">Live barter listings</h2>
+        <h2 className="mb-3 text-sm font-semibold">{status === 'active' ? 'Live barter listings' : 'Barter listings'}</h2>
         <section aria-label="Find barter items" className="browse-toolbar mb-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-xl border border-gray-200 bg-white p-3">
-            <label className="auction-search-field flex w-64 max-w-full items-center gap-2.5 text-gray-500">
+            <label className="auction-search-field flex w-80 max-w-full items-center gap-2.5 text-gray-500">
                 <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true" className="shrink-0"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>
                 <input type="search" value={search} maxLength={120} onChange={event => setDraft({ from: query, value: event.target.value })} aria-label="Search barter item names" placeholder="Find an item…" className="w-full min-w-0 rounded-full border-0 bg-gray-100 px-4 py-2.5 text-xs text-gray-900 dark:text-gray-100" />
             </label>
-            <div className="ml-auto"><AuctionSortMenu ariaLabel="Sort barter auctions" value={sort} onChange={value => update('sort', value)} options={[['ending', 'Ending Soon'], ['newest', 'Newest'], ['activity', 'Recent Activity']]} /></div>
+            <div className="ml-auto"><AuctionSortMenu title="Status" ariaLabel="Barter status" value={status} options={barterStatuses} onChange={value => update('status', value)} /></div>
+            <AuctionSortMenu ariaLabel="Sort barter auctions" value={sort} onChange={value => update('sort', value)} options={[deadlineSort, ['newest', 'Newest'], ['activity', 'Recent Activity']]} />
         </section>
         <hr className="mb-3 border-0 border-t border-gray-200" />
         {error && <p role="alert">Barters could not be loaded. {error} <button onClick={refresh}>Retry</button></p>}

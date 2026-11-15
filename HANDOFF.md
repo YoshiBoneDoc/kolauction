@@ -1,3 +1,45 @@
+# November 15 Barter Corner status filter — local, migration queued
+
+Barter Corner now uses the same Status dropdown component as All Auctions, with
+All Auctions, Active (default), Cancelled, Expired / no bids and Ended (all outcomes).
+Completed trades is omitted because barter settlement completion is not tracked.
+Status lives in the URL/cache key, resets page/sort on change, and selects Recently
+Ended ordering for closed filters. Cards retain server-confirmed status and actual
+cancellation times instead of forcing every result active.
+
+Queued **289** (after 288) filters statuses before the existing bounded 24-row
+pagination and ignore-sensitive visibility checks. Existing three-argument browse
+calls still default to active, preserving Home. No bidder identities or pending
+offers are added. Apply once then deploy website; matching ignored bot SQL is an
+alternative copy. No bot runtime release needed. Not applied/deployed.
+
+Eight targeted browse/card tests, changed-source lint and build pass. Database
+regression is expanded but still blocked at local PostgreSQL initdb startup (the
+shared-memory exhaustion noted below). No database execution or browser visual QA
+confirmed. Personal quickstart unchanged.
+
+# November 15 listing detail layout and optional host messages — local change
+
+Sell/Bundle/Giveaway details now group bid, market value and buyout in a bordered
+panel; Wiki/Pricegun sit beneath optional Mr. A acceptance terms. Barter details
+use the matching panel and optional Host Message strip. Shared Sell/Bundle/Giveaway/
+Buy/Barter creation form has an optional 500-character plain-text message, shown in
+preview and details only when nonblank. Existing bid, buyout and barter review
+checks remain in place. No new polling or browser reads.
+
+Queued **288** (after 287) adds bounded message storage and an atomic creator that
+reuses existing creators, plus authorized detail-reader decoration. Apply once,
+then deploy website; matching ignored bot SQL is an alternative copy. No bot
+runtime release required. Not applied/deployed. Personal quickstart unchanged.
+
+Four targeted message/publication/rendering and giveaway service tests, changed-
+source lint and build pass. Two broader browse/practice render failures reproduce
+on clean HEAD. Database suite could not start: macOS PostgreSQL shared-memory IDs/
+limits are exhausted (`shmget: No space left on device`); migration execution is
+unverified. Browser visual QA unavailable because browser access host is offline.
+Database regression includes message atomicity, bounds, blank/plain-text storage,
+idempotent barter creation and ignore-sensitive detail privacy, awaiting execution.
+
 # Host barter revision follow-up — local change
 
 Host detail now has a lazy, paginated Requested revisions section separate from pending review. Queued migration 287 adds a host-only read for changes-requested offers and withdrawn offers retaining revision feedback. Accepted and outright rejected offers are excluded. Requires manual SQL application and website deployment; neither performed. Changed-source lint passes; database execution and browser QA unverified.

@@ -1,0 +1,39 @@
+.listing-detail .listing-price-panel:has(.listing-buyout) {
+    align-items: start;
+}
+.listing-detail .listing-price-panel:not(:has(.listing-buyout)) {
+    grid-template-columns: minmax(0, 1fr);
+}
+.listing-buyout > section {
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+.listing-buyout > section > div:first-child {
+    align-items: center;
+}
+.dark .listing-detail .listing-price-panel {
+    border-color: #38506b;
+    background: linear-gradient(110deg, #192d43, #142336);
+}
+.dark .listing-detail .listing-host-message {
+    border-color: #665180;
+    background: linear-gradient(100deg, #302641, #252238);
+}
+@media (min-width: 640px) {
+    .listing-detail > section[aria-label="Auction overview"] > div:first-child {
+        border-right: 1px solid #d1d5db;
+        padding-right: 1rem;
+    }
+    .dark .listing-detail > section[aria-label="Auction overview"] > div:first-child {
+        border-color: #38506b;
+    }
+}
+
+.listing-detail .listing-price-panel > .space-y-2.py-4 {
+    padding-top: 0;
+    padding-bottom: 0;
+}
+.listing-detail .listing-price-panel > .space-y-2.py-4 > p:last-child {
+    padding-top: 0.75rem;
+}

@@ -1,4 +1,5 @@
 import { formatCompactMeat } from '../lib/formatMeat';
+import HostMessage from '../components/HostMessage';
 import BarterSymbol from '../components/BarterSymbol';
 import { writeBarter } from '../lib/barter';
 import MarketPrice from '../components/MarketPrice';
@@ -52,6 +53,7 @@ export default function AuctionAnItem() {
     const [itemSearch, setItemSearch] = useState('');
     const [selectedItem, setSelectedItem] = useState('');
     const selectedCatalogItem = catalogItems.find(item => String(item.id) === selectedItem);
+    const [hostMessage, setHostMessage] = useState('');
     const [quantity, setQuantity] = useState('1');
     const [showBuyout, setShowBuyout] = useState(false);
     const buyoutInput = useRef(null);
@@ -155,6 +157,7 @@ export default function AuctionAnItem() {
         if (relistHandled.current === locationKey || !canRelist(state?.relist || {}, currentUser)) return;
         relistHandled.current = locationKey;
         const draft = relistDraft(state.relist);
+        setHostMessage(state.relist.hostMessage || '');
         setAuctionKind(draft.kind);
         if (draft.kind === 'barter') setGiveaway(false);
         setSelectedItem(draft.itemId); setItemSearch(draft.kind === 'bundle' ? '' : draft.itemSearch);
@@ -230,7 +233,7 @@ export default function AuctionAnItem() {
             setError('Enter a reduction from 1 to 99 percent.'); return;
         }
         if (isBarter) barterPublication.current = crypto.randomUUID();
-        setPreview({ ...(mrAEnabled && !isBuy && !giveaway ? { mrARate } : {}), ...(relisting ? { autoRelist: true, relistCount: Number(relistCount), relistReduction: relistPricing === 'reduce' ? Number(relistReduction) : 0 } : {}), ...(giveaway ? { giveawayTitle: giveawayTitle.trim(), giveawayWinCondition: giveawayCondition } : {}), item: contents ? bundleTitle(contents, customTitle) : item.name, itemId: contents ? contents[0].id : item.id, quantity: contents ? 1 : count, ...(contents ? { bundleItems: contents, bundleTitle: customTitle || null, bundleImageItemId: contents.some(entry => entry.id === bundleImageItemId) ? bundleImageItemId : null } : {}), minBidMeat: minimum, instantPurchasePrice: purchasePrice, auctionTime, escrowMode, ...(customEndAt ? { customEndAt } : {}),
+        setPreview({ hostMessage: hostMessage.trim(), ...(mrAEnabled && !isBuy && !giveaway ? { mrARate } : {}), ...(relisting ? { autoRelist: true, relistCount: Number(relistCount), relistReduction: relistPricing === 'reduce' ? Number(relistReduction) : 0 } : {}), ...(giveaway ? { giveawayTitle: giveawayTitle.trim(), giveawayWinCondition: giveawayCondition } : {}), item: contents ? bundleTitle(contents, customTitle) : item.name, itemId: contents ? contents[0].id : item.id, quantity: contents ? 1 : count, ...(contents ? { bundleItems: contents, bundleTitle: customTitle || null, bundleImageItemId: contents.some(entry => entry.id === bundleImageItemId) ? bundleImageItemId : null } : {}), minBidMeat: minimum, instantPurchasePrice: purchasePrice, auctionTime, escrowMode, ...(customEndAt ? { customEndAt } : {}),
             image: contents ? bundleCover(contents, bundleImageItemId, bundlePrices).image : itemImageUrl(item.image), ...(isBuy ? { auctionKind, deliveryMode } : isBarter ? { auctionKind: 'barter' } : {}) });
         setError('');
         setBundleTitleConflict(false);
@@ -244,7 +247,7 @@ export default function AuctionAnItem() {
         setPending(true);
         setError('');
         try {
-            const id = preview.auctionKind === 'barter' ? await writeBarter('create_barter_auction', {
+            const id = preview.auctionKind === 'barter' ? preview.hostMessage ? await writeBarter('create_listing_with_message', { p_listing: { ...preview, requestId: barterPublication.current } }) : await writeBarter('create_barter_auction', {
                 p_item_id: preview.itemId, p_quantity: preview.quantity, p_minimum: preview.minBidMeat,
                 p_duration: Number(preview.auctionTime), p_end: preview.customEndAt || null, p_request: barterPublication.current,
             }) : await addAuction(preview);
@@ -365,6 +368,7 @@ export default function AuctionAnItem() {
                     </div>}
                     {preview.giveawayTitle && <p className="mb-3 font-bold text-red-700">Giveaway: {preview.giveawayTitle}</p>}
                     {preview.mrARate && <p className="my-3 text-sm">Accept Mr. A&apos;s at {preview.mrARate.toLocaleString()} Meat each, fixed for this auction.</p>}
+                    <HostMessage message={preview.hostMessage} />
                     <dl className="divide-y divide-gray-100 text-sm">
                         {!preview.bundleItems && <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] items-baseline gap-3 py-2.5">
                             <dt className="text-gray-500">Quantity</dt>
@@ -614,6 +618,9 @@ export default function AuctionAnItem() {
                         </div>}
                     </div>}
                     {currentUser?.isAdmin && canViewRaffles(currentUser) && !giveaway && auctionKind === 'sell' && escrowMode && <div className="mb-4"><div className="grid grid-cols-2 gap-2"><button type="button" aria-pressed={false} onClick={selectRaffle} className="raffle-mode-button raffle-mode-purple min-h-11 w-full rounded border border-violet-700 bg-violet-700 px-4 font-bold text-white transition-[background-color,box-shadow] duration-150 hover:bg-violet-600 hover:shadow-[0_0_14px_rgba(139,92,246,0.45)] motion-reduce:transition-none">Raffle</button><button type="button" aria-pressed={giveaway} onClick={selectGiveaway} className="raffle-mode-button raffle-mode-red min-h-11 w-full rounded border border-red-700 bg-red-700 px-4 font-bold text-white transition-[background-color,box-shadow] duration-150 hover:bg-red-600 hover:shadow-[0_0_14px_rgba(239,68,68,0.4)] motion-reduce:transition-none">Giveaway</button></div></div>}
+                    <label htmlFor="host-message" className="mb-2 block text-sm font-bold">Host message (optional)</label>
+                    <textarea id="host-message" rows={3} maxLength={500} value={hostMessage} onChange={event => setHostMessage(event.target.value)} aria-describedby="host-message-help" className={fieldClass} placeholder="Anything you would like bidders to know?" />
+                    <p id="host-message-help" className="-mt-2 mb-4 text-xs text-gray-500">Public plain-text message · {hostMessage.length}/500 characters. Leave blank to hide.</p>
                     <button type="submit" className={`auction-preview-button ${giveaway ? 'special-preview-button giveaway-preview-button' : ''} min-h-11 w-full rounded bg-blue-600 px-4 py-3 font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50`}>{giveaway ? 'Preview Giveaway' : isBarter ? 'Preview Barter' : 'Preview Auction'}</button>
                 </form>}
             </div>

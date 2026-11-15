@@ -292,6 +292,62 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         assert history('seller',sid=seller,who=buyer)['rows']==[]
         assert not any(row['auction_kind']=='barter' for row in history(who=buyer)['rows'])
         call("select public.set_player_ignored(48889601,false);",uid=buyer)
+        # Status filtering happens before bounded pagination and preserves privacy.
+        def browse_status(status, page=1, who=seller):
+            return json.loads(call(f"select public.read_barter_auctions('Paging','ended-desc',{page},'{status}');", uid=who))
+        sql("update khub_bot.barter_auctions set created_at=now()-interval '2 days',end_time=now()-interval '1 day' where item like 'Paging%';")
+        expired_page = browse_status('expired')
+        assert len(expired_page['rows']) == 24 and expired_page['more']
+        assert all(row['status'] == 'expired' for row in expired_page['rows'])
+        assert len(browse_status('expired', 2)['rows']) == 2
+        assert browse_status('active')['rows'] == []
+        assert len(browse_status('ended')['rows']) == 24
+        assert len(browse_status('all')['rows']) == 24
+        sql("update khub_bot.barter_auctions set cancelled_at=now() where item='Paging item 00';")
+        cancelled_rows = browse_status('cancelled')['rows']
+        assert len(cancelled_rows) == 1 and cancelled_rows[0]['status'] == 'cancelled'
+        assert cancelled_rows[0]['cancelledAt'] is not None
+        assert browse_status('ended')['rows'][0]['id'] == cancelled_rows[0]['id']
+        assert len(browse_status('expired', 2)['rows']) == 1
+        call("select public.read_barter_auctions('', 'ending', 1, 'completed');", error='Invalid browse options')
+        call("select public.set_player_ignored(48889601,true);", uid=buyer)
+        for status in ['all','active','cancelled','expired','ended']:
+            assert browse_status(status, who=buyer)['rows'] == []
+        call("select public.set_player_ignored(48889601,false);", uid=buyer)
+        accepted_item = sql(f"select item from khub_bot.barter_auctions where id='{aid}';")
+        accepted_ended = json.loads(call("select public.read_barter_auctions(" + lit(accepted_item) + ", 'ended-desc', 1, 'ended');"))['rows']
+        accepted_row = next(row for row in accepted_ended if row['id'] == aid)
+        assert accepted_row['status'] == 'awaiting_trade' and accepted_row['currentBid'] == 100
+        assert not any('bidder' in key.lower() for key in accepted_row)
+        print('PASS: barter status filters, cancelled timestamps, recent-end ordering, pagination and ignored-host visibility')
+        # Optional host messages are atomic, bounded, plain text and visible only
+        # through an already-authorized detail read. Original creators still work.
+        listing = {'item': 'asbestos ore', 'itemId': 364, 'quantity': 1, 'minBidMeat': 100,
+                   'auctionTime': '24', 'escrowMode': False, 'hostMessage': '  Hello <b>world</b>!  '}
+        def with_message(payload, error=None):
+            return call('select public.create_listing_with_message(' + lit(json.dumps(payload)) + ');', error=error)
+        message_id = with_message(listing)
+        assert sql(f"select host_message from public.auctions where id='{message_id}';") == 'Hello <b>world</b>!'
+        detail = json.loads(sql(f"set role anon; select public.read_auction_detail_static('detail','{message_id}');"))
+        assert detail['rows'][0]['host_message'] == 'Hello <b>world</b>!'
+        before = sql('select count(*) from public.auctions;')
+        with_message({**listing, 'hostMessage': 'x' * 501}, error='500 characters')
+        assert sql('select count(*) from public.auctions;') == before
+        with_message({**listing, 'quantity': 0}, error='quantity')
+        blank_id = with_message({**listing, 'hostMessage': '   '})
+        assert sql(f"select host_message is null from public.auctions where id='{blank_id}';") == 't'
+        token = str(uuid4())
+        barter_listing = {**listing, 'auctionKind': 'barter', 'itemId': 2, 'quantity': 2, 'minBidMeat': None, 'requestId': token}
+        message_barter = with_message(barter_listing)
+        assert json.loads(call(f"select public.read_barter_detail('{message_barter}');"))['hostMessage'] == 'Hello <b>world</b>!'
+        assert with_message({**barter_listing, 'hostMessage': 'Changed retry'}) == message_barter
+        assert sql(f"select host_message from khub_bot.barter_auctions where id='{message_barter}';") == 'Hello <b>world</b>!'
+        call("select public.set_player_ignored(48889601,true);", uid=buyer)
+        hidden = json.loads(call(f"select public.read_auction_detail_static('detail','{message_id}');", uid=buyer))
+        assert hidden['rows'] == []
+        assert call(f"select public.read_barter_detail('{message_barter}');", uid=buyer) == ''
+        call("select public.set_player_ignored(48889601,false);", uid=buyer)
+        print('PASS: host message atomic creation, length/blank validation, plain text, idempotent barter publication and ignored-host privacy')
         print('PASS: combined profile/seller barter history, ordinary projection/stat parity, pagination, filters, private bids and ignored-host visibility')
         print('PASS: host cancellation, restrictions, repeat safety, preserved offers, closed writes/notices, accepted/deadline guards and concurrent acceptance')
         print('PASS: concurrent duplicate submissions and conflicting host decisions serialize without duplication or overwrite')

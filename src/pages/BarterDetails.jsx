@@ -1,3 +1,6 @@
+import HostMessage from '../components/HostMessage';
+import AuctionItemImage from '../components/AuctionItemImage';
+import './listingDetails.css';
 import BarterBidHistoryRow from '../components/BarterBidHistoryRow';
 import BarterAcceptedBid from '../components/BarterAcceptedBid';
 import { auctionQuantityLabel } from '../lib/bundles';
@@ -12,7 +15,7 @@ import { useAuctionBoundaryNow } from '../hooks/useAuctionBoundaryNow';
 import TradeTypeBadge from '../components/TradeTypeBadge';
 import BarterSymbol from '../components/BarterSymbol';
 import MarketPrice from '../components/MarketPrice';
-import RemainingTime from '../components/RemainingTime';
+import AuctionDetailFooter from '../components/AuctionDetailFooter';
 import DirectTradeHelp from '../components/DirectTradeHelp';
 import BarterOfferForm from '../components/BarterOfferForm';
 import BarterOfferReview from '../components/BarterOfferReview';
@@ -60,37 +63,31 @@ export default function BarterDetails() {
         {error && <p role="alert" className="mx-auto max-w-4xl">{error} <button onClick={refresh}>Retry</button></p>}
         {auction === undefined && !error && <p role="status">Loading barter…</p>}
         {auction === null && <p>Barter not found.</p>}
-        {auction && <><div className="mx-auto max-w-4xl rounded-lg border border-gray-200 relative bg-white p-4 shadow-lg sm:p-6">
+        {auction && <><div className="listing-detail mx-auto max-w-4xl rounded-xl border border-gray-200 relative bg-white p-4 shadow-lg sm:p-5">
             <div className="absolute right-4 top-4 flex items-center gap-3 sm:right-6 sm:top-6"><TradeTypeBadge escrow={false} short /><BarterSymbol size={42} /></div>
-            <section className="grid gap-x-6 gap-y-3 sm:grid-cols-[200px_minmax(0,1fr)]">
+            <section className="grid gap-x-6 gap-y-4 sm:grid-cols-[200px_minmax(0,1fr)]">
                 <div className="min-w-0 space-y-2 text-center">
-                    <img src={auction.image} alt={auction.item} className="mx-auto h-48 w-48 rounded-lg bg-white p-3 object-contain [image-rendering:pixelated]" />
-                    <MarketPrice itemId={auction.itemId} quantity={auction.quantity} />
+                    <AuctionItemImage key={auction.id} src={auction.image} item={auction.item} enhanceEnabled />
                 </div>
-                <div className="space-y-3">
-                    <div className="space-y-1 pr-36">
+                <div className="min-w-0 space-y-4">
+                    <div className="space-y-3 pr-24 sm:pr-28">
                         <h1 className="break-words text-3xl font-bold text-blue-600 sm:text-4xl">{auction.item} <span className="text-xl text-gray-600">{auctionQuantityLabel(auction)}</span></h1>
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-600">
-                            <ItemResources item={auction.item} itemId={auction.itemId} separator={false} />
-                            <span aria-hidden="true">·</span>
                             <span title={auction.minimumValue == null ? 'No minimum bid market value' : `Offer value must exceed ${auction.minimumValue.toLocaleString('en-US')} Meat`}>Min: {auction.minimumValue == null ? 'None' : `${formatCompactMeat(auction.minimumValue)} Meat`}</span>
                         </div>
 
                     </div>
-                    <BarterAcceptedBid offer={acceptedOffer} value={auction.currentBid} />
+                    <ItemResources item={auction.item} itemId={auction.itemId} separator={false} />
+                    <div className="listing-price-panel rounded-lg border border-gray-200 bg-gray-50 p-4"><BarterAcceptedBid offer={acceptedOffer} value={auction.currentBid} /><MarketPrice itemId={auction.itemId} quantity={auction.quantity} /></div>
+                    <HostMessage message={auction.hostMessage} />
                 </div>
             </section>
             <div className="mt-4 grid items-end gap-x-6 gap-y-2 pb-4 sm:grid-cols-[200px_minmax(0,1fr)]">
                 <div className="text-sm text-gray-700 sm:col-start-2 sm:row-start-1">
-                    <div className="space-y-2">
-                    <p className="break-words">Sold by: <SellerLink auction={{ ...auction, owner: auction.host }} /></p>
-                    {active ? <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                        <span className="inline-flex rounded border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Live</span>
-                        <span aria-hidden="true" className="text-gray-400">·</span>
-                        <p className={auction.endTime - now <= 10800000 ? 'text-red-700' : 'text-gray-600'}>Ends in <time dateTime={new Date(auction.endTime).toISOString()} title={new Date(auction.endTime).toLocaleString()}><RemainingTime endTime={auction.endTime} /></time></p>
-                    </div> : <p>{auction.cancelled ? 'Cancelled' : auction.currentOfferId ? 'Ended — settle the accepted offer by Direct trade' : 'Ended without an accepted offer'}</p>}
-                    {cancelError && <p role="alert" className="text-xs text-red-700">{cancelError}</p>}
-                    </div>
+                    <AuctionDetailFooter seller={<SellerLink auction={{ ...auction, owner: auction.host }} />} active={active} endTime={auction.endTime} now={now}>
+                        {!active && <p>{auction.cancelled ? 'Cancelled' : auction.currentOfferId ? 'Ended — settle the accepted offer by Direct trade' : 'Ended without an accepted offer'}</p>}
+                        {cancelError && <p role="alert" className="text-xs text-red-700">{cancelError}</p>}
+                    </AuctionDetailFooter>
                 </div>
                 <div className="min-w-0 sm:col-start-1 sm:row-start-1 sm:has-[details[open]]:col-span-2 sm:has-[details[open]]:row-start-2"><DirectTradeHelp forListing /></div>
             </div>

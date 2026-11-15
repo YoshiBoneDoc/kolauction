@@ -1,3 +1,4 @@
+import HostMessage from './HostMessage';
 import AuctionWatching from './AuctionWatching';
 import SavedAuctions from './SavedAuctions';
 import { useAuctionBoundaryNow } from '../hooks/useAuctionBoundaryNow';
@@ -117,8 +118,8 @@ export default function BuyAuctionDetails({ auction, backLink }) {
                     </div>
                 </div>
             </header>
-            <section aria-label="Buy order overview" className="space-y-3">
-                <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-[minmax(0,8fr)_minmax(0,5fr)_minmax(0,7fr)] sm:gap-5">
+            <section aria-label="Buy order overview" className="space-y-4">
+                <div className="grid min-w-0 grid-cols-1 gap-5 sm:grid-cols-[minmax(0,8fr)_minmax(0,5fr)_minmax(0,7fr)] sm:gap-5">
                     <div className="min-w-0 space-y-1">
                         <h2 className="text-xs font-medium text-[#64748B]">Offer Price</h2>
                         <p className="buy-detail-price break-words text-2xl font-bold leading-tight tracking-tight text-[#183153]">{auction.pricePerItem.toLocaleString('en-US')} <span className="whitespace-nowrap text-sm font-normal tracking-normal">Meat / item</span></p>
@@ -161,6 +162,7 @@ export default function BuyAuctionDetails({ auction, backLink }) {
                 </div>}
                 {auction.buyClosingReason && auction.reservedQuantity > 0 && ['active', 'settling'].includes(result.status) && <p className="text-xs text-[#64748B]">Honoring existing reservations</p>}
             </section>
+            <HostMessage message={auction.hostMessage} />
             {owns && canViewFees && result.status === 'pending_escrow' && <section aria-label="Fund buy auction" className="buy-detail-action rounded-lg bg-[#F0F5FF] px-4 py-3">
                 <h2 className="mb-4 text-2xl font-bold leading-tight">Fund your order</h2>
                 <p className="w-full text-base font-normal leading-6">Send <strong className="buy-funding-highlight font-semibold text-[#B4232D]">{auction.fundingRequired?.toLocaleString('en-US')} Meat</strong> to <strong className="buy-funding-highlight font-semibold text-[#B4232D]">kHub (#3888760)</strong> via KMail. Include the command below in the message body. Attach no items.</p>

@@ -27,6 +27,7 @@ export function mapAuction(row, bidRows) {
         liveUnavailable: row._live_unavailable === true,
         auctionKind: row.auction_kind || 'sell',
         giveawayTitle: row.giveaway_title || null,
+        hostMessage: row.host_message || null,
         giveawayWinCondition: row.giveaway_win_condition || 'last_bid',
         isBundle: Array.isArray(row.bundle_items) && row.bundle_items.length > 1,
         bundleItems: Array.isArray(row.bundle_items) ? row.bundle_items.map(item => ({ ...item, name: decodeItemName(item.name), id: Number(item.id), quantity: Number(item.quantity) })) : [],
@@ -219,6 +220,11 @@ export function createAuctionService(client, { publicReader = null, readDeadline
             return { auctions: data.rows.map((row) => mapAuction(row, [])), total: Number(data.total) };
         },
         async create(auction) {
+            if (auction.hostMessage?.trim()) {
+                const { data, error } = await requireClient().rpc('create_listing_with_message', { p_listing: auction });
+                if (error) throw databaseError(error);
+                return data;
+            }
             if (auction.mrARate != null) {
                 const { data, error } = await requireClient().rpc('create_mr_a_auction', { p_listing: auction, p_rate: auction.mrARate });
                 if (error) throw databaseError(error);
