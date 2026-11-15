@@ -70,6 +70,12 @@ export default function AllAuctions() {
     const found = total;
     const page = Math.min(requestedPage, Math.max(1, Math.ceil(found / 24)));
     const pageRows = auctions;
+    const hasFeaturedGiveaway = Boolean(featuredGiveaway && featuredGiveaway.endTime > now);
+    const ordinaryCards = pageRows.filter(auction => !(hasFeaturedGiveaway && auction.id === featuredGiveaway.id));
+    // Raffle previews share the 24-card grid; trim only the displayed auction tail.
+    const visibleAuctionCards = visibleRaffles.length
+        ? ordinaryCards.slice(0, Math.max(0, 24 - visibleRaffles.length - Number(hasFeaturedGiveaway)))
+        : ordinaryCards;
     const bookmarkCounts = useAuctionBookmarkCounts(pageRows);
     const mySavedAuctionIds = useMySavedAuctionIds();
     const [showBookmarkers, setShowBookmarkers] = useState(false);
@@ -119,7 +125,10 @@ export default function AllAuctions() {
                 <h1 className="auction-page-title my-4 text-center font-bold text-[#7695FF]">All Auctions</h1>
                 <PendingTrades />
 
-                <section aria-label="Find auctions" className={`browse-toolbar mb-1 rounded-xl border border-gray-200 bg-white px-3 pt-3 ${filtersOpen ? 'pb-1' : 'pb-3'}`}>
+                {!isLoading && hasLoaded && <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
+                        {hasLoaded && <p role="status">{listingOrderDelayed ? 'Results may be out of date. Count and ordering are being refreshed.' : `${found} ${found === 1 ? 'auction' : 'auctions'} found${visibleRaffles.length ? ` · ${visibleRaffles.length} raffle ${visibleRaffles.length === 1 ? 'preview' : 'previews'}` : ''}`}</p>}
+                </div>}
+                <section aria-label="Find auctions" className={`browse-toolbar mb-3 rounded-xl border border-gray-200 bg-white px-3 pt-3 ${filtersOpen ? 'pb-1' : 'pb-3'}`}>
                     <div className="flex flex-wrap items-end gap-3">
                         <label htmlFor="auction-search" className="auction-search-field flex w-80 max-w-full items-center gap-2.5 text-gray-500">
                             <span className="sr-only">Search item names or auction number</span>
@@ -154,14 +163,11 @@ export default function AllAuctions() {
                     <button onClick={refreshAuctions} className="underline">Retry</button>
                 </p>}
                 {isLoading ? <p role="status">Loading auctions…</p> : <>
-                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
-                        {hasLoaded && <p role="status">{listingOrderDelayed ? 'Results may be out of date. Count and ordering are being refreshed.' : `${found} ${found === 1 ? 'auction' : 'auctions'} found${visibleRaffles.length ? ` · ${visibleRaffles.length} raffle ${visibleRaffles.length === 1 ? 'preview' : 'previews'}` : ''}`}</p>}
-                    </div>
                     {!error && pageRows.length === 0 && visibleRaffles.length === 0 && <p className="rounded-lg border bg-white p-6">{trade === 'none' ? 'Select Escrow or Direct to show auctions.' : mineOnly ? 'No auctions of yours match these filters.' : 'No auctions match your search and filters. Try another item name or status.'}</p>}
                     <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         {featuredGiveaway && featuredGiveaway.endTime > now && <GiveawayCard compact auction={featuredGiveaway} now={now} />}
                         {visibleRaffles.map(raffle => <RaffleAuctionCard key={`raffle-${raffle.id}`} raffle={raffle} />)}
-                        {pageRows.filter(auction => !(featuredGiveaway?.endTime > now && auction.id === featuredGiveaway.id)).map((auction) => <div key={auction.id} className={`auction-bookmark-card relative min-w-0 ${bookmarkCounts[auction.id] > 0 && !auction.liveUnavailable ? 'has-bookmark-ribbon' : ''}`}>
+                        {visibleAuctionCards.map((auction) => <div key={auction.id} className={`auction-bookmark-card relative min-w-0 ${bookmarkCounts[auction.id] > 0 && !auction.liveUnavailable ? 'has-bookmark-ribbon' : ''}`}>
                             {bookmarkCounts[auction.id] > 0 && !auction.liveUnavailable && <span className={`auction-bookmark-ribbon${mySavedAuctionIds.has(auction.id) ? ' is-saved' : ''}`}
                                 onMouseEnter={() => setShowBookmarkers(true)} onFocus={() => setShowBookmarkers(true)}
                                 tabIndex={bookmarkers.admin ? 0 : undefined}

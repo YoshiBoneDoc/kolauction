@@ -34,7 +34,6 @@ export default function BarterCorner() {
             <h1 className="auction-page-title text-center font-bold text-[#7695FF]">Barter Corner</h1>
             <Link to="/auction-item?kind=barter" className="shrink-0 text-sm text-blue-700 hover:underline dark:text-blue-300 sm:absolute sm:right-0">Create Barter <span aria-hidden="true">→</span></Link>
         </div>
-        <h2 className="mb-3 text-sm font-semibold">{status === 'active' ? 'Live barter listings' : 'Barter listings'}</h2>
         <section aria-label="Find barter items" className="browse-toolbar mb-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-xl border border-gray-200 bg-white p-3">
             <label className="auction-search-field flex w-80 max-w-full items-center gap-2.5 text-gray-500">
                 <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true" className="shrink-0"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>
