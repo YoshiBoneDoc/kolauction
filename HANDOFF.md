@@ -1,3 +1,20 @@
+# November 16 game login — local integration, not deployed
+
+Added `/khubMMO` (“I'm Bored” at the right of the navigation theme toggle),
+retaining `/game` as an alias, and a private `/api/game-login` Worker route.
+The endpoint validates the live Supabase user and existing account-access RPC,
+rejects banned/mismatched accounts, and signs a five-minute Firebase custom token
+with the canonical website username. MMO retains its Firebase functionality and
+uses a stable separate khub identity. No SQL, financial, bot or cache changes.
+
+Activation needs Worker Firebase signing secrets, public game URL/origin, and a
+public shared SpacetimeDB server. The other repository's assets are not copied by
+the website build. Legacy username collisions fail closed pending explicit account
+linking. See [setup and behavior](docs/GAME_LOGIN.md:1). No production deployment
+or account migration performed. Personal bot quickstart unchanged. Both frontend
+builds, 52 targeted website tests, 15 game claim/character tests and the website
+secret scan and changed-source lint pass. Live login with configured signing secrets remains unverified.
+
 # November 15 donation item leaderboard values — local, migration queued
 
 Queued **292**, after 284/108, adds private receipt-linked item valuation snapshots.
@@ -271,7 +288,7 @@ bot at initial verification: 486 passed / 1 malformed-mail failure; financial
 tests pass. Follow-up now filters only null inbox entries before gift discovery
 and normalization; all 95 escrow tests pass, including the original failure.
 Other malformed entries retain their review/hold protections. Not deployed.
-Build/lint/secret scan pass. Browser visual QA remains outstanding.
+Build/lint/secret scan and changed-source lint pass. Browser visual QA remains outstanding.
 
 ## November 14 leaderboard refresh repair — SQL applied
 
@@ -560,7 +577,7 @@ responses. No extra read requests/polling/shared-cache changes. Heart clicks now
 write to Supabase; old browser favorites are not imported as votes. Apply 247 once
 then deploy website; matching ignored bot copy exists, no bot restart needed.
 33 targeted Node tests and disposable free-text/poll-heart SQL regressions pass;
-build, changed-source lint and secret scan pass. No production SQL/deployment or
+build, changed-source lint and secret scan and changed-source lint pass. No production SQL/deployment or
 browser visual QA. Personal quickstart unchanged.
 
 November 9 login activity: queued **248** adds private, indexed minimal login events

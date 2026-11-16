@@ -10,6 +10,7 @@ const RaffleCommitment = lazy(() => import('./pages/RaffleCommitment'));
 const Raffles = lazy(() => import("./pages/Raffles"));
 const RaffleHistory = lazy(() => import('./pages/RaffleHistory'));
 const Leaderboards = lazy(() => import("./pages/Leaderboards"));
+const Game = lazy(() => import('./pages/Game'));
 const Home = lazy(() => import("./pages/Home"));
 const AllAuctions = lazy(() => import("./pages/AllAuctions"));
 const BarterDetails = lazy(() => import("./pages/BarterDetails"));
@@ -73,6 +74,8 @@ const App = () => {
             <AuctionReadError />
             <SiteActivity><RenderBoundary key={pathname.replace(/\/+$/, '') === '/auctions' ? pathname : `${pathname}${search}`}><Suspense fallback={<RouteLoading />}><Routes>
                 <Route path="/" element={<Home />} />
+                <Route path="/khubMMO" element={<Game />} />
+                <Route path="/game" element={<Game />} />
                 <Route path="/raffles" element={<Raffles />} />
                 <Route path="/raffles/history" element={<RaffleHistory />} />
                 <Route path="/raffle/:id/commitment" element={<RaffleCommitment />} />

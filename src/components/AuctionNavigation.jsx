@@ -44,9 +44,10 @@ export default function AuctionNavigation() {
     return (
         <nav ref={navigation} aria-label="Main navigation" className="site-navigation mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm lg:py-3">
             <Link {...linkProps("/")}>Home</Link>
-            <div className="ml-auto flex items-center lg:order-last lg:ml-0">
+            <div className="ml-auto flex items-center gap-x-3 lg:order-last lg:ml-0">
                 {separator}
                 <ThemeToggle />
+                <Link {...linkProps("/khubMMO")}>I'm Bored</Link>
             </div>
             <button ref={menuButton} type="button" aria-expanded={menuOpen} aria-controls="main-navigation-links"
                 onClick={() => setExpandedAt(menuOpen ? null : location.key)}

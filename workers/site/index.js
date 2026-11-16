@@ -1,3 +1,4 @@
+import { onRequest as gameLogin } from '../../functions/api/game-login.js';
 import { onRequest as bookmarkCounts } from '../../functions/api/public-bookmark-counts.js';
 import { onRequest as publicCommitment } from '../../functions/api/public-raffle-commitment.js';
 import { itemCatalog } from './itemCatalog.js';
@@ -10,6 +11,7 @@ import { onRequest as invalidateAuctions } from '../../functions/api/public-auct
 // Reuse the existing handlers: the same privacy, signing and method checks apply
 // to Workers Static Assets and to any retained Pages deployment.
 const routes = new Map([
+    ['/api/game-login', gameLogin],
     ['/api/public-bookmark-counts', bookmarkCounts],
     ['/api/public-auctions', publicAuctions],
     ['/api/public-banner', publicBanner],
