@@ -15,10 +15,17 @@ export async function onRequest({ request, env }, fetcher = fetch) {
     if (authorization.length > 16384 || !/^Bearer [A-Za-z0-9._~-]+$/.test(authorization)) return reply('Login on khub first', 401);
     const base = env.SUPABASE_URL || env.VITE_SUPABASE_URL;
     const publishableKey = env.SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_PUBLISHABLE_KEY;
-    const email = env.GAME_FIREBASE_CLIENT_EMAIL;
+    const email = typeof env.GAME_FIREBASE_CLIENT_EMAIL === 'string' ? env.GAME_FIREBASE_CLIENT_EMAIL.trim() : '';
     const pem = env.GAME_FIREBASE_PRIVATE_KEY;
-    if (!base || !publishableKey || typeof email !== 'string' ||
-        !email.endsWith('@mmo7-5864a.iam.gserviceaccount.com') || !pem) return reply('Game login is not configured yet.', 503);
+    const missing = [];
+    if (!base) missing.push('SUPABASE_URL');
+    if (!publishableKey) missing.push('SUPABASE_PUBLISHABLE_KEY');
+    if (!email) missing.push('GAME_FIREBASE_CLIENT_EMAIL');
+    if (!pem) missing.push('GAME_FIREBASE_PRIVATE_KEY');
+    if (missing.length) return reply(`Game login: missing Worker runtime settings: ${missing.join(', ')}.`, 503);
+    if (!email.endsWith('@mmo7-5864a.iam.gserviceaccount.com')) {
+        return reply('Game login: GAME_FIREBASE_CLIENT_EMAIL must belong to Firebase project mmo7-5864a.', 503);
+    }
     try {
         const url = new URL(base);
         if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) throw new Error('Invalid configuration');
