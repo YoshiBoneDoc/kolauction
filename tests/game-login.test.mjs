@@ -20,6 +20,7 @@ function upstream({ account = profile, identity = user, userStatus = 200, profil
     const calls = [];
     return { calls, fetcher: async (url, options) => {
         calls.push({ url, options });
+        assert.equal(options.redirect, 'manual');
         assert.equal(options.headers.apikey, 'public-test-key');
         assert.equal(options.headers.Authorization, 'Bearer signed.user.token');
         return url.endsWith('/auth/v1/user') ? Response.json(identity, { status: userStatus }) : Response.json(account, { status: profileStatus });
@@ -139,4 +140,16 @@ test('login accepts a JSON-quoted key and reports signing failures without revea
     const body = await failed.json();
     assert.match(body.error, /firebase-signing/);
     assert(!JSON.stringify(body).includes('not-a-valid-private-key'));
+});
+
+
+test('redirected Supabase requests fail without forwarding credentials', async () => {
+    let calls = 0;
+    const response = await onRequest({ request: request(), env }, async (_url, options) => {
+        calls++;
+        assert.equal(options.redirect, 'manual');
+        return new Response(null, { status: 302, headers: { Location: 'https://other.example/' } });
+    });
+    assert.equal(response.status, 503);
+    assert.equal(calls, 1);
 });

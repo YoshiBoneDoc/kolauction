@@ -32,13 +32,13 @@ export async function onRequest({ request, env }, fetcher = fetch) {
         if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) throw new Error('Invalid configuration');
         const authHeaders = { apikey: publishableKey, Authorization: authorization, 'Content-Type': 'application/json' };
         stage = 'supabase-user';
-        const userResponse = await fetcher(`${url.origin}/auth/v1/user`, { headers: authHeaders, signal: AbortSignal.timeout(8000), redirect: 'error' });
+        const userResponse = await fetcher(`${url.origin}/auth/v1/user`, { headers: authHeaders, signal: AbortSignal.timeout(8000), redirect: 'manual' });
         if (!userResponse.ok) return reply('Login on khub first', userResponse.status === 401 || userResponse.status === 403 ? 401 : 503);
         const user = await userResponse.json();
         if (!UUID.test(user?.id || '')) return reply('Login on khub first', 401);
         stage = 'supabase-profile';
         const profileResponse = await fetcher(`${url.origin}/rest/v1/rpc/read_my_account_access`, {
-            method: 'POST', headers: authHeaders, body: '{}', signal: AbortSignal.timeout(8000), redirect: 'error',
+            method: 'POST', headers: authHeaders, body: '{}', signal: AbortSignal.timeout(8000), redirect: 'manual',
         });
         if (!profileResponse.ok) return reply('Your khub account could not be checked. Please try again.', 503);
         const profile = await profileResponse.json();
