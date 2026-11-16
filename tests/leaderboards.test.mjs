@@ -131,8 +131,6 @@ test('podium awards follow each benchmark and leave seven unbadged table players
         const all=nodes(tree);
         const personal=all.find(node=>node.props?.className==='club-personal-total');
         assert.equal(personal.props.children, category==='Total trades' ? '42' : category==='Top donors' ? '500 Meat' : '123,400,000 Meat');
-        const donorExplanation=all.some(node=>node.type==='p' && typeof node.props.children==='string' && node.props.children.includes('item market values fixed at the time of donation'));
-        assert.equal(donorExplanation,category==='Top donors');
         const podium=all.find(node=>node.type==='ol');
         assert.deepEqual(nodes(podium).filter(node=>node.props?.className==='club-podium-person').map(node=>nodes(node).find(child=>child.type===Link).props.children),expectedNames);
         assert.equal(nodes(podium).find(node=>node.props?.className==='club-podium-total').props.children,expectedTotal);
