@@ -44,6 +44,19 @@ export async function onRequest({ request, env }, fetcher = fetch) {
         const profile = await profileResponse.json();
         if (profile?.id !== user.id || typeof profile.is_banned !== 'boolean') return reply('Your khub account could not be checked. Please try again.', 503);
         if (profile.is_banned) return reply('Your khub account cannot enter the game.', 403);
+        let isAdmin = profile.is_admin === true;
+        if (profile.access_version !== 1) {
+            stage = 'supabase-admin';
+            const adminResponse = await fetcher(`${url.origin}/rest/v1/rpc/khub_is_administrator`, {
+                method: 'POST', headers: authHeaders, body: '{}', signal: AbortSignal.timeout(8000), redirect: 'manual',
+            });
+            if (!adminResponse.ok) return reply('Your khub account could not be checked. Please try again.', 503);
+            const admin = await adminResponse.json();
+            if (typeof admin !== 'boolean') return reply('Your khub account could not be checked. Please try again.', 503);
+            isAdmin = admin;
+        } else if (typeof profile.is_admin !== 'boolean') {
+            return reply('Your khub account could not be checked. Please try again.', 503);
+        }
         const username = profile.khub_username;
         if (typeof username !== 'string' || username !== username.trim() || !username.length || username.length > 16 || [...username].some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)) {
             return reply('Your khub username could not be loaded. Please contact support.', 409);
@@ -53,7 +66,7 @@ export async function onRequest({ request, env }, fetcher = fetch) {
             iss: email, sub: email,
             aud: 'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit',
             iat: now, exp: now + 300, uid: `khub:${user.id}`,
-            claims: { khub_user_id: user.id, khub_username: username },
+            claims: { khub_user_id: user.id, khub_username: username, khub_is_admin: isAdmin },
         };
         stage = 'firebase-signing';
         const normalizedPem = pem.trim().replace(/^"|"$/g, '');

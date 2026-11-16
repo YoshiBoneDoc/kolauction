@@ -15,7 +15,7 @@ const request = (options = {}) => new Request(`${origin}/api/game-login`, {
     method: 'POST', headers: { Authorization: 'Bearer signed.user.token', Origin: origin }, ...options,
 });
 const user = { id, user_metadata: { khub_username: 'FORGED' } };
-const profile = { id, khub_username: 'KoL Player', is_banned: false };
+const profile = { id, khub_username: 'KoL Player', is_banned: false, access_version: 1, is_admin: false };
 function upstream({ account = profile, identity = user, userStatus = 200, profileStatus = 200 } = {}) {
     const calls = [];
     return { calls, fetcher: async (url, options) => {
@@ -38,7 +38,7 @@ test('khub login verifies the live user and account, then signs only authoritati
     assert.equal(claims.uid, `khub:${id}`);
     assert.equal(claims.aud, 'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit');
     assert.equal(claims.exp - claims.iat, 300);
-    assert.deepEqual(claims.claims, { khub_user_id: id, khub_username: 'KoL Player' });
+    assert.deepEqual(claims.claims, { khub_user_id: id, khub_username: 'KoL Player', khub_is_admin: false });
     assert(await crypto.subtle.verify('RSASSA-PKCS1-v1_5', keyPair.publicKey, Buffer.from(signature, 'base64url'), new TextEncoder().encode(`${header}.${payload}`)));
     assert.equal(f.calls.length, 2);
     assert(f.calls[1].url.endsWith('/rest/v1/rpc/read_my_account_access'));
@@ -152,4 +152,15 @@ test('redirected Supabase requests fail without forwarding credentials', async (
     });
     assert.equal(response.status, 503);
     assert.equal(calls, 1);
+});
+
+
+test('only the authoritative account response can grant game admin', async () => {
+    for (const isAdmin of [true, false]) {
+        const f = upstream({ account: { ...profile, is_admin: isAdmin } });
+        const response = await onRequest({ request: request({ body: JSON.stringify({ is_admin: !isAdmin }) }), env }, f.fetcher);
+        assert.equal(response.status, 200);
+        const { customToken } = await response.json();
+        assert.equal(JSON.parse(Buffer.from(customToken.split('.')[1], 'base64url')).claims.khub_is_admin, isAdmin);
+    }
 });
