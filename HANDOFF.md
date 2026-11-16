@@ -1,3 +1,43 @@
+# November 15 donation item leaderboard values — local, migration queued
+
+Queued **292**, after 284/108, adds private receipt-linked item valuation snapshots.
+Donor totals now sum actual donated Meat plus quantity × the available market
+quote at receipt time, using the existing 26-hour freshness window. Quotes dated
+after receipt are excluded; unavailable/stale/missing quotes remain explicitly
+unvalued. Values and evidence are captured atomically at donation ingestion and
+never repriced by receipt replay or subsequent market updates. Existing receipts
+are backfilled only where the retained quote qualifies as of their receipt time;
+only the current and one prior quote per item are retained, so most old item
+donations cannot be valued. The prior quote handles intake crossing a daily price
+refresh with storage bounded by catalog size; older delayed intake without evidence
+remains unpriced.
+Verified gift contents normalized as DONATE follow the same path; consumed
+wrappers and legacy unopened gifts are not estimated.
+
+Ranking/search/personal totals and future top-donor eligibility share the existing
+snapshot. Ordinary trade counts/volume, exclusions/privacy, refresh locks/cooldown,
+locked fee terms, financial reports, balances, reserves and transfers are unchanged.
+No new browser reads/polling or live market calls. Apply 292 once, then deploy the
+website; matching ignored bot SQL is an alternative copy, no bot restart needed.
+Not applied/deployed. Personal quickstart unchanged.
+
+21 targeted website tests and changed-source lint pass. Database regression now
+covers receipt-time/as-of evidence, item-only/mixed donations, duplicate items,
+large exact values, absent/stale/unavailable/newer quotes, replay, result changes,
+refund exclusion, intake crossing a market refresh and private grants. Execution is blocked before startup by local
+PostgreSQL shared-memory exhaustion (`shmget: No space left on device`), including
+a probe using mmap options. SQL execution and browser visual QA are unverified.
+
+# November 15 previous raffle winners — local website change
+
+Raffle list/details now link to `/raffles/history`, a lazy-loaded, newest-first
+history with raffle detail links, winner names, selected prizes and explicit
+canceled/no-ticket outcomes. Ten rows per page plus one lookahead; existing
+RLS/audience checks, authorization-scoped read cache and result RPC are reused.
+Winner reads occur only for the displayed page and drawn winners; no polling or
+new SQL/bot changes. Ten targeted tests, changed-source lint and build pass.
+Browser visual QA and deployment are unverified. Personal quickstart unchanged.
+
 # November 15 host message length — local, migration queued
 
 Listing form now caps optional host messages at 250 characters with a two-row

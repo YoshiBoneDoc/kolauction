@@ -55,6 +55,7 @@ export function LeaderboardsPanel({ data = null, signedIn = false, loading = fal
                     <label className="club-search"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg><input type="search" disabled={!signedIn || !data} value={search} maxLength={120} onChange={event => { setSearch(event.target.value); onSearch?.(event.target.value, activeTab, 0); }} placeholder={isDonors ? 'Find a donor…' : 'Find a trader…'} aria-label="Search leaderboard players" /></label>
                 </div>
                 <h2 id="club-rankings-title" className="club-ranking-heading">{leaderboardTitle}<span className="club-ranking-period"> · lifetime</span>{!isDonors && <span className="club-ranking-types">(All trade types)</span>}{isDonors && <span className="club-donor-waiver-note">The current top donor has all escrow fees waived.</span>}</h2>
+                {isDonors && <p className="club-personal-caption">Totals include donated Meat and item market values fixed at the time of donation. Items without a historical market quote are excluded.</p>}
                 {podium.length > 0 && <ol className="club-podium" aria-label="Top three leaderboard awards">
                     {podium.map(player => <li key={player.id} className={`club-podium-place club-podium-place-${player.rank}`} value={player.rank}>
                         <div className="club-podium-person">

@@ -181,6 +181,62 @@ with tempfile.TemporaryDirectory(prefix='khub-leaderboards-',dir='/tmp') as fold
         assert not search('no-match')['rows']
         sql("set role anon;select public.search_leaderboards('volume','Player',0);",error='permission denied')
         sql(f"set request.jwt.claim.sub='{uid(13)}';set role authenticated;select public.search_leaderboards('invalid','Player',0);",error='Invalid leaderboard search')
-        print('Leaderboard accounting, exact totals, privacy, ignores, top-ten bounds and maintenance wiring passed.')
+        # Donation valuation uses real receipt-time snapshots and the unchanged
+        # private ranking readers, with exact numeric arithmetic and no repricing.
+        sql("""alter table khub_bot.receipts add column received_at timestamptz not null default now();
+        create table khub_bot.market_prices(item_id integer primary key,price_meat bigint,observed_at timestamptz,checked_at timestamptz,available boolean);
+        insert into khub_bot.market_prices values
+        (1,1000,now()-interval '1 hour',now()-interval '1 hour',true),
+        (2,999999,now()+interval '1 hour',now()+interval '1 hour',true),
+        (3,999999,now()-interval '27 hours',now()-interval '27 hours',true),
+        (4,999999,now()-interval '1 hour',now()-interval '1 hour',false),
+        (5,9007199254740991,now()-interval '1 hour',now()-interval '1 hour',true);
+        insert into khub_bot.receipts(mail_id,sender_id,result,payload) values
+        ('old-items',104,'donation','{"meat":0,"items":[{"id":1,"quantity":2}],"raw":{"type":"normal","message":"DONATE"}}');""")
+        trade_snapshot={category:read(4)[category] for category in ['volume','trades']}
+        sql(migration('202611150292_donation_item_market_values.sql'))
+        assert sql("select value_meat from khub_bot.donation_item_values where receipt_id='old-items';")=='2000'
+        def donate(mid,sender,items,meat=0,received='now()',result='donation',message='DONATE'):
+            payload=json.dumps({'meat':meat,'items':items,'raw':{'type':'normal','message':message}})
+            sql(f"insert into khub_bot.receipts(mail_id,sender_id,result,payload,received_at) values ('{mid}',{sender},'{result}','{payload}',{received});")
+        donate('mixed',104,[{'id':1,'quantity':3},{'id':1,'quantity':2},{'id':2,'quantity':100},
+                              {'id':3,'quantity':100},{'id':4,'quantity':100},{'id':999,'quantity':100}],50)
+        assert sql("select value_meat from khub_bot.donation_item_values where receipt_id='mixed';")=='5000'
+        snapshots=json.loads(sql("select items from khub_bot.donation_item_values where receipt_id='mixed';"))
+        assert [item['status'] for item in snapshots]==['valued','no_historical_quote','stale','unavailable','no_historical_quote'],snapshots
+        assert snapshots[0]['quantity']=='5' and snapshots[0]['unit_price_meat']=='1000'
+        donate('old-unpriced',104,[{'id':1,'quantity':100}],received="now()-interval '2 days'")
+        assert sql("select value_meat from khub_bot.donation_item_values where receipt_id='old-unpriced';")=='0'
+        # A daily import between receipt and ingestion retains the earlier quote.
+        sql("update khub_bot.market_prices set price_meat=2000,observed_at=now()-interval '10 minutes',checked_at=now()-interval '10 minutes' where item_id=1;")
+        donate('delayed-items',107,[{'id':1,'quantity':2}],received="now()-interval '30 minutes'")
+        assert sql("select value_meat from khub_bot.donation_item_values where receipt_id='delayed-items';")=='2000'
+        assert sql("select count(*) from khub_bot.previous_donation_market_prices where item_id=1;")=='1'
+        donate('large-items',106,[{'id':5,'quantity':5000000000}])
+        assert sql("select value_meat from khub_bot.donation_item_values where receipt_id='large-items';")==str(9007199254740991*5000000000)
+        donate('not-a-donation',104,[{'id':1,'quantity':100}],result='accepted')
+        donate('implicit-items',104,[{'id':1,'quantity':100}],message='')
+        assert sql("select count(*) from khub_bot.donation_item_values where receipt_id in ('not-a-donation','implicit-items');")=='0'
+        # Result transitions capture exactly once; receipt replay and price refresh
+        # cannot retroactively change the immutable value or count items twice.
+        donate('transition',104,[{'id':1,'quantity':1}],result='processing')
+        sql("update khub_bot.receipts set result='donation' where mail_id='transition';")
+        sql("update khub_bot.market_prices set price_meat=900000 where item_id=1;update khub_bot.receipts set result='donation' where mail_id in ('mixed','transition');")
+        assert sql("select value_meat from khub_bot.donation_item_values where receipt_id='mixed';")=='5000'
+        assert sql("select value_meat from khub_bot.donation_item_values where receipt_id='transition';")=='2000'
+        sql("update khub_bot.leaderboard_state set refreshed_at='-infinity';select khub_bot.refresh_leaderboards();")
+        assert read(4)['personal']['donors']=='9050'
+        assert read(6)['personal']['donors']==str(9007199254740991*5000000000)
+        assert read(2)['personal']['donors']=='500'
+        assert read(6)['donors'][0]['id']==uid(6)
+        assert all(read(4)[category]==trade_snapshot[category] for category in ['volume','trades'])
+        assert search('Player4','donors')['rows'][0]['value']=='9050'
+        sql("update khub_bot.receipts set result='refunded' where mail_id='mixed';update khub_bot.leaderboard_state set refreshed_at='-infinity';select khub_bot.refresh_leaderboards();")
+        assert read(4)['personal']['donors']=='4000'
+        for role in ['anon','authenticated','service_role']:
+            assert sql(f"select has_table_privilege('{role}','khub_bot.donation_item_values','select');")=='f'
+            assert sql(f"select has_table_privilege('{role}','khub_bot.previous_donation_market_prices','select');")=='f'
+            assert sql(f"select has_function_privilege('{role}','khub_bot.donation_item_quote(timestamptz,jsonb)','execute');")=='f'
+        print('Leaderboard accounting, exact totals, privacy, ignores, top-ten bounds, receipt-time donation values and maintenance wiring passed.')
     finally:
         if started: subprocess.run([str(BIN/'pg_ctl'),'-D',str(data),'-m','immediate','-w','stop'],check=True,capture_output=True)

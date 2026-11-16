@@ -8,6 +8,7 @@ import AuctionNavigation from "./components/AuctionNavigation";
 const HighRollersInvitation = lazy(() => import('./components/HighRollersInvitation'));
 const RaffleCommitment = lazy(() => import('./pages/RaffleCommitment'));
 const Raffles = lazy(() => import("./pages/Raffles"));
+const RaffleHistory = lazy(() => import('./pages/RaffleHistory'));
 const Leaderboards = lazy(() => import("./pages/Leaderboards"));
 const Home = lazy(() => import("./pages/Home"));
 const AllAuctions = lazy(() => import("./pages/AllAuctions"));
@@ -73,6 +74,7 @@ const App = () => {
             <SiteActivity><RenderBoundary key={pathname.replace(/\/+$/, '') === '/auctions' ? pathname : `${pathname}${search}`}><Suspense fallback={<RouteLoading />}><Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/raffles" element={<Raffles />} />
+                <Route path="/raffles/history" element={<RaffleHistory />} />
                 <Route path="/raffle/:id/commitment" element={<RaffleCommitment />} />
                 <Route path="/raffle/:id" element={<Raffles />} />
                 <Route path="/leaderboards" element={<Leaderboards />} />
