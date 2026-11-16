@@ -534,7 +534,7 @@ const InfoPage = () => {
                                 <span aria-hidden="true" className="absolute -bottom-[9px] left-0 top-[9px] w-px -translate-x-1/2 bg-gray-300 group-last:hidden dark:bg-gray-600" />
                                 <span aria-hidden="true" className="absolute left-0 top-1.5 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-gray-400 dark:bg-gray-500" />
                                 <p>First public Mystery Raffle held</p>
-                                <p className="mt-0.5 text-[0.875em] leading-tight text-gray-500 dark:text-gray-400">Winner: — · Prize: —</p>
+                                <p className="mt-0.5 text-[0.875em] leading-tight text-gray-500 dark:text-gray-400">Winner: Slip_N_Slide · Prize: Mr. Accessory</p>
                             </div>
                         </li>
                     </ul>
