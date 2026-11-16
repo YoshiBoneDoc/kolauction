@@ -30,7 +30,7 @@ export function createGameLoginBridge({ frame, gameOrigin, getSession, userId, h
             }
             reply({ customToken: result.customToken });
         } catch {
-            reply({ error: 'Game login is temporarily unavailable. Please try again.' });
+            reply({ error: 'Game login failed (website connection). Please try again.' });
         } finally { pending = false; }
     };
     host.addEventListener('message', receive);

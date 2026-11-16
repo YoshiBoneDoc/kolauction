@@ -129,3 +129,14 @@ test('the website Worker serves the game login API instead of SPA HTML', async (
     assert.equal(post.status, 401);
     assert.equal(post.headers.get('Content-Type'), 'application/json');
 });
+
+test('login accepts a JSON-quoted key and reports signing failures without revealing secrets', async () => {
+    const f = upstream();
+    const quoted = await onRequest({ request: request(), env: { ...env, GAME_FIREBASE_PRIVATE_KEY: JSON.stringify(env.GAME_FIREBASE_PRIVATE_KEY) } }, f.fetcher);
+    assert.equal(quoted.status, 200);
+    const failed = await onRequest({ request: request(), env: { ...env, GAME_FIREBASE_PRIVATE_KEY: 'not-a-valid-private-key' } }, f.fetcher);
+    assert.equal(failed.status, 503);
+    const body = await failed.json();
+    assert.match(body.error, /firebase-signing/);
+    assert(!JSON.stringify(body).includes('not-a-valid-private-key'));
+});
