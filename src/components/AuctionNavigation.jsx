@@ -12,6 +12,22 @@ export default function AuctionNavigation() {
     const location = useLocation();
     const { pathname } = location;
     const [expandedAt, setExpandedAt] = useState(null);
+    const [onlineCount, setOnlineCount] = useState(null);
+    useEffect(() => {
+        let active = true;
+        const refresh = async () => {
+            if (document.hidden) return;
+            try {
+                const response = await fetch('/api/game-online');
+                const data = response.ok ? await response.json() : null;
+                if (active) setOnlineCount(Number.isSafeInteger(data?.count) && data.count >= 0 ? data.count : null);
+            } catch { if (active) setOnlineCount(null); }
+        };
+        refresh();
+        const timer = window.setInterval(refresh, 60000);
+        document.addEventListener('visibilitychange', refresh);
+        return () => { active = false; window.clearInterval(timer); document.removeEventListener('visibilitychange', refresh); };
+    }, []);
     const menuOpen = expandedAt === location.key;
     const menuButton = useRef(null);
     const navigation = useRef(null);
@@ -47,7 +63,7 @@ export default function AuctionNavigation() {
             <div className="ml-auto flex items-center gap-x-3 lg:order-last lg:ml-0">
                 {separator}
                 <ThemeToggle />
-                <Link {...linkProps("/khubMMO")}>I'm Bored</Link>
+                <Link {...linkProps("/khubMMO")}>I'm Bored{onlineCount !== null && <span className="ml-1 inline-flex items-center gap-1" aria-label={`${onlineCount} players online`}>(<svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 text-green-600"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 7a7 7 0 0 1 14 0v1H5v-1Z" /></svg>{onlineCount})</span>}</Link>
             </div>
             <button ref={menuButton} type="button" aria-expanded={menuOpen} aria-controls="main-navigation-links"
                 onClick={() => setExpandedAt(menuOpen ? null : location.key)}

@@ -19,7 +19,6 @@ export default function Game() {
         });
     }, [userId, url.origin, validUrl]);
     if (!validUrl) return <main className="mx-auto my-10 w-full max-w-sm rounded-xl border border-slate-600 bg-[#252a34] p-8 text-center text-white">
-        <h1 className="mb-6 text-2xl font-semibold">Login on khub first</h1>
         <button type="button" className="w-full rounded border border-[#5684b8] bg-[#426b9b] p-3 font-semibold"
             onClick={() => setLoginMessage('Game login is temporarily unavailable. Please try again.')}>Login</button>
         {loginMessage && <p className="mt-4" role="status">{loginMessage}</p>}
