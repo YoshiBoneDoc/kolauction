@@ -453,3 +453,11 @@ test('Bundle filter rotates independently beside Buyout and before ownership', (
         bundle.props.onClick(); assert.deepEqual(updates.at(-1), ['bundle', next]);
     }
 });
+
+test('inline buyout button appears only after a bid', () => {
+    user = { id: 'buyer' };
+    for (const [auction, expected] of [[{ ...base, currentBid: 0, bidCount: 0, bids: [] }, false], [{ ...base, currentBid: 0, bidCount: 1 }, true], [{ ...base, currentBid: 200, bidCount: 0 }, true]]) {
+        const h = harness(AuctionBidForm, { auction, inline: true });
+        assert.equal(nodes(h.tree).some(node => node.type === 'button' && node.props.children === 'Buyout'), expected);
+    }
+});

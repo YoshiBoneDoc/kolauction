@@ -1,3 +1,28 @@
+# November 20 raffle count preference — local, migration queued
+
+Queued **295**, after 293, stores the last successful admin count-visibility
+selection as the default for future raffle activations (including existing drafts).
+Seeds from the newest active raffle, otherwise newest non-preview raffle, otherwise
+hidden. Existing raffle visibility is preserved. Admin toggle atomically updates
+its active raffle and private preference under the existing activation advisory
+lock; failed/unauthorized updates cannot change the default. Purple button and
+helper text explain the behavior. Matching ignored bot SQL is an alternative copy.
+Apply one copy then deploy frontend; no bot runtime release. Not applied/deployed.
+Build, changed-source lint and diff checks pass. Local database suite cannot start
+because initdb fails; migration execution and browser visual QA remain unverified.
+Personal quickstart unchanged.
+
+# November 20 completed raffle source cleanup — local, migration queued
+
+Queued **294**, after 253, allows cleanup of settled raffle ticket/SUPPLY receipts
+without an individual outgoing reply. Requires the existing settled account,
+zero held Meat/inventory, settlement queued and all raffle deliveries confirmed;
+existing receipt delivery, closet, preparation review and intake guards remain.
+Other raffle commands retain their existing confirmed-delivery cleanup rules.
+Matching ignored bot SQL included; apply one copy only. No bot runtime change.
+Not applied/deployed. Database regression now uses ticket/SUPPLY receipts without
+replies; execution blocked at local initdb startup. Personal quickstart unchanged.
+
 # November 16 game login — local integration, not deployed
 
 Added `/khubMMO` (“I'm Bored” at the right of the navigation theme toggle),
