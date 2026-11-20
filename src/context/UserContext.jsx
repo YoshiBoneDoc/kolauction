@@ -4,7 +4,7 @@ import { supabase, initialAuthLink } from "../lib/supabase";
 import { createAuthService } from "../lib/auth";
 import { recoveryUserForEvent } from "../lib/authLinks";
 import BannedAccount from "../components/BannedAccount";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { withReadDeadline } from '../lib/readDeadline';
 import { coordinatedRefresh, refreshScope } from '../lib/coordinatedRefresh';
 import { trafficPressure } from '../lib/trafficPressure';
@@ -181,7 +181,7 @@ export const UserProvider = ({ children }) => {
                 : restrictedAccount && !appealPage ? <BannedAccount account={restrictedAccount} onLogout={logoutUser} />
                     : authError && session?.user && !appealPage ? <main className="space-y-3 p-6">
                         <h1 className="text-xl font-semibold">Account access could not be checked</h1>
-                        <p>We’ll try again automatically. You can also <Link to="/submit-appeal" className="text-blue-700 underline">submit an appeal</Link>.</p>
+                        <button type="button" onClick={() => window.location.reload()} className="text-blue-700 underline">Reload page</button>
                     </main> : children}
         </UserContext.Provider>
     );
