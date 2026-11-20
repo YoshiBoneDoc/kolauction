@@ -4,6 +4,7 @@ import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import { formatCompactMeat } from '../lib/formatMeat';
 import { supabase } from '../lib/supabase';
+import { readRaffle } from '../lib/raffleService';
 
 const number = value => BigInt(value ?? 0).toLocaleString('en-US');
 const meat = value => value == null ? 'Unavailable' : `${number(value)} Meat`;
@@ -43,13 +44,33 @@ export default function AdminRaffleAnalytics({ revision = 0 }) {
     const [error, setError] = useState('');
     const [offset, setOffset] = useState(0);
     const [open, setOpen] = useState({});
+    const [visibility, setVisibility] = useState({});
+    const [visibilityError, setVisibilityError] = useState('');
+    const [saving, setSaving] = useState(null);
+    const toggleVisibility = async r => {
+        setSaving(r.id); setVisibilityError('');
+        try {
+            const { data: value, error: failure } = await supabase.rpc('set_raffle_public_counts', { p_id: r.id, p_show: !visibility[r.id] });
+            if (failure) throw failure;
+            setVisibility(previous => ({ ...previous, [r.id]: value }));
+            readRaffle.invalidate();
+        } catch { setVisibilityError('Could not update public count visibility. Please retry.'); }
+        finally { setSaving(null); }
+    };
     useEffect(() => {
         let active = true;
         setError('');
         supabase.rpc('read_admin_raffle_analytics', { p_offset: offset }).then(({ data: value, error: failure }) => {
             if (!active) return;
             if (failure || !value) setError(failure?.code === '42501' ? 'Administrator access required.' : 'Raffle analytics unavailable. Apply migration 203, then refresh.');
-            else setData(value);
+            else {
+                setData(value);
+                if (value.current.length) supabase.from('mystery_raffles').select('id,show_public_counts').in('id', value.current.map(r => r.id)).then(({ data: rows, error: failure }) => {
+                    if (!active) return;
+                    if (failure) setVisibilityError('Public count visibility unavailable.');
+                    else setVisibility(Object.fromEntries(rows.map(row => [row.id, row.show_public_counts])));
+                }).catch(() => { if (active) setVisibilityError('Public count visibility unavailable.'); });
+            }
         }).catch(() => { if (active) setError('Raffle analytics unavailable. Please refresh.'); });
         return () => { active = false; };
     }, [offset, revision]);
@@ -59,9 +80,11 @@ export default function AdminRaffleAnalytics({ revision = 0 }) {
         <HighRollersClub />
         <section aria-label="Current raffle" className={panel}>
             <h2 className="mb-2 text-sm font-semibold text-gray-900">Current Raffle</h2>
+            {visibilityError && <p role="alert">{visibilityError}</p>}
             {!data.current.length && <p>No current raffles.</p>}
             {data.current.map(r => <div key={r.id} className="border-t border-gray-200 py-2 first:border-0">
                 <div className="flex flex-wrap justify-between gap-2"><Link className={link} to={`/raffle/${r.id}`}>{r.name}{r.raffle_number && ` #${r.raffle_number}`}</Link><span className="capitalize">{r.status}</span></div>
+                {r.state === 'active' && <button type="button" className="mt-2 rounded border border-gray-400 px-3 py-1" disabled={saving !== null || visibility[r.id] == null} aria-pressed={!!visibility[r.id]} onClick={() => toggleVisibility(r)}>{visibility[r.id] ? 'Hide ticket and participant counts' : 'Show ticket and participant counts'}</button>}
                 <p className="my-1 tabular-nums">{number(r.tickets)} tickets · {meat(r.revenue)}</p>
                 <p className="text-xs">{r.prize_name ? `Winning prize: ${number(r.prize_quantity)} × ${r.prize_name}` : new Date(r.ends_at) <= new Date() && r.state !== 'preview' ? 'Closed · winning prize pending drawing' : `Prize pool: ${r.pool.map(p => `${number(p.quantity)} × ${p.name}`).join(' · ')}`}</p>
                 <details className="mt-2 text-xs" open={!!open[r.id]} onToggle={e => { const value = e.currentTarget.open; setOpen(previous => previous[r.id] === value ? previous : { ...previous, [r.id]: value }); }}><summary className="cursor-pointer">Participants</summary><Participants raffleId={r.id} initialRows={r.participants_page} /></details>
