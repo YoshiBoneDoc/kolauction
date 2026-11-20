@@ -461,3 +461,11 @@ test('inline buyout button appears only after a bid', () => {
         assert.equal(nodes(h.tree).some(node => node.type === 'button' && node.props.children === 'Buyout'), expected);
     }
 });
+
+test('detail buyout action requires a bid in direct and escrow modes', () => {
+    user = { id: 'buyer' };
+    for (const escrowMode of [false, true]) for (const [currentBid, bidCount, expected] of [[0, 0, false], [200, 1, true]]) {
+        const h = harness(InstantPurchaseAction, { auction: { ...base, escrowMode, currentBid, bidCount, bids: [] } });
+        assert.equal(nodes(h.tree).some(n => n.type === 'button' && n.props.children === 'Buyout'), expected);
+    }
+});

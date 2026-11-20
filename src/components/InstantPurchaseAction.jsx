@@ -22,7 +22,8 @@ export default function InstantPurchaseAction({ auction, compact = false, showTe
     const price = auction.instantPurchasePrice.toLocaleString('en-US');
     const displayedPrice = compact ? formatCompactMeat(auction.instantPurchasePrice) : price;
     const isSeller = currentUser?.id === auction.sellerId;
-    const canShowAction = !currentUser?.isBanned && !isSeller
+    const hasBids = (auction.bidCount ?? auction.bids?.length ?? 0) > 0 || auction.currentBid > 0;
+    const canShowAction = hasBids && !currentUser?.isBanned && !isSeller
         && (auction.escrowMode || Boolean(currentUser) || compact);
     if (!showPrice && !canShowAction) return null;
 
@@ -55,7 +56,7 @@ export default function InstantPurchaseAction({ auction, compact = false, showTe
                         <p className={`break-words font-bold text-green-800 ${dense ? 'text-sm' : 'text-2xl'}`}><SellPrice amount={auction.instantPurchasePrice} quantity={auction.quantity} compact={false} /></p>
                     </>}
                 </div>}
-                {currentUser?.isBanned || currentUser?.id === auction.sellerId ? null : auction.escrowMode ? (compact ? <Link to={`/auction/${auction.id}`} title="View KMail buyout instructions" className={buttonClass}>Buyout</Link> : <button type="button" onClick={() => setShowBuyInstructions(value => !value)} aria-expanded={showBuyInstructions} className={buttonClass}>Buyout</button>) : currentUser ? (
+                {!canShowAction ? null : auction.escrowMode ? (compact ? <Link to={`/auction/${auction.id}`} title="View KMail buyout instructions" className={buttonClass}>Buyout</Link> : <button type="button" onClick={() => setShowBuyInstructions(value => !value)} aria-expanded={showBuyInstructions} className={buttonClass}>Buyout</button>) : currentUser ? (
                     <button onClick={purchase} disabled={pending} title={`Buyout price: ${price} Meat`} className={buttonClass}>{pending ? 'Accepting…' : 'Buyout'}</button>
                 ) : compact ? <Link to="/login" className={buttonClass}>Buyout</Link> : null}
             </div>
