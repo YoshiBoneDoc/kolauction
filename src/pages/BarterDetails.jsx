@@ -1,4 +1,4 @@
-import BarterPendingTrades from '../components/BarterPendingTrades';
+import PendingTrades from '../components/PendingTrades';
 import HostMessage from '../components/HostMessage';
 import AuctionItemImage from '../components/AuctionItemImage';
 import './listingDetails.css';
@@ -60,7 +60,7 @@ export default function BarterDetails() {
         finally { refresh(); cancelLock.current = false; setCancelling(false); }
     }
     return <main className="site-page-background flex-1 bg-[#F1F3F5] px-4 py-6 sm:px-6">
-        <div className="mx-auto max-w-4xl"><BarterPendingTrades /></div>
+        <div className="mx-auto max-w-4xl"><PendingTrades /></div>
         <div className="mx-auto mb-4 max-w-4xl"><Link to="/barter" className="text-sm text-blue-700 underline">Back to Barter Corner</Link></div>
         {error && <p role="alert" className="mx-auto max-w-4xl">{error} <button onClick={refresh}>Retry</button></p>}
         {auction === undefined && !error && <p role="status">Loading barter…</p>}

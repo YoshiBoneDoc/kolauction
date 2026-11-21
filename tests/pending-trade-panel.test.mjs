@@ -12,7 +12,7 @@ function fixture(initial) {
  const user={id:'buyer'};
  const hooks={useContext:key=>key==='user'?{currentUser:user}:context,useState(initial){const i=cursor++;if(!(i in state))state[i]=initial;return[state[i],value=>{state[i]=value;}];},useRef(initial){const i=cursor++;return state[i] ||= {current:initial};},useEffect(fn,deps){const i=cursor++;if(!state[i]||deps.some((v,n)=>v!==state[i][n])){state[i]=deps;effects.push(fn);}}};
  const module={exports:{}};
- new Function('require','module','exports',code)(name=>name==='test-hooks'?hooks:name==='../context/UserContext'?{UserContext:'user'}:name==='../context/AuctionsContext'?{AuctionsContext:'auctions'}:name==='react-router-dom'?{Link:'a'}:name==='../lib/bundles'?{auctionQuantityLabel:()=>'(2 items)'}:name==='../lib/formatMeat'?{formatCompactMeat:String}:name.includes('ConfirmTradeButton')?'confirm-trade':name.includes('TradeFeedback')?'trade-feedback':require(name),module,module.exports);
+ new Function('require','module','exports',code)(name=>name==='../hooks/useBarterRead'?(()=>({data:context.barterTrades || []})):name==='../lib/barter'?{writeBarter:async()=>{}}:name==='test-hooks'?hooks:name==='../context/UserContext'?{UserContext:'user'}:name==='../context/AuctionsContext'?{AuctionsContext:'auctions'}:name==='react-router-dom'?{Link:'a'}:name==='../lib/bundles'?{auctionQuantityLabel:()=>'(2 items)'}:name==='../lib/formatMeat'?{formatCompactMeat:String}:name.includes('ConfirmTradeButton')?'confirm-trade':name.includes('TradeFeedback')?'trade-feedback':require(name),module,module.exports);
  context={...context,setPendingExpanded:value=>opened.push(value),setPendingPage:value=>pages.push(value)};
  function nodes(n){if(!n||typeof n!=='object')return[];if(typeof n.type==='function')return nodes(n.type(n.props));return[n,...React.Children.toArray(n.props?.children).flatMap(nodes)];}
  return {opened,pages,render(patch={}){context={...context,...patch};cursor=0;tree=nodes(module.exports.default());while(effects.length)effects.shift()();return tree;},button(label){return tree.find(n=>n.type==='button'&&n.props['aria-label']===label);}};
@@ -29,4 +29,18 @@ test('full cards navigate locally with no collapse control, and one trade hides 
 });
 test('navigation crosses only the existing bounded page boundary',()=>{
  const f=fixture({pendingExpanded:true,pendingTrades:Array.from({length:12},(_,i)=>trade(i)),pendingTotal:13,pendingPage:1});f.render();for(let i=0;i<11;i++){f.button('Next pending trade').props.onClick();f.render();}assert.deepEqual(f.pages,[]);f.button('Next pending trade').props.onClick();assert.deepEqual(f.pages,[2]);
+});
+
+test('barters share direct trade arrows and card layout, including barter-only accounts',()=>{
+ const barter={id:'barter-1',item:'Barter item',quantity:2,isHost:false,confirmed:false,rating:null};
+ const f=fixture({pendingExpanded:true,pendingTrades:[trade(1)],pendingTotal:1,barterTrades:[barter]});
+ let tree=f.render();assert.ok(tree.some(n=>n.props['aria-live']==='polite' && React.Children.toArray(n.props.children).join('')==='1 / 2'));
+ f.button('Next pending trade').props.onClick();tree=f.render();
+ assert.ok(tree.some(n=>n.type==='a'&&n.props.to==='/barter/barter-1'));
+ assert.equal(tree.filter(n=>n.type==='article').length,1);
+ assert.equal(f.button('Next pending trade').props.disabled,true);
+ f.button('Previous pending trade').props.onClick();tree=f.render();
+ assert.ok(tree.some(n=>n.type==='a'&&n.props.to==='/auction/trade-1'));
+ const solo=fixture({pendingExpanded:false,pendingTrades:[],pendingTotal:0,barterTrades:[barter]});
+ assert.ok(solo.render().some(n=>n.type==='a'&&n.props.to==='/barter/barter-1'));
 });

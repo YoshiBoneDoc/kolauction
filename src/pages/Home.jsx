@@ -1,4 +1,3 @@
-import BarterPendingTrades from '../components/BarterPendingTrades';
 import AuctionLiveUnavailable from '../components/AuctionLiveUnavailable';
 import PopularAuctions from '../components/PopularAuctions';
 import HighRollers from '../components/HighRollers';
@@ -46,7 +45,7 @@ export default function Home() {
                 {auctions.some(auction => auction.liveUnavailable) && <div className="mb-4 grid gap-3 sm:grid-cols-2">
                     {auctions.filter(auction => auction.liveUnavailable).map(auction => <AuctionLiveUnavailable key={auction.id} auction={auction} />)}
                 </div>}
-                <PendingTrades /><BarterPendingTrades />
+                <PendingTrades />
                 {featuredGiveaway && (featuredGiveaway.liveUnavailable || getAuctionStatus(featuredGiveaway, now) === 'active') && <div className="mb-8">
                     <GiveawayCard auction={featuredGiveaway} now={now} />
                     <p className="mt-1.5 text-center text-xs"><Link to="/giveaways" className="text-blue-700 underline hover:text-blue-800 dark:text-blue-300 dark:hover:text-blue-200">How Does This Giveaway Work?</Link></p>

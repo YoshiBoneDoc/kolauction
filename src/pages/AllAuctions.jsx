@@ -1,4 +1,3 @@
-import BarterPendingTrades from '../components/BarterPendingTrades';
 import TradeTypeBadge from '../components/TradeTypeBadge';
 import AuctionSortMenu from '../components/AuctionSortMenu';
 import AuctionPagination from '../components/AuctionPagination';
@@ -124,7 +123,7 @@ export default function AllAuctions() {
 
             <main className="mx-auto max-w-7xl">
                 <h1 className="auction-page-title my-4 text-center font-bold text-[#7695FF]">All Auctions</h1>
-                <PendingTrades /><BarterPendingTrades />
+                <PendingTrades />
 
                 {!isLoading && hasLoaded && <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
                         {hasLoaded && <p role="status">{listingOrderDelayed ? 'Results may be out of date. Count and ordering are being refreshed.' : `${found} ${found === 1 ? 'auction' : 'auctions'} found${visibleRaffles.length ? ` · ${visibleRaffles.length} raffle ${visibleRaffles.length === 1 ? 'preview' : 'previews'}` : ''}`}</p>}
