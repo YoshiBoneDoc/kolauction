@@ -1,24 +1,19 @@
-# November 21 barter confirmation review — local follow-up
+# November 21 barter incomplete response — local, SQL queued
 
-296 is now in the applied-migration directory; its production installation is not
-confirmed by that placement alone. New queued **297** adds barter thumb votes and
-received-completion counts to profile reputation, plus deduplicated confirmation
-KMail via the existing notice delivery queue and an actor lookup index. Matching
-ignored bot SQL is an alternative copy; apply once, no bot runtime change.
-Personal quickstart unchanged. Completion never adds estimated Meat to financial totals.
+Queued **298** adds barter Report Incomplete support tickets and participant notices;
+the shared banner now omits the raw barter UUID. Four banner tests, changed-source
+lint and build pass. SQL execution remains unverified due to the local PostgreSQL
+startup blocker. See the [barter guide](docs/BARTER_CORNER.md:87) for behavior and
+limitations. Apply after 297, then deploy; no bot runtime change. Quickstart unchanged.
 
-Added database assertions for participant authorization, rating-before-confirm rejection,
-both confirmations, duplicate confirmation/notice safety, final votes and reputation.
-Execution blocked before migration loading by local PostgreSQL shared-memory ID
-exhaustion (`shmget: No space left on device`). SQL execution remains unverified.
-Targeted Node run: 11 pass, one practice-form rendering assertion fails; no practice
-form code changed in this follow-up. Changed-source lint passes.
+# November 21 barter responses and shared banner — local
 
-Remaining differences from ordinary Direct trades: incomplete-report/moderation
-workflow, ongoing reminder notices, persisted completion in browse/profile history,
-and pending-banner pagination are not integrated. Current banner shows the oldest
-12 unrated exchanges, advancing as responses and ratings are saved. Do not describe
-this as complete Direct-trade parity. Production deployment remains unverified.
+Barters now share the Direct-trade response banner and arrows. Four banner tests,
+changed-source lint and build pass. Database execution is blocked by local
+PostgreSQL shared-memory exhaustion; browser QA and deployment remain unverified.
+296 is in the applied directory, without production confirmation; 297 is queued.
+See the [barter guide](docs/BARTER_CORNER.md:87) for behavior, SQL rollout,
+verification details and remaining gaps. Personal quickstart unchanged.
 
 # November 20 raffle count preference — local, migration queued
 

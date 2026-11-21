@@ -4,10 +4,12 @@ Repository audit: November 2, 2026. Remaining work only; implementation is not p
 of production deployment. Start with [the handoff](HANDOFF.md:1).
 
 ## NEED TO FIX:
-- Barter account/seller history integration is local in queued **286** (after 285); apply once then deploy the website. Shared row styles and a small barter symbol are used; financial totals remain separate.
+- Finish barter incomplete reports/moderation, completed history status, reminders
+  and full response pagination. Verify SQL rollout and deployment using the
+  [barter guide](docs/BARTER_CORNER.md:87).
 - Leaderboard split-fulfillment correction is local in queued **284**: one completed-trade credit per player per auction, with all eligible Meat volume preserved. Apply once after verified 268; normal maintenance rebuilds historical rankings. No runtime deployment required.
 - Escrow loyalty and reusable promotions are implemented locally in queued 269–272; normal activation remains disabled. See [policy, November exceptions and rollout gates](docs/ESCROW_FEE_PROMOTIONS.md:1). Production installation/deployment/activation require explicit owner approval.
-- Barter Corner is implemented locally with a separate Direct-only ledger, 40m listing minimum, item/Meat offers, host review and private feedback. Apply queued 273 then deploy the website; no production activation is confirmed. See [rules, limitations and verification](docs/BARTER_CORNER.md:1).
+
 
 ## Future leaderboard fee implementation — preserve trade terms
 

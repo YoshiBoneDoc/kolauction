@@ -49,9 +49,9 @@ Separate private `khub_bot.barter_auctions` / `barter_offers` tables and explici
 RPC projections guarantee separation from All Auctions, Home ordinary listings,
 ordinary bidding, bot intake/settlement and Meat-based accounting. No changes to
 ordinary auction SQL, commissions, escrow reserves or bot financial processing.
-Barter trades do not enter ordinary settlement confirmations, completed-sale
-statistics or leaderboard financial totals; those would need explicit component
-accounting and moderation integration, rather than treating estimates as Meat.
+Barter confirmations are stored separately from ordinary auction settlement.
+Barter estimates do not enter completed-sale financial totals or leaderboard Meat
+volume. The confirmation/reputation integration below does not transfer assets.
 
 Creation and offer/review writes reuse verified-trader and ban protections. Direct
 ignore visibility applies to browse/details/submission; host decisions also check
@@ -80,6 +80,51 @@ links to each detail page. Account changes clear displayed private data immediat
 write notifications invalidate reads and refresh visible consumers. No private
 payloads enter shared public caches or persistent browser storage.
 
+## Completion responses and shared banner
+
+SQL **296** adds participant-only completion responses and final thumbs-up/down
+ratings for concluded barters with an accepted winning offer. Each player confirms
+receipt of their agreed exchange; both confirmations are required for the response
+reader's completed indicator. Each player may rate after their own confirmation,
+matching ordinary Direct-trade rating timing. Identical retries are safe; a saved
+rating cannot be changed. Losing bidders, live listings and cancelled/unsold
+barters cannot confirm. Ratings do not replace completion responses.
+
+SQL **297** adds barter ratings and received-confirmation counts to profile
+reputation, deduplicated confirmation KMail through the existing delivery queue,
+and an actor lookup index. Apply once after 296, using either the website SQL or
+matching ignored bot copy. No bot runtime release is required. File placement
+alone does not confirm production installation; deployment remains unverified.
+
+The website uses one yellow PendingTrades banner for ordinary Direct trades and
+barters, with the same compact card, confirmation dialog, rating buttons and
+left/right arrows. Only one exchange appears at a time. Home, All Auctions,
+Barter Corner and barter details use this component. Barters link to their own
+details and display Direct barter instead of treating estimates as a Meat price.
+They follow the last ordinary pending-trade page. The barter reader returns at
+most twelve unrated exchanges; subsequent exchanges become available as players
+save responses and ratings. Full barter-response pagination remains outstanding.
+
+SQL **298**, after 297, adds Report Incomplete beside Confirm Complete and removes
+raw barter UUIDs from the shared card. Reports require a concluded winning exchange,
+are serialized against confirmation, and create a private administrator support
+ticket plus a deduplicated participant KMail notice. A report is separate from
+completion; the reporter may then leave a final feedback rating. Confirmed players
+cannot report, and reporters cannot subsequently confirm through the ordinary
+button. Corrections require administrator review; an integrated report withdrawal
+and moderation workflow remains outstanding. The explanation is optional (1,800
+characters maximum). Apply one SQL copy, then deploy the website; no bot runtime
+change. SQL execution remains unverified due to the local database startup blocker.
+
+Ongoing reminder notices and persisted completed status in browse/profile histories
+remain separate follow-up work.
+This is not complete ordinary Direct-trade parity. Four targeted shared-banner
+tests, changed-source lint and production build pass. Browser visual QA remains
+unverified. Database regression includes authorization, duplicate confirmation and
+notice safety, both-player completion, final votes and reputation assertions;
+execution is blocked at local PostgreSQL initialization by shared-memory ID
+exhaustion, before migrations run. SQL execution is therefore unverified.
+
 ## Account and seller histories
 
 Queued **286**, after 285, adds `read_profile_auction_page` for merged account and
@@ -100,7 +145,7 @@ minimum and duration. No offers, winner, old deadline or financial state is copi
 normal creation validation and confirmation still apply. Accepted trades awaiting
 settlement cannot be relisted. Host
 acceptance determines displayed leading values even if an own pending offer is
-worth more. This adds history visibility, not barter completion confirmations,
+worth more. This history migration adds visibility; later response migrations provide confirmations,
 financial reporting or leaderboard integration.
 
 Merged seller pages use the existing authorization-scoped browser read cache and

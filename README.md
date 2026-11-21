@@ -46,6 +46,8 @@ scaffolding. SQL, website, cache Worker and bot have separate release lifecycles
 - Raffles: private tickets, prize supply, commitments, verified randomness, durable
   draws and fulfillment. These use separate intake/accounting from auction bids;
   availability depends on deployed feature gates.
+- Direct-only [Barter Corner](docs/BARTER_CORNER.md:1), including item/Meat offers,
+  host review and shared trade response controls.
 - Feedback/withdrawal, trade queries, ignores and visibility filtering, moderation,
   bans/appeals, reviewed ban gallery, admin inbox/analytics, announcements and polls.
 

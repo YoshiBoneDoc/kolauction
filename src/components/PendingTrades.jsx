@@ -1,3 +1,4 @@
+import ReportBarterIncomplete from './ReportBarterIncomplete';
 import useBarterRead from '../hooks/useBarterRead';
 import { writeBarter } from '../lib/barter';
 import { auctionQuantityLabel } from '../lib/bundles';
@@ -18,11 +19,11 @@ function TradeCard({ auction }) {
     const { currentUser } = useContext(UserContext);
     const isBarter = auction.isBarter;
     const isSeller = isBarter ? auction.isHost : auction.sellerId === currentUser.id;
-    const responded = isBarter ? auction.confirmed : hasResponded(auction, currentUser.id);
+    const responded = isBarter ? auction.confirmed || auction.reported : hasResponded(auction, currentUser.id);
     return <article className="flex min-w-0 flex-col gap-2 rounded border border-amber-200 bg-white px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div className="min-w-0">
             <h3 className="text-sm font-semibold leading-5"><Link to={`/${isBarter ? 'barter' : 'auction'}/${auction.id}`} title="Private trade details and instructions" className="break-words text-gray-900 hover:text-blue-700 hover:underline">{auction.bundleItems?.length > 1 ? <>{auction.item} {auctionQuantityLabel(auction)}</> : <>{auction.quantity.toLocaleString('en-US')} × {auction.item}</>}</Link></h3>
-            <p className="mt-0.5 text-xs leading-4 text-gray-500">#{auction.auctionNumber || auction.id} · {isSeller ? 'Seller' : 'Buyer'} · <span className="font-medium text-gray-700">{isBarter ? 'Direct barter' : `${formatCompactMeat(auction.finalPrice)} Meat`}</span></p>
+            <p className="mt-0.5 text-xs leading-4 text-gray-500">{!isBarter && <>#{auction.auctionNumber || auction.id} · </>}{isSeller ? 'Seller' : 'Buyer'} · <span className="font-medium text-gray-700">{isBarter ? 'Direct barter' : `${formatCompactMeat(auction.finalPrice)} Meat`}</span></p>
             {auction.banReviewRequired && <p className="mt-1 max-w-xl text-xs text-slate-600">Account restriction: contact an administrator before sending further assets. Only confirm what you have received.</p>}
         </div>
         <div className="shrink-0">
@@ -30,6 +31,7 @@ function TradeCard({ auction }) {
             <p className="mb-2 text-sm font-semibold">Was this trade completed?</p>
             <div className="flex flex-wrap items-center gap-2">
             <ConfirmTradeButton auctionId={auction.id} onConfirm={isBarter ? id => writeBarter('confirm_barter_trade', { p_id: id }) : undefined} className="button-green inline-flex min-h-8 items-center justify-center rounded border border-green-700 bg-green-700 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50" />
+            {isBarter && <ReportBarterIncomplete auctionId={auction.id} />}
             {!isBarter && !auction.ownTradeReport && <Link to={`/auction/${auction.id}/report-trade`} className="button-red inline-flex min-h-8 items-center justify-center rounded border px-3 py-1.5 text-xs font-medium">Report Incomplete</Link>}
             </div></>}
         </div>

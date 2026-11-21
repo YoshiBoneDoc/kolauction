@@ -12,7 +12,7 @@ function fixture(initial) {
  const user={id:'buyer'};
  const hooks={useContext:key=>key==='user'?{currentUser:user}:context,useState(initial){const i=cursor++;if(!(i in state))state[i]=initial;return[state[i],value=>{state[i]=value;}];},useRef(initial){const i=cursor++;return state[i] ||= {current:initial};},useEffect(fn,deps){const i=cursor++;if(!state[i]||deps.some((v,n)=>v!==state[i][n])){state[i]=deps;effects.push(fn);}}};
  const module={exports:{}};
- new Function('require','module','exports',code)(name=>name==='../hooks/useBarterRead'?(()=>({data:context.barterTrades || []})):name==='../lib/barter'?{writeBarter:async()=>{}}:name==='test-hooks'?hooks:name==='../context/UserContext'?{UserContext:'user'}:name==='../context/AuctionsContext'?{AuctionsContext:'auctions'}:name==='react-router-dom'?{Link:'a'}:name==='../lib/bundles'?{auctionQuantityLabel:()=>'(2 items)'}:name==='../lib/formatMeat'?{formatCompactMeat:String}:name.includes('ConfirmTradeButton')?'confirm-trade':name.includes('TradeFeedback')?'trade-feedback':require(name),module,module.exports);
+ new Function('require','module','exports',code)(name=>name==='../hooks/useBarterRead'?(()=>({data:context.barterTrades || []})):name==='../lib/barter'?{writeBarter:async()=>{}}:name==='test-hooks'?hooks:name==='../context/UserContext'?{UserContext:'user'}:name==='../context/AuctionsContext'?{AuctionsContext:'auctions'}:name==='react-router-dom'?{Link:'a'}:name==='../lib/bundles'?{auctionQuantityLabel:()=>'(2 items)'}:name==='../lib/formatMeat'?{formatCompactMeat:String}:name.includes('ReportBarterIncomplete')?'report-barter':name.includes('ConfirmTradeButton')?'confirm-trade':name.includes('TradeFeedback')?'trade-feedback':require(name),module,module.exports);
  context={...context,setPendingExpanded:value=>opened.push(value),setPendingPage:value=>pages.push(value)};
  function nodes(n){if(!n||typeof n!=='object')return[];if(typeof n.type==='function')return nodes(n.type(n.props));return[n,...React.Children.toArray(n.props?.children).flatMap(nodes)];}
  return {opened,pages,render(patch={}){context={...context,...patch};cursor=0;tree=nodes(module.exports.default());while(effects.length)effects.shift()();return tree;},button(label){return tree.find(n=>n.type==='button'&&n.props['aria-label']===label);}};
@@ -38,6 +38,8 @@ test('barters share direct trade arrows and card layout, including barter-only a
  f.button('Next pending trade').props.onClick();tree=f.render();
  assert.ok(tree.some(n=>n.type==='a'&&n.props.to==='/barter/barter-1'));
  assert.equal(tree.filter(n=>n.type==='article').length,1);
+ assert.ok(tree.some(n=>n.type==='report-barter'));
+ assert.ok(!tree.some(n=>React.Children.toArray(n.props.children).join('').includes('#barter-1')));
  assert.equal(f.button('Next pending trade').props.disabled,true);
  f.button('Previous pending trade').props.onClick();tree=f.render();
  assert.ok(tree.some(n=>n.type==='a'&&n.props.to==='/auction/trade-1'));

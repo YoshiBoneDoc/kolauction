@@ -295,6 +295,9 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         after_feedback=json.loads(sql(f"select khub_bot.profile_feedback('{seller}');"))
         assert after_feedback['seller_positive']==before_feedback['seller_positive']+1
         assert after_feedback['seller_confirmed']==before_feedback['seller_confirmed']+1
+        call(f"select public.report_barter_incomplete('{aid}','{uuid4()}','');",uid=buyer,error='Only participants')
+        call(f"select public.report_barter_incomplete('{aid}','{uuid4()}','');",uid=seller,error='already confirmed')
+
 
         public_rows=history('seller',sid=seller,who=None,status='ended')['rows']
         assert next(row for row in public_rows if row['id']==aid)['winner_id'] is None
