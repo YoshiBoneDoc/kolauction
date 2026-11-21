@@ -2,7 +2,7 @@ import { useContext, useId, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { AuctionsContext } from '../context/AuctionsContext';
 
-export default function ConfirmTradeButton({ auctionId, className, onConfirmed }) {
+export default function ConfirmTradeButton({ auctionId, className, onConfirmed, onConfirm }) {
     const { confirmTrade } = useContext(AuctionsContext);
     const dialog = useRef(null);
     const submitting = useRef(false);
@@ -16,7 +16,7 @@ export default function ConfirmTradeButton({ auctionId, className, onConfirmed }
         setPending(true);
         setError('');
         try {
-            await confirmTrade(auctionId);
+            await (onConfirm || confirmTrade)(auctionId);
             dialog.current?.close();
             onConfirmed?.();
         } catch (failure) { setError(failure.message); }
@@ -39,4 +39,4 @@ export default function ConfirmTradeButton({ auctionId, className, onConfirmed }
         </dialog>
     </>;
 }
-ConfirmTradeButton.propTypes = { auctionId: PropTypes.string.isRequired, className: PropTypes.string, onConfirmed: PropTypes.func };
+ConfirmTradeButton.propTypes = { auctionId: PropTypes.string.isRequired, className: PropTypes.string, onConfirm: PropTypes.func, onConfirmed: PropTypes.func };

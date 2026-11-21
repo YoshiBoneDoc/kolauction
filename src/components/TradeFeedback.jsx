@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import ThumbIcon from './ThumbIcon';
 import { AuctionsContext } from '../context/AuctionsContext';
 
-export default function TradeFeedback({ auctionId, role, rating = null }) {
+export default function TradeFeedback({ auctionId, role, rating = null, onRate }) {
     const { rateTrade } = useContext(AuctionsContext);
     const [savedRating, setSavedRating] = useState(rating);
     const [pending, setPending] = useState(false);
@@ -18,7 +18,7 @@ export default function TradeFeedback({ auctionId, role, rating = null }) {
         setPending(true);
         setError('');
         try {
-            await rateTrade(auctionId, value);
+            await (onRate || rateTrade)(auctionId, value);
             setSavedRating(value);
             setSavedThisVisit(true);
         } catch (failure) { setError(failure.message); }
@@ -37,4 +37,4 @@ export default function TradeFeedback({ auctionId, role, rating = null }) {
         {error && <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>}
     </div>;
 }
-TradeFeedback.propTypes = { auctionId: PropTypes.string.isRequired, role: PropTypes.oneOf(['buyer', 'seller']).isRequired, rating: PropTypes.oneOf([1, -1]) };
+TradeFeedback.propTypes = { auctionId: PropTypes.string.isRequired, role: PropTypes.oneOf(['buyer', 'seller']).isRequired, onRate: PropTypes.func, rating: PropTypes.oneOf([1, -1]) };

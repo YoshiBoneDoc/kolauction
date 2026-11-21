@@ -1,3 +1,4 @@
+import BarterPendingTrades from '../components/BarterPendingTrades';
 import { auctionFilters } from '../lib/auctionBrowsing';
 import AuctionSortMenu from '../components/AuctionSortMenu';
 import { useEffect, useState } from 'react';
@@ -29,7 +30,7 @@ export default function BarterCorner() {
     const rows = (data?.rows || []).map(row => ({ ...row, auctionKind: 'barter', status: row.status || 'active', escrowMode: false, minBidMeat: row.minimumValue || 0 }));
     const now = useAuctionBoundaryNow(rows);
     function update(name, value) { setParams(previous => { const next = new URLSearchParams(previous); next.set(name, String(value)); if (name !== 'page') next.delete('page'); if (name === 'status') next.delete('sort'); return next; }); }
-    return <div className="barter-browse-page site-page-background flex flex-1 flex-col bg-[#F9F9F9] px-4 pb-8 sm:px-6"><main className="mx-auto flex w-full max-w-7xl flex-1 flex-col">
+    return <div className="barter-browse-page site-page-background flex flex-1 flex-col bg-[#F9F9F9] px-4 pb-8 sm:px-6"><main className="mx-auto flex w-full max-w-7xl flex-1 flex-col"><BarterPendingTrades />
         <div className="relative my-4 flex items-center justify-between gap-3 sm:justify-center">
             <h1 className="auction-page-title text-center font-bold text-[#7695FF]">Barter Corner</h1>
             <Link to="/auction-item?kind=barter" className="shrink-0 text-sm text-blue-700 hover:underline dark:text-blue-300 sm:absolute sm:right-0">Create Barter <span aria-hidden="true">→</span></Link>
