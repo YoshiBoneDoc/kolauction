@@ -275,6 +275,27 @@ with tempfile.TemporaryDirectory(prefix='khub-bot-only-expiration-',dir='/tmp') 
         assert history('seller',sid=seller,who=other)['bids']==[]
         sql(f"update khub_bot.barter_auctions set created_at=now()-interval '2 days',end_time=now()-interval '1 day' where id='{aid}';")
         assert next(row for row in history(who=other)['rows'] if row['id']==aid)['winner_id']==other
+        # Completion is participant-only, idempotent and independent of final votes.
+        call(f"select public.confirm_barter_trade('{aid}');",uid=buyer,error='Only participants')
+        call(f"select public.rate_barter_partner('{aid}',1);",uid=other,error='Confirm completion')
+        before_feedback=json.loads(sql(f"select khub_bot.profile_feedback('{seller}');"))
+        call(f"select public.confirm_barter_trade('{aid}');",uid=other)
+        call(f"select public.confirm_barter_trade('{aid}');",uid=other)
+        assert sql(f"select count(*) from khub_bot.barter_trade_responses where auction_id='{aid}';")=='1'
+        assert sql(f"select count(*) from khub_bot.deliveries where dedupe_key='barter-confirmation:{aid}:{other}';")=='1'
+        rows=json.loads(call('select public.read_barter_trades();',uid=other))
+        assert next(r for r in rows if r['id']==aid)['completed'] is False
+        call(f"select public.confirm_barter_trade('{aid}');",uid=seller)
+        assert next(r for r in json.loads(call('select public.read_barter_trades();',uid=other)) if r['id']==aid)['completed'] is True
+        call(f"select public.rate_barter_partner('{aid}',0);",uid=other,error='thumbs')
+        call(f"select public.rate_barter_partner('{aid}',1);",uid=other)
+        call(f"select public.rate_barter_partner('{aid}',1);",uid=other)
+        call(f"select public.rate_barter_partner('{aid}',-1);",uid=other,error='cannot be changed')
+        assert not any(r['id']==aid for r in json.loads(call('select public.read_barter_trades();',uid=other)))
+        after_feedback=json.loads(sql(f"select khub_bot.profile_feedback('{seller}');"))
+        assert after_feedback['seller_positive']==before_feedback['seller_positive']+1
+        assert after_feedback['seller_confirmed']==before_feedback['seller_confirmed']+1
+
         public_rows=history('seller',sid=seller,who=None,status='ended')['rows']
         assert next(row for row in public_rows if row['id']==aid)['winner_id'] is None
         assert next(row for row in history('seller',sid=seller,who=buyer,status='ended')['rows'] if row['id']==aid)['winner_id'] is None

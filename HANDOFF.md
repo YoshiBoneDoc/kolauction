@@ -1,3 +1,25 @@
+# November 21 barter confirmation review — local follow-up
+
+296 is now in the applied-migration directory; its production installation is not
+confirmed by that placement alone. New queued **297** adds barter thumb votes and
+received-completion counts to profile reputation, plus deduplicated confirmation
+KMail via the existing notice delivery queue and an actor lookup index. Matching
+ignored bot SQL is an alternative copy; apply once, no bot runtime change.
+Personal quickstart unchanged. Completion never adds estimated Meat to financial totals.
+
+Added database assertions for participant authorization, rating-before-confirm rejection,
+both confirmations, duplicate confirmation/notice safety, final votes and reputation.
+Execution blocked before migration loading by local PostgreSQL shared-memory ID
+exhaustion (`shmget: No space left on device`). SQL execution remains unverified.
+Targeted Node run: 11 pass, one practice-form rendering assertion fails; no practice
+form code changed in this follow-up. Changed-source lint passes.
+
+Remaining differences from ordinary Direct trades: incomplete-report/moderation
+workflow, ongoing reminder notices, persisted completion in browse/profile history,
+and pending-banner pagination are not integrated. Current banner shows the oldest
+12 unrated exchanges, advancing as responses and ratings are saved. Do not describe
+this as complete Direct-trade parity. Production deployment remains unverified.
+
 # November 20 raffle count preference — local, migration queued
 
 Queued **295**, after 293, stores the last successful admin count-visibility
