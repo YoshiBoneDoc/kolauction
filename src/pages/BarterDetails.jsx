@@ -87,7 +87,7 @@ export default function BarterDetails() {
             <div className="mt-4 grid items-end gap-x-6 gap-y-2 pb-4 sm:grid-cols-[200px_minmax(0,1fr)]">
                 <div className="text-sm text-gray-700 sm:col-start-2 sm:row-start-1">
                     <AuctionDetailFooter seller={<SellerLink auction={{ ...auction, owner: auction.host }} />} active={active} endTime={auction.endTime} now={now}>
-                        {!active && <p>{auction.cancelled ? 'Cancelled' : auction.currentOfferId ? 'Ended — settle the accepted offer by Direct trade' : 'Ended without an accepted offer'}</p>}
+                        {!active && <p>{auction.cancelled ? 'Cancelled' : auction.completed ? 'Trade completed' : auction.currentOfferId ? 'Ended — settle the accepted offer by Direct trade' : 'Ended without an accepted offer'}</p>}
                         {cancelError && <p role="alert" className="text-xs text-red-700">{cancelError}</p>}
                     </AuctionDetailFooter>
                 </div>

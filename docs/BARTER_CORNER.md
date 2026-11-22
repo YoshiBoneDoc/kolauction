@@ -202,3 +202,10 @@ host was unavailable during the local preview attempt; not deployed.
 The ignored `bot/supabase/migrations/202611140273_barter_auctions.sql` copy is a
 backup/release alternative for the same SQL, not a second migration to apply. No
 bot binary change is needed. The owner's personal quickstart guide is unchanged.
+
+SQL **299** derives completed barter status from both actual participants’ saved
+confirmations for profile/seller histories, browse cards and barter details. Existing
+confirmations take effect immediately after migration; no reconfirmation or financial
+ledger writes are needed. Apply after 298, then deploy the website. Local lint and
+production build pass; database regression is blocked at local initdb, before SQL
+execution. Production migration and deployment remain unverified.
