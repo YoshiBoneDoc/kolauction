@@ -60,9 +60,8 @@ export default function InstantPurchaseAction({ auction, compact = false, showTe
                     <button onClick={purchase} disabled={pending} title={`Buyout price: ${price} Meat`} className={buttonClass}>{pending ? 'Accepting…' : 'Buyout'}</button>
                 ) : compact ? <Link to="/login" className={buttonClass}>Buyout</Link> : null}
             </div>
-            {!compact && <div className="mt-2 space-y-2 text-xs text-gray-600">
-                {showTerms && !auction.escrowMode && <SettlementTerms escrowMode={false} />}
-                {auction.escrowMode && auction.mrARate && <p>Use BID or BUY with Meat, Mr. A’s, or both at the fixed rate. Extra Meat is returned; a Mr. A portion above buyout is rejected in full.</p>}
+            {!compact && showTerms && !auction.escrowMode && <div className="mt-2 space-y-2 text-xs text-gray-600">
+                <SettlementTerms escrowMode={false} />
             </div>}
             {showBuyInstructions && auction.escrowMode && <KmailInstructions auction={auction} mode="buy" />}
             {error && <p role="alert" className="mt-3 break-words text-sm text-red-700">{error}</p>}
